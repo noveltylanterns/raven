@@ -48,6 +48,10 @@ use Raven\Lib\Auth\Panel\PanelPermissionDefinitionCatalog;
 use Raven\Lib\Auth\Panel\PanelTwoFactorPreferencesService;
 use Raven\Lib\Auth\PasswordChangePolicy;
 use Raven\Lib\Auth\SessionFlash;
+use Raven\Lib\Extension\ExtensionEditorCatalogService;
+use Raven\Lib\Extension\ExtensionStateStore;
+use Raven\Lib\Extension\Panel\ExtensionCatalogService;
+use Raven\Lib\Extension\Panel\ExtensionPermissionCatalogService;
 use Raven\Lib\Parser\ChannelDataParser;
 use Raven\Lib\Parser\ConfigParser;
 use Raven\Lib\Parser\FeedRouteParser;
@@ -68,6 +72,7 @@ use Raven\Lib\View\Panel\EditorMDE;
 use Raven\Lib\View\Panel\EditorTabs;
 use Raven\Lib\View\Panel\PanelMediaConfigService;
 use Raven\Lib\View\Error as ViewError;
+use Raven\Lib\View\Public\ThemeCatalog;
 use Raven\Lib\Transport\Upload;
 use RuntimeException;
 
@@ -128,6 +133,11 @@ final class PanelRuntimeBuilder
         $tagRepository = null;
         $taxonomyLookupRepository = null;
         $channelRepository = null;
+        $extensionStateStore = null;
+        $extensionPermissionCatalogService = null;
+        $extensionCatalogService = null;
+        $extensionEditorCatalogService = null;
+        $themeCatalogService = null;
         $groupRepository = null;
         $pageImageRepository = null;
         $pageRepository = null;
@@ -491,24 +501,161 @@ final class PanelRuntimeBuilder
         $rvn['panel_domain_system'] = $panelSystemDomain;
 
         /**
+         * Reads enabled form rows from one extension service map.
+         *
+         * Extension manifest validation needs the same shortcode/form context on
+         * panel bootstrap that the system controller already uses for extension
+         * management screens. Keep the lookup local to the runtime builder so the
+         * permission-map seam stays library-owned instead of routing through a controller.
+         *
+         * @param string $extensionKey Extension directory key.
+         * @return array<int, array{name: string, slug: string}>
+         */
+        $extensionFormsProvider = static function (string $extensionKey) use (&$rvn): array {
+            $normalized = strtolower(trim($extensionKey));
+            $extensionServicesFor = $rvn['extension_services_for'] ?? null;
+            if (!is_callable($extensionServicesFor)) {
+                return [];
+            }
+
+            $extensionServices = $extensionServicesFor($normalized);
+            if (!is_array($extensionServices)) {
+                return [];
+            }
+
+            $formsRepository = $extensionServices['forms'] ?? null;
+            if (!is_object($formsRepository) || !method_exists($formsRepository, 'listAll')) {
+                return [];
+            }
+
+            /** @var mixed $rows */
+            $rows = $formsRepository->listAll();
+            if (!is_array($rows)) {
+                return [];
+            }
+
+            $items = [];
+            foreach ($rows as $row) {
+                if (!is_array($row) || empty($row['enabled'])) {
+                    continue;
+                }
+
+                $slug = strtolower(trim((string) ($row['slug'] ?? '')));
+                if ($slug === '' || preg_match('/^[a-z0-9][a-z0-9_-]*$/', $slug) !== 1) {
+                    continue;
+                }
+
+                $name = trim((string) ($row['name'] ?? ''));
+                if ($name === '') {
+                    $name = $slug;
+                }
+
+                $items[] = [
+                    'name' => $name,
+                    'slug' => $slug,
+                ];
+            }
+
+            return $items;
+        };
+
+        /**
+         * Reuses one shared extension-state store across panel bootstrap helpers.
+         */
+        $extensionStateStoreFactory = $memoize(static function () use (&$extensionStateStore, $rvn): ExtensionStateStore {
+            $extensionStateStore = new ExtensionStateStore((string) $rvn['root'] . '/private/ext');
+
+            return $extensionStateStore;
+        });
+
+        /**
+         * Reuses one shared extension-permission catalog across panel bootstrap helpers.
+         */
+        $extensionPermissionCatalogFactory = $memoize(static function () use (
+            &$extensionPermissionCatalogService,
+            $rvn,
+            $extensionStateStoreFactory
+        ): ExtensionPermissionCatalogService {
+            $extensionPermissionCatalogService = new ExtensionPermissionCatalogService(
+                $extensionStateStoreFactory(),
+                $rvn['input']
+            );
+
+            return $extensionPermissionCatalogService;
+        });
+
+        /**
+         * Reuses one shared extension catalog for runtime-side manifest reads.
+         */
+        $extensionCatalogFactory = $memoize(static function () use (
+            &$extensionCatalogService,
+            $rvn,
+            $extensionStateStoreFactory,
+            $extensionPermissionCatalogFactory
+        ): ExtensionCatalogService {
+            $extensionCatalogService = new ExtensionCatalogService(
+                (string) $rvn['root'],
+                $extensionStateStoreFactory(),
+                $extensionPermissionCatalogFactory(),
+                $rvn['config'],
+                $rvn['input']
+            );
+
+            return $extensionCatalogService;
+        });
+
+        /**
+         * Reuses one shared extension editor catalog for page-editor contribution reads.
+         */
+        $extensionEditorCatalogFactory = $memoize(static function () use (
+            &$extensionEditorCatalogService,
+            $rvn
+        ): ExtensionEditorCatalogService {
+            $extensionEditorCatalogService = new ExtensionEditorCatalogService(
+                (string) $rvn['root'],
+                $rvn['input'],
+                new \Raven\Lib\Parser\PageBlockParser($rvn['input'])
+            );
+
+            return $extensionEditorCatalogService;
+        });
+
+        /**
+         * Reuses one shared public-theme catalog for runtime-side stock-theme reads.
+         */
+        $themeCatalogFactory = $memoize(static function () use (&$themeCatalogService, $rvn): ThemeCatalog {
+            $themeCatalogService = new ThemeCatalog(
+                (string) $rvn['root'] . '/public/theme',
+                $rvn['input'],
+                ['raven']
+            );
+
+            return $themeCatalogService;
+        });
+
+        /**
          * Builds a session-scoped extension permission map for the current panel user.
          *
          * Guests and unauthenticated requests keep the immutable stock/guest-only
          * permission surface, so extension permission metadata resolves to empty.
          *
+         * @param array<int, string> $directoryFilter Optional extension-directory whitelist.
          * @return array<string, array<string, mixed>>
          */
-        $rvn['panel_permission_map_provider'] = static function () use (&$rvn, $resolveAuth): array {
+        $rvn['panel_permission_map_provider'] = static function (array $directoryFilter = []) use (
+            $resolveAuth,
+            $extensionCatalogFactory,
+            $extensionFormsProvider
+        ): array {
             if (($resolveAuth()->userId() ?? null) === null) {
                 return [];
             }
 
-            $systemControllerFactory = $rvn['panel_system_controller'] ?? null;
-            if (is_callable($systemControllerFactory)) {
-                return $systemControllerFactory()->extensionPanelPermissionMapForDirectories();
-            }
-
-            return [];
+            $extensionCatalog = $extensionCatalogFactory();
+            return $extensionCatalog->panelPermissionMapForDirectories(
+                $directoryFilter,
+                static fn (string $extensionPath): array => $extensionCatalog->readManifest($extensionPath, $extensionFormsProvider)
+            );
         };
 
         /**
@@ -572,7 +719,15 @@ final class PanelRuntimeBuilder
          * Builds the split page controller on first use.
          * Owns page list, create/edit, save, gallery upload/delete, and page delete.
          */
-        $rvn['panel_page_controller'] = static function () use (&$pageController, &$rvn, $panelContentDomain, $panelTaxonomyDomain): PageController {
+        $rvn['panel_page_controller'] = static function () use (
+            &$pageController,
+            &$rvn,
+            $panelContentDomain,
+            $panelTaxonomyDomain,
+            $extensionStateStoreFactory,
+            $extensionCatalogFactory,
+            $extensionEditorCatalogFactory
+        ): PageController {
             if ($pageController instanceof PageController) {
                 return $pageController;
             }
@@ -600,6 +755,9 @@ final class PanelRuntimeBuilder
                 $rvn['panel_editor_blocks'],
                 $rvn['panel_editor_mce'],
                 $rvn['panel_editor_mde'],
+                $extensionStateStoreFactory(),
+                $extensionCatalogFactory(),
+                $extensionEditorCatalogFactory(),
                 is_callable($rvn['extension_services_for'] ?? null)
                     ? $rvn['extension_services_for']
                     : static fn (?string $extensionDirectory = null): array => []
@@ -847,7 +1005,7 @@ final class PanelRuntimeBuilder
          * Builds the split routing controller on first use.
          * Owns `/routing*` only.
          */
-        $rvn['panel_routing_controller'] = static function () use (&$routingController, &$rvn, $panelSystemDomain): RoutingController {
+        $rvn['panel_routing_controller'] = static function () use (&$routingController, &$rvn, $panelSystemDomain, $themeCatalogFactory): RoutingController {
             if ($routingController instanceof RoutingController) {
                 return $routingController;
             }
@@ -864,7 +1022,8 @@ final class PanelRuntimeBuilder
                 $systemDomain['page'],
                 $systemDomain['redirect'],
                 $systemDomain['user'],
-                $systemDomain['taxonomy_lookup']
+                $systemDomain['taxonomy_lookup'],
+                $themeCatalogFactory()
             );
 
             return $routingController;
@@ -874,7 +1033,12 @@ final class PanelRuntimeBuilder
          * Builds the split update controller on first use.
          * Owns `/update*` only.
          */
-        $rvn['panel_update_controller'] = static function () use (&$updateController, &$rvn): UpdateController {
+        $rvn['panel_update_controller'] = static function () use (
+            &$updateController,
+            &$rvn,
+            $extensionCatalogFactory,
+            $themeCatalogFactory
+        ): UpdateController {
             if ($updateController instanceof UpdateController) {
                 return $updateController;
             }
@@ -885,7 +1049,9 @@ final class PanelRuntimeBuilder
                 $requestContextFactory(),
                 $rvn['config'],
                 $rvn['input'],
-                (string) $rvn['root']
+                (string) $rvn['root'],
+                $themeCatalogFactory()->stockSlugs(),
+                $extensionCatalogFactory()->stockExtensionDirectories()
             );
 
             return $updateController;
@@ -895,7 +1061,7 @@ final class PanelRuntimeBuilder
          * Builds the split configuration controller on first use.
          * Owns `/configuration` and `/configuration/save` only.
          */
-        $rvn['panel_config_controller'] = static function () use (&$configController, &$rvn, $panelSystemDomain): ConfigController {
+        $rvn['panel_config_controller'] = static function () use (&$configController, &$rvn, $panelSystemDomain, $themeCatalogFactory): ConfigController {
             if ($configController instanceof ConfigController) {
                 return $configController;
             }
@@ -907,13 +1073,13 @@ final class PanelRuntimeBuilder
                 $requestContextFactory(),
                 $rvn['config'],
                 $rvn['input'],
-                (string) $rvn['root'],
                 $systemDomain['channel'],
                 $systemDomain['category_set'],
                 $systemDomain['tag_set'],
                 $rvn['panel_editor_tabs'],
                 $rvn['panel_editor'],
-                $rvn['panel_editor_blocks']
+                $rvn['panel_editor_blocks'],
+                $themeCatalogFactory()
             );
 
             return $configController;
@@ -923,7 +1089,13 @@ final class PanelRuntimeBuilder
          * Builds the split system controller on first use.
          * Owns themes and extensions.
          */
-        $rvn['panel_system_controller'] = static function () use (&$systemController, &$rvn): SystemController {
+        $rvn['panel_system_controller'] = static function () use (
+            &$systemController,
+            &$rvn,
+            $extensionStateStoreFactory,
+            $extensionCatalogFactory,
+            $themeCatalogFactory
+        ): SystemController {
             if ($systemController instanceof SystemController) {
                 return $systemController;
             }
@@ -935,6 +1107,9 @@ final class PanelRuntimeBuilder
                 $rvn['config'],
                 $rvn['input'],
                 (string) $rvn['root'],
+                $extensionStateStoreFactory(),
+                $extensionCatalogFactory(),
+                $themeCatalogFactory(),
                 is_callable($rvn['extension_services_for'] ?? null)
                     ? $rvn['extension_services_for']
                     : static fn (?string $extensionDirectory = null): array => []

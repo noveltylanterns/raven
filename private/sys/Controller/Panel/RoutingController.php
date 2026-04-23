@@ -64,7 +64,7 @@ final class RoutingController
     private ?PageDataParser $pageParser = null;
     private ?RedirectDataParser $redirectParser = null;
     private ?UserDataParser $userParser = null;
-    private ?ThemeCatalog $themeCatalogService = null;
+    private ThemeCatalog $themeCatalogService;
     private ?PanelRoutingPreviewService $panelRoutingPreviewService = null;
 
     /**
@@ -77,6 +77,7 @@ final class RoutingController
      * @param RedirectRepository $redirectRepo Redirect repository for routing inventory rows.
      * @param UserRepository $userRepo User repository for routing inventory rows.
      * @param callable(): TaxonomyRepoParser $taxonomyLookupRepoResolver Lazy taxonomy lookup parser resolver.
+     * @param ThemeCatalog $themeCatalogService Shared public-theme catalog for route preview rendering.
      * @return void
      */
     public function __construct(
@@ -88,7 +89,8 @@ final class RoutingController
         PageRepository $pageRepo,
         RedirectRepository $redirectRepo,
         UserRepository $userRepo,
-        callable $taxonomyLookupRepoResolver
+        callable $taxonomyLookupRepoResolver,
+        ThemeCatalog $themeCatalogService
     ) {
         $this->context = $context;
         $this->config = $config;
@@ -100,6 +102,7 @@ final class RoutingController
         $this->userRepo = $userRepo;
         $this->taxonomyLookupRepoResolver = Closure::fromCallable($taxonomyLookupRepoResolver);
         $this->identifierResolver = new LoginIdentifierResolver();
+        $this->themeCatalogService = $themeCatalogService;
     }
 
     /**
@@ -594,22 +597,6 @@ final class RoutingController
     }
 
     /**
-     * Returns the public-theme catalog service on first use.
-     */
-    private function themeCatalogService(): ThemeCatalog
-    {
-        if (!$this->themeCatalogService instanceof ThemeCatalog) {
-            $this->themeCatalogService = new ThemeCatalog(
-                $this->root . '/public/theme',
-                $this->input,
-                ['raven']
-            );
-        }
-
-        return $this->themeCatalogService;
-    }
-
-    /**
      * Returns the panel routing-preview service on first use.
      */
     private function panelRoutingPreviewService(): PanelRoutingPreviewService
@@ -618,7 +605,7 @@ final class RoutingController
             $this->panelRoutingPreviewService = new PanelRoutingPreviewService(
                 $this->root,
                 $this->input,
-                $this->themeCatalogService()
+                $this->themeCatalogService
             );
         }
 

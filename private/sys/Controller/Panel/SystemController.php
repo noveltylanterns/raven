@@ -23,7 +23,6 @@ use Raven\Lib\Extension\ExtensionStateStore;
 use Raven\Lib\Extension\ExtensionStorageCleaner;
 use Raven\Lib\Extension\ExtensionStorageProvisioner;
 use Raven\Lib\Extension\Panel\ExtensionCatalogService;
-use Raven\Lib\Extension\Panel\ExtensionPermissionCatalogService;
 use Raven\Lib\Extension\Panel\ExtensionScaffoldService;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\Transport\Upload;
@@ -49,14 +48,13 @@ final class SystemController
     /** @var Closure(string): array<string, mixed> */
     private Closure $extensionServicesFor;
     private ?ArchivePackage $archivePackages = null;
-    private ?ExtensionStateStore $extensionStateStore = null;
+    private ExtensionStateStore $extensionStateStore;
     private ?ExtensionScaffoldService $extensionScaffoldService = null;
     private ?ThemeGenerator $themeGenerator = null;
-    private ?ExtensionPermissionCatalogService $extensionPermissionCatalogService = null;
     private ?ExtensionStorageProvisioner $extensionStorageProvisioner = null;
     private ?ExtensionBootstrapContractResolver $extensionBootstrapContractResolver = null;
-    private ?ExtensionCatalogService $extensionCatalogService = null;
-    private ?ThemeCatalog $themeCatalogService = null;
+    private ExtensionCatalogService $extensionCatalogService;
+    private ThemeCatalog $themeCatalogService;
     private ?ArchiveInstall $packageInstallWorkflowService = null;
     private ?ArchiveDelete $directoryTreeService = null;
 
@@ -65,6 +63,9 @@ final class SystemController
      * @param Config $config Runtime configuration reader.
      * @param InputSanitizer $input Shared request input sanitizer.
      * @param string $root Project root path for filesystem-backed admin workflows.
+     * @param ExtensionStateStore $extensionStateStore Shared extension state store for panel system reads/writes.
+     * @param ExtensionCatalogService $extensionCatalogService Shared extension catalog for manifest and stock-extension reads.
+     * @param ThemeCatalog $themeCatalogService Shared public-theme catalog for theme inventory and slug validation.
      * @param callable(string): array<string, mixed> $extensionServicesFor Lazy per-extension services resolver.
      * @return void
      */
@@ -73,12 +74,18 @@ final class SystemController
         Config $config,
         InputSanitizer $input,
         string $root,
+        ExtensionStateStore $extensionStateStore,
+        ExtensionCatalogService $extensionCatalogService,
+        ThemeCatalog $themeCatalogService,
         callable $extensionServicesFor
     ) {
         $this->context = $context;
         $this->config = $config;
         $this->input = $input;
         $this->root = rtrim($root, '/\\');
+        $this->extensionStateStore = $extensionStateStore;
+        $this->extensionCatalogService = $extensionCatalogService;
+        $this->themeCatalogService = $themeCatalogService;
         $this->extensionServicesFor = Closure::fromCallable($extensionServicesFor);
     }
 
@@ -101,9 +108,9 @@ final class SystemController
             'flashSuccess' => $this->context->pullFlash('success'),
             'flashError' => $this->context->pullFlash('error'),
             'section' => 'themes',
-            'themes' => $this->listPublicThemesForPanel(),
-            'activeTheme' => $this->activePublicThemeSlug(),
-            'themeOptions' => Theme::options($this->publicThemesRoot()),
+            'themes' => $this->themeCatalogService->listForPanel(),
+            'activeTheme' => $this->themeCatalogService->activeSlugFromConfig($this->config),
+            'themeOptions' => Theme::options($this->themeCatalogService->root()),
             'packageArchiveAcceptAttribute' => $archivePackages->packageAccept(),
             'packageArchiveFormats' => $archivePackages->packageFormatLabels(),
             'exportArchiveFormats' => $archivePackages->exportFormatOptions(),
@@ -129,12 +136,12 @@ final class SystemController
         }
 
         $themeSlug = strtolower(trim((string) $this->input->text($post['theme'] ?? null, 80)));
-        if (!$this->isSafePublicThemeSlug($themeSlug)) {
+        if (!$this->themeCatalogService->isSafeSlug($themeSlug)) {
             $this->context->flash('error', 'Invalid theme identifier.');
             Redirect::redirect($this->context->panelUrl('/themes'));
         }
 
-        $availableThemes = $this->publicThemeOptions();
+        $availableThemes = $this->themeCatalogService->options();
         if (!isset($availableThemes[$themeSlug])) {
             $this->context->flash('error', 'Theme "' . $themeSlug . '" is not available.');
             Redirect::redirect($this->context->panelUrl('/themes'));
@@ -177,24 +184,24 @@ final class SystemController
         }
 
         $themeSlug = strtolower(trim((string) $this->input->text($post['slug'] ?? null, 80)));
-        if (!$this->isSafePublicThemeSlug($themeSlug)) {
+        if (!$this->themeCatalogService->isSafeSlug($themeSlug)) {
             $this->context->flash('error', 'Theme slug must use lowercase letters, numbers, underscores, or dashes.');
             Redirect::redirect($this->context->panelUrl('/themes'));
         }
 
         $parentTheme = strtolower(trim((string) $this->input->text($post['parent_theme'] ?? null, 80)));
-        if ($parentTheme !== '' && !$this->isSafePublicThemeSlug($parentTheme)) {
+        if ($parentTheme !== '' && !$this->themeCatalogService->isSafeSlug($parentTheme)) {
             $this->context->flash('error', 'Parent theme slug is invalid.');
             Redirect::redirect($this->context->panelUrl('/themes'));
         }
 
         $cloneTheme = strtolower(trim((string) $this->input->text($post['clone_theme'] ?? null, 80)));
-        if ($cloneTheme !== '' && !$this->isSafePublicThemeSlug($cloneTheme)) {
+        if ($cloneTheme !== '' && !$this->themeCatalogService->isSafeSlug($cloneTheme)) {
             $this->context->flash('error', 'Clone-source theme slug is invalid.');
             Redirect::redirect($this->context->panelUrl('/themes'));
         }
 
-        $themesRoot = $this->publicThemesRoot();
+        $themesRoot = $this->themeCatalogService->root();
         $themeOptions = Theme::options($themesRoot);
         $themeManifests = Theme::manifests($themesRoot);
         if ($parentTheme !== '' && !isset($themeOptions[$parentTheme])) {
@@ -341,11 +348,11 @@ final class SystemController
         $slugResult = $this->packageInstallWorkflowService()->resolveInstallName(
             (string) ($post['upload_slug'] ?? ''),
             $archiveName,
-            fn (string $name): ?string => $derivedThemeSlug ?? $this->themeSlugFromArchiveFilename($name),
-            fn (string $slug): bool => $this->isSafePublicThemeSlug($slug),
-            fn (string $slug): bool => $this->isStockPublicThemeSlug($slug),
-            fn (string $slug): ?string => $this->nextAvailablePublicThemeSlug($slug),
-            fn (string $slug): bool => file_exists($this->publicThemesRoot() . '/' . $slug),
+            fn (string $name): ?string => $derivedThemeSlug ?? $this->themeCatalogService->slugFromArchiveFilename($name),
+            fn (string $slug): bool => $this->themeCatalogService->isSafeSlug($slug),
+            fn (string $slug): bool => $this->themeCatalogService->isStockSlug($slug),
+            fn (string $slug): ?string => $this->themeCatalogService->nextAvailableSlug($slug),
+            fn (string $slug): bool => file_exists($this->themeCatalogService->root() . '/' . $slug),
             'Theme',
             'Theme slug must use lowercase letters, numbers, underscores, or dashes.'
         );
@@ -354,7 +361,7 @@ final class SystemController
             if (
                 trim((string) ($post['upload_slug'] ?? '')) === ''
                 && $derivedThemeSlug === null
-                && $this->themeSlugFromArchiveFilename($archiveName) === null
+                && $this->themeCatalogService->slugFromArchiveFilename($archiveName) === null
             ) {
                 $slugError = 'Theme upload failed: theme.json must include a valid "slug" value or use Slug Override.';
             }
@@ -364,7 +371,7 @@ final class SystemController
         }
         $themeSlug = (string) ($slugResult['name'] ?? '');
 
-        $themesRoot = $this->publicThemesRoot();
+        $themesRoot = $this->themeCatalogService->root();
         if (!is_dir($themesRoot) && !mkdir($themesRoot, 0775, true) && !is_dir($themesRoot)) {
             $this->context->flash('error', 'Failed to initialize public/theme directory.');
             Redirect::redirect($this->context->panelUrl('/themes'));
@@ -433,12 +440,12 @@ final class SystemController
         }
 
         $themeSlug = strtolower(trim((string) $this->input->text($query['theme'] ?? null, 80)));
-        if (!$this->isSafePublicThemeSlug($themeSlug)) {
+        if (!$this->themeCatalogService->isSafeSlug($themeSlug)) {
             $this->context->flash('error', 'Invalid theme identifier.');
             Redirect::redirect($this->context->panelUrl('/themes'));
         }
 
-        $themePath = $this->publicThemesRoot() . '/' . $themeSlug;
+        $themePath = $this->themeCatalogService->root() . '/' . $themeSlug;
         if (!is_dir($themePath)) {
             $this->context->flash('error', 'Theme directory was not found on disk.');
             Redirect::redirect($this->context->panelUrl('/themes'));
@@ -480,23 +487,23 @@ final class SystemController
         }
 
         $themeSlug = strtolower(trim((string) $this->input->text($post['theme'] ?? null, 80)));
-        if (!$this->isSafePublicThemeSlug($themeSlug)) {
+        if (!$this->themeCatalogService->isSafeSlug($themeSlug)) {
             $this->context->flash('error', 'Invalid theme identifier.');
             Redirect::redirect($this->context->panelUrl('/themes'));
         }
 
-        if ($this->isStockPublicThemeSlug($themeSlug)) {
+        if ($this->themeCatalogService->isStockSlug($themeSlug)) {
             $this->context->flash('error', 'Stock themes cannot be uninstalled.');
             Redirect::redirect($this->context->panelUrl('/themes'));
         }
 
-        $themePath = $this->publicThemesRoot() . '/' . $themeSlug;
+        $themePath = $this->themeCatalogService->root() . '/' . $themeSlug;
         if (!is_dir($themePath)) {
             $this->context->flash('error', 'Theme directory was not found on disk.');
             Redirect::redirect($this->context->panelUrl('/themes'));
         }
 
-        if ($this->activePublicThemeSlug() === $themeSlug) {
+        if ($this->themeCatalogService->activeSlugFromConfig($this->config) === $themeSlug) {
             $this->context->flash('error', 'Active theme cannot be uninstalled. Enable another theme first.');
             Redirect::redirect($this->context->panelUrl('/themes'));
         }
@@ -524,7 +531,9 @@ final class SystemController
         }
 
         try {
-            $extensions = $this->listExtensionsForPanel();
+            $extensions = $this->extensionCatalogService->listForPanel(
+                fn (string $extensionKey): array => $this->listEnabledExtensionForms($extensionKey)
+            );
         } catch (\RuntimeException $exception) {
             $this->context->flash('error', $exception->getMessage());
             $extensions = [];
@@ -563,23 +572,26 @@ final class SystemController
         }
 
         $extensionName = $this->input->text($post['extension'] ?? null, 120);
-        if (!$this->isSafeExtensionDirectoryName((string) $extensionName)) {
+        if (!$this->extensionCatalogService->isSafeExtensionDirectoryName((string) $extensionName)) {
             $this->context->flash('error', 'Invalid extension identifier.');
             Redirect::redirect($this->context->panelUrl('/extensions'));
         }
 
-        $extensionPath = $this->extensionsBasePath() . '/' . $extensionName;
+        $extensionPath = $this->extensionStateStore->basePath() . '/' . $extensionName;
         if (!is_dir($extensionPath)) {
             $this->context->flash('error', 'Extension directory was not found on disk.');
             Redirect::redirect($this->context->panelUrl('/extensions'));
         }
 
-        $manifest = $this->readExtensionManifest($extensionPath);
+        $manifest = $this->extensionCatalogService->readManifest(
+            $extensionPath,
+            fn (string $extensionKey): array => $this->listEnabledExtensionForms($extensionKey)
+        );
         if (!($manifest['valid'] ?? false)) {
-            $enabledMap = $this->loadExtensionStateMap();
+            $enabledMap = $this->extensionStateStore->loadEnabledMap();
             if (isset($enabledMap[$extensionName])) {
                 unset($enabledMap[$extensionName]);
-                $this->saveExtensionStateMap($enabledMap);
+                $this->extensionStateStore->saveEnabledMap($enabledMap);
             }
 
             $reason = (string) ($manifest['invalid_reason'] ?? 'Invalid extension metadata.');
@@ -600,14 +612,14 @@ final class SystemController
                 $this->provisionEnabledExtensionStorage((string) $extensionName, $manifest);
             }
 
-            $enabledMap = $this->loadExtensionStateMap();
+            $enabledMap = $this->extensionStateStore->loadEnabledMap();
             if ($enable) {
                 $enabledMap[(string) $extensionName] = true;
             } else {
                 unset($enabledMap[(string) $extensionName]);
             }
 
-            $this->saveExtensionStateMap($enabledMap);
+            $this->extensionStateStore->saveEnabledMap($enabledMap);
         } catch (\RuntimeException $exception) {
             $this->context->flash('error', $exception->getMessage());
             Redirect::redirect($this->context->panelUrl('/extensions'));
@@ -658,23 +670,27 @@ final class SystemController
         }
 
         $extensionName = $this->input->text($post['extension'] ?? null, 120);
-        if (!$this->isSafeExtensionDirectoryName((string) $extensionName)) {
+        if (!$this->extensionCatalogService->isSafeExtensionDirectoryName((string) $extensionName)) {
             $this->context->flash('error', 'Invalid extension identifier.');
             Redirect::redirect($this->context->panelUrl('/extensions'));
         }
 
-        $extensionPath = $this->extensionsBasePath() . '/' . $extensionName;
+        $extensionPath = $this->extensionStateStore->basePath() . '/' . $extensionName;
         if (!is_dir($extensionPath)) {
             $this->context->flash('error', 'Extension directory was not found on disk.');
             Redirect::redirect($this->context->panelUrl('/extensions'));
         }
 
-        $manifest = $this->readExtensionManifest($extensionPath);
-        $isStockExtension = $this->isStockExtensionDirectory((string) $extensionName);
+        $manifest = $this->extensionCatalogService->readManifest(
+            $extensionPath,
+            fn (string $extensionKey): array => $this->listEnabledExtensionForms($extensionKey)
+        );
+        $isStockExtension = $this->extensionCatalogService->isStockExtensionDirectory((string) $extensionName);
 
-        $enabledMap = $this->loadExtensionStateMap();
-        $permissionMap = $this->loadExtensionPermissionMap();
-        $permissionBitsMap = $this->loadExtensionPermissionBitsMap();
+        $state = $this->extensionStateStore->loadStateData();
+        $enabledMap = $state['enabled'];
+        $permissionMap = $state['permissions'];
+        $permissionBitsMap = $state['permission_bits'];
         if (!empty($enabledMap[$extensionName])) {
             $this->context->flash('error', 'Disable the extension before uninstalling it.');
             Redirect::redirect($this->context->panelUrl('/extensions'));
@@ -705,7 +721,7 @@ final class SystemController
         ) {
             unset($enabledMap[$extensionName], $permissionMap[$extensionName], $permissionBitsMap[$extensionName]);
             try {
-                $this->saveExtensionState($enabledMap, $permissionMap, $permissionBitsMap);
+                $this->extensionStateStore->saveState($enabledMap, $permissionMap, $permissionBitsMap);
             } catch (\RuntimeException $exception) {
                 $this->context->flash('error', 'Extension uninstalled, but state cleanup failed: ' . $exception->getMessage());
                 Redirect::redirect($this->context->panelUrl('/extensions'));
@@ -753,10 +769,10 @@ final class SystemController
             (string) ($post['upload_slug'] ?? ''),
             $archiveName,
             fn (string $name): ?string => $derivedExtensionSlug,
-            fn (string $name): bool => $this->isSafeExtensionDirectoryName($name),
-            fn (string $name): bool => $this->isStockExtensionDirectory($name),
+            fn (string $name): bool => $this->extensionCatalogService->isSafeExtensionDirectoryName($name),
+            fn (string $name): bool => $this->extensionCatalogService->isStockExtensionDirectory($name),
             fn (string $name): ?string => $this->nextAvailableExtensionDirectoryName($name),
-            fn (string $name): bool => file_exists($this->extensionsBasePath() . '/' . $name),
+            fn (string $name): bool => file_exists($this->extensionStateStore->basePath() . '/' . $name),
             'Extension',
             'Extension directory must use lowercase letters, numbers, underscores, or dashes.'
         );
@@ -772,13 +788,13 @@ final class SystemController
         $extensionName = (string) ($nameResult['name'] ?? '');
 
         try {
-            $this->ensureExtensionsDirectory();
+            $this->extensionStateStore->ensureDirectory();
         } catch (\RuntimeException $exception) {
             $this->context->flash('error', $exception->getMessage());
             Redirect::redirect($this->context->panelUrl('/extensions'));
         }
 
-        $targetDirectory = $this->extensionsBasePath() . '/' . $extensionName;
+        $targetDirectory = $this->extensionStateStore->basePath() . '/' . $extensionName;
         if (!mkdir($targetDirectory, 0775, true) && !is_dir($targetDirectory)) {
             $this->context->flash('error', 'Failed to create extension directory.');
             Redirect::redirect($this->context->panelUrl('/extensions'));
@@ -804,7 +820,10 @@ final class SystemController
             Redirect::redirect($this->context->panelUrl('/extensions'));
         }
 
-        $manifest = $this->readExtensionManifest($targetDirectory);
+        $manifest = $this->extensionCatalogService->readManifest(
+            $targetDirectory,
+            fn (string $extensionKey): array => $this->listEnabledExtensionForms($extensionKey)
+        );
         if (!($manifest['valid'] ?? false)) {
             $this->directoryTreeService()->removeTree($targetDirectory);
             $reason = (string) ($manifest['invalid_reason'] ?? 'Missing required extension metadata.');
@@ -813,16 +832,17 @@ final class SystemController
         }
 
         try {
-            $enabledMap = $this->loadExtensionStateMap();
-            $permissionMap = $this->loadExtensionPermissionMap();
-            $permissionBitsMap = $this->loadExtensionPermissionBitsMap();
+            $state = $this->extensionStateStore->loadStateData();
+            $enabledMap = $state['enabled'];
+            $permissionMap = $state['permissions'];
+            $permissionBitsMap = $state['permission_bits'];
             if (
                 isset($enabledMap[$extensionName])
                 || isset($permissionMap[$extensionName])
                 || isset($permissionBitsMap[$extensionName])
             ) {
                 unset($enabledMap[$extensionName], $permissionMap[$extensionName], $permissionBitsMap[$extensionName]);
-                $this->saveExtensionState($enabledMap, $permissionMap, $permissionBitsMap);
+                $this->extensionStateStore->saveState($enabledMap, $permissionMap, $permissionBitsMap);
             }
         } catch (\RuntimeException $exception) {
             $this->directoryTreeService()->removeTree($targetDirectory);
@@ -853,12 +873,12 @@ final class SystemController
         }
 
         $extensionName = strtolower(trim((string) $this->input->text($query['extension'] ?? null, 120)));
-        if (!$this->isSafeExtensionDirectoryName($extensionName)) {
+        if (!$this->extensionCatalogService->isSafeExtensionDirectoryName($extensionName)) {
             $this->context->flash('error', 'Invalid extension identifier.');
             Redirect::redirect($this->context->panelUrl('/extensions'));
         }
 
-        $extensionPath = $this->extensionsBasePath() . '/' . $extensionName;
+        $extensionPath = $this->extensionStateStore->basePath() . '/' . $extensionName;
         if (!is_dir($extensionPath)) {
             $this->context->flash('error', 'Extension directory was not found on disk.');
             Redirect::redirect($this->context->panelUrl('/extensions'));
@@ -905,7 +925,7 @@ final class SystemController
             Redirect::redirect($this->context->panelUrl('/extensions'));
         }
 
-        if ($this->isStockExtensionDirectory($extensionName)) {
+        if ($this->extensionCatalogService->isStockExtensionDirectory($extensionName)) {
             $this->context->flash('error', 'That extension directory name is reserved by a stock extension.');
             Redirect::redirect($this->context->panelUrl('/extensions'));
         }
@@ -963,13 +983,13 @@ final class SystemController
         $generateComposerFile = isset($post['generate_composer']) && (string) $post['generate_composer'] === '1';
 
         try {
-            $this->ensureExtensionsDirectory();
+            $this->extensionStateStore->ensureDirectory();
         } catch (\RuntimeException $exception) {
             $this->context->flash('error', $exception->getMessage());
             Redirect::redirect($this->context->panelUrl('/extensions'));
         }
 
-        $extensionPath = $this->extensionsBasePath() . '/' . $extensionName;
+        $extensionPath = $this->extensionStateStore->basePath() . '/' . $extensionName;
         if (file_exists($extensionPath)) {
             $this->context->flash('error', 'An extension directory with this name already exists.');
             Redirect::redirect($this->context->panelUrl('/extensions'));
@@ -998,16 +1018,17 @@ final class SystemController
         }
 
         try {
-            $enabledMap = $this->loadExtensionStateMap();
-            $permissionMap = $this->loadExtensionPermissionMap();
-            $permissionBitsMap = $this->loadExtensionPermissionBitsMap();
+            $state = $this->extensionStateStore->loadStateData();
+            $enabledMap = $state['enabled'];
+            $permissionMap = $state['permissions'];
+            $permissionBitsMap = $state['permission_bits'];
             if (
                 isset($enabledMap[$extensionName])
                 || isset($permissionMap[$extensionName])
                 || isset($permissionBitsMap[$extensionName])
             ) {
                 unset($enabledMap[$extensionName], $permissionMap[$extensionName], $permissionBitsMap[$extensionName]);
-                $this->saveExtensionState($enabledMap, $permissionMap, $permissionBitsMap);
+                $this->extensionStateStore->saveState($enabledMap, $permissionMap, $permissionBitsMap);
             }
         } catch (\RuntimeException $exception) {
             $this->directoryTreeService()->removeTree($extensionPath);
@@ -1067,53 +1088,13 @@ final class SystemController
      */
     public function extensionPanelPermissionMapForDirectories(array $directoryFilter = []): array
     {
-        return $this->extensionCatalogService()->panelPermissionMapForDirectories(
+        return $this->extensionCatalogService->panelPermissionMapForDirectories(
             $directoryFilter,
-            fn (string $extensionPath): array => $this->readExtensionManifest($extensionPath)
+            fn (string $extensionPath): array => $this->extensionCatalogService->readManifest(
+                $extensionPath,
+                fn (string $extensionKey): array => $this->listEnabledExtensionForms($extensionKey)
+            )
         );
-    }
-
-    /**
-     * Returns public theme rows for the theme-manager list view.
-     *
-     * @return array<int, array{
-     *   slug: string,
-     *   name: string,
-     *   is_stock: bool,
-     *   is_child_theme: bool,
-     *   parent_theme: string,
-     *   has_css: bool,
-     *   has_wrapper: bool,
-     *   inheritance_chain: string
-     * }>
-     */
-    private function listPublicThemesForPanel(): array
-    {
-        return $this->themeCatalogService()->listForPanel();
-    }
-
-    /**
-     * Validates public-theme slugs for safe filesystem usage.
-     */
-    private function isSafePublicThemeSlug(string $slug): bool
-    {
-        return $this->themeCatalogService()->isSafeSlug($slug);
-    }
-
-    /**
-     * Derives one public-theme slug from an archive filename.
-     */
-    private function themeSlugFromArchiveFilename(string $archiveName): ?string
-    {
-        return $this->themeCatalogService()->slugFromArchiveFilename($archiveName);
-    }
-
-    /**
-     * Resolves the next available public-theme slug by appending copy suffixes.
-     */
-    private function nextAvailablePublicThemeSlug(string $baseSlug): ?string
-    {
-        return $this->themeCatalogService()->nextAvailableSlug($baseSlug);
     }
 
     /**
@@ -1122,11 +1103,11 @@ final class SystemController
     private function nextAvailableExtensionDirectoryName(string $baseName): ?string
     {
         $normalizedBase = strtolower(trim($baseName));
-        if (!$this->isSafeExtensionDirectoryName($normalizedBase)) {
+        if (!$this->extensionCatalogService->isSafeExtensionDirectoryName($normalizedBase)) {
             return null;
         }
 
-        $extensionsRoot = $this->extensionsBasePath();
+        $extensionsRoot = $this->extensionStateStore->basePath();
         $candidate = $normalizedBase;
         if (!file_exists($extensionsRoot . '/' . $candidate)) {
             return $candidate;
@@ -1142,7 +1123,7 @@ final class SystemController
             }
 
             $candidate = $trimmedBase . $suffix;
-            if (!$this->isSafeExtensionDirectoryName($candidate)) {
+            if (!$this->extensionCatalogService->isSafeExtensionDirectoryName($candidate)) {
                 continue;
             }
 
@@ -1152,40 +1133,6 @@ final class SystemController
         }
 
         return null;
-    }
-
-    /**
-     * Returns true when one public theme slug is part of the stock bundle.
-     */
-    private function isStockPublicThemeSlug(string $slug): bool
-    {
-        return $this->themeCatalogService()->isStockSlug($slug);
-    }
-
-    /**
-     * Returns discoverable public themes from `public/theme/{slug}/theme.json`.
-     *
-     * @return array<string, string> Theme slug to display name map.
-     */
-    private function publicThemeOptions(): array
-    {
-        return $this->themeCatalogService()->options();
-    }
-
-    /**
-     * Returns the filesystem root containing public themes.
-     */
-    private function publicThemesRoot(): string
-    {
-        return $this->themeCatalogService()->root();
-    }
-
-    /**
-     * Resolves the active public theme slug from configuration plus discovered manifests.
-     */
-    private function activePublicThemeSlug(): string
-    {
-        return $this->themeCatalogService()->activeSlugFromConfig($this->config);
     }
 
     /**
@@ -1232,70 +1179,6 @@ final class SystemController
         }
 
         return [];
-    }
-
-    /**
-     * Discovers installed extensions from `private/ext/{name}/`.
-     *
-     * @return array<int, array{
-     *   directory: string,
-     *   type: string,
-     *   panel_path: string,
-     *   has_panel_routes: bool,
-     *   name: string,
-     *   version: string,
-     *   description: string,
-     *   author: string,
-     *   homepage: string,
-     *   docs: string,
-     *   valid: bool,
-     *   invalid_reason: string,
-     *   enabled: bool,
-     *   is_stock: bool,
-     *   can_uninstall: bool,
-     *   uninstall_block_reason: string
-     * }>
-     */
-    private function listExtensionsForPanel(): array
-    {
-        return $this->extensionCatalogService()->listForPanel(
-            fn (string $extensionKey): array => $this->listEnabledExtensionForms($extensionKey)
-        );
-    }
-
-    /**
-     * Reads optional extension metadata from ext.json.
-     *
-     * @param string $extensionPath Extension directory path.
-     * @return array{
-     *   valid: bool,
-     *   invalid_reason: string,
-     *   type: string,
-     *   panel_path: string,
-     *   name: string,
-     *   version: string,
-     *   description: string,
-     *   author: string,
-     *   homepage: string,
-     *   docs: string,
-     *   permission_levels: array<int, array{key: string, label: string}>,
-     *   default_permission_level: string
-     * }
-     */
-    private function readExtensionManifest(string $extensionPath): array
-    {
-        return $this->extensionCatalogService()->readManifest(
-            $extensionPath,
-            fn (string $extensionKey): array => $this->listEnabledExtensionForms($extensionKey)
-        );
-    }
-
-    /**
-     * Returns the absolute path to `private/ext`.
-     */
-    private function extensionsBasePath(): string
-    {
-        return $this->extensionStateStore()->basePath();
     }
 
     /**
@@ -1369,86 +1252,6 @@ final class SystemController
     }
 
     /**
-     * Ensures the extension base directory exists.
-     *
-     * @return void
-     */
-    private function ensureExtensionsDirectory(): void
-    {
-        $this->extensionStateStore()->ensureDirectory();
-    }
-
-    /**
-     * Loads the enabled extension map from disk.
-     *
-     * @return array<string, bool> Enabled extension map.
-     */
-    private function loadExtensionStateMap(): array
-    {
-        return $this->extensionStateStore()->loadEnabledMap();
-    }
-
-    /**
-     * Loads the required panel-side permission bit map per extension.
-     *
-     * @return array<string, int> Required permission-bit map.
-     */
-    private function loadExtensionPermissionMap(): array
-    {
-        return $this->extensionStateStore()->loadPermissionMap();
-    }
-
-    /**
-     * Loads the extension permission-bit map per extension level.
-     *
-     * @return array<string, array<string, int>> Extension permission-bit map.
-     */
-    private function loadExtensionPermissionBitsMap(): array
-    {
-        return $this->extensionStateStore()->loadPermissionBitsMap();
-    }
-
-    /**
-     * Saves the enabled extension map.
-     *
-     * @param array<string, bool> $enabledMap Enabled extension map.
-     * @return void
-     */
-    private function saveExtensionStateMap(array $enabledMap): void
-    {
-        $this->extensionStateStore()->saveEnabledMap($enabledMap);
-    }
-
-    /**
-     * Saves extension enablement plus permission state.
-     *
-     * @param array<string, bool> $enabledMap Enabled extension map.
-     * @param array<string, int> $permissionMap Required permission-bit map.
-     * @param array<string, array<string, int>> $permissionBitsMap Level-to-bit map.
-     * @return void
-     */
-    private function saveExtensionState(array $enabledMap, array $permissionMap, array $permissionBitsMap = []): void
-    {
-        $this->extensionStateStore()->saveState($enabledMap, $permissionMap, $permissionBitsMap);
-    }
-
-    /**
-     * Returns true when one extension directory is part of the stock bundle.
-     */
-    private function isStockExtensionDirectory(string $directoryName): bool
-    {
-        return $this->extensionCatalogService()->isStockExtensionDirectory($directoryName);
-    }
-
-    /**
-     * Validates extension directory names for filesystem-safe usage.
-     */
-    private function isSafeExtensionDirectoryName(string $name): bool
-    {
-        return $this->extensionCatalogService()->isSafeExtensionDirectoryName($name);
-    }
-
-    /**
      * Returns the archive-package service on first use.
      */
     private function archivePackages(): ArchivePackage
@@ -1458,18 +1261,6 @@ final class SystemController
         }
 
         return $this->archivePackages;
-    }
-
-    /**
-     * Returns the extension-state store on first use.
-     */
-    private function extensionStateStore(): ExtensionStateStore
-    {
-        if (!$this->extensionStateStore instanceof ExtensionStateStore) {
-            $this->extensionStateStore = new ExtensionStateStore($this->root . '/private/ext');
-        }
-
-        return $this->extensionStateStore;
     }
 
     /**
@@ -1522,55 +1313,6 @@ final class SystemController
         }
 
         return $this->directoryTreeService;
-    }
-
-    /**
-     * Returns the extension-permission catalog service on first use.
-     */
-    private function extensionPermissionCatalogService(): ExtensionPermissionCatalogService
-    {
-        if (!$this->extensionPermissionCatalogService instanceof ExtensionPermissionCatalogService) {
-            $this->extensionPermissionCatalogService = new ExtensionPermissionCatalogService(
-                $this->extensionStateStore(),
-                $this->input
-            );
-        }
-
-        return $this->extensionPermissionCatalogService;
-    }
-
-    /**
-     * Returns the extension catalog service on first use.
-     */
-    private function extensionCatalogService(): ExtensionCatalogService
-    {
-        if (!$this->extensionCatalogService instanceof ExtensionCatalogService) {
-            $this->extensionCatalogService = new ExtensionCatalogService(
-                $this->root,
-                $this->extensionStateStore(),
-                $this->extensionPermissionCatalogService(),
-                $this->config,
-                $this->input
-            );
-        }
-
-        return $this->extensionCatalogService;
-    }
-
-    /**
-     * Returns the public-theme catalog service on first use.
-     */
-    private function themeCatalogService(): ThemeCatalog
-    {
-        if (!$this->themeCatalogService instanceof ThemeCatalog) {
-            $this->themeCatalogService = new ThemeCatalog(
-                $this->root . '/public/theme',
-                $this->input,
-                ['raven']
-            );
-        }
-
-        return $this->themeCatalogService;
     }
 
 }

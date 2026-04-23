@@ -37,12 +37,14 @@ final class CategoryController
      * @param SharedController $context Shared public request context.
      * @param PageRepository $pageRepo Page repository for public category page lists.
      * @param TaxonomyRepoParser $taxonomyLookupRepo Taxonomy lookup parser for category resolution.
+     * @param ThemeCatalog $themeCatalogService Shared public-theme catalog for template resolution.
      * @return void
      */
     public function __construct(
         SharedController $context,
         PageRepository $pageRepo,
-        TaxonomyRepoParser $taxonomyLookupRepo
+        TaxonomyRepoParser $taxonomyLookupRepo,
+        ThemeCatalog $themeCatalogService
     ) {
         $this->context = $context;
         $this->pageParser = new PageDataParser($context->input(), $pageRepo);
@@ -53,11 +55,7 @@ final class CategoryController
             dirname(__DIR__, 4)
         );
         $this->publicChannelPageRouteService = new PublicChannelPageRouteService($context->input());
-        $this->themeCatalogService = new ThemeCatalog(
-            dirname(__DIR__, 4) . '/public/theme',
-            $context->input(),
-            ['raven']
-        );
+        $this->themeCatalogService = $themeCatalogService;
     }
 
     /**

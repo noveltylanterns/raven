@@ -68,9 +68,12 @@ final class ExtensionCatalogService
     {
         $this->stateStore->ensureDirectory();
 
-        $enabledMap = $this->stateStore->loadEnabledMap();
-        $permissionMap = $this->stateStore->loadPermissionMap();
-        $permissionBitsMap = $this->stateStore->loadPermissionBitsMap();
+        // The panel catalog cleans state and manifest visibility together, so
+        // read the persisted extension-state payload once before walking disk.
+        $state = $this->stateStore->loadStateData();
+        $enabledMap = $state['enabled'];
+        $permissionMap = $state['permissions'];
+        $permissionBitsMap = $state['permission_bits'];
         $entries = scandir($this->stateStore->basePath()) ?: [];
         $extensions = [];
 

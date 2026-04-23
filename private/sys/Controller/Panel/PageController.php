@@ -22,7 +22,6 @@ use Raven\Core\Repository\UserRepository;
 use Raven\Lib\Auth\LoginIdentifierResolver;
 use Raven\Lib\Extension\Panel\ExtensionCatalogService;
 use Raven\Lib\Extension\ExtensionEditorCatalogService;
-use Raven\Lib\Extension\Panel\ExtensionPermissionCatalogService;
 use Raven\Lib\Extension\ExtensionStateStore;
 use Raven\Lib\Media\Panel\PageImageManager;
 use Raven\Lib\Parser\CategoryDataParser;
@@ -98,10 +97,9 @@ final class PageController
     private ?EditorAuthor $pageAuthorOptionBuilder = null;
     private ?LoginIdentifierResolver $identifierResolver = null;
     private ?UserDataParser $userParser = null;
-    private ?ExtensionStateStore $extensionStateStore = null;
-    private ?ExtensionPermissionCatalogService $extensionPermissionCatalogService = null;
-    private ?ExtensionCatalogService $extensionCatalogService = null;
-    private ?ExtensionEditorCatalogService $extensionEditorCatalogService = null;
+    private ExtensionStateStore $extensionStateStore;
+    private ExtensionCatalogService $extensionCatalogService;
+    private ExtensionEditorCatalogService $extensionEditorCatalogService;
     /** @var array<string, array{label: string, editor: string}>|null */
     private ?array $pageBodyBlockTypeDefinitionsCache = null;
 
@@ -124,6 +122,9 @@ final class PageController
      * @param EditorBlocks $editorBlocks Shared repeater-block view helper for modular panel rows.
      * @param EditorMCE $editorMce TinyMCE-specific helpers for asset URL and gallery-item payload building.
      * @param EditorMDE $editorMde EasyMDE-specific helpers for asset URLs and JS fallback path lists.
+     * @param ExtensionStateStore $extensionStateStore Shared extension state store for enabled-extension reads.
+     * @param ExtensionCatalogService $extensionCatalogService Shared extension catalog for manifest validation reads.
+     * @param ExtensionEditorCatalogService $extensionEditorCatalogService Shared editor catalog for extension body blocks and shortcode menus.
      * @param callable $extensionServicesFor Extension services resolver used to load per-extension shortcode and body-block contributions.
      * @return void
      */
@@ -146,6 +147,9 @@ final class PageController
         EditorBlocks $editorBlocks,
         EditorMCE $editorMce,
         EditorMDE $editorMde,
+        ExtensionStateStore $extensionStateStore,
+        ExtensionCatalogService $extensionCatalogService,
+        ExtensionEditorCatalogService $extensionEditorCatalogService,
         callable $extensionServicesFor
     ) {
         $this->context = $context;
@@ -166,6 +170,9 @@ final class PageController
         $this->editorBlocks = $editorBlocks;
         $this->editorMce = $editorMce;
         $this->editorMde = $editorMde;
+        $this->extensionStateStore = $extensionStateStore;
+        $this->extensionCatalogService = $extensionCatalogService;
+        $this->extensionEditorCatalogService = $extensionEditorCatalogService;
         $this->extensionServicesFor = Closure::fromCallable($extensionServicesFor);
     }
 
@@ -342,7 +349,11 @@ final class PageController
         $this->context->renderPanel('panel/page/edit', [
             'page' => $page,
             'currentUserId' => $currentUserId !== null ? $currentUserId : 0,
-            'authorOptions' => $this->pageAuthorOptions(),
+            'authorOptions' => $this->pageAuthorOptionBuilder()->build(
+                $this->userParser()->listAll(),
+                $this->input,
+                fn (string $value): ?string => $this->identifierResolver()->normalizeUsernameOrEmail($this->input, $value)
+            ),
             'channelOptions' => $channelOptions,
             'defaultCategorySetSelection' => $this->allowedTaxonomySetIdsForChannel(null, 'category'),
             'defaultTagSetSelection' => $this->allowedTaxonomySetIdsForChannel(null, 'tag'),
@@ -364,7 +375,7 @@ final class PageController
             'editorDefault' => $this->editor->normalizeBodyTextEditorOption(
                 (string) $this->config->get('content.editor', 'tinymce')
             ),
-            'routeModeDefault' => $this->globalPageRouteMode(),
+            'routeModeDefault' => ChannelRouteParser::globalPageRouteMode($this->config),
             'routeSeparatorDefault' => ChannelRouteParser::normalizeGlobalSeparator(
                 (string) $this->config->get('content.separator', '-')
             ),
@@ -1030,87 +1041,6 @@ final class PageController
         return $this->identifierResolver;
     }
 
-    /**
-     * Returns the extension state store on first use.
-     *
-     * The state store exposes the enabled-extension map and base path for all
-     * extension catalog and editor catalog lookups.
-     *
-     * @return ExtensionStateStore Extension enablement and state persistence.
-     */
-    private function extensionStateStore(): ExtensionStateStore
-    {
-        if (!$this->extensionStateStore instanceof ExtensionStateStore) {
-            // Three levels up from private/sys/Controller/Panel/ → private/ext.
-            $this->extensionStateStore = new ExtensionStateStore(dirname(__DIR__, 3) . '/ext');
-        }
-
-        return $this->extensionStateStore;
-    }
-
-    /**
-     * Returns the extension permission catalog service on first use.
-     *
-     * @return ExtensionPermissionCatalogService Extension permission catalog for manifest reads.
-     */
-    private function extensionPermissionCatalogService(): ExtensionPermissionCatalogService
-    {
-        if (!$this->extensionPermissionCatalogService instanceof ExtensionPermissionCatalogService) {
-            $this->extensionPermissionCatalogService = new ExtensionPermissionCatalogService(
-                $this->extensionStateStore(),
-                $this->input
-            );
-        }
-
-        return $this->extensionPermissionCatalogService;
-    }
-
-    /**
-     * Returns the extension catalog service on first use.
-     *
-     * Used by the manifest reader to load body-block and shortcode definitions
-     * declared by enabled extensions.
-     *
-     * @return ExtensionCatalogService Extension catalog for manifest reads and forms lookups.
-     */
-    private function extensionCatalogService(): ExtensionCatalogService
-    {
-        if (!$this->extensionCatalogService instanceof ExtensionCatalogService) {
-            // Four levels up from private/sys/Controller/Panel/ → app root.
-            $this->extensionCatalogService = new ExtensionCatalogService(
-                dirname(__DIR__, 4),
-                $this->extensionStateStore(),
-                $this->extensionPermissionCatalogService(),
-                $this->config,
-                $this->input
-            );
-        }
-
-        return $this->extensionCatalogService;
-    }
-
-    /**
-     * Returns the extension editor catalog service on first use.
-     *
-     * Scans enabled extensions for body-block type definitions and insertable
-     * shortcodes that should appear in the page editor UI.
-     *
-     * @return ExtensionEditorCatalogService Extension editor catalog for page-editor contributions.
-     */
-    private function extensionEditorCatalogService(): ExtensionEditorCatalogService
-    {
-        if (!$this->extensionEditorCatalogService instanceof ExtensionEditorCatalogService) {
-            // Four levels up from private/sys/Controller/Panel/ → app root.
-            $this->extensionEditorCatalogService = new ExtensionEditorCatalogService(
-                dirname(__DIR__, 4),
-                $this->input,
-                $this->pageBlockParser()
-            );
-        }
-
-        return $this->extensionEditorCatalogService;
-    }
-
     // -------------------------------------------------------------------------
     // Taxonomy / route helpers
     // -------------------------------------------------------------------------
@@ -1207,16 +1137,6 @@ final class PageController
         return $selection;
     }
 
-    /**
-     * Returns the configured global page route mode.
-     *
-     * @return string Global page route mode slug (e.g. 'slug', 'id', 'id-slug').
-     */
-    private function globalPageRouteMode(): string
-    {
-        return ChannelRouteParser::globalPageRouteMode($this->config);
-    }
-
     // -------------------------------------------------------------------------
     // Body-block / editor helpers
     // -------------------------------------------------------------------------
@@ -1237,7 +1157,7 @@ final class PageController
         }
 
         $this->pageBodyBlockTypeDefinitionsCache = $this->pageBlocks()->mergeTypeDefinitions(
-            $this->extensionProvidedBodyBlocksForEditor($this->loadExtensionStateMap())
+            $this->extensionProvidedBodyBlocksForEditor($this->extensionStateStore->loadEnabledMap())
         );
 
         return $this->pageBodyBlockTypeDefinitionsCache;
@@ -1280,10 +1200,13 @@ final class PageController
      */
     private function extensionProvidedBodyBlocksForEditor(array $enabledMap): array
     {
-        return $this->extensionEditorCatalogService()->panelBodyBlockDefinitions(
+        return $this->extensionEditorCatalogService->panelBodyBlockDefinitions(
             $enabledMap,
-            $this->extensionsBasePath(),
-            fn (string $extensionPath): array => $this->readExtensionManifest($extensionPath)
+            $this->extensionStateStore->basePath(),
+            fn (string $extensionPath): array => $this->extensionCatalogService->readManifest(
+                $extensionPath,
+                fn (string $extensionKey): array => $this->listEnabledExtensionForms($extensionKey)
+            )
         );
     }
 
@@ -1294,60 +1217,16 @@ final class PageController
      */
     private function pageEditorInsertableShortcodes(): array
     {
-        return $this->extensionEditorCatalogService()->panelInsertableShortcodes(
-            $this->loadExtensionStateMap(),
-            $this->extensionsBasePath(),
-            fn (string $extensionPath): array => $this->readExtensionManifest($extensionPath),
+        return $this->extensionEditorCatalogService->panelInsertableShortcodes(
+            $this->extensionStateStore->loadEnabledMap(),
+            $this->extensionStateStore->basePath(),
+            fn (string $extensionPath): array => $this->extensionCatalogService->readManifest(
+                $extensionPath,
+                fn (string $extensionKey): array => $this->listEnabledExtensionForms($extensionKey)
+            ),
             fn (string $extensionKey): array => $this->listEnabledExtensionForms($extensionKey),
             $this->config
         );
-    }
-
-    /**
-     * Reads optional extension metadata from the extension's `ext.json` manifest.
-     *
-     * @param string $extensionPath Absolute path to the extension directory.
-     * @return array{
-     *   valid: bool,
-     *   invalid_reason: string,
-     *   type: string,
-     *   panel_path: string,
-     *   name: string,
-     *   version: string,
-     *   description: string,
-     *   author: string,
-     *   homepage: string,
-     *   docs: string,
-     *   permission_levels: array<int, array{key: string, label: string}>,
-     *   default_permission_level: string
-     * }
-     */
-    private function readExtensionManifest(string $extensionPath): array
-    {
-        return $this->extensionCatalogService()->readManifest(
-            $extensionPath,
-            fn (string $extensionKey): array => $this->listEnabledExtensionForms($extensionKey)
-        );
-    }
-
-    /**
-     * Returns the absolute path to the `private/ext` extensions directory.
-     *
-     * @return string Absolute path to the extensions base directory.
-     */
-    private function extensionsBasePath(): string
-    {
-        return $this->extensionStateStore()->basePath();
-    }
-
-    /**
-     * Loads the enabled-extension slug map from the state file on disk.
-     *
-     * @return array<string, bool> Extension slug → enabled flag map.
-     */
-    private function loadExtensionStateMap(): array
-    {
-        return $this->extensionStateStore()->loadEnabledMap();
     }
 
     /**
@@ -1405,31 +1284,6 @@ final class PageController
     // -------------------------------------------------------------------------
     // Author and user helpers
     // -------------------------------------------------------------------------
-
-    /**
-     * Returns page-author select options for the page editor Meta tab.
-     *
-     * @return array<int, array{id: int, username: string, name: string}> Author option rows for the editor dropdown.
-     */
-    private function pageAuthorOptions(): array
-    {
-        return $this->pageAuthorOptionBuilder()->build(
-            $this->userParser()->listAll(),
-            $this->input,
-            fn (string $value): ?string => $this->normalizeUserIdentifierValue($value)
-        );
-    }
-
-    /**
-     * Normalizes one user identifier value (username or email) for author option matching.
-     *
-     * @param string $rawValue Raw username or email value.
-     * @return string|null Normalized identifier, or null when invalid.
-     */
-    private function normalizeUserIdentifierValue(string $rawValue): ?string
-    {
-        return $this->identifierResolver()->normalizeUsernameOrEmail($this->input, $rawValue);
-    }
 
     /**
      * @return PageDataParser

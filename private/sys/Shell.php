@@ -487,14 +487,37 @@ function raven_cli_find_row_by_slug(array $rows, string $slug): ?array
 }
 
 /**
+ * Returns a cached extension-state store for the active CLI process.
+ *
+ * CLI extension commands often read and then immediately write the same state
+ * file. Keeping one store instance per project root avoids rebuilding the same
+ * filesystem seam for each helper call in the same command flow.
+ *
+ * @param string $root Project root path.
+ * @return ExtensionStateStore Shared extension-state store for that root.
+ */
+function raven_cli_extension_state_store(string $root): ExtensionStateStore
+{
+    static $stores = [];
+
+    $normalizedRoot = rtrim($root, '/');
+    if (!isset($stores[$normalizedRoot]) || !$stores[$normalizedRoot] instanceof ExtensionStateStore) {
+        $stores[$normalizedRoot] = new ExtensionStateStore($normalizedRoot . '/private/ext');
+    }
+
+    return $stores[$normalizedRoot];
+}
+
+/**
  * @return array{enabled: array<string, bool>, permissions: array<string, int>}
  */
 function raven_cli_extension_state_load(string $root): array
 {
-    $stateStore = new ExtensionStateStore(rtrim($root, '/') . '/private/ext');
+    $state = raven_cli_extension_state_store($root)->loadStateData();
+
     return [
-        'enabled' => $stateStore->loadEnabledMap(),
-        'permissions' => $stateStore->loadPermissionMap(),
+        'enabled' => $state['enabled'],
+        'permissions' => $state['permissions'],
     ];
 }
 
@@ -504,8 +527,7 @@ function raven_cli_extension_state_load(string $root): array
  */
 function raven_cli_extension_state_save(string $root, array $enabled, array $permissions): void
 {
-    $stateStore = new ExtensionStateStore(rtrim($root, '/') . '/private/ext');
-    $stateStore->saveState($enabled, $permissions);
+    raven_cli_extension_state_store($root)->saveState($enabled, $permissions);
 }
 
 function raven_cli_remove_directory_recursive(string $directory): void

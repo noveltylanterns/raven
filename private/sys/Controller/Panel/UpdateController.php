@@ -14,13 +14,9 @@ namespace Raven\Core\Controller\Panel;
 use Raven\Core\Config;
 use Raven\Lib\Archive\Update as ArchiveUpdate;
 use Raven\Lib\Archive\Upstream;
-use Raven\Lib\Extension\ExtensionStateStore;
-use Raven\Lib\Extension\Panel\ExtensionCatalogService;
-use Raven\Lib\Extension\Panel\ExtensionPermissionCatalogService;
 use Raven\Lib\Format\Git;
 use Raven\Lib\Scribe\ConfigScribe;
 use Raven\Lib\Security\InputSanitizer;
-use Raven\Lib\View\Public\ThemeCatalog;
 
 /**
  * Handles the split panel updater routes.
@@ -35,10 +31,10 @@ final class UpdateController
     private Config $config;
     private InputSanitizer $input;
     private string $root;
-    private ?ExtensionStateStore $extensionStateStore = null;
-    private ?ExtensionPermissionCatalogService $extensionPermissionCatalogService = null;
-    private ?ExtensionCatalogService $extensionCatalogService = null;
-    private ?ThemeCatalog $themeCatalogService = null;
+    /** @var array<int, string> */
+    private array $stockPublicThemeSlugs;
+    /** @var array<int, string> */
+    private array $stockExtensionDirectories;
     private ?Git $gitArchiveHandler = null;
     private ?Upstream $updateSourceResolver = null;
     private ?ArchiveUpdate $updateWorkflowService = null;
@@ -48,18 +44,24 @@ final class UpdateController
      * @param Config $config Runtime configuration reader.
      * @param InputSanitizer $input Shared request input sanitizer.
      * @param string $root Project root path for updater filesystem workflows.
+     * @param array<int, string> $stockPublicThemeSlugs Canonical stock public theme slugs protected from overwrite.
+     * @param array<int, string> $stockExtensionDirectories Canonical stock extension directories protected from overwrite.
      * @return void
      */
     public function __construct(
         SharedController $context,
         Config $config,
         InputSanitizer $input,
-        string $root
+        string $root,
+        array $stockPublicThemeSlugs,
+        array $stockExtensionDirectories
     ) {
         $this->context = $context;
         $this->config = $config;
         $this->input = $input;
         $this->root = rtrim($root, '/\\');
+        $this->stockPublicThemeSlugs = $stockPublicThemeSlugs;
+        $this->stockExtensionDirectories = $stockExtensionDirectories;
     }
 
     /**
@@ -161,7 +163,7 @@ final class UpdateController
      */
     private function stockPublicThemeSlugs(): array
     {
-        return $this->themeCatalogService()->stockSlugs();
+        return $this->stockPublicThemeSlugs;
     }
 
     /**
@@ -171,68 +173,7 @@ final class UpdateController
      */
     private function stockExtensionDirectories(): array
     {
-        return $this->extensionCatalogService()->stockExtensionDirectories();
-    }
-
-    /**
-     * Returns the extension-state store on first use.
-     */
-    private function extensionStateStore(): ExtensionStateStore
-    {
-        if (!$this->extensionStateStore instanceof ExtensionStateStore) {
-            $this->extensionStateStore = new ExtensionStateStore($this->root . '/private/ext');
-        }
-
-        return $this->extensionStateStore;
-    }
-
-    /**
-     * Returns the extension-permission catalog service on first use.
-     */
-    private function extensionPermissionCatalogService(): ExtensionPermissionCatalogService
-    {
-        if (!$this->extensionPermissionCatalogService instanceof ExtensionPermissionCatalogService) {
-            $this->extensionPermissionCatalogService = new ExtensionPermissionCatalogService(
-                $this->extensionStateStore(),
-                $this->input
-            );
-        }
-
-        return $this->extensionPermissionCatalogService;
-    }
-
-    /**
-     * Returns the extension catalog service on first use.
-     */
-    private function extensionCatalogService(): ExtensionCatalogService
-    {
-        if (!$this->extensionCatalogService instanceof ExtensionCatalogService) {
-            $this->extensionCatalogService = new ExtensionCatalogService(
-                $this->root,
-                $this->extensionStateStore(),
-                $this->extensionPermissionCatalogService(),
-                $this->config,
-                $this->input
-            );
-        }
-
-        return $this->extensionCatalogService;
-    }
-
-    /**
-     * Returns the public-theme catalog service on first use.
-     */
-    private function themeCatalogService(): ThemeCatalog
-    {
-        if (!$this->themeCatalogService instanceof ThemeCatalog) {
-            $this->themeCatalogService = new ThemeCatalog(
-                $this->root . '/public/theme',
-                $this->input,
-                ['raven']
-            );
-        }
-
-        return $this->themeCatalogService;
+        return $this->stockExtensionDirectories;
     }
 
     /**

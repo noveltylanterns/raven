@@ -40,7 +40,17 @@ final class ExtensionRegistry
 
     private static ?ManifestContractValidator $manifestContractValidator = null;
     private static ?ExtensionProviderValidator $providerValidator = null;
-    private static ?ExtensionStateStore $stateStore = null;
+    /**
+     * Per-process extension-state store cache keyed by project root.
+     *
+     * Manifest metadata is already memoized per root, so the state-store seam
+     * should follow the same rule instead of assuming one project tree per PHP
+     * process forever. This keeps long-lived tests and tooling flows from
+     * accidentally reusing the wrong `private/ext` / `private/dat/ext` paths.
+     *
+     * @var array<string, ExtensionStateStore>
+     */
+    private static array $stateStores = [];
 
     /**
      * Per-process manifest cache keyed by "{root}::{directory}".
@@ -670,18 +680,19 @@ final class ExtensionRegistry
     }
 
     /**
-     * Returns the singleton ExtensionStateStore instance for the given root.
+     * Returns the cached ExtensionStateStore instance for the given root.
      *
      * @param string $root Project root path.
      * @return ExtensionStateStore
      */
     private static function stateStore(string $root): ExtensionStateStore
     {
-        if (!self::$stateStore instanceof ExtensionStateStore) {
+        $normalizedRoot = rtrim($root, '/\\');
+        if (!isset(self::$stateStores[$normalizedRoot]) || !self::$stateStores[$normalizedRoot] instanceof ExtensionStateStore) {
             // Auto-derives stateBasePath as private/dat/ext from extensionsBasePath.
-            self::$stateStore = new ExtensionStateStore($root . '/private/ext');
+            self::$stateStores[$normalizedRoot] = new ExtensionStateStore($normalizedRoot . '/private/ext');
         }
 
-        return self::$stateStore;
+        return self::$stateStores[$normalizedRoot];
     }
 }

@@ -31,9 +31,11 @@ use Raven\Core\Repository\RedirectRepository;
 use Raven\Core\Repository\UserRepository;
 use Raven\Core\Renderer;
 use Raven\Lib\Auth\AuthService;
+use Raven\Lib\Extension\ExtensionEditorCatalogService;
 use Raven\Lib\Parser\ChannelDataParser;
 use Raven\Lib\Parser\ConfigParser;
 use Raven\Lib\Parser\TaxonomyRepoParser;
+use Raven\Lib\View\Public\ThemeCatalog;
 use RuntimeException;
 
 /**
@@ -71,10 +73,12 @@ final class PublicRuntimeBuilder
         $taxonomyLookup = null;
         $channelRepository = null;
         $channelDataParser = null;
+        $extensionEditorCatalogService = null;
         $groupRepository = null;
         $pageImageRepository = null;
         $pageRepository = null;
         $redirectRepository = null;
+        $themeCatalogService = null;
         $userRepository = null;
 
         $rvn['view'] = new Renderer((string) $rvn['root'] . '/private/tpl');
@@ -306,6 +310,32 @@ final class PublicRuntimeBuilder
         };
 
         /**
+         * Reuses one shared public-theme catalog across public controllers.
+         */
+        $themeCatalogFactory = $memoize(static function () use (&$themeCatalogService, $rvn): ThemeCatalog {
+            $themeCatalogService = new ThemeCatalog(
+                (string) $rvn['root'] . '/public/theme',
+                $rvn['input'],
+                ['raven']
+            );
+
+            return $themeCatalogService;
+        });
+
+        /**
+         * Reuses one shared extension editor catalog for public page block reads.
+         */
+        $extensionEditorCatalogFactory = $memoize(static function () use (&$extensionEditorCatalogService, $rvn): ExtensionEditorCatalogService {
+            $extensionEditorCatalogService = new ExtensionEditorCatalogService(
+                (string) $rvn['root'],
+                $rvn['input'],
+                new \Raven\Lib\Parser\PageBlockParser($rvn['input'])
+            );
+
+            return $extensionEditorCatalogService;
+        });
+
+        /**
          * Public content/feed routes share the same page/channel/redirect runtime
          * dependencies, so expose them as one clustered factory ahead of the later
          * sub-controller split.
@@ -374,7 +404,7 @@ final class PublicRuntimeBuilder
         /**
          * Builds the shared request context for split public sub-controllers.
          */
-        $rvn['public_request_context'] = static function () use (&$publicSharedController, $rvn, $resolveAuth): SharedController {
+        $rvn['public_request_context'] = static function () use (&$publicSharedController, $rvn, $resolveAuth, $themeCatalogFactory): SharedController {
             if ($publicSharedController instanceof SharedController) {
                 return $publicSharedController;
             }
@@ -383,7 +413,8 @@ final class PublicRuntimeBuilder
                 $rvn['config'],
                 $resolveAuth(),
                 $rvn['input'],
-                $rvn['csrf']
+                $rvn['csrf'],
+                $themeCatalogFactory()
             );
 
             return $publicSharedController;
@@ -413,7 +444,7 @@ final class PublicRuntimeBuilder
         /**
          * Builds the split public channel controller on first use.
          */
-        $rvn['public_channel_controller'] = static function () use (&$publicChannelController, &$rvn, $publicContentDomain, $publicAuthDomain, $publicFormDomain): PublicChannelController {
+        $rvn['public_channel_controller'] = static function () use (&$publicChannelController, &$rvn, $publicContentDomain, $publicAuthDomain, $publicFormDomain, $themeCatalogFactory, $extensionEditorCatalogFactory): PublicChannelController {
             if ($publicChannelController instanceof PublicChannelController) {
                 return $publicChannelController;
             }
@@ -429,6 +460,8 @@ final class PublicRuntimeBuilder
                 $contentDomain['page'],
                 $contentDomain['redirect'],
                 $authDomain['user'],
+                $themeCatalogFactory(),
+                $extensionEditorCatalogFactory(),
                 $formDomain['extension_services']
             );
 
@@ -438,7 +471,7 @@ final class PublicRuntimeBuilder
         /**
          * Builds the split public category controller on first use.
          */
-        $rvn['public_category_controller'] = static function () use (&$publicCategoryController, &$rvn, $publicContentDomain): PublicCategoryController {
+        $rvn['public_category_controller'] = static function () use (&$publicCategoryController, &$rvn, $publicContentDomain, $themeCatalogFactory): PublicCategoryController {
             if ($publicCategoryController instanceof PublicCategoryController) {
                 return $publicCategoryController;
             }
@@ -449,7 +482,8 @@ final class PublicRuntimeBuilder
             $publicCategoryController = new PublicCategoryController(
                 $requestContextFactory(),
                 $contentDomain['page'],
-                $contentDomain['taxonomy_lookup']()
+                $contentDomain['taxonomy_lookup'](),
+                $themeCatalogFactory()
             );
 
             return $publicCategoryController;
@@ -517,7 +551,7 @@ final class PublicRuntimeBuilder
         /**
          * Builds the split public tag controller on first use.
          */
-        $rvn['public_tag_controller'] = static function () use (&$publicTagController, &$rvn, $publicContentDomain): PublicTagController {
+        $rvn['public_tag_controller'] = static function () use (&$publicTagController, &$rvn, $publicContentDomain, $themeCatalogFactory): PublicTagController {
             if ($publicTagController instanceof PublicTagController) {
                 return $publicTagController;
             }
@@ -528,7 +562,8 @@ final class PublicRuntimeBuilder
             $publicTagController = new PublicTagController(
                 $requestContextFactory(),
                 $contentDomain['page'],
-                $contentDomain['taxonomy_lookup']()
+                $contentDomain['taxonomy_lookup'](),
+                $themeCatalogFactory()
             );
 
             return $publicTagController;
@@ -537,7 +572,7 @@ final class PublicRuntimeBuilder
         /**
          * Builds the split public page controller on first use.
          */
-        $rvn['public_page_controller'] = static function () use (&$publicPageController, &$rvn, $publicContentDomain, $publicAuthDomain, $publicFormDomain): PublicPageController {
+        $rvn['public_page_controller'] = static function () use (&$publicPageController, &$rvn, $publicContentDomain, $publicAuthDomain, $publicFormDomain, $themeCatalogFactory, $extensionEditorCatalogFactory): PublicPageController {
             if ($publicPageController instanceof PublicPageController) {
                 return $publicPageController;
             }
@@ -554,6 +589,8 @@ final class PublicRuntimeBuilder
                 $contentDomain['page'],
                 $contentDomain['redirect'],
                 $authDomain['user'],
+                $themeCatalogFactory(),
+                $extensionEditorCatalogFactory(),
                 $formDomain['extension_services']
             );
 

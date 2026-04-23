@@ -132,7 +132,6 @@ final class ConfigController
     private SharedController $context;
     private Config $config;
     private InputSanitizer $input;
-    private string $root;
     private ChannelRepository $channelRepo;
     private ?ChannelDataParser $channelParser = null;
     /** @var Closure(): SetRepository */
@@ -153,37 +152,36 @@ final class ConfigController
     private ?array $categorySetOptionsCache = null;
     /** @var array<int, array{id: int, name: string, slug: string, is_root: bool}>|null */
     private ?array $tagSetOptionsCache = null;
-    private ?ThemeCatalog $themeCatalogService = null;
+    private ThemeCatalog $themeCatalogService;
 
     /**
      * @param SharedController $context Shared panel request context.
      * @param Config $config Runtime configuration reader for cross-field validation.
      * @param InputSanitizer $input Shared input sanitizer for config forms.
-     * @param string $root Project root path for theme catalog lookups.
      * @param ChannelRepository $channelRepo Channel repository for feed-channel options.
      * @param callable(): SetRepository $categorySetRepoResolver Lazy category-set resolver.
      * @param callable(): SetRepository $tagSetRepoResolver Lazy tag-set resolver.
      * @param EditorTabs $editorTabs Shared panel editor-tab normalization and URL builder.
      * @param Editor $editor Shared panel editor utility methods (body-text editor, theme normalization).
      * @param EditorBlocks $editorBlocks Shared repeater-block view helper for modular panel rows.
+     * @param ThemeCatalog $themeCatalogService Shared public-theme catalog for config theme options.
      * @return void
      */
     public function __construct(
         SharedController $context,
         Config $config,
         InputSanitizer $input,
-        string $root,
         ChannelRepository $channelRepo,
         callable $categorySetRepoResolver,
         callable $tagSetRepoResolver,
         EditorTabs $editorTabs,
         Editor $editor,
-        EditorBlocks $editorBlocks
+        EditorBlocks $editorBlocks,
+        ThemeCatalog $themeCatalogService
     ) {
         $this->context = $context;
         $this->config = $config;
         $this->input = $input;
-        $this->root = rtrim($root, '/\\');
         $this->channelRepo = $channelRepo;
         $this->categorySetRepoResolver = Closure::fromCallable($categorySetRepoResolver);
         $this->tagSetRepoResolver = Closure::fromCallable($tagSetRepoResolver);
@@ -191,6 +189,7 @@ final class ConfigController
         $this->editorTabs = $editorTabs;
         $this->editor = $editor;
         $this->editorBlocks = $editorBlocks;
+        $this->themeCatalogService = $themeCatalogService;
     }
 
     /**
@@ -422,7 +421,7 @@ final class ConfigController
             return $this->publicThemeOptionsCache;
         }
 
-        $this->publicThemeOptionsCache = $this->themeCatalogService()->options();
+        $this->publicThemeOptionsCache = $this->themeCatalogService->options();
         return $this->publicThemeOptionsCache;
     }
 
@@ -2258,21 +2257,4 @@ final class ConfigController
         return self::$timezoneIdentifiers;
     }
 
-    /**
-     * Returns the public-theme catalog service on first use.
-     *
-     * @return ThemeCatalog Shared public-theme catalog helper.
-     */
-    private function themeCatalogService(): ThemeCatalog
-    {
-        if (!$this->themeCatalogService instanceof ThemeCatalog) {
-            $this->themeCatalogService = new ThemeCatalog(
-                $this->root . '/public/theme',
-                $this->input,
-                ['raven']
-            );
-        }
-
-        return $this->themeCatalogService;
-    }
 }

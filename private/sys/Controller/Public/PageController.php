@@ -51,14 +51,14 @@ final class PageController
     private bool $embeddedFormRuntimesLoaded = false;
     /** @var array<string, array{label: string, editor: string}>|null */
     private ?array $pageBodyBlockTypeDefinitionsCache = null;
-    private ?ThemeCatalog $themeCatalogService = null;
+    private ThemeCatalog $themeCatalogService;
     private ?ThemeTemplate $themeTemplate = null;
     private ?MetaService $metaService = null;
     private ?TemplateDecorator $templateDecorator = null;
     private ?PageMarkdown $pageMarkdown = null;
     private ?PageBlockParser $pageBlockParser = null;
     private ?PageBlocks $pageBlocks = null;
-    private ?ExtensionEditorCatalogService $extensionEditorCatalogService = null;
+    private ExtensionEditorCatalogService $extensionEditorCatalogService;
     private ?EmbeddedFormRuntimeService $embeddedFormRuntimeService = null;
     private ?UserDataParser $profileContactService = null;
     private ?PublicChannelPageRouteService $publicChannelPageRouteService = null;
@@ -70,6 +70,8 @@ final class PageController
      * @param PageRepository $pageRepo Page repository for homepage, channel, and page lookups.
      * @param RedirectRepository $redirectRepo Redirect repository for public redirect fallbacks.
      * @param UserRepository $userRepo User repository for author profile lookups in page meta.
+     * @param ThemeCatalog $themeCatalogService Shared public-theme catalog for template resolution and meta reads.
+     * @param ExtensionEditorCatalogService $extensionEditorCatalogService Shared extension editor catalog for public block definitions.
      * @param callable(?string=): array<string, mixed> $extensionServicesProvider Lazy extension-services resolver for shortcode runtimes.
      * @return void
      */
@@ -80,6 +82,8 @@ final class PageController
         PageRepository $pageRepo,
         RedirectRepository $redirectRepo,
         UserRepository $userRepo,
+        ThemeCatalog $themeCatalogService,
+        ExtensionEditorCatalogService $extensionEditorCatalogService,
         callable $extensionServicesProvider
     ) {
         $this->context = $context;
@@ -88,6 +92,8 @@ final class PageController
         $this->pageParser = new PageDataParser($context->input(), $pageRepo);
         $this->redirectRepo = $redirectRepo;
         $this->userParser = new UserDataParser($context->input(), $userRepo);
+        $this->themeCatalogService = $themeCatalogService;
+        $this->extensionEditorCatalogService = $extensionEditorCatalogService;
         $this->extensionServicesProvider = Closure::fromCallable($extensionServicesProvider);
     }
 
@@ -404,7 +410,7 @@ final class PageController
         }
 
         $this->pageBodyBlockTypeDefinitionsCache = $this->pageBlocks()->mergeTypeDefinitions(
-            $this->extensionEditorCatalogService()->publicBodyBlockDefinitions()
+            $this->extensionEditorCatalogService->publicBodyBlockDefinitions()
         );
 
         return $this->pageBodyBlockTypeDefinitionsCache;
@@ -530,7 +536,7 @@ final class PageController
      */
     private function currentPublicThemeSlug(): string
     {
-        return $this->themeCatalogService()->activeSlugFromConfig($this->context->config());
+        return $this->themeCatalogService->activeSlugFromConfig($this->context->config());
     }
 
     /**
@@ -540,25 +546,7 @@ final class PageController
      */
     private function publicThemesRoot(): string
     {
-        return $this->themeCatalogService()->root();
-    }
-
-    /**
-     * Returns the shared public theme catalog service.
-     *
-     * @return ThemeCatalog Shared public theme catalog service.
-     */
-    private function themeCatalogService(): ThemeCatalog
-    {
-        if (!$this->themeCatalogService instanceof ThemeCatalog) {
-            $this->themeCatalogService = new ThemeCatalog(
-                dirname(__DIR__, 4) . '/public/theme',
-                $this->context->input(),
-                ['raven']
-            );
-        }
-
-        return $this->themeCatalogService;
+        return $this->themeCatalogService->root();
     }
 
     /**
@@ -571,7 +559,7 @@ final class PageController
         if (!$this->metaService instanceof MetaService) {
             $this->metaService = new MetaService(
                 $this->context->requestContextResolver(),
-                $this->themeCatalogService(),
+                $this->themeCatalogService,
                 $this->profileContactService(),
                 $this->context->feedParser()
             );
@@ -658,21 +646,4 @@ final class PageController
         return $this->pageBlocks;
     }
 
-    /**
-     * Returns the shared extension editor catalog service.
-     *
-     * @return ExtensionEditorCatalogService Shared extension editor catalog service.
-     */
-    private function extensionEditorCatalogService(): ExtensionEditorCatalogService
-    {
-        if (!$this->extensionEditorCatalogService instanceof ExtensionEditorCatalogService) {
-            $this->extensionEditorCatalogService = new ExtensionEditorCatalogService(
-                dirname(__DIR__, 4),
-                $this->context->input(),
-                $this->pageBlockParser()
-            );
-        }
-
-        return $this->extensionEditorCatalogService;
-    }
 }

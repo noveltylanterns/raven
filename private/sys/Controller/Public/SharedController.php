@@ -47,7 +47,7 @@ final class SharedController
     private ?GroupRouteParser $groupParser = null;
     private ?UserDataParser $profileContactService = null;
     private ?Captcha $captchaService = null;
-    private ?ThemeCatalog $themeCatalogService = null;
+    private ThemeCatalog $themeCatalogService;
     private ?MetaService $metaService = null;
     private ?TemplateDecorator $templateDecorator = null;
     private ?ThemeTemplate $themeTemplate = null;
@@ -57,18 +57,21 @@ final class SharedController
      * @param AuthService $auth Auth/session service for public requests.
      * @param InputSanitizer $input Shared request input sanitizer.
      * @param Csrf $csrf CSRF helper for public forms and auth flows.
+     * @param ThemeCatalog $themeCatalogService Shared public-theme catalog for wrapper/meta/template reads.
      * @return void
      */
     public function __construct(
         Config $config,
         AuthService $auth,
         InputSanitizer $input,
-        Csrf $csrf
+        Csrf $csrf,
+        ThemeCatalog $themeCatalogService
     ) {
         $this->config = $config;
         $this->auth = $auth;
         $this->input = $input;
         $this->csrf = $csrf;
+        $this->themeCatalogService = $themeCatalogService;
         $this->flash = new SessionFlash('_raven_public_flash');
         $this->themeBrace = new ThemeBrace(dirname(__DIR__, 4) . '/.tmp/template_tag_cache');
     }
@@ -425,7 +428,7 @@ final class SharedController
      */
     private function currentPublicThemeSlug(): string
     {
-        return $this->themeCatalogService()->activeSlugFromConfig($this->config);
+        return $this->themeCatalogService->activeSlugFromConfig($this->config);
     }
 
     /**
@@ -435,25 +438,7 @@ final class SharedController
      */
     private function publicThemesRoot(): string
     {
-        return $this->themeCatalogService()->root();
-    }
-
-    /**
-     * Returns the cached theme catalog service.
-     *
-     * @return ThemeCatalog Shared theme catalog service.
-     */
-    private function themeCatalogService(): ThemeCatalog
-    {
-        if (!$this->themeCatalogService instanceof ThemeCatalog) {
-            $this->themeCatalogService = new ThemeCatalog(
-                dirname(__DIR__, 4) . '/public/theme',
-                $this->input,
-                ['raven']
-            );
-        }
-
-        return $this->themeCatalogService;
+        return $this->themeCatalogService->root();
     }
 
     /**
@@ -480,7 +465,7 @@ final class SharedController
         if (!$this->metaService instanceof MetaService) {
             $this->metaService = new MetaService(
                 $this->requestContextResolver(),
-                $this->themeCatalogService(),
+                $this->themeCatalogService,
                 $this->profileContactService(),
                 $this->feedParser()
             );

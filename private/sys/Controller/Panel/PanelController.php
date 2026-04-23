@@ -18,6 +18,7 @@ use Raven\Core\Routing\Router;
 use Raven\Core\Routing\Panel\PanelAuthRouteRegistrar;
 use Raven\Core\Routing\Panel\PanelCategoryRouteRegistrar;
 use Raven\Core\Routing\Panel\PanelChannelRouteRegistrar;
+use Raven\Core\Routing\Panel\PanelConfigRouteRegistrar;
 use Raven\Core\Routing\Panel\PanelContentRouteRegistrar;
 use Raven\Core\Routing\Panel\PanelDashboardRouteRegistrar;
 use Raven\Core\Routing\Panel\PanelExtensionRouteRegistrar;
@@ -166,6 +167,13 @@ final class PanelController
                 throw new RuntimeException('Panel system controller factory is unavailable.');
             };
 
+        /** @var callable(array<int, string>=): array<string, array<string, mixed>> $panelPermissionMapProvider */
+        $panelPermissionMapProvider = is_callable($rvn['panel_permission_map_provider'] ?? null)
+            ? $rvn['panel_permission_map_provider']
+            : static function (array $directoryFilter = []): array {
+                return [];
+            };
+
         /** @var callable(): object $panelRequestContext */
         $panelRequestContext = is_callable($rvn['panel_request_context'] ?? null)
             ? $rvn['panel_request_context']
@@ -275,8 +283,9 @@ final class PanelController
 
         $extensionPermissionCatalog = [];
         if ($shouldInitializeFullPanelRuntime) {
-            // Resolve extension permission levels/bit assignments from controller-managed state.
-            $extensionPermissionCatalog = $panelSystemController()->extensionPanelPermissionMapForDirectories(array_keys($enabledExtensionManifests));
+            // Resolve extension permission levels from the shared runtime provider so
+            // panel-entry orchestration does not call the system route controller directly.
+            $extensionPermissionCatalog = $panelPermissionMapProvider(array_keys($enabledExtensionManifests));
 
             $_SESSION['_raven_extension_permission_masks'] = $extensionPermissionCatalog;
             $_SESSION['_raven_enabled_extensions'] = array_keys($enabledExtensions);
@@ -411,7 +420,8 @@ final class PanelController
         PanelRoutingRouteRegistrar::register($router, $panelRoutingController);
         PanelUpdateRouteRegistrar::register($router, $panelUpdateController);
         PanelPreferencesRouteRegistrar::register($router, $panelPreferencesController);
-        PanelSystemRouteRegistrar::register($router, $panelConfigController, $panelSystemController);
+        PanelConfigRouteRegistrar::register($router, $panelConfigController);
+        PanelSystemRouteRegistrar::register($router, $panelSystemController);
 
         PanelExtensionRouteRegistrar::register(
             $router,
