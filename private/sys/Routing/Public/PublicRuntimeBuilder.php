@@ -34,6 +34,9 @@ use Raven\Lib\Auth\AuthService;
 use Raven\Lib\Extension\ExtensionEditorCatalogService;
 use Raven\Lib\Parser\ChannelDataParser;
 use Raven\Lib\Parser\ConfigParser;
+use Raven\Lib\Parser\GroupDataParser;
+use Raven\Lib\Parser\PageImageParser;
+use Raven\Lib\Parser\RedirectDataParser;
 use Raven\Lib\Parser\TaxonomyRepoParser;
 use Raven\Lib\View\Public\ThemeCatalog;
 use RuntimeException;
@@ -310,6 +313,30 @@ final class PublicRuntimeBuilder
         };
 
         /**
+         * Wraps the redirect repository in the read-only parser seam for public controllers.
+         * The underlying RedirectRepository is still available for any other wiring that needs it.
+         */
+        $redirectDataParserFactory = $memoize(static function () use ($redirectRepositoryFactory, $rvn): RedirectDataParser {
+            return new RedirectDataParser($rvn['input'], $redirectRepositoryFactory());
+        });
+
+        /**
+         * Wraps the page-image repository in the read-only parser seam for public rendering.
+         * The underlying PageImageRepository is still available for panel wiring that needs writes.
+         */
+        $pageImageParserFactory = $memoize(static function () use ($pageImageRepositoryFactory): PageImageParser {
+            return new PageImageParser($pageImageRepositoryFactory());
+        });
+
+        /**
+         * Wraps the group repository in the read-only parser seam for public auth/group routes.
+         * The underlying GroupRepository is still available for panel wiring that needs writes.
+         */
+        $groupDataParserFactory = $memoize(static function () use ($groupRepositoryFactory, $rvn): GroupDataParser {
+            return new GroupDataParser($rvn['input'], $groupRepositoryFactory());
+        });
+
+        /**
          * Reuses one shared public-theme catalog across public controllers.
          */
         $themeCatalogFactory = $memoize(static function () use (&$themeCatalogService, $rvn): ThemeCatalog {
@@ -345,17 +372,17 @@ final class PublicRuntimeBuilder
         $publicContentDomain = $memoize(static function () use (
             $channelDataParserFactory,
             $channelRepositoryFactory,
-            $pageImageRepositoryFactory,
+            $pageImageParserFactory,
             $pageRepositoryFactory,
-            $redirectRepositoryFactory,
+            $redirectDataParserFactory,
             $taxonomyLookupRepository
         ): array {
             return [
                 'channel' => $channelRepositoryFactory(),
                 'channel_parser' => $channelDataParserFactory(),
-                'page_images' => $pageImageRepositoryFactory(),
+                'page_images' => $pageImageParserFactory(),
                 'page' => $pageRepositoryFactory(),
-                'redirect' => $redirectRepositoryFactory(),
+                'redirect' => $redirectDataParserFactory(),
                 'taxonomy_lookup' => $taxonomyLookupRepository,
             ];
         });
@@ -367,12 +394,12 @@ final class PublicRuntimeBuilder
          * @return array<string, mixed>
          */
         $publicAuthDomain = $memoize(static function () use (
-            $groupRepositoryFactory,
+            $groupDataParserFactory,
             $userRepositoryFactory,
             $inviteTokenRepository
         ): array {
             return [
-                'group' => $groupRepositoryFactory(),
+                'group' => $groupDataParserFactory(),
                 'user' => $userRepositoryFactory(),
                 'invite_tokens' => $inviteTokenRepository,
             ];

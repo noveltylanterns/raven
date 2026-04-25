@@ -13,6 +13,7 @@ namespace Raven\Core\Repository;
 
 use PDO;
 use Raven\Lib\Parser\ChannelContextParser;
+use Raven\Lib\Parser\ChannelRepoParser;
 use Raven\Lib\Database\TableNameResolver;
 use Raven\Lib\Scribe\ChannelRecordScribe;
 use Raven\Lib\Scribe\ChannelScribe;
@@ -65,8 +66,8 @@ final class ChannelRepository
         }
 
         usort($channels, static function (array $a, array $b): int {
-            $aIsRoot = ChannelContextParser::isRootChannelId((int) ($a['id'] ?? -1));
-            $bIsRoot = ChannelContextParser::isRootChannelId((int) ($b['id'] ?? -1));
+            $aIsRoot = ChannelRepoParser::isRootChannelId((int) ($a['id'] ?? -1));
+            $bIsRoot = ChannelRepoParser::isRootChannelId((int) ($b['id'] ?? -1));
             if ($aIsRoot !== $bIsRoot) {
                 return $aIsRoot ? -1 : 1;
             }
@@ -220,7 +221,7 @@ final class ChannelRepository
     {
         $rows = [];
         foreach ($this->listRecords() as $channel) {
-            if (ChannelContextParser::isRootChannelId((int) ($channel['id'] ?? -1))) {
+            if (ChannelRepoParser::isRootChannelId((int) ($channel['id'] ?? -1))) {
                 continue;
             }
 
@@ -228,8 +229,8 @@ final class ChannelRepository
                 'id' => (int) ($channel['id'] ?? 0),
                 'name' => (string) ($channel['name'] ?? ''),
                 'slug' => (string) ($channel['slug'] ?? ''),
-                'category_sets' => ChannelContextParser::normalizeTaxonomySetSelection($channel['category_sets'] ?? [], false),
-                'tag_sets' => ChannelContextParser::normalizeTaxonomySetSelection($channel['tag_sets'] ?? [], false),
+                'category_sets' => ChannelRepoParser::normalizeTaxonomySetSelection($channel['category_sets'] ?? [], false),
+                'tag_sets' => ChannelRepoParser::normalizeTaxonomySetSelection($channel['tag_sets'] ?? [], false),
                 'editor_override' => (string) ($channel['editor_override'] ?? 'inherit'),
                 'route_mode' => (string) ($channel['route_mode'] ?? 'inherit'),
                 'route_separator' => (string) ($channel['route_separator'] ?? 'inherit'),
@@ -262,8 +263,8 @@ final class ChannelRepository
                 'name' => (string) ($channel['name'] ?? ''),
                 'slug' => (string) ($channel['slug'] ?? ''),
                 'feed_enabled' => (bool) ($channel['feed_enabled'] ?? false),
-                'category_sets' => ChannelContextParser::normalizeTaxonomySetSelection($channel['category_sets'] ?? [], false),
-                'tag_sets' => ChannelContextParser::normalizeTaxonomySetSelection($channel['tag_sets'] ?? [], false),
+                'category_sets' => ChannelRepoParser::normalizeTaxonomySetSelection($channel['category_sets'] ?? [], false),
+                'tag_sets' => ChannelRepoParser::normalizeTaxonomySetSelection($channel['tag_sets'] ?? [], false),
                 'editor_override' => (string) ($channel['editor_override'] ?? 'inherit'),
                 'route_mode' => (string) ($channel['route_mode'] ?? 'inherit'),
                 'route_separator' => (string) ($channel['route_separator'] ?? 'inherit'),
@@ -271,8 +272,8 @@ final class ChannelRepository
         }
 
         usort($rows, static function (array $a, array $b): int {
-            $aIsRoot = ChannelContextParser::isRootChannelId((int) ($a['id'] ?? -1));
-            $bIsRoot = ChannelContextParser::isRootChannelId((int) ($b['id'] ?? -1));
+            $aIsRoot = ChannelRepoParser::isRootChannelId((int) ($a['id'] ?? -1));
+            $bIsRoot = ChannelRepoParser::isRootChannelId((int) ($b['id'] ?? -1));
             if ($aIsRoot !== $bIsRoot) {
                 return $aIsRoot ? -1 : 1;
             }
@@ -303,7 +304,7 @@ final class ChannelRepository
      */
     public function findById(int $id): ?array
     {
-        if ($id < ChannelContextParser::ROOT_CHANNEL_ID) {
+        if ($id < ChannelRepoParser::ROOT_CHANNEL_ID) {
             return null;
         }
 
@@ -371,7 +372,7 @@ final class ChannelRepository
         $count = 0;
 
         foreach ($this->listRecords() as $record) {
-            $selection = ChannelContextParser::normalizeTaxonomySetSelection($record[$field] ?? [], false);
+            $selection = ChannelRepoParser::normalizeTaxonomySetSelection($record[$field] ?? [], false);
             if (in_array($setId, $selection, true)) {
                 $count++;
             }
@@ -469,7 +470,7 @@ final class ChannelRepository
 
     private function normalizeChannelId(mixed $value): ?int
     {
-        return ChannelContextParser::normalizeChannelId($value);
+        return ChannelRepoParser::normalizeChannelId($value);
     }
 
     /**

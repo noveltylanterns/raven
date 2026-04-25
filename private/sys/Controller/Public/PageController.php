@@ -12,10 +12,9 @@ declare(strict_types=1);
 namespace Raven\Core\Controller\Public;
 
 use Closure;
-use Raven\Core\Repository\PageImageRepository;
 use Raven\Core\Repository\PageRepository;
-use Raven\Core\Repository\RedirectRepository;
 use Raven\Core\Repository\UserRepository;
+use Raven\Lib\Parser\PageImageParser;
 use Raven\Lib\Extension\Public\EmbeddedFormRuntimeInterface;
 use Raven\Lib\Extension\Public\EmbeddedFormRuntimeService;
 use Raven\Lib\Extension\Public\EmbeddedShortcodeRuntimeInterface;
@@ -24,6 +23,7 @@ use Raven\Lib\Parser\ChannelDataParser;
 use Raven\Lib\Parser\ChannelRouteParser;
 use Raven\Lib\Parser\PageBlockParser;
 use Raven\Lib\Parser\PageDataParser;
+use Raven\Lib\Parser\RedirectDataParser;
 use Raven\Lib\Parser\UserDataParser;
 use Raven\Lib\Transport\Redirect;
 use Raven\Core\Routing\Public\PublicChannelPageRouteService;
@@ -41,9 +41,9 @@ final class PageController
 {
     private SharedController $context;
     private ChannelDataParser $channelParser;
-    private PageImageRepository $pageImages;
+    private PageImageParser $pageImages;
     private PageDataParser $pageParser;
-    private RedirectRepository $redirectRepo;
+    private RedirectDataParser $redirectParser;
     private UserDataParser $userParser;
     private Closure $extensionServicesProvider;
     /** @var array<string, EmbeddedShortcodeRuntimeInterface|EmbeddedFormRuntimeInterface> */
@@ -66,9 +66,9 @@ final class PageController
     /**
      * @param SharedController $context Shared public request context.
      * @param ChannelDataParser $channelParser Channel data parser for public channel-route lookups.
-     * @param PageImageRepository $pageImages Page-image repository for gallery rendering and page meta images.
+     * @param PageImageParser $pageImages Page-image parser for read-only gallery rendering and page meta images.
      * @param PageRepository $pageRepo Page repository for homepage, channel, and page lookups.
-     * @param RedirectRepository $redirectRepo Redirect repository for public redirect fallbacks.
+     * @param RedirectDataParser $redirectParser Redirect data parser for public redirect fallbacks.
      * @param UserRepository $userRepo User repository for author profile lookups in page meta.
      * @param ThemeCatalog $themeCatalogService Shared public-theme catalog for template resolution and meta reads.
      * @param ExtensionEditorCatalogService $extensionEditorCatalogService Shared extension editor catalog for public block definitions.
@@ -78,9 +78,9 @@ final class PageController
     public function __construct(
         SharedController $context,
         ChannelDataParser $channelParser,
-        PageImageRepository $pageImages,
+        PageImageParser $pageImages,
         PageRepository $pageRepo,
-        RedirectRepository $redirectRepo,
+        RedirectDataParser $redirectParser,
         UserRepository $userRepo,
         ThemeCatalog $themeCatalogService,
         ExtensionEditorCatalogService $extensionEditorCatalogService,
@@ -90,7 +90,7 @@ final class PageController
         $this->channelParser = $channelParser;
         $this->pageImages = $pageImages;
         $this->pageParser = new PageDataParser($context->input(), $pageRepo);
-        $this->redirectRepo = $redirectRepo;
+        $this->redirectParser = $redirectParser;
         $this->userParser = new UserDataParser($context->input(), $userRepo);
         $this->themeCatalogService = $themeCatalogService;
         $this->extensionEditorCatalogService = $extensionEditorCatalogService;
@@ -425,7 +425,7 @@ final class PageController
      */
     private function tryRedirect(string $pageSlug, ?string $channelSlug = null): bool
     {
-        $redirectRow = $this->redirectRepo->findActiveByPath($pageSlug, $channelSlug);
+        $redirectRow = $this->redirectParser->findActiveByPath($pageSlug, $channelSlug);
         if ($redirectRow === null) {
             return false;
         }

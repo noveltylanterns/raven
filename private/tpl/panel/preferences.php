@@ -1734,7 +1734,7 @@ $preferencesToolbarItems = [
                 </div>
                 <?php endif; ?>
                 <input id="cover_image" name="cover_image" type="file" class="form-control" accept=".gif,.jpg,.jpeg,.png,image/gif,image/jpeg,image/png">
-                <div class="form-text">Stored locally at <code>/uploads/user/cover/</code> using your user string as the filename base.</div>
+                <div class="form-text">Stored locally at <code>/uploads/user/{id}/cover.ext</code>.</div>
                 <?php if ($coverImage !== ''): ?>
                     <div class="form-check mt-2">
                         <input class="form-check-input" type="checkbox" value="1" id="remove_cover_image" name="remove_cover_image">

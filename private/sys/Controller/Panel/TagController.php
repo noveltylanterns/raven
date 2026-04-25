@@ -2,8 +2,8 @@
 
 /**
  * RAVEN CMS
- * ~/private/sys/Controller/Panel/TaxonomyController.php
- * Split panel taxonomy controller for tag management routes.
+ * ~/private/sys/Controller/Panel/TagController.php
+ * Panel controller for tag and tag-set management routes.
  * Docs: https://raven.lanterns.io
  */
 
@@ -28,10 +28,11 @@ use Raven\Lib\View\Panel\EditorTabs;
 /**
  * Handles panel tag and tag-set management routes.
  *
- * Redirect, channel, and category management were split into their own
- * controllers; this controller now owns only the `/tag*` route family.
+ * Owns the `/tag*` route family exclusively. Category, channel, and redirect
+ * management each live in their own split controllers so tag dependencies are
+ * only constructed on `/tag*` requests.
  */
-final class TaxonomyController
+final class TagController
 {
     private SharedController $context;
     private InputSanitizer $input;

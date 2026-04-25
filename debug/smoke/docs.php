@@ -40,7 +40,7 @@ final class ConfigurationDocsSmokeRunner
         $this->root = rtrim($root, '/');
         $this->runnerPath = $this->root . '/debug/util/request-runner.php';
         $this->phpCommand = $this->resolvePhpCommand();
-        $this->docsPath = $this->root . '/docs/Configuration.md';
+        $this->docsPath = $this->root . '/docs/configuration.md';
         $this->runId = time();
 
         /** @var array<string, mixed> $config */
@@ -96,7 +96,7 @@ final class ConfigurationDocsSmokeRunner
         try {
             $docs = file_get_contents($this->docsPath);
             if (!is_string($docs) || trim($docs) === '') {
-                throw new RuntimeException('Unable to read docs/Configuration.md.');
+                throw new RuntimeException('Unable to read docs/configuration.md.');
             }
 
             $config = require $this->root . '/private/dat/config.php';
@@ -281,61 +281,61 @@ final class ConfigurationDocsSmokeRunner
     {
         $specs = [
             'category' => [
-                'docs' => 'docs/Categories.md',
+                'docs' => 'docs/categories.md',
                 'views' => [
                     'private/tpl/panel/category/list.php',
                     'private/tpl/panel/category/edit.php',
                 ],
             ],
             'channel' => [
-                'docs' => 'docs/Channels.md',
+                'docs' => 'docs/channels.md',
                 'views' => [
                     'private/tpl/panel/channel/list.php',
                     'private/tpl/panel/channel/edit.php',
                 ],
             ],
             'extension' => [
-                'docs' => 'docs/Extensions.md',
+                'docs' => 'docs/extensions.md',
                 'views' => [
                     'private/tpl/panel/extensions.php',
                 ],
             ],
             'group' => [
-                'docs' => 'docs/Groups.md',
+                'docs' => 'docs/groups.md',
                 'views' => [
                     'private/tpl/panel/group/list.php',
                     'private/tpl/panel/group/edit.php',
                 ],
             ],
             'page' => [
-                'docs' => 'docs/Pages.md',
+                'docs' => 'docs/pages.md',
                 'views' => [
                     'private/tpl/panel/page/list.php',
                     'private/tpl/panel/page/edit.php',
                 ],
             ],
             'preference' => [
-                'docs' => 'docs/Preferences.md',
+                'docs' => 'docs/preferences.md',
                 'views' => [
                     'private/tpl/panel/preferences.php',
                 ],
             ],
             'redirect' => [
-                'docs' => 'docs/Redirects.md',
+                'docs' => 'docs/redirects.md',
                 'views' => [
                     'private/tpl/panel/redirect/list.php',
                     'private/tpl/panel/redirect/edit.php',
                 ],
             ],
             'tag' => [
-                'docs' => 'docs/Tags.md',
+                'docs' => 'docs/tags.md',
                 'views' => [
                     'private/tpl/panel/tag/list.php',
                     'private/tpl/panel/tag/edit.php',
                 ],
             ],
             'user' => [
-                'docs' => 'docs/Users.md',
+                'docs' => 'docs/users.md',
                 'views' => [
                     'private/tpl/panel/user/list.php',
                     'private/tpl/panel/user/edit.php',

@@ -21,15 +21,15 @@ Last updated: 2026-03-25
 - `panel/theme/AGENTS.md`
 
 ## Documentation Map
-- System file tree and ownership map: `docs/Filetree.md`
+- System file tree and ownership map: `docs/filetree.md`
 - Project summary: `README.md`
-- Project docs index: `docs/README.md`
-- Core behavior docs: `docs/*.md` (Pages, Users, Routing, Configuration, Extensions, etc.)
-- CLI command docs: `docs/CLI.md`
+- Project docs index: `docs/readme.md`
+- Core behavior docs: `docs/*.md` (pages.md, users.md, routing.md, configuration.md, extensions.md, etc.)
+- CLI command docs: `docs/cli.md`
 - Release change history: `release-notes.md`
 
 ## First Orientation
-- If you need the fastest whole-system map, read `docs/Filetree.md` immediately after this file.
+- If you need the fastest whole-system map, read `docs/filetree.md` immediately after this file.
 - It is the quickest way to understand Raven's component boundaries and how the main directories relate to one another.
 
 ## Runtime Summary
@@ -107,8 +107,8 @@ they feed the `rvn-docs` documentation generator that powers the live docs site.
 ## CLI Map
 - Shipped Raven commands live in `private/bin/`.
 - Shared CLI implementation lives in `private/lib/Shell/raven_cli.php`.
-- Command usage and arguments live in `docs/CLI.md`.
+- Command usage and arguments live in `docs/cli.md`.
 
 ## System Map
-- The full directory/component map now lives in `docs/Filetree.md`.
+- The full directory/component map now lives in `docs/filetree.md`.
 - Use subsystem-local guides for build rules in `private/ext/AGENTS.md`, `public/theme/AGENTS.md`, and `panel/theme/AGENTS.md`.

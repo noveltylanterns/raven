@@ -95,6 +95,28 @@ final class RedirectDataParser
     }
 
     /**
+     * Returns the first active redirect matching a path and optional channel scope.
+     *
+     * Used by public route controllers to detect redirect fallbacks before returning 404.
+     * Only active redirects are returned; inactive rows are excluded by the repository query.
+     *
+     * @param string      $slug        URL slug segment to match against redirect path column.
+     * @param string|null $channelSlug Channel slug scope, or null for root-scope redirects.
+     * @return array<string, mixed>|null Active redirect row with channel context, or null when none matches.
+     */
+    public function findActiveByPath(string $slug, ?string $channelSlug = null): ?array
+    {
+        $normalizedSlug = $this->input->slug($slug);
+        if ($normalizedSlug === null) {
+            return null;
+        }
+
+        $normalizedChannel = $channelSlug !== null ? $this->input->slug($channelSlug) : null;
+
+        return $this->redirectRepo()->findActiveByPath($normalizedSlug, $normalizedChannel);
+    }
+
+    /**
      * Returns redirect edit-form data with normalized selector handling.
      *
      * @param int|null $id Redirect id in edit mode, or null in create mode.

@@ -31,7 +31,7 @@ use Raven\Lib\View\Panel\EditorTabs;
  *
  * Owns channel list, channel create/edit, channel save, and channel delete.
  * Channel taxonomy-set selection remains here because it is channel-specific
- * edit-state, even though category/tag set CRUD stays with TaxonomyController.
+ * edit-state; category/tag set CRUD lives in CategoryController and TagController.
  */
 final class ChannelController
 {

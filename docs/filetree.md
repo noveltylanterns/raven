@@ -142,8 +142,8 @@ This file is the fast system map for Raven CMS. Use it to quickly understand the
 - `private/lib/Auth/`
   - All auth and permission machinery for both core and extensions.
   - Includes `AuthService` (delight-im wrapper + auth/session/read facade), login/2FA flow services, group role policy, and user/session helpers. Existing-account auth-user writes now route through `lib/Scribe/AuthProfileScribe.php`.
-  - `Auth/Panel/` — panel-only ACL classes: `PanelAccess` (permission bit constants), `PanelAccessCatalog`, `PanelPermissionDefinitionCatalog`, `PanelSessionGuard`, `PanelInvitePolicyService`, `PanelTwoFactorPreferencesService`, `UserPanelHydrator`, `UserPanelQueryService`.
-  - `Auth/Public/` — public-route-only auth helpers: `GroupPublicRouteService`, `UserRoutingDataService`.
+  - `Auth/Panel/` — panel-only ACL classes: `PanelAccess` (permission bit constants), `PanelAccessCatalog`, `PanelPermissionDefinitionCatalog`, `PanelSessionGuard`, `PanelInvitePolicyService`, `PanelTwoFactorPreferencesService`, `UserPanelHydrator`.
+  - `Auth/Public/` — public-route-only auth helpers: `GroupPublicRouteService`.
   - Login-time 2FA orchestration now hangs off `LoginChallengeFlow`, `LoginChallengeState`, `LoginEmailChallenge`, `LoginEmailDelivery`, and `LoginWebAuthnChallengeService` instead of the older `TwoFactor*` login helper names.
   - `SessionFlash.php` — session-backed flash message store; used by both panel and public routes.
   - `SessionCookie.php` — session cookie configuration policy; applied at bootstrap.
@@ -154,7 +154,7 @@ This file is the fast system map for Raven CMS. Use it to quickly understand the
   - `ChannelRouteParser` — channel/page routing policy statics: `globalPageRouteMode`, `effectiveChannelRouteMode`, `resolveChannelSeparator`, `normalizeGlobalSeparator`, and related helpers. `ChannelDataParser` — repo-backed channel reads and record normalization for public routes, panel editors, debug utilities, and CLI inspection; owns channel `findBySlug`, `idBySlug`, `listOptions`, `slugExists`, `listRoutingOptions`, and explicit taxonomy-set assignment count reads.
   - `CategoryRouteParser` — static `categoryEnabled()` and `categoryRoutePrefix()` policy (extracted from the old `ChannelParser`). `CategoryDataParser` — repo-backed category reads for public routing, panel taxonomy editors, and CLI inspection.
   - `TagRouteParser` — static `tagEnabled()` and `tagRoutePrefix()` policy (extracted from the old `ChannelParser`). `TagDataParser` — repo-backed tag reads for public routing, panel taxonomy editors, and CLI inspection.
-  - `PageRouteParser` — static URL-building policy: `normalizeSlugForLookup`, `parseDateSlugSegment`, `normalizePageIdForLookup`, `resolveLookupTarget`, `buildRouteSegment`, `datePrefix`. `PageDataParser` — repo-backed page reads for public content, feed, and panel list flows.
+  - `PageRouteParser` — static URL-building policy: `normalizeSlugForLookup`, `parseDateSlugSegment`, `normalizePageIdForLookup`, `resolveLookupTarget`, `buildRouteSegment`, `datePrefix`. `PageDataParser` — repo-backed page reads for public content, feed, panel list flows, and panel editor payloads; owns gallery hydration via `PageEditorGalleryHydrator` so `PageRepository` stays free of panel-media concerns.
   - `PageBlockParser` — shared page body-block type, CSS token, extension-definition, and stored-payload normalization used by page repositories plus the panel/public page-block helpers.
   - `TaxonomyDataParser` — shared category/tag page-list query helper for page counts and paginated public listings by slug or id.
   - `TaxonomyRepoParser` — repo-backed taxonomy lookup helper for category/tag slug resolution, routing inventory option sets, and page-editor taxonomy option payloads.
@@ -162,7 +162,7 @@ This file is the fast system map for Raven CMS. Use it to quickly understand the
   - `GroupRouteParser` — group/profile routing policy: `profileRoutePrefix`, `groupRoutePrefix`, `groupMode`, `groupRoutesEnabledForRoutingTable`, and related config-taking statics. `GroupDataParser` — repo-backed group reads: `listAll`, `listPageForPanel`, `findById`, `findBySlug`.
   - `FeedRouteParser` — feed routing policy (purely config-backed; no data counterpart). `UserDataParser` — profile-contact normalization plus repository-backed user/profile reads for public profiles, panel user screens, and installer user-database checks. `RedirectDataParser` — repo-backed redirect reads for panel redirect management and CLI inspection.
   - `PageDuplicateParser` — the `(slug, channel)` uniqueness lookup helper used by `PageRepository` and `RedirectRepository`.
-  - `ChannelContextParser` and `SetParser` own the channel/set normalization policy plus read-side loading of the PHP-file-backed records under `private/dat/channel/`, `private/dat/category-set/`, and `private/dat/tag-set/`.
+  - `ChannelRepoParser` — stateless channel constants (`ROOT_CHANNEL_ID`, `ROOT_CHANNEL_SLUG`, `ROOT_CHANNEL_NAME`) and static normalization helpers (`isRootChannelId`, `isRootChannelSlug`, `normalizeTaxonomySetSelection`, `channelsByIdMap`, `applyPageChannelContext`, `resolveChannelIdBySlug`, etc.). This is the low-level primitive imported by repositories, routing builders, scribes, and parsers that only need channel normalization without the filesystem I/O of `ChannelContextParser`. `ChannelContextParser` extends `ChannelRepoParser` and adds the read-side loading of the PHP-file-backed channel store under `private/dat/channel/`; only classes that actually instantiate a file-backed channel reader should import it. `SetParser` owns the equivalent read-side loading for `private/dat/category-set/` and `private/dat/tag-set/`.
   - `ConfigParser` owns dot-path config reads, scalar coercion, nested-form reads, and config-field stringification. `PanelParser` owns panel-path normalization and permission helpers. Both are utility parsers with no route/data split.
 - `private/lib/Scribe/`
   - Canonical write-side helpers that pair with the parser layer.
@@ -173,8 +173,8 @@ This file is the fast system map for Raven CMS. Use it to quickly understand the
   - `TaxonomyImageScribe` owns taxonomy/channel/group image filesystem writes: upload validation, source-plus-variant generation, and stored-path cleanup for category, tag, channel, and group image slots. The panel controllers now keep config/path reads on `Media/Panel/TaxonomyImageService` while routing image mutations through the canonical scribe seam.
   - `TaxonomyScribe` owns the shared SQL write paths for category/tag rows: save/update, taxonomy-image filename persistence, default-set reassignment, and transactional delete-plus-page-detach cleanup. `CategoryRepository` and `TagRepository` keep the read-heavy listing and lookup queries above it.
   - `RedirectScribe` owns redirect-row writes: channel-scope resolution, `(channel, slug)` uniqueness enforcement, create/update persistence, and delete-by-id cleanup for panel-managed redirects. `RedirectRepository` keeps the read/listing and public lookup flows above it.
-  - `GroupScribe` owns group mutation rules: stock-role save policy, custom group id allocation, image filename writes, and guarded non-stock delete behavior. `GroupRepository` keeps the read/list/public-route queries above it.
-  - `UserScribe` owns auth/app user writes: create/update/delete persistence, user-string generation, uniqueness checks, and transactional user-group membership replacement. `UserRepository` keeps the read/list/profile queries above it.
+  - `GroupScribe` owns group mutation rules: stock-role save policy, custom group id allocation, image filename writes, and guarded non-stock delete behavior. `GroupRepository` keeps the read/list/public-route queries above it; both now own their own idempotent `attachUserToGroup` SQL instead of sharing `GroupMembershipWriteService`.
+  - `UserScribe` owns auth/app user writes: create/update/delete persistence, user-string generation, uniqueness checks, and transactional user-group membership replacement. `UserRepository` is now the sole SQL surface for user reads, panel list queries, routing data, and group-membership catalog queries — all SQL formerly split across `UserPanelQueryService`, `UserGroupCatalogService`, and `UserRoutingDataService` is inlined directly.
   - `AuthProfileScribe` owns auth-user profile/security writes for existing accounts: current-user preference updates, password changes, avatar/cover references, and stored 2FA payload persistence. `AuthService` keeps the login/session/read facade above it.
   - `LoginThrottleScribe` owns login-throttle bucket writes for the `auth_failures` table: bucket upserts, explicit clears, and stale-row pruning. `LoginThrottleService` keeps the read-side bucket lookup and lockout policy above it.
   - `ExtensionStateScribe` owns filesystem writes for `private/dat/ext/.state.php`: extension-state normalization, serialization, state-directory creation, and schema-marker invalidation when enablement changes. `ExtensionStateStore` keeps the read-side state loading helpers above it.
@@ -231,7 +231,7 @@ This file is the fast system map for Raven CMS. Use it to quickly understand the
 If you need to understand Raven quickly, read in this order:
 
 1. `AGENTS.md`
-2. `docs/Filetree.md`
+2. `docs/filetree.md`
 3. `README.md`
-4. `docs/README.md`
+4. `docs/readme.md`
 5. The subsystem-local `AGENTS.md` for the area you are editing

@@ -12,9 +12,9 @@ declare(strict_types=1);
 namespace Raven\Core\Controller\Public;
 
 use Closure;
-use Raven\Core\Repository\GroupRepository;
 use Raven\Core\Repository\InviteRepository;
 use Raven\Core\Repository\UserRepository;
+use Raven\Lib\Parser\GroupDataParser;
 use Raven\Lib\Auth\LoginAttemptPolicy;
 use Raven\Lib\Auth\LoginAttemptWorkflowService;
 use Raven\Lib\Auth\LoginChallengeFlow;
@@ -30,7 +30,7 @@ use Raven\Lib\Transport\Redirect;
 final class AuthController
 {
     private SharedController $context;
-    private GroupRepository $groupRepo;
+    private GroupDataParser $groupDataParser;
     private UserRepository $userRepo;
     private Closure $inviteTokensResolver;
     private ?InviteRepository $inviteTokens = null;
@@ -42,19 +42,19 @@ final class AuthController
 
     /**
      * @param SharedController $context Shared public request context.
-     * @param GroupRepository $groupRepo Group repository for registration target-group resolution.
+     * @param GroupDataParser $groupDataParser Group data parser for registration target-group resolution.
      * @param UserRepository $userRepo User repository for registration persistence.
      * @param callable(): InviteRepository $inviteTokensResolver Lazy invite-token repository resolver.
      * @return void
      */
     public function __construct(
         SharedController $context,
-        GroupRepository $groupRepo,
+        GroupDataParser $groupDataParser,
         UserRepository $userRepo,
         callable $inviteTokensResolver
     ) {
         $this->context = $context;
-        $this->groupRepo = $groupRepo;
+        $this->groupDataParser = $groupDataParser;
         $this->userRepo = $userRepo;
         $this->inviteTokensResolver = Closure::fromCallable($inviteTokensResolver);
         $this->identifierResolver = new LoginIdentifierResolver();
@@ -484,7 +484,7 @@ final class AuthController
     private function registrationGroupIds(): array
     {
         foreach (['user', 'guest', 'validating'] as $slug) {
-            $groupId = $this->groupRepo->idBySlug($slug);
+            $groupId = $this->groupDataParser->idBySlug($slug);
             if (is_int($groupId) && $groupId > 0) {
                 return [$groupId];
             }

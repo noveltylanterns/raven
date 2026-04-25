@@ -16,11 +16,7 @@ namespace Raven\Core\Repository;
 use PDO;
 use Raven\Lib\Auth\AuthPayloadCodec;
 use Raven\Lib\Auth\ContactProfileNormalizer;
-use Raven\Lib\Auth\GroupMembershipWriteService;
-use Raven\Lib\Auth\UserGroupCatalogService;
 use Raven\Lib\Auth\Panel\UserPanelHydrator;
-use Raven\Lib\Auth\Panel\UserPanelQueryService;
-use Raven\Lib\Auth\Public\UserRoutingDataService;
 use Raven\Lib\Database\TableNameResolver;
 use Raven\Lib\Scribe\UserScribe;
 
@@ -35,11 +31,7 @@ final class UserRepository
     private string $prefix;
     private AuthPayloadCodec $authPayloadCodec;
     private UserPanelHydrator $panelHydrator;
-    private UserGroupCatalogService $userGroupCatalogService;
-    private UserPanelQueryService $userPanelQueryService;
-    private GroupMembershipWriteService $groupMembershipWriteService;
     private UserScribe $userScribe;
-    private UserRoutingDataService $userRoutingDataService;
 
     public function __construct(PDO $authDb, PDO $rvnDb, string $driver, string $prefix)
     {
@@ -50,11 +42,7 @@ final class UserRepository
         $this->prefix = preg_replace('/[^a-zA-Z0-9_]/', '', $prefix) ?? '';
         $this->authPayloadCodec = new AuthPayloadCodec(new ContactProfileNormalizer());
         $this->panelHydrator = new UserPanelHydrator();
-        $this->userGroupCatalogService = new UserGroupCatalogService();
-        $this->userPanelQueryService = new UserPanelQueryService();
-        $this->groupMembershipWriteService = new GroupMembershipWriteService();
         $this->userScribe = new UserScribe();
-        $this->userRoutingDataService = new UserRoutingDataService();
     }
 
     /**
@@ -168,15 +156,159 @@ final class UserRepository
      */
     public function listRoutingData(bool $includeGroups, bool $includeUsers): array
     {
-        return $this->userRoutingDataService->listRoutingData(
-            $this->rvnDb,
-            $this->appAuthTable('users'),
-            $this->groupTable('groups'),
-            $this->groupTable('user_groups'),
-            $includeGroups,
-            $includeUsers,
-            fn (array $users, array $groupMap): array => $this->hydratePanelUsers($users, $groupMap)
+        if (!$includeGroups && !$includeUsers) {
+            return ['group_rows' => [], 'user_rows' => []];
+        }
+
+        $usersTable   = $this->appAuthTable('users');
+        $groupsTable  = $this->groupTable('groups');
+        $ugTable      = $this->groupTable('user_groups');
+        $unionParts   = [];
+
+        if ($includeGroups) {
+            $unionParts[] = 'SELECT
+                    \'group\' AS row_type,
+                    g.id AS group_id,
+                    g.name AS group_name,
+                    g.slug AS group_slug,
+                    g.route AS group_route,
+                    g.permissions AS group_permissions,
+                    CASE WHEN LOWER(g.slug) IN (\'admin\', \'user\', \'guest\', \'validating\', \'banned\') THEN 1 ELSE 0 END AS group_is_stock,
+                    COALESCE(mc.member_count, 0) AS group_member_count,
+                    NULL AS user_id,
+                    NULL AS username,
+                    NULL AS user_string,
+                    NULL AS name,
+                    NULL AS email,
+                    NULL AS theme,
+                    NULL AS avatar,
+                    NULL AS user_group_name,
+                    NULL AS user_group_permissions
+                 FROM ' . $groupsTable . ' g
+                 LEFT JOIN (
+                    SELECT "group" AS group_id, COUNT(*) AS member_count
+                    FROM ' . $ugTable . '
+                    GROUP BY "group"
+                 ) mc ON mc.group_id = g.id';
+        }
+
+        if ($includeUsers) {
+            $unionParts[] = 'SELECT
+                    \'user\' AS row_type,
+                    NULL AS group_id,
+                    NULL AS group_name,
+                    NULL AS group_slug,
+                    NULL AS group_route,
+                    NULL AS group_permissions,
+                    NULL AS group_is_stock,
+                    NULL AS group_member_count,
+                    u.id AS user_id,
+                    u.username AS username,
+                    u.string AS user_string,
+                    u.name AS name,
+                    u.email AS email,
+                    u.theme AS theme,
+                    u.avatar AS avatar,
+                    g.name AS user_group_name,
+                    g.permissions AS user_group_permissions
+                 FROM ' . $usersTable . ' u
+                 LEFT JOIN ' . $ugTable . ' ug ON ug.user = u.id
+                 LEFT JOIN ' . $groupsTable . ' g ON g.id = ug."group"';
+        }
+
+        $stmt = $this->rvnDb->prepare(
+            'SELECT
+                row_type,
+                group_id,
+                group_name,
+                group_slug,
+                group_route,
+                group_permissions,
+                group_is_stock,
+                group_member_count,
+                user_id,
+                username,
+                user_string,
+                name,
+                email,
+                theme,
+                avatar,
+                user_group_name,
+                user_group_permissions
+             FROM (
+                 ' . implode(' UNION ALL ', $unionParts) . '
+             ) routing_auth_rows
+             ORDER BY
+                CASE row_type WHEN \'group\' THEN 0 ELSE 1 END ASC,
+                COALESCE(group_id, 0) ASC,
+                COALESCE(user_id, 0) ASC,
+                user_group_name ASC'
         );
+        $stmt->execute();
+        $rows = $stmt->fetchAll() ?: [];
+
+        $groupRows = [];
+        $usersById = [];
+        /** @var array<int, array<int, array{name: string, permissions: int}>> $groupMap */
+        $groupMap = [];
+
+        foreach ($rows as $row) {
+            $rowType = strtolower(trim((string) ($row['row_type'] ?? '')));
+            if ($rowType === 'group') {
+                $groupId = (int) ($row['group_id'] ?? 0);
+                if ($groupId < 1) {
+                    continue;
+                }
+
+                $groupRows[] = [
+                    'id'           => $groupId,
+                    'name'         => (string) ($row['group_name'] ?? ''),
+                    'slug'         => (string) ($row['group_slug'] ?? ''),
+                    'route'        => (int) ($row['group_route'] ?? 0),
+                    'permissions'  => (int) ($row['group_permissions'] ?? 0),
+                    'is_stock'     => (int) ($row['group_is_stock'] ?? 0),
+                    'member_count' => (int) ($row['group_member_count'] ?? 0),
+                ];
+                continue;
+            }
+
+            if ($rowType !== 'user') {
+                continue;
+            }
+
+            $userId = (int) ($row['user_id'] ?? 0);
+            if ($userId < 1) {
+                continue;
+            }
+
+            if (!isset($usersById[$userId])) {
+                $usersById[$userId] = [
+                    'id'       => $userId,
+                    'username' => (string) ($row['username'] ?? ''),
+                    'string'   => (string) ($row['user_string'] ?? ''),
+                    'name'     => (string) ($row['name'] ?? ''),
+                    'email'    => (string) ($row['email'] ?? ''),
+                    'theme'    => (string) (($row['theme'] ?? '') !== '' ? $row['theme'] : 'default'),
+                    'avatar'   => isset($row['avatar']) && $row['avatar'] !== '' ? (string) $row['avatar'] : null,
+                ];
+            }
+
+            $groupName = trim((string) ($row['user_group_name'] ?? ''));
+            if ($groupName === '') {
+                continue;
+            }
+
+            $groupMap[$userId] ??= [];
+            $groupMap[$userId][] = [
+                'name'        => $groupName,
+                'permissions' => (int) ($row['user_group_permissions'] ?? 0),
+            ];
+        }
+
+        return [
+            'group_rows' => $groupRows,
+            'user_rows'  => $this->hydratePanelUsers(array_values($usersById), $groupMap),
+        ];
     }
 
     /**
@@ -209,46 +341,273 @@ final class UserRepository
     /**
      * Returns paginated users with group summaries for panel listing.
      *
-     * @return array<int, array<string, mixed>>
+     * @param int         $limit           Maximum number of rows to return.
+     * @param int         $offset          Zero-based row offset for pagination.
+     * @param string|null $groupNameFilter Optional group name to filter results by membership.
+     * @return array<int, array<string, mixed>> Hydrated panel user rows.
      */
     public function listForPanel(int $limit = 50, int $offset = 0, ?string $groupNameFilter = null): array
     {
-        return $this->userPanelQueryService->listForPanel(
-            $this->authDb,
-            $this->rvnDb,
-            $this->authTable('users'),
-            $this->groupTable('groups'),
-            $this->groupTable('user_groups'),
-            $limit,
-            $offset,
-            $groupNameFilter,
-            fn (array $userIds): array => $this->groupEntriesByUserId($userIds),
-            fn (array $users, array $groupMap): array => $this->hydratePanelUsers($users, $groupMap)
+        $usersTable  = $this->authTable('users');
+        $groupsTable = $this->groupTable('groups');
+        $ugTable     = $this->groupTable('user_groups');
+        $normalizedGroupFilter = strtolower(trim((string) ($groupNameFilter ?? '')));
+        $userIds = [];
+
+        if ($normalizedGroupFilter === '') {
+            $stmt = $this->authDb->prepare(
+                'SELECT id
+                 FROM ' . $usersTable . '
+                 ORDER BY id ASC
+                 LIMIT :limit OFFSET :offset'
+            );
+            $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+            $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+            $stmt->execute();
+            foreach ($stmt->fetchAll() ?: [] as $row) {
+                $userId = (int) ($row['id'] ?? 0);
+                if ($userId > 0) {
+                    $userIds[] = $userId;
+                }
+            }
+        } else {
+            // Filter by group name: look up matching user ids through the group membership junction.
+            $stmt = $this->rvnDb->prepare(
+                'SELECT DISTINCT ug.user AS user_id
+                 FROM ' . $ugTable . ' ug
+                 INNER JOIN ' . $groupsTable . ' g ON g.id = ug."group"
+                 WHERE LOWER(g.name) = :group_name
+                 ORDER BY ug.user ASC
+                 LIMIT :limit OFFSET :offset'
+            );
+            $stmt->bindValue(':group_name', $normalizedGroupFilter, PDO::PARAM_STR);
+            $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+            $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+            $stmt->execute();
+            foreach ($stmt->fetchAll() ?: [] as $row) {
+                $userId = (int) ($row['user_id'] ?? 0);
+                if ($userId > 0) {
+                    $userIds[] = $userId;
+                }
+            }
+        }
+
+        $userIds = array_values(array_unique(array_filter($userIds, static fn (int $id): bool => $id > 0)));
+        if ($userIds === []) {
+            return [];
+        }
+
+        $placeholders = [];
+        $params = [];
+        foreach ($userIds as $index => $userId) {
+            $placeholder = ':user_id_' . $index;
+            $placeholders[] = $placeholder;
+            $params[$placeholder] = $userId;
+        }
+
+        $stmt = $this->authDb->prepare(
+            'SELECT id, username, string, name, email, theme, avatar
+             FROM ' . $usersTable . '
+             WHERE id IN (' . implode(', ', $placeholders) . ')
+             ORDER BY id ASC'
         );
+        $stmt->execute($params);
+        $users = $stmt->fetchAll() ?: [];
+        $groupMap = $this->groupEntriesByUserId($userIds);
+
+        return $this->hydratePanelUsers($users, $groupMap);
     }
 
     /**
-     * Returns one paginated panel-user page plus total row count.
+     * Returns one paginated panel-user page plus total row count and full group catalog.
      *
+     * @param int         $limit           Maximum number of rows to return.
+     * @param int         $offset          Zero-based row offset for pagination.
+     * @param string|null $groupNameFilter Optional group name to filter results by membership.
      * @return array{
      *   rows: array<int, array<string, mixed>>,
      *   total: int,
      *   group_options: array<int, array{id: int, name: string, slug: string, permissions: int, is_stock: int}>
-     * }
+     * } Paginated user rows, total count, and group options for the filter picker.
      */
     public function listPageForPanel(int $limit = 50, int $offset = 0, ?string $groupNameFilter = null): array
     {
-        return $this->userPanelQueryService->listPageForPanel(
-            $this->rvnDb,
-            $this->authTable('users'),
-            $this->groupTable('groups'),
-            $this->groupTable('user_groups'),
-            $limit,
-            $offset,
-            $groupNameFilter,
-            fn (?string $filter): int => $this->countForPanel($filter),
-            fn (array $users, array $groupMap): array => $this->hydratePanelUsers($users, $groupMap)
+        $usersTable  = $this->authTable('users');
+        $groupsTable = $this->groupTable('groups');
+        $ugTable     = $this->groupTable('user_groups');
+        $normalizedGroupFilter = strtolower(trim((string) ($groupNameFilter ?? '')));
+        $safeLimit  = max(1, $limit);
+        $safeOffset = max(0, $offset);
+        $total = 0;
+
+        if ($normalizedGroupFilter === '') {
+            // Window function keeps a single query instead of a separate COUNT pass.
+            $stmt = $this->rvnDb->prepare(
+                'WITH page_users AS (
+                     SELECT u.id,
+                            u.username,
+                            u.string,
+                            u.name,
+                            u.email,
+                            u.theme,
+                            u.avatar,
+                            COUNT(*) OVER() AS total_rows
+                     FROM ' . $usersTable . ' u
+                     ORDER BY u.id ASC
+                     LIMIT :limit OFFSET :offset
+                 )
+                 SELECT pu.id AS user_id,
+                        pu.username,
+                        pu.string,
+                        pu.name,
+                        pu.email,
+                        pu.theme,
+                        pu.avatar,
+                        pu.total_rows,
+                        g.id AS group_id,
+                        g.name AS group_name,
+                        g.slug AS group_slug,
+                        g.permissions AS group_permissions,
+                        CASE WHEN LOWER(g.slug) IN (\'admin\', \'user\', \'guest\', \'validating\', \'banned\') THEN 1 ELSE 0 END AS group_is_stock,
+                        CASE WHEN ug.user IS NULL THEN 0 ELSE 1 END AS group_selected
+                 FROM ' . $groupsTable . ' g
+                 LEFT JOIN page_users pu ON 1 = 1
+                 LEFT JOIN ' . $ugTable . ' ug
+                   ON ug."group" = g.id
+                  AND ug.user = pu.id
+                 ORDER BY COALESCE(pu.id, 0) ASC, g.id ASC'
+            );
+            $stmt->bindValue(':limit', $safeLimit, PDO::PARAM_INT);
+            $stmt->bindValue(':offset', $safeOffset, PDO::PARAM_INT);
+        } else {
+            // Pre-filter user ids via CTE so group-filter and user-page share one query pass.
+            $stmt = $this->rvnDb->prepare(
+                'WITH filtered_user_ids AS (
+                     SELECT DISTINCT ug.user AS user_id
+                     FROM ' . $ugTable . ' ug
+                     INNER JOIN ' . $groupsTable . ' gf ON gf.id = ug."group"
+                     WHERE LOWER(gf.name) = :group_name
+                 ),
+                 page_users AS (
+                     SELECT u.id,
+                            u.username,
+                            u.string,
+                            u.name,
+                            u.email,
+                            u.theme,
+                            u.avatar,
+                            COUNT(*) OVER() AS total_rows
+                     FROM ' . $usersTable . ' u
+                     INNER JOIN filtered_user_ids f ON f.user_id = u.id
+                     ORDER BY u.id ASC
+                     LIMIT :limit OFFSET :offset
+                 )
+                 SELECT pu.id AS user_id,
+                        pu.username,
+                        pu.string,
+                        pu.name,
+                        pu.email,
+                        pu.theme,
+                        pu.avatar,
+                        pu.total_rows,
+                        g.id AS group_id,
+                        g.name AS group_name,
+                        g.slug AS group_slug,
+                        g.permissions AS group_permissions,
+                        CASE WHEN LOWER(g.slug) IN (\'admin\', \'user\', \'guest\', \'validating\', \'banned\') THEN 1 ELSE 0 END AS group_is_stock,
+                        CASE WHEN ug.user IS NULL THEN 0 ELSE 1 END AS group_selected
+                 FROM ' . $groupsTable . ' g
+                 LEFT JOIN page_users pu ON 1 = 1
+                 LEFT JOIN ' . $ugTable . ' ug
+                   ON ug."group" = g.id
+                  AND ug.user = pu.id
+                 ORDER BY COALESCE(pu.id, 0) ASC, g.id ASC'
+            );
+            $stmt->bindValue(':group_name', $normalizedGroupFilter, PDO::PARAM_STR);
+            $stmt->bindValue(':limit', $safeLimit, PDO::PARAM_INT);
+            $stmt->bindValue(':offset', $safeOffset, PDO::PARAM_INT);
+        }
+
+        $stmt->execute();
+        $rows = $stmt->fetchAll() ?: [];
+
+        $usersById = [];
+        /** @var array<int, array<int, array{name: string, permissions: int}>> $groupMap */
+        $groupMap = [];
+        $groupOptionsById = [];
+        foreach ($rows as $row) {
+            $groupId = (int) ($row['group_id'] ?? 0);
+            if ($groupId > 0 && !isset($groupOptionsById[$groupId])) {
+                $groupOptionsById[$groupId] = [
+                    'id'          => $groupId,
+                    'name'        => (string) ($row['group_name'] ?? ''),
+                    'slug'        => (string) ($row['group_slug'] ?? ''),
+                    'permissions' => (int) ($row['group_permissions'] ?? 0),
+                    'is_stock'    => (int) ($row['group_is_stock'] ?? 0),
+                ];
+            }
+
+            $userId = (int) ($row['user_id'] ?? 0);
+            if ($userId < 1) {
+                continue;
+            }
+
+            if (!isset($usersById[$userId])) {
+                if ($total === 0) {
+                    $total = (int) ($row['total_rows'] ?? 0);
+                }
+
+                $usersById[$userId] = [
+                    'id'       => $userId,
+                    'username' => (string) ($row['username'] ?? ''),
+                    'string'   => (string) ($row['string'] ?? $row['user_string'] ?? ''),
+                    'name'     => (string) ($row['name'] ?? ''),
+                    'email'    => (string) ($row['email'] ?? ''),
+                    'theme'    => (string) (($row['theme'] ?? '') !== '' ? $row['theme'] : 'default'),
+                    'avatar'   => isset($row['avatar']) && $row['avatar'] !== '' ? (string) $row['avatar'] : null,
+                ];
+            }
+
+            if ($groupId > 0 && (int) ($row['group_selected'] ?? 0) === 1) {
+                $groupMap[$userId] ??= [];
+                $groupMap[$userId][] = [
+                    'name'        => (string) ($row['group_name'] ?? ''),
+                    'permissions' => (int) ($row['group_permissions'] ?? 0),
+                ];
+            }
+        }
+
+        // Window COUNT() returns 0 for the empty page when offset is beyond the result set;
+        // fall back to a direct count query so pagination metadata stays accurate.
+        if ($usersById === [] && $safeOffset > 0) {
+            $total = $this->countForPanel($normalizedGroupFilter !== '' ? $normalizedGroupFilter : null);
+        }
+
+        $groupOptions = array_values($groupOptionsById);
+        usort(
+            $groupOptions,
+            static function (array $a, array $b): int {
+                $aIsStock = (int) ($a['is_stock'] ?? 0);
+                $bIsStock = (int) ($b['is_stock'] ?? 0);
+                if ($aIsStock !== $bIsStock) {
+                    return $bIsStock <=> $aIsStock;
+                }
+
+                $aName = strtolower(trim((string) ($a['name'] ?? '')));
+                $bName = strtolower(trim((string) ($b['name'] ?? '')));
+                if ($aName !== $bName) {
+                    return $aName <=> $bName;
+                }
+
+                return ((int) ($a['id'] ?? 0)) <=> ((int) ($b['id'] ?? 0));
+            }
         );
+
+        return [
+            'rows'          => $this->hydratePanelUsers(array_values($usersById), $groupMap),
+            'total'         => $total,
+            'group_options' => $groupOptions,
+        ];
     }
 
     /**
@@ -776,25 +1135,60 @@ final class UserRepository
     }
 
     /**
-     * Builds map: user_id => list of group rows.
+     * Builds a map of user_id to assigned group entries for the given user ids.
      *
-     * @param array<int> $userIds
-     * @return array<int, array<int, array{name: string, permissions: int}>>
+     * When the list is empty all group memberships are returned, which supports the
+     * edit-form path where the full catalog must be loaded for a single known user.
+     *
+     * @param array<int> $userIds User ids to query group memberships for.
+     * @return array<int, array<int, array{name: string, permissions: int}>> Map of user id to group entry list.
      */
     private function groupEntriesByUserId(array $userIds = []): array
     {
-        return $this->userGroupCatalogService->groupEntriesByUserId(
-            $this->rvnDb,
-            $this->groupTable('groups'),
-            $this->groupTable('user_groups'),
-            $userIds
+        $userIds = array_values(array_unique(array_filter($userIds, static fn (int $id): bool => $id > 0)));
+
+        $where  = '';
+        $params = [];
+        if ($userIds !== []) {
+            $placeholders = [];
+            foreach ($userIds as $index => $userId) {
+                $placeholder = ':user_' . $index;
+                $placeholders[] = $placeholder;
+                $params[$placeholder] = $userId;
+            }
+            $where = ' WHERE ug.user IN (' . implode(', ', $placeholders) . ')';
+        }
+
+        $stmt = $this->rvnDb->prepare(
+            'SELECT ug.user, g.name, g.permissions
+             FROM ' . $this->groupTable('user_groups') . ' ug
+             INNER JOIN ' . $this->groupTable('groups') . ' g ON g.id = ug."group"
+             ' . $where . '
+             ORDER BY ug.user ASC, g.id ASC'
         );
+        $stmt->execute($params);
+
+        $rows = $stmt->fetchAll() ?: [];
+        $map  = [];
+        foreach ($rows as $row) {
+            $userId = (int) $row['user'];
+            $map[$userId] ??= [];
+            $map[$userId][] = [
+                'name'        => (string) ($row['name'] ?? ''),
+                'permissions' => (int) ($row['permissions'] ?? 0),
+            ];
+        }
+
+        return $map;
     }
 
     /**
-     * Returns one combined payload for user-group rows and group filter options.
+     * Returns group-membership map and full group catalog for a set of user ids.
      *
-     * @param array<int> $userIds
+     * Used by the edit-form path to produce both the selected-group display and
+     * the complete group options for the assignment picker in one query pass.
+     *
+     * @param array<int> $userIds User ids to resolve memberships for.
      * @return array{
      *   group_map: array<int, array<int, array{name: string, permissions: int}>>,
      *   group_options: array<int, array{id: int, name: string, slug: string, permissions: int, is_stock: int}>
@@ -802,12 +1196,138 @@ final class UserRepository
      */
     private function groupEntriesAndOptionsForUserIds(array $userIds): array
     {
-        return $this->userGroupCatalogService->groupEntriesAndOptionsForUserIds(
-            $this->rvnDb,
-            $this->groupTable('groups'),
-            $this->groupTable('user_groups'),
-            $userIds
+        $groupsTable = $this->groupTable('groups');
+        $ugTable     = $this->groupTable('user_groups');
+        $normalizedUserIds = array_values(array_unique(array_filter($userIds, static fn (int $id): bool => $id > 0)));
+
+        if ($normalizedUserIds === []) {
+            // No users on this page — return all group options with an empty membership map
+            // so the edit-form assignment picker is still populated.
+            $stmt = $this->rvnDb->prepare(
+                'SELECT g.id AS group_id,
+                        g.name AS group_name,
+                        g.slug AS group_slug,
+                        g.permissions AS group_permissions,
+                        CASE WHEN LOWER(g.slug) IN (\'admin\', \'user\', \'guest\', \'validating\', \'banned\') THEN 1 ELSE 0 END AS group_is_stock
+                 FROM ' . $groupsTable . ' g
+                 ORDER BY g.id ASC'
+            );
+            $stmt->execute();
+
+            $rows = $stmt->fetchAll() ?: [];
+            $groupOptions = [];
+            foreach ($rows as $row) {
+                $groupId = (int) ($row['group_id'] ?? 0);
+                if ($groupId < 1) {
+                    continue;
+                }
+
+                $groupOptions[] = [
+                    'id'          => $groupId,
+                    'name'        => (string) ($row['group_name'] ?? ''),
+                    'slug'        => (string) ($row['group_slug'] ?? ''),
+                    'permissions' => (int) ($row['group_permissions'] ?? 0),
+                    'is_stock'    => (int) ($row['group_is_stock'] ?? 0),
+                ];
+            }
+
+            return [
+                'group_map'     => [],
+                'group_options' => $this->sortGroupOptions($groupOptions),
+            ];
+        }
+
+        $params       = [];
+        $placeholders = [];
+        foreach ($normalizedUserIds as $index => $userId) {
+            $placeholder = ':user_' . $index;
+            $placeholders[] = $placeholder;
+            $params[$placeholder] = $userId;
+        }
+
+        // LEFT JOIN keeps all groups visible so the options picker shows the full catalog
+        // even when none of the current page users belong to a given group.
+        $stmt = $this->rvnDb->prepare(
+            'SELECT g.id AS group_id,
+                    g.name AS group_name,
+                    g.slug AS group_slug,
+                    g.permissions AS group_permissions,
+                    CASE WHEN LOWER(g.slug) IN (\'admin\', \'user\', \'guest\', \'validating\', \'banned\') THEN 1 ELSE 0 END AS group_is_stock,
+                    ug.user
+             FROM ' . $groupsTable . ' g
+             LEFT JOIN ' . $ugTable . ' ug
+               ON ug."group" = g.id
+              AND ug.user IN (' . implode(', ', $placeholders) . ')
+             ORDER BY g.id ASC, ug.user ASC'
         );
+        $stmt->execute($params);
+
+        $rows           = $stmt->fetchAll() ?: [];
+        $groupMap       = [];
+        $groupOptionsById = [];
+
+        foreach ($rows as $row) {
+            $groupId = (int) ($row['group_id'] ?? 0);
+            if ($groupId < 1) {
+                continue;
+            }
+
+            if (!isset($groupOptionsById[$groupId])) {
+                $groupOptionsById[$groupId] = [
+                    'id'          => $groupId,
+                    'name'        => (string) ($row['group_name'] ?? ''),
+                    'slug'        => (string) ($row['group_slug'] ?? ''),
+                    'permissions' => (int) ($row['group_permissions'] ?? 0),
+                    'is_stock'    => (int) ($row['group_is_stock'] ?? 0),
+                ];
+            }
+
+            $userId = (int) ($row['user'] ?? 0);
+            if ($userId < 1) {
+                continue;
+            }
+
+            $groupMap[$userId] ??= [];
+            $groupMap[$userId][] = [
+                'name'        => (string) ($row['group_name'] ?? ''),
+                'permissions' => (int) ($row['group_permissions'] ?? 0),
+            ];
+        }
+
+        return [
+            'group_map'     => $groupMap,
+            'group_options' => $this->sortGroupOptions(array_values($groupOptionsById)),
+        ];
+    }
+
+    /**
+     * Sorts group options: stock groups first, then alphabetically by name, then by id.
+     *
+     * @param array<int, array{id: int, name: string, slug: string, permissions: int, is_stock: int}> $groupOptions Unsorted group option rows.
+     * @return array<int, array{id: int, name: string, slug: string, permissions: int, is_stock: int}> Sorted group option rows.
+     */
+    private function sortGroupOptions(array $groupOptions): array
+    {
+        usort(
+            $groupOptions,
+            static function (array $a, array $b): int {
+                $aIsStock = (int) ($a['is_stock'] ?? 0);
+                $bIsStock = (int) ($b['is_stock'] ?? 0);
+                if ($aIsStock !== $bIsStock) {
+                    return $bIsStock <=> $aIsStock;
+                }
+
+                $aName = strtolower(trim((string) ($a['name'] ?? '')));
+                $bName = strtolower(trim((string) ($b['name'] ?? '')));
+                if ($aName !== $bName) {
+                    return $aName <=> $bName;
+                }
+
+                return ((int) ($a['id'] ?? 0)) <=> ((int) ($b['id'] ?? 0));
+            }
+        );
+
+        return $groupOptions;
     }
 
     /**
@@ -823,17 +1343,39 @@ final class UserRepository
     }
 
     /**
-     * Inserts one user-group membership idempotently.
+     * Inserts one user-group link idempotently, ignoring pre-existing rows.
+     *
+     * Uses backend-specific INSERT … DO NOTHING / INSERT IGNORE syntax to avoid
+     * a separate EXISTS check that could race under concurrent requests.
+     *
+     * @param int $userId  User id to attach.
+     * @param int $groupId Group id to attach the user to.
+     * @return void
      */
     private function attachUserToGroup(int $userId, int $groupId): void
     {
-        $this->groupMembershipWriteService->attachUserToGroup(
-            $this->rvnDb,
-            $this->driver,
-            $this->groupTable('user_groups'),
-            $userId,
-            $groupId
-        );
+        $table  = $this->groupTable('user_groups');
+        $driver = strtolower(trim($this->driver));
+        if ($driver === 'mysql') {
+            $stmt = $this->rvnDb->prepare(
+                'INSERT IGNORE INTO ' . $table . ' (user, `group`)
+                 VALUES (:user_id, :group_id)'
+            );
+        } elseif ($driver === 'pgsql') {
+            $stmt = $this->rvnDb->prepare(
+                'INSERT INTO ' . $table . ' ("user", "group")
+                 VALUES (:user_id, :group_id)
+                 ON CONFLICT ("user", "group") DO NOTHING'
+            );
+        } else {
+            $stmt = $this->rvnDb->prepare(
+                'INSERT INTO ' . $table . ' (user, "group")
+                 VALUES (:user_id, :group_id)
+                 ON CONFLICT(user, "group") DO NOTHING'
+            );
+        }
+
+        $stmt->execute([':user_id' => $userId, ':group_id' => $groupId]);
     }
 
     /**

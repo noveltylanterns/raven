@@ -97,6 +97,48 @@ final class GroupDataParser
     }
 
     /**
+     * Returns the numeric id for a group by its slug, or null when not found.
+     *
+     * @param string $slug Group slug to resolve.
+     * @return int|null Group id, or null when slug does not match any group.
+     */
+    public function idBySlug(string $slug): ?int
+    {
+        $normalizedSlug = $this->input->slug($slug);
+        if ($normalizedSlug === null) {
+            return null;
+        }
+
+        return $this->groupRepo()->idBySlug($normalizedSlug);
+    }
+
+    /**
+     * Returns flat name/slug option rows for group select menus.
+     *
+     * @return array<int, array{id: int, name: string, slug: string}> Group option rows ordered by name.
+     */
+    public function listOptions(): array
+    {
+        return $this->groupRepo()->listOptions();
+    }
+
+    /**
+     * Returns the public group page record plus decorated member list for one group slug.
+     *
+     * @param string $slug Group slug to resolve.
+     * @return array{group: array<string, mixed>, members: array<int, array<string, mixed>>}|null Group and member data, or null when not found.
+     */
+    public function findPublicRouteDataBySlug(string $slug): ?array
+    {
+        $normalizedSlug = $this->input->slug($slug);
+        if ($normalizedSlug === null) {
+            return null;
+        }
+
+        return $this->groupRepo()->findPublicRouteDataBySlug($normalizedSlug);
+    }
+
+    /**
      * Returns the injected group repository for repo-backed reads.
      *
      * @return GroupRepository Repository backing canonical read methods.

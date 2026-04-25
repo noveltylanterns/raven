@@ -26,7 +26,7 @@ use Raven\Core\Controller\Panel\RedirectController;
 use Raven\Core\Controller\Panel\RoutingController;
 use Raven\Core\Controller\Panel\SharedController;
 use Raven\Core\Controller\Panel\SystemController;
-use Raven\Core\Controller\Panel\TaxonomyController;
+use Raven\Core\Controller\Panel\TagController;
 use Raven\Core\Controller\Panel\UpdateController;
 use Raven\Core\Controller\Panel\UserController;
 use Raven\Core\Repository\CategoryRepository;
@@ -121,7 +121,7 @@ final class PanelRuntimeBuilder
         $logsController = null;
         $routingController = null;
         $systemController = null;
-        $taxonomyController = null;
+        $tagController = null;
         $updateController = null;
         $userController = null;
         $categorySetRepository = null;
@@ -851,18 +851,18 @@ final class PanelRuntimeBuilder
         };
 
         /**
-         * Builds the split taxonomy controller on first use.
-         * Owns tag, tag-set, and shared taxonomy deletion helpers.
+         * Builds the split tag controller on first use.
+         * Owns tag list, create/edit, save, delete, and tag-set routes.
          */
-        $rvn['panel_taxonomy_controller'] = static function () use (&$taxonomyController, &$rvn, $panelTaxonomyDomain): TaxonomyController {
-            if ($taxonomyController instanceof TaxonomyController) {
-                return $taxonomyController;
+        $rvn['panel_tag_controller'] = static function () use (&$tagController, &$rvn, $panelTaxonomyDomain): TagController {
+            if ($tagController instanceof TagController) {
+                return $tagController;
             }
 
             /** @var callable(): SharedController $requestContextFactory */
             $requestContextFactory = $rvn['panel_request_context'];
             $taxonomyDomain = $panelTaxonomyDomain();
-            $taxonomyController = new TaxonomyController(
+            $tagController = new TagController(
                 $requestContextFactory(),
                 $rvn['input'],
                 $taxonomyDomain['tag'],
@@ -875,7 +875,7 @@ final class PanelRuntimeBuilder
                 new Upload()
             );
 
-            return $taxonomyController;
+            return $tagController;
         };
 
         /**
@@ -894,7 +894,7 @@ final class PanelRuntimeBuilder
                 $rvn['config'],
                 $rvn['input'],
                 (string) $rvn['root'],
-                $userDomain['group'],
+                new GroupDataParser($rvn['input'], $userDomain['group']),
                 $userDomain['user'],
                 $userDomain['invite_tokens'],
                 new SessionFlash('_raven_flash_list'),

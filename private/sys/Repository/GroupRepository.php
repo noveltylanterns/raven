@@ -12,7 +12,6 @@ declare(strict_types=1);
 namespace Raven\Core\Repository;
 
 use PDO;
-use Raven\Lib\Auth\GroupMembershipWriteService;
 use Raven\Lib\Auth\Public\GroupPublicRouteService;
 use Raven\Lib\Auth\GroupRolePolicy;
 use Raven\Lib\Database\TableNameResolver;
@@ -32,7 +31,6 @@ final class GroupRepository
     private string $driver;
     private string $prefix;
     private GroupRolePolicy $rolePolicy;
-    private GroupMembershipWriteService $groupMembershipWriteService;
     private GroupPublicRouteService $groupPublicRouteService;
     private GroupScribe $groupScribe;
 
@@ -42,7 +40,6 @@ final class GroupRepository
         $this->driver = $driver;
         $this->prefix = preg_replace('/[^a-zA-Z0-9_]/', '', $prefix) ?? '';
         $this->rolePolicy = new GroupRolePolicy();
-        $this->groupMembershipWriteService = new GroupMembershipWriteService();
         $this->groupPublicRouteService = new GroupPublicRouteService();
         $this->groupScribe = new GroupScribe($db, $driver, $prefix);
     }
@@ -455,29 +452,57 @@ final class GroupRepository
     }
 
     /**
-     * Returns membership count for one user.
+     * Returns the number of group memberships the given user currently holds.
+     *
+     * @param int $userId User id to count memberships for.
+     * @return int Current membership count for the user.
      */
     private function membershipCountForUser(int $userId): int
     {
-        return $this->groupMembershipWriteService->membershipCountForUser(
-            $this->db,
-            $this->table('user_groups'),
-            $userId
+        $stmt = $this->db->prepare(
+            'SELECT COUNT(*)
+             FROM ' . $this->table('user_groups') . '
+             WHERE user = :user'
         );
+        $stmt->execute([':user' => $userId]);
+
+        return (int) $stmt->fetchColumn();
     }
 
     /**
-     * Inserts one user-group membership idempotently.
+     * Inserts one user-group link idempotently, ignoring pre-existing rows.
+     *
+     * Uses backend-specific INSERT … DO NOTHING / INSERT IGNORE syntax to avoid
+     * a separate EXISTS check that could race under concurrent requests.
+     *
+     * @param int $userId  User id to attach.
+     * @param int $groupId Group id to attach the user to.
+     * @return void
      */
     private function attachUserToGroup(int $userId, int $groupId): void
     {
-        $this->groupMembershipWriteService->attachUserToGroup(
-            $this->db,
-            $this->driver,
-            $this->table('user_groups'),
-            $userId,
-            $groupId
-        );
+        $table = $this->table('user_groups');
+        $driver = strtolower(trim($this->driver));
+        if ($driver === 'mysql') {
+            $stmt = $this->db->prepare(
+                'INSERT IGNORE INTO ' . $table . ' (user, `group`)
+                 VALUES (:user_id, :group_id)'
+            );
+        } elseif ($driver === 'pgsql') {
+            $stmt = $this->db->prepare(
+                'INSERT INTO ' . $table . ' ("user", "group")
+                 VALUES (:user_id, :group_id)
+                 ON CONFLICT ("user", "group") DO NOTHING'
+            );
+        } else {
+            $stmt = $this->db->prepare(
+                'INSERT INTO ' . $table . ' (user, "group")
+                 VALUES (:user_id, :group_id)
+                 ON CONFLICT(user, "group") DO NOTHING'
+            );
+        }
+
+        $stmt->execute([':user_id' => $userId, ':group_id' => $groupId]);
     }
 
     /**

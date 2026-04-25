@@ -252,7 +252,7 @@ final class TaxonomyRepoParser
                     'active' => (int) ($row['active'] ?? 0),
                     'target' => (string) ($row['target'] ?? ''),
                 ];
-                $result['redirect_rows'][] = ChannelContextParser::applyBasicChannelContext($redirectRow, $channel);
+                $result['redirect_rows'][] = ChannelRepoParser::applyBasicChannelContext($redirectRow, $channel);
             }
         }
 
@@ -377,7 +377,7 @@ final class TaxonomyRepoParser
      */
     private function channelsByIdMap(): array
     {
-        return ChannelContextParser::channelsByIdMap($this->channelRepo->listRecords());
+        return ChannelRepoParser::channelsByIdMap($this->channelRepo->listRecords());
     }
 
     /**

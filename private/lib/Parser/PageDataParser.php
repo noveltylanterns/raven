@@ -12,6 +12,7 @@ declare(strict_types=1);
 namespace Raven\Lib\Parser;
 
 use Raven\Core\Repository\PageRepository;
+use Raven\Lib\Media\Panel\PageEditorGalleryHydrator;
 use Raven\Lib\Security\InputSanitizer;
 use RuntimeException;
 
@@ -25,6 +26,7 @@ final class PageDataParser
 {
     private InputSanitizer $input;
     private ?PageRepository $pageRepo;
+    private PageEditorGalleryHydrator $galleryHydrator;
 
     /**
      * Initializes the page data reader.
@@ -36,6 +38,7 @@ final class PageDataParser
     {
         $this->input = $input;
         $this->pageRepo = $pageRepo;
+        $this->galleryHydrator = new PageEditorGalleryHydrator();
     }
 
     /**
@@ -248,7 +251,10 @@ final class PageDataParser
     }
 
     /**
-     * Returns the panel edit form data for one page by id, including gallery images.
+     * Returns the panel edit form data for one page by id, including hydrated gallery images.
+     *
+     * The repository returns raw image/variant join rows; gallery hydration is applied here
+     * so `PageRepository` stays free of panel-media concerns.
      *
      * @param int $id Page id to load.
      * @return array{page: array<string, mixed>, gallery_images: array<int, array<string, mixed>>}|null Edit data, or null when not found.
@@ -259,7 +265,18 @@ final class PageDataParser
             return null;
         }
 
-        return $this->pageRepo()->editFormDataById($id);
+        $result = $this->pageRepo()->editFormDataById($id);
+        if ($result === null) {
+            return null;
+        }
+
+        return [
+            'page'          => $result['page'],
+            'gallery_images' => $this->galleryHydrator->hydrate(
+                $result['gallery_rows'],
+                fn (string $storedPath): string => '/' . ltrim($storedPath, '/')
+            ),
+        ];
     }
 
     /**
@@ -409,8 +426,8 @@ final class PageDataParser
             return null;
         }
 
-        if ($allowRoot && $normalized === ChannelContextParser::ROOT_CHANNEL_SLUG) {
-            return ChannelContextParser::ROOT_CHANNEL_SLUG;
+        if ($allowRoot && $normalized === ChannelRepoParser::ROOT_CHANNEL_SLUG) {
+            return ChannelRepoParser::ROOT_CHANNEL_SLUG;
         }
 
         return $this->input->slug($normalized);
@@ -436,7 +453,7 @@ final class PageDataParser
         }
 
         $normalized = strtolower(trim($channel));
-        if ($normalized === '' || $normalized === ChannelContextParser::ROOT_CHANNEL_SLUG) {
+        if ($normalized === '' || $normalized === ChannelRepoParser::ROOT_CHANNEL_SLUG) {
             return null;
         }
 

@@ -90,11 +90,11 @@ final class PanelController
                 throw new RuntimeException('Panel category controller factory is unavailable.');
             };
 
-        /** @var callable(): object $panelTaxonomyController */
-        $panelTaxonomyController = is_callable($rvn['panel_taxonomy_controller'] ?? null)
-            ? $rvn['panel_taxonomy_controller']
+        /** @var callable(): object $panelTagController */
+        $panelTagController = is_callable($rvn['panel_tag_controller'] ?? null)
+            ? $rvn['panel_tag_controller']
             : static function (): object {
-                throw new RuntimeException('Panel taxonomy controller factory is unavailable.');
+                throw new RuntimeException('Panel tag controller factory is unavailable.');
             };
 
         /** @var callable(): object $panelRedirectController */
@@ -412,7 +412,7 @@ final class PanelController
         PanelContentRouteRegistrar::register($router, $panelPageController, $rvn['input'], $renderNotFound);
         PanelChannelRouteRegistrar::register($router, $panelChannelController, $rvn['input'], $renderNotFound);
         PanelCategoryRouteRegistrar::register($router, $panelCategoryController, $rvn['input'], $categoryEnabled, $renderNotFound);
-        PanelTagRouteRegistrar::register($router, $panelTaxonomyController, $rvn['input'], $tagEnabled, $renderNotFound);
+        PanelTagRouteRegistrar::register($router, $panelTagController, $rvn['input'], $tagEnabled, $renderNotFound);
         PanelRedirectRouteRegistrar::register($router, $panelRedirectController, $rvn['input'], $renderNotFound);
         PanelUserRouteRegistrar::register($router, $panelUserController, $rvn['input'], $renderNotFound);
         PanelGroupRouteRegistrar::register($router, $panelGroupController, $rvn['input'], $renderNotFound);

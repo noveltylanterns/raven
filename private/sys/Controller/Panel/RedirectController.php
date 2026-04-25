@@ -21,9 +21,8 @@ use Raven\Lib\View\Panel\Editor;
 /**
  * Handles redirect management routes for the panel.
  *
- * Extracted from the legacy monolithic PanelController and the transitional
- * TaxonomyController slice. Redirect CRUD is the narrowest taxonomy seam and
- * stands well on its own because it has no category/tag coupling.
+ * Redirect CRUD is the narrowest taxonomy seam and stands well on its own
+ * because it has no category/tag coupling.
  */
 final class RedirectController
 {

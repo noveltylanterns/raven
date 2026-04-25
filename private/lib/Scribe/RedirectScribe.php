@@ -14,7 +14,7 @@ namespace Raven\Lib\Scribe;
 use PDO;
 use Raven\Core\Repository\ChannelRepository;
 use Raven\Lib\Database\TableNameResolver;
-use Raven\Lib\Parser\ChannelContextParser;
+use Raven\Lib\Parser\ChannelRepoParser;
 use Raven\Lib\Parser\PageDuplicateParser;
 use RuntimeException;
 
@@ -179,11 +179,11 @@ final class RedirectScribe
      */
     private function channelIdBySlug(?string $slug): ?int
     {
-        if (ChannelContextParser::isRootChannelSlug((string) ($slug ?? ''))) {
+        if (ChannelRepoParser::isRootChannelSlug((string) ($slug ?? ''))) {
             return 0;
         }
 
-        return ChannelContextParser::resolveChannelIdBySlug(
+        return ChannelRepoParser::resolveChannelIdBySlug(
             $slug,
             fn (string $normalized): ?int => $this->channelRepo->idBySlug($normalized),
             'Selected channel does not exist.'

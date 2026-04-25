@@ -293,17 +293,13 @@ final class PreferencesController
                 if ($normalizedExtension === null) {
                     $errors[] = 'Avatar upload format is not supported.';
                 } else {
-                    if ($currentUserString === null) {
-                        $errors[] = 'User string is missing for this account.';
+                    $storeResult = $this->userMediaScribe->storeAvatarUpload($userId, $avatarUpload, $normalizedExtension);
+                    if (!(bool) ($storeResult['ok'] ?? false)) {
+                        $errors[] = (string) ($storeResult['error'] ?? 'Avatar upload failed.');
                     } else {
-                        $storeResult = $this->userMediaScribe->storeAvatarUpload($currentUserString, $avatarUpload, $normalizedExtension);
-                        if (!(bool) ($storeResult['ok'] ?? false)) {
-                            $errors[] = (string) ($storeResult['error'] ?? 'Avatar upload failed.');
-                        } else {
-                            $avatarSet = true;
-                            $avatarFilename = (string) ($storeResult['filename'] ?? '');
-                            $uploadedAvatarFilename = $avatarFilename;
-                        }
+                        $avatarSet = true;
+                        $avatarFilename = (string) ($storeResult['path'] ?? '');
+                        $uploadedAvatarFilename = $avatarFilename;
                     }
                 }
             }
@@ -322,14 +318,12 @@ final class PreferencesController
                 $normalizedExtension = $this->userMediaScribe->normalizeExtension((string) ($result['extension'] ?? ''));
                 if ($normalizedExtension === null) {
                     $errors[] = 'Cover image upload format is not supported.';
-                } elseif ($currentUserString === null) {
-                    $errors[] = 'User string is missing for this account.';
                 } else {
-                    $storeResult = $this->userMediaScribe->storeCoverUpload($currentUserString, $coverUpload, $normalizedExtension);
+                    $storeResult = $this->userMediaScribe->storeCoverUpload($userId, $coverUpload, $normalizedExtension);
                     if (!(bool) ($storeResult['ok'] ?? false)) {
                         $errors[] = (string) ($storeResult['error'] ?? 'Cover image upload failed.');
                     } else {
-                        $coverImage = (string) ($storeResult['filename'] ?? '');
+                        $coverImage = (string) ($storeResult['path'] ?? '');
                         $uploadedCoverFilename = $coverImage;
                     }
                 }

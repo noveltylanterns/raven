@@ -39,7 +39,7 @@ No but seriously, the Agent has been very uncooperative about this one. I'm not 
 
 ## Building on Raven
 
-There are several places in your local install that are going to be ignored by the future update process: Your **Theme** and **Extension** folders. They are designed to safely accomodate your modifications and preserve them through system updates. If you need further architectural info, I had Codex [document](docs/README.md) its work.
+There are several places in your local install that are going to be ignored by the future update process: Your **Theme** and **Extension** folders. They are designed to safely accomodate your modifications and preserve them through system updates. If you need further architectural info, I had Codex [document](docs/readme.md) its work.
 
 ### Themes
 
@@ -74,11 +74,11 @@ There are several extension types:
 
 Raven also ships with several useful bundled stock extensions. They are disabled by default on new installs. These official Stock extensions **cannot** be deleted.
 
-Point your Agent at [private/ext/AGENTS.md](private/ext/AGENTS.md) to get started with building Raven extensions, or generate a skeleton in your panel's [Extension Manager](docs/Extensions.md).
+Point your Agent at [private/ext/AGENTS.md](private/ext/AGENTS.md) to get started with building Raven extensions, or generate a skeleton in your panel's [Extension Manager](docs/extensions.md).
 
 #### Enable the Output Profiler
 
-The option is available in your [System Configuration](docs/Configuration.md). It puts a little debug toolbar at the bottom of every page, so you can easily chase down hiccups & bloat - exactly what you need for auditing AI-generated code.
+The option is available in your [System Configuration](docs/configuration.md). It puts a little debug toolbar at the bottom of every page, so you can easily chase down hiccups & bloat - exactly what you need for auditing AI-generated code.
 
 
 ## Caveats
@@ -103,7 +103,7 @@ Brothers, truly I tell you: ***There is a better way.***
 
 ## Useful Links
 
-Documentation Index: [docs/README.md](docs/README.md)
+Documentation Index: [docs/readme.md](docs/readme.md)
 
 Official Site: [raven.lanterns.io](https://raven.lanterns.io)
 

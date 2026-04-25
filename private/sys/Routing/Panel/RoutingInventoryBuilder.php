@@ -11,7 +11,7 @@ declare(strict_types=1);
 
 namespace Raven\Core\Routing\Panel;
 
-use Raven\Lib\Parser\ChannelContextParser;
+use Raven\Lib\Parser\ChannelRepoParser;
 use Raven\Lib\Security\InputSanitizer;
 
 /**
@@ -215,8 +215,8 @@ final class RoutingInventoryBuilder
                 continue;
             }
 
-            $isRootChannel = ChannelContextParser::isRootChannelId($channelId)
-                || ChannelContextParser::isRootChannelSlug($channelSlug);
+            $isRootChannel = ChannelRepoParser::isRootChannelId($channelId)
+                || ChannelRepoParser::isRootChannelSlug($channelSlug);
             $landingSlug = $isRootChannel
                 ? $this->rootLandingSlug($pagesForRouting)
                 : trim((string) ($channelLandingMap[$channelSlug] ?? ''));
@@ -588,7 +588,7 @@ final class RoutingInventoryBuilder
         foreach ($pagesForRouting as $page) {
             $channelId = (int) ($page['channel'] ?? 0);
             $channelSlug = trim((string) ($page['channel_slug'] ?? ''));
-            if ($channelId !== ChannelContextParser::ROOT_CHANNEL_ID && $channelSlug !== '') {
+            if ($channelId !== ChannelRepoParser::ROOT_CHANNEL_ID && $channelSlug !== '') {
                 continue;
             }
 

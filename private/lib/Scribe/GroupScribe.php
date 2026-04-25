@@ -12,7 +12,6 @@ declare(strict_types=1);
 namespace Raven\Lib\Scribe;
 
 use PDO;
-use Raven\Lib\Auth\GroupMembershipWriteService;
 use Raven\Lib\Auth\GroupRolePolicy;
 use Raven\Lib\Database\TableNameResolver;
 use RuntimeException;
@@ -33,7 +32,6 @@ final class GroupScribe
     private string $driver;
     private string $prefix;
     private GroupRolePolicy $rolePolicy;
-    private GroupMembershipWriteService $groupMembershipWriteService;
 
     /**
      * Prepares the group scribe for group writes.
@@ -48,7 +46,6 @@ final class GroupScribe
         $this->driver = $driver;
         $this->prefix = preg_replace('/[^a-zA-Z0-9_]/', '', $prefix) ?? '';
         $this->rolePolicy = new GroupRolePolicy();
-        $this->groupMembershipWriteService = new GroupMembershipWriteService();
     }
 
     /**
@@ -242,15 +239,24 @@ final class GroupScribe
     /**
      * Returns the next custom group id from the reserved custom range.
      *
-     * @return int Next available custom group id.
+     * Scans MAX(id) in the custom range and increments by one to avoid reusing retired ids.
+     *
+     * @return int Next available custom group id at or above the custom range floor.
      */
     private function nextCustomGroupId(): int
     {
-        return $this->groupMembershipWriteService->nextCustomGroupId(
-            $this->db,
-            $this->table('groups'),
-            self::CUSTOM_GROUP_ID_START
+        $stmt = $this->db->prepare(
+            'SELECT MAX(id)
+             FROM ' . $this->table('groups') . '
+             WHERE id >= :min_id'
         );
+        $stmt->execute([':min_id' => self::CUSTOM_GROUP_ID_START]);
+        $maxId = $stmt->fetchColumn();
+        if ($maxId === false || $maxId === null) {
+            return self::CUSTOM_GROUP_ID_START;
+        }
+
+        return max((int) $maxId + 1, self::CUSTOM_GROUP_ID_START);
     }
 
     /**

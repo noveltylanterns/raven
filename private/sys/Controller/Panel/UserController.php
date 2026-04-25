@@ -13,8 +13,8 @@ namespace Raven\Core\Controller\Panel;
 
 use Closure;
 use Raven\Core\Config;
-use Raven\Core\Repository\GroupRepository;
 use Raven\Core\Repository\InviteRepository;
+use Raven\Lib\Parser\GroupDataParser;
 use Raven\Core\Repository\UserRepository;
 use Raven\Lib\Auth\LoginIdentifierResolver;
 use Raven\Lib\Auth\Panel\PanelAccess;
@@ -47,7 +47,7 @@ final class UserController
     private Config $config;
     private InputSanitizer $input;
     private string $root;
-    private GroupRepository $groupRepo;
+    private GroupDataParser $groupDataParser;
     private UserRepository $userRepo;
     private Closure $inviteTokensResolver;
     private ?InviteRepository $inviteTokens = null;
@@ -70,7 +70,7 @@ final class UserController
      * @param Config $config Runtime configuration reader.
      * @param InputSanitizer $input Shared request input sanitizer.
      * @param string $root Project root path for user-media storage helpers.
-     * @param GroupRepository $groupRepo Group repository for assignment filters and fallbacks.
+     * @param GroupDataParser $groupDataParser Group data parser for group option reads and slug lookups.
      * @param UserRepository $userRepo User repository for panel user CRUD.
      * @param callable(): InviteRepository $inviteTokensResolver Lazy invite-token repository resolver.
      * @param SessionFlash $flashList List-style flash store for generated token batches.
@@ -92,7 +92,7 @@ final class UserController
         Config $config,
         InputSanitizer $input,
         string $root,
-        GroupRepository $groupRepo,
+        GroupDataParser $groupDataParser,
         UserRepository $userRepo,
         callable $inviteTokensResolver,
         SessionFlash $flashList,
@@ -112,7 +112,7 @@ final class UserController
         $this->config = $config;
         $this->input = $input;
         $this->root = rtrim($root, '/\\');
-        $this->groupRepo = $groupRepo;
+        $this->groupDataParser = $groupDataParser;
         $this->userRepo = $userRepo;
         $this->inviteTokensResolver = Closure::fromCallable($inviteTokensResolver);
         $this->flashList = $flashList;
@@ -163,7 +163,7 @@ final class UserController
 
         $groupOptions = is_array($pageResult['group_options'] ?? null)
             ? $pageResult['group_options']
-            : $this->groupRepo->listOptions();
+            : $this->groupDataParser->listOptions();
 
         $this->context->renderPanel('panel/user/list', [
             'users' => $userRows,
@@ -348,7 +348,7 @@ final class UserController
             ? array_values(array_unique(array_merge([$primaryGroupId], $secondaryGroupIds)))
             : array_values(array_unique($secondaryGroupIds));
 
-        $groupOptions = $this->groupRepo->listOptions();
+        $groupOptions = $this->groupDataParser->listOptions();
         $validGroupIds = array_map(static fn (array $group): int => (int) $group['id'], $groupOptions);
         $groupIds = array_values(array_intersect($groupIds, $validGroupIds));
 
@@ -439,7 +439,7 @@ final class UserController
         }
 
         if ($primaryGroupId < 1) {
-            $fallbackGroupId = $this->groupRepo->idBySlug('guest') ?? 0;
+            $fallbackGroupId = $this->groupDataParser->idBySlug('guest') ?? 0;
             if ($fallbackGroupId > 0) {
                 $primaryGroupId = $fallbackGroupId;
                 if (!in_array($primaryGroupId, $groupIds, true)) {
@@ -495,19 +495,14 @@ final class UserController
             }
 
             if ($id !== null) {
-                if ($currentUserString === null) {
-                    $this->context->flash('error', 'User string is missing for this account.');
-                    Redirect::redirect($editUrl);
-                }
-
-                $storeResult = $this->userMediaScribe->storeAvatarUpload($currentUserString, $avatarUpload, $normalizedExtension);
+                $storeResult = $this->userMediaScribe->storeAvatarUpload($id, $avatarUpload, $normalizedExtension);
                 if (!(bool) ($storeResult['ok'] ?? false)) {
                     $this->context->flash('error', (string) ($storeResult['error'] ?? 'Avatar upload failed.'));
                     Redirect::redirect($editUrl);
                 }
 
                 $avatarSet = true;
-                $avatarFilename = (string) ($storeResult['filename'] ?? '');
+                $avatarFilename = (string) ($storeResult['path'] ?? '');
                 $uploadedAvatarFilename = $avatarFilename;
             } else {
                 $pendingAvatarUpload = $avatarUpload;
@@ -533,18 +528,13 @@ final class UserController
             }
 
             if ($id !== null) {
-                if ($currentUserString === null) {
-                    $this->context->flash('error', 'User string is missing for this account.');
-                    Redirect::redirect($editUrl);
-                }
-
-                $storeResult = $this->userMediaScribe->storeCoverUpload($currentUserString, $coverUpload, $normalizedExtension);
+                $storeResult = $this->userMediaScribe->storeCoverUpload($id, $coverUpload, $normalizedExtension);
                 if (!(bool) ($storeResult['ok'] ?? false)) {
                     $this->context->flash('error', (string) ($storeResult['error'] ?? 'Cover image upload failed.'));
                     Redirect::redirect($editUrl);
                 }
 
-                $coverImage = (string) ($storeResult['filename'] ?? '');
+                $coverImage = (string) ($storeResult['path'] ?? '');
                 $uploadedCoverFilename = $coverImage;
             } else {
                 $pendingCoverUpload = $coverUpload;
@@ -596,23 +586,23 @@ final class UserController
                 }
 
                 if (is_array($pendingAvatarUpload) && is_string($pendingAvatarExtension)) {
-                    $storeResult = $this->userMediaScribe->storeAvatarUpload($createdUserString, $pendingAvatarUpload, $pendingAvatarExtension);
+                    $storeResult = $this->userMediaScribe->storeAvatarUpload($savedId, $pendingAvatarUpload, $pendingAvatarExtension);
                     if (!(bool) ($storeResult['ok'] ?? false)) {
                         throw new \RuntimeException((string) ($storeResult['error'] ?? 'Avatar upload failed.'));
                     }
 
                     $avatarSet = true;
-                    $avatarFilename = (string) ($storeResult['filename'] ?? '');
+                    $avatarFilename = (string) ($storeResult['path'] ?? '');
                     $uploadedAvatarFilename = $avatarFilename;
                 }
 
                 if (is_array($pendingCoverUpload) && is_string($pendingCoverExtension)) {
-                    $storeResult = $this->userMediaScribe->storeCoverUpload($createdUserString, $pendingCoverUpload, $pendingCoverExtension);
+                    $storeResult = $this->userMediaScribe->storeCoverUpload($savedId, $pendingCoverUpload, $pendingCoverExtension);
                     if (!(bool) ($storeResult['ok'] ?? false)) {
                         throw new \RuntimeException((string) ($storeResult['error'] ?? 'Cover image upload failed.'));
                     }
 
-                    $coverImage = (string) ($storeResult['filename'] ?? '');
+                    $coverImage = (string) ($storeResult['path'] ?? '');
                     $uploadedCoverFilename = $coverImage;
                 }
 

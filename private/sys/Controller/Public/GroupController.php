@@ -11,7 +11,7 @@ declare(strict_types=1);
 
 namespace Raven\Core\Controller\Public;
 
-use Raven\Core\Repository\GroupRepository;
+use Raven\Lib\Parser\GroupDataParser;
 use Raven\Lib\View\Public\RouteRenderService;
 use Raven\Lib\View\Public\TemplateDecorator;
 
@@ -21,21 +21,21 @@ use Raven\Lib\View\Public\TemplateDecorator;
 final class GroupController
 {
     private SharedController $context;
-    private GroupRepository $groupRepo;
+    private GroupDataParser $groupDataParser;
     private RouteRenderService $routeRenderService;
     private TemplateDecorator $templateDecorator;
 
     /**
      * @param SharedController $context Shared public request context.
-     * @param GroupRepository $groupRepo Group repository for public group routes.
+     * @param GroupDataParser $groupDataParser Group data parser for public group-page lookups.
      * @return void
      */
     public function __construct(
         SharedController $context,
-        GroupRepository $groupRepo
+        GroupDataParser $groupDataParser
     ) {
         $this->context = $context;
-        $this->groupRepo = $groupRepo;
+        $this->groupDataParser = $groupDataParser;
         $this->routeRenderService = new RouteRenderService();
         $this->templateDecorator = new TemplateDecorator(
             $context->config(),
@@ -75,7 +75,7 @@ final class GroupController
             return;
         }
 
-        $groupRouteData = $this->groupRepo->findPublicRouteDataBySlug($normalizedSlug);
+        $groupRouteData = $this->groupDataParser->findPublicRouteDataBySlug($normalizedSlug);
         if ($groupRouteData === null) {
             $this->context->notFound();
             return;

@@ -12,13 +12,10 @@ declare(strict_types=1);
 namespace Raven\Core\Repository;
 
 use PDO;
-use Raven\Lib\Parser\ChannelContextParser;
+use Raven\Lib\Parser\ChannelRepoParser;
 use Raven\Lib\Parser\PageBlockParser;
-use Raven\Lib\Parser\TaxonomyDataParser;
 use Raven\Lib\Scribe\PageScribe;
-use Raven\Lib\View\Panel\ListFilter;
 use Raven\Lib\Database\TableNameResolver;
-use Raven\Lib\Media\Panel\PageEditorGalleryHydrator;
 use Raven\Lib\Parser\PageDuplicateParser;
 use RuntimeException;
 
@@ -34,9 +31,6 @@ final class PageRepository
     private bool $categoryEnabled;
     private bool $tagEnabled;
     private PageBlockParser $pageBlockParser;
-    private PageEditorGalleryHydrator $pageEditorGalleryHydrator;
-    private ListFilter $panelListFilter;
-    private TaxonomyDataParser $taxonomyDataParser;
     private PageScribe $pageScribe;
 
     public function __construct(
@@ -55,9 +49,6 @@ final class PageRepository
         $this->categoryEnabled = $categoryEnabled;
         $this->tagEnabled = $tagEnabled;
         $this->pageBlockParser = new PageBlockParser();
-        $this->pageEditorGalleryHydrator = new PageEditorGalleryHydrator();
-        $this->panelListFilter = new ListFilter();
-        $this->taxonomyDataParser = new TaxonomyDataParser();
         $this->pageScribe = new PageScribe($db, $driver, $prefix, $categoryEnabled, $tagEnabled);
     }
 
@@ -353,7 +344,7 @@ final class PageRepository
         ];
 
         $channel = null;
-        if ($normalizedChannelSlug === ChannelContextParser::ROOT_CHANNEL_SLUG) {
+        if ($normalizedChannelSlug === ChannelRepoParser::ROOT_CHANNEL_SLUG) {
             $sql .= ' AND p.channel = 0';
         } elseif ($normalizedChannelSlug !== '') {
             $channel = $this->channelRepo->findBySlug($normalizedChannelSlug);
@@ -430,8 +421,8 @@ final class PageRepository
         ];
 
         $clauses = [];
-        $includeRoot = isset($normalizedSlugs[ChannelContextParser::ROOT_CHANNEL_SLUG]);
-        unset($normalizedSlugs[ChannelContextParser::ROOT_CHANNEL_SLUG]);
+        $includeRoot = isset($normalizedSlugs[ChannelRepoParser::ROOT_CHANNEL_SLUG]);
+        unset($normalizedSlugs[ChannelRepoParser::ROOT_CHANNEL_SLUG]);
 
         if ($includeRoot) {
             $clauses[] = 'p.channel = 0';
@@ -819,9 +810,13 @@ final class PageRepository
     }
 
     /**
-     * Returns page-edit payload with page row and gallery rows in one query.
+     * Returns the hydrated page row and raw image/variant join rows for the page editor.
      *
-     * @return array{page: array<string, mixed>, gallery_images: array<int, array<string, mixed>>}|null
+     * Gallery image hydration is the caller's responsibility; pass `gallery_rows` to
+     * `PageEditorGalleryHydrator::hydrate()` to produce the final `gallery_images` array.
+     *
+     * @param int $id Page id to load.
+     * @return array{page: array<string, mixed>, gallery_rows: array<int, array<string, mixed>>}|null Null when no page matches.
      */
     public function editFormDataById(int $id): ?array
     {
@@ -877,9 +872,18 @@ final class PageRepository
             return null;
         }
 
+        // Strip image/variant join columns before hydrating the page row.
+        $pageRow = $rows[0];
+        foreach (array_keys($pageRow) as $col) {
+            $col = (string) $col;
+            if (str_starts_with($col, 'image_') || str_starts_with($col, 'variant_')) {
+                unset($pageRow[$col]);
+            }
+        }
+
         return [
-            'page' => $this->withChannelContext($this->hydratePageRow($this->stripEditorMediaColumns($rows[0]))),
-            'gallery_images' => $this->hydrateEditorGalleryRows($rows),
+            'page'       => $this->withChannelContext($this->hydratePageRow($pageRow)),
+            'gallery_rows' => $rows,
         ];
     }
 
@@ -1199,18 +1203,7 @@ final class PageRepository
             return [];
         }
 
-        $channelsById = $this->channelsByIdMap();
-
-        return $this->taxonomyDataParser->listPagesByCategorySlug(
-            $this->db,
-            $this->table('pages'),
-            $this->table('categories'),
-            $this->table('page_categories'),
-            $slug,
-            $limit,
-            $offset,
-            fn (array $row): array => $this->withChannelContext($this->hydratePageRow($row), null, $channelsById)
-        );
+        return $this->listTaxonomyPagesBySlug($this->table('categories'), $this->table('page_categories'), 'category', $slug, $limit, $offset);
     }
 
     /**
@@ -1222,13 +1215,7 @@ final class PageRepository
             return 0;
         }
 
-        return $this->taxonomyDataParser->countPagesByCategorySlug(
-            $this->db,
-            $this->table('pages'),
-            $this->table('categories'),
-            $this->table('page_categories'),
-            $slug
-        );
+        return $this->countTaxonomyPagesBySlug($this->table('categories'), $this->table('page_categories'), 'category', $slug);
     }
 
     /**
@@ -1242,18 +1229,7 @@ final class PageRepository
             return [];
         }
 
-        $channelsById = $this->channelsByIdMap();
-
-        return $this->taxonomyDataParser->listPagesByTagSlug(
-            $this->db,
-            $this->table('pages'),
-            $this->table('tags'),
-            $this->table('page_tags'),
-            $slug,
-            $limit,
-            $offset,
-            fn (array $row): array => $this->withChannelContext($this->hydratePageRow($row), null, $channelsById)
-        );
+        return $this->listTaxonomyPagesBySlug($this->table('tags'), $this->table('page_tags'), 'tag', $slug, $limit, $offset);
     }
 
     /**
@@ -1265,13 +1241,7 @@ final class PageRepository
             return 0;
         }
 
-        return $this->taxonomyDataParser->countPagesByTagSlug(
-            $this->db,
-            $this->table('pages'),
-            $this->table('tags'),
-            $this->table('page_tags'),
-            $slug
-        );
+        return $this->countTaxonomyPagesBySlug($this->table('tags'), $this->table('page_tags'), 'tag', $slug);
     }
 
     /**
@@ -1285,19 +1255,7 @@ final class PageRepository
             return ['rows' => [], 'total' => 0];
         }
 
-        $channelsById = $this->channelsByIdMap();
-
-        return $this->taxonomyDataParser->listPageByCategorySlug(
-            $this->db,
-            $this->table('pages'),
-            $this->table('categories'),
-            $this->table('page_categories'),
-            $slug,
-            $limit,
-            $offset,
-            fn (array $row): array => $this->withChannelContext($this->hydratePageRow($row), null, $channelsById),
-            fn (string $taxonomySlug): int => $this->countByCategorySlug($taxonomySlug)
-        );
+        return $this->listTaxonomyPagedBySlug($this->table('categories'), $this->table('page_categories'), 'category', $slug, $limit, $offset, fn (): int => $this->countByCategorySlug($slug));
     }
 
     /**
@@ -1311,19 +1269,7 @@ final class PageRepository
             return ['rows' => [], 'total' => 0];
         }
 
-        $channelsById = $this->channelsByIdMap();
-
-        return $this->taxonomyDataParser->listPageByTagSlug(
-            $this->db,
-            $this->table('pages'),
-            $this->table('tags'),
-            $this->table('page_tags'),
-            $slug,
-            $limit,
-            $offset,
-            fn (array $row): array => $this->withChannelContext($this->hydratePageRow($row), null, $channelsById),
-            fn (string $taxonomySlug): int => $this->countByTagSlug($taxonomySlug)
-        );
+        return $this->listTaxonomyPagedBySlug($this->table('tags'), $this->table('page_tags'), 'tag', $slug, $limit, $offset, fn (): int => $this->countByTagSlug($slug));
     }
 
     /**
@@ -1337,17 +1283,7 @@ final class PageRepository
             return [];
         }
 
-        $channelsById = $this->channelsByIdMap();
-
-        return $this->taxonomyDataParser->listPagesByCategoryId(
-            $this->db,
-            $this->table('pages'),
-            $this->table('page_categories'),
-            $categoryId,
-            $limit,
-            $offset,
-            fn (array $row): array => $this->withChannelContext($this->hydratePageRow($row), null, $channelsById)
-        );
+        return $this->listTaxonomyPagesById($this->table('page_categories'), 'category', $categoryId, $limit, $offset);
     }
 
     /**
@@ -1359,12 +1295,7 @@ final class PageRepository
             return 0;
         }
 
-        return $this->taxonomyDataParser->countPagesByCategoryId(
-            $this->db,
-            $this->table('pages'),
-            $this->table('page_categories'),
-            $categoryId
-        );
+        return $this->countTaxonomyPagesById($this->table('page_categories'), 'category', $categoryId);
     }
 
     /**
@@ -1378,18 +1309,7 @@ final class PageRepository
             return ['rows' => [], 'total' => 0];
         }
 
-        $channelsById = $this->channelsByIdMap();
-
-        return $this->taxonomyDataParser->listPageByCategoryId(
-            $this->db,
-            $this->table('pages'),
-            $this->table('page_categories'),
-            $categoryId,
-            $limit,
-            $offset,
-            fn (array $row): array => $this->withChannelContext($this->hydratePageRow($row), null, $channelsById),
-            fn (int $taxonomyId): int => $this->countByCategoryId($taxonomyId)
-        );
+        return $this->listTaxonomyPagedById($this->table('page_categories'), 'category', $categoryId, $limit, $offset, fn (): int => $this->countByCategoryId($categoryId));
     }
 
     /**
@@ -1403,17 +1323,7 @@ final class PageRepository
             return [];
         }
 
-        $channelsById = $this->channelsByIdMap();
-
-        return $this->taxonomyDataParser->listPagesByTagId(
-            $this->db,
-            $this->table('pages'),
-            $this->table('page_tags'),
-            $tagId,
-            $limit,
-            $offset,
-            fn (array $row): array => $this->withChannelContext($this->hydratePageRow($row), null, $channelsById)
-        );
+        return $this->listTaxonomyPagesById($this->table('page_tags'), 'tag', $tagId, $limit, $offset);
     }
 
     /**
@@ -1425,12 +1335,7 @@ final class PageRepository
             return 0;
         }
 
-        return $this->taxonomyDataParser->countPagesByTagId(
-            $this->db,
-            $this->table('pages'),
-            $this->table('page_tags'),
-            $tagId
-        );
+        return $this->countTaxonomyPagesById($this->table('page_tags'), 'tag', $tagId);
     }
 
     /**
@@ -1444,18 +1349,7 @@ final class PageRepository
             return ['rows' => [], 'total' => 0];
         }
 
-        $channelsById = $this->channelsByIdMap();
-
-        return $this->taxonomyDataParser->listPageByTagId(
-            $this->db,
-            $this->table('pages'),
-            $this->table('page_tags'),
-            $tagId,
-            $limit,
-            $offset,
-            fn (array $row): array => $this->withChannelContext($this->hydratePageRow($row), null, $channelsById),
-            fn (int $taxonomyId): int => $this->countByTagId($taxonomyId)
-        );
+        return $this->listTaxonomyPagedById($this->table('page_tags'), 'tag', $tagId, $limit, $offset, fn (): int => $this->countByTagId($tagId));
     }
 
     /**
@@ -1508,44 +1402,11 @@ final class PageRepository
     }
 
     /**
-     * Drops media-join columns from combined page-editor row.
-     *
-     * @param array<string, mixed> $row
-     * @return array<string, mixed>
-     */
-    private function stripEditorMediaColumns(array $row): array
-    {
-        return $this->pageEditorGalleryHydrator->stripEditorMediaColumns($row);
-    }
-
-    /**
-     * Hydrates page-editor image/variant rows from combined query output.
-     *
-     * @param array<int, array<string, mixed>> $rows
-     * @return array<int, array<string, mixed>>
-     */
-    private function hydrateEditorGalleryRows(array $rows): array
-    {
-        return $this->pageEditorGalleryHydrator->hydrate(
-            $rows,
-            fn (string $storedPath): string => $this->publicUrlFromStoredPath($storedPath)
-        );
-    }
-
-    /**
-     * Converts one stored relative path into a public URL path.
-     */
-    private function publicUrlFromStoredPath(string $storedPath): string
-    {
-        return '/' . ltrim($storedPath, '/');
-    }
-
-    /**
      * @return array<int, array<string, mixed>>
      */
     private function channelsByIdMap(): array
     {
-        return ChannelContextParser::channelsByIdMap($this->channelRepo->listRecords());
+        return ChannelRepoParser::channelsByIdMap($this->channelRepo->listRecords());
     }
 
     /**
@@ -1567,7 +1428,7 @@ final class PageRepository
             }
         }
 
-        return ChannelContextParser::applyPageChannelContext($row, $resolvedChannel);
+        return ChannelRepoParser::applyPageChannelContext($row, $resolvedChannel);
     }
 
     /**
@@ -1575,11 +1436,11 @@ final class PageRepository
      */
     private function channelIdBySlug(string $slug): ?int
     {
-        if (ChannelContextParser::isRootChannelSlug($slug)) {
+        if (ChannelRepoParser::isRootChannelSlug($slug)) {
             throw new RuntimeException('The stock <root> channel placeholder cannot be selected directly.');
         }
 
-        return ChannelContextParser::resolveChannelIdBySlug(
+        return ChannelRepoParser::resolveChannelIdBySlug(
             $slug,
             fn (string $normalized): ?int => $this->channelRepo->idBySlug($normalized),
             'Selected channel does not exist.'
@@ -1644,43 +1505,255 @@ final class PageRepository
         bool $includeCategoryFilters = true,
         bool $includeTagFilters = true
     ): void {
-        $this->panelListFilter->appendIntEquals(
-            $where,
-            $params,
-            'p.channel',
-            $channelId,
-            $placeholderPrefix,
-            'channel'
+        if ($channelId !== null && $channelId > 0) {
+            $where[] = 'p.channel = :' . $placeholderPrefix . '_channel_id';
+            $params[':' . $placeholderPrefix . '_channel_id'] = $channelId;
+        }
+
+        if ($includeCategoryFilters && $categoryId !== null && $categoryId > 0) {
+            $where[] = 'EXISTS (
+                SELECT 1 FROM ' . $pageCategoriesTable . ' pc
+                WHERE pc.page = p.id AND pc.category = :' . $placeholderPrefix . '_category_id
+            )';
+            $params[':' . $placeholderPrefix . '_category_id'] = $categoryId;
+        }
+
+        if ($includeTagFilters && $tagId !== null && $tagId > 0) {
+            $where[] = 'EXISTS (
+                SELECT 1 FROM ' . $pageTagsTable . ' pt
+                WHERE pt.page = p.id AND pt.tag = :' . $placeholderPrefix . '_tag_id
+            )';
+            $params[':' . $placeholderPrefix . '_tag_id'] = $tagId;
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Taxonomy page-query helpers (formerly TaxonomyDataParser)
+    // -------------------------------------------------------------------------
+
+    /**
+     * Counts published pages linked to one taxonomy term by slug.
+     *
+     * @param string $taxonomyTable  Prefixed taxonomy table name (categories or tags).
+     * @param string $linkTable      Prefixed page-taxonomy link table name.
+     * @param string $joinCol        Link-table join column name ('category' or 'tag').
+     * @param string $slug           Normalized taxonomy slug.
+     * @return int                   Published page count for the term.
+     */
+    private function countTaxonomyPagesBySlug(string $taxonomyTable, string $linkTable, string $joinCol, string $slug): int
+    {
+        $stmt = $this->db->prepare(
+            'SELECT COUNT(*)
+             FROM ' . $this->table('pages') . ' p
+             INNER JOIN ' . $linkTable . ' pt ON pt.page = p.id
+             INNER JOIN ' . $taxonomyTable . ' t ON t.id = pt.' . $joinCol . '
+             WHERE t.slug = :slug AND p.status = :status'
         );
+        $stmt->execute([':slug' => $slug, ':status' => 'published']);
+        return (int) $stmt->fetchColumn();
+    }
 
-        if ($includeCategoryFilters) {
-            $this->panelListFilter->appendExistsIntMatch(
-                $where,
-                $params,
-                $pageCategoriesTable,
-                'pc',
-                'pc.page',
-                'p.id',
-                'pc.category',
-                $categoryId,
-                $placeholderPrefix,
-                'category'
-            );
+    /**
+     * Counts published pages linked to one taxonomy term by id.
+     *
+     * @param string $linkTable Prefixed page-taxonomy link table name.
+     * @param string $joinCol   Link-table join column name ('category' or 'tag').
+     * @param int    $id        Taxonomy id to query.
+     * @return int              Published page count for the term.
+     */
+    private function countTaxonomyPagesById(string $linkTable, string $joinCol, int $id): int
+    {
+        $stmt = $this->db->prepare(
+            'SELECT COUNT(*)
+             FROM ' . $this->table('pages') . ' p
+             INNER JOIN ' . $linkTable . ' pt ON pt.page = p.id
+             WHERE pt.' . $joinCol . ' = :id AND p.status = :status'
+        );
+        $stmt->execute([':id' => $id, ':status' => 'published']);
+        return (int) $stmt->fetchColumn();
+    }
+
+    /**
+     * Lists published pages linked to one taxonomy term by slug.
+     *
+     * @param string $taxonomyTable Prefixed taxonomy table name.
+     * @param string $linkTable     Prefixed page-taxonomy link table name.
+     * @param string $joinCol       Link-table join column name.
+     * @param string $slug          Normalized taxonomy slug.
+     * @param int    $limit         Maximum rows to return.
+     * @param int    $offset        Zero-based row offset.
+     * @return array<int, array<string, mixed>> Hydrated published page rows.
+     */
+    private function listTaxonomyPagesBySlug(string $taxonomyTable, string $linkTable, string $joinCol, string $slug, int $limit, int $offset): array
+    {
+        $stmt = $this->db->prepare(
+            'SELECT p.*
+             FROM ' . $this->table('pages') . ' p
+             INNER JOIN ' . $linkTable . ' pt ON pt.page = p.id
+             INNER JOIN ' . $taxonomyTable . ' t ON t.id = pt.' . $joinCol . '
+             WHERE t.slug = :slug AND p.status = :status
+             ORDER BY p.created DESC, p.id DESC
+             LIMIT :limit OFFSET :offset'
+        );
+        $stmt->bindValue(':slug', $slug);
+        $stmt->bindValue(':status', 'published', PDO::PARAM_STR);
+        $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+        $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+        $stmt->execute();
+
+        $channelsById = $this->channelsByIdMap();
+        $result = [];
+        foreach ($stmt->fetchAll() ?: [] as $row) {
+            if (is_array($row)) {
+                $result[] = $this->withChannelContext($this->hydratePageRow($row), null, $channelsById);
+            }
         }
 
-        if ($includeTagFilters) {
-            $this->panelListFilter->appendExistsIntMatch(
-                $where,
-                $params,
-                $pageTagsTable,
-                'pt',
-                'pt.page',
-                'p.id',
-                'pt.tag',
-                $tagId,
-                $placeholderPrefix,
-                'tag'
-            );
+        return $result;
+    }
+
+    /**
+     * Lists published pages linked to one taxonomy term by id.
+     *
+     * @param string $linkTable Prefixed page-taxonomy link table name.
+     * @param string $joinCol   Link-table join column name.
+     * @param int    $id        Taxonomy id to query.
+     * @param int    $limit     Maximum rows to return.
+     * @param int    $offset    Zero-based row offset.
+     * @return array<int, array<string, mixed>> Hydrated published page rows.
+     */
+    private function listTaxonomyPagesById(string $linkTable, string $joinCol, int $id, int $limit, int $offset): array
+    {
+        $stmt = $this->db->prepare(
+            'SELECT p.*
+             FROM ' . $this->table('pages') . ' p
+             INNER JOIN ' . $linkTable . ' pt ON pt.page = p.id
+             WHERE pt.' . $joinCol . ' = :id
+               AND p.status = :status
+             ORDER BY p.created DESC, p.id DESC
+             LIMIT :limit OFFSET :offset'
+        );
+        $stmt->bindValue(':id', $id, PDO::PARAM_INT);
+        $stmt->bindValue(':status', 'published', PDO::PARAM_STR);
+        $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+        $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+        $stmt->execute();
+
+        $channelsById = $this->channelsByIdMap();
+        $result = [];
+        foreach ($stmt->fetchAll() ?: [] as $row) {
+            if (is_array($row)) {
+                $result[] = $this->withChannelContext($this->hydratePageRow($row), null, $channelsById);
+            }
         }
+
+        return $result;
+    }
+
+    /**
+     * Returns one paginated taxonomy listing by slug using a window-count SELECT.
+     *
+     * When $offset > 0 and no rows come back (past the last page), $fallbackCount is
+     * invoked to return the true total without a separate round-trip on page one.
+     *
+     * @param string   $taxonomyTable  Prefixed taxonomy table name.
+     * @param string   $linkTable      Prefixed page-taxonomy link table name.
+     * @param string   $joinCol        Link-table join column name.
+     * @param string   $slug           Normalized taxonomy slug.
+     * @param int      $limit          Maximum rows to return.
+     * @param int      $offset         Zero-based row offset.
+     * @param callable $fallbackCount  Invoked when a paged query returns no rows past the end.
+     * @return array{rows: array<int, array<string, mixed>>, total: int} Paginated rows and total count.
+     */
+    private function listTaxonomyPagedBySlug(string $taxonomyTable, string $linkTable, string $joinCol, string $slug, int $limit, int $offset, callable $fallbackCount): array
+    {
+        $safeLimit = max(1, $limit);
+        $safeOffset = max(0, $offset);
+
+        $stmt = $this->db->prepare(
+            'SELECT p.*, COUNT(*) OVER() AS total_rows
+             FROM ' . $this->table('pages') . ' p
+             INNER JOIN ' . $linkTable . ' pt ON pt.page = p.id
+             INNER JOIN ' . $taxonomyTable . ' t ON t.id = pt.' . $joinCol . '
+             WHERE t.slug = :slug
+               AND p.status = :status
+             ORDER BY p.created DESC, p.id DESC
+             LIMIT :limit OFFSET :offset'
+        );
+        $stmt->bindValue(':slug', $slug);
+        $stmt->bindValue(':status', 'published', PDO::PARAM_STR);
+        $stmt->bindValue(':limit', $safeLimit, PDO::PARAM_INT);
+        $stmt->bindValue(':offset', $safeOffset, PDO::PARAM_INT);
+        $stmt->execute();
+
+        return $this->hydrateTaxonomyPagedRows($stmt->fetchAll() ?: [], $safeOffset > 0 ? $fallbackCount : null);
+    }
+
+    /**
+     * Returns one paginated taxonomy listing by id using a window-count SELECT.
+     *
+     * @param string   $linkTable      Prefixed page-taxonomy link table name.
+     * @param string   $joinCol        Link-table join column name.
+     * @param int      $id             Taxonomy id to query.
+     * @param int      $limit          Maximum rows to return.
+     * @param int      $offset         Zero-based row offset.
+     * @param callable $fallbackCount  Invoked when a paged query returns no rows past the end.
+     * @return array{rows: array<int, array<string, mixed>>, total: int} Paginated rows and total count.
+     */
+    private function listTaxonomyPagedById(string $linkTable, string $joinCol, int $id, int $limit, int $offset, callable $fallbackCount): array
+    {
+        $safeLimit = max(1, $limit);
+        $safeOffset = max(0, $offset);
+
+        $stmt = $this->db->prepare(
+            'SELECT p.*, COUNT(*) OVER() AS total_rows
+             FROM ' . $this->table('pages') . ' p
+             INNER JOIN ' . $linkTable . ' pt ON pt.page = p.id
+             WHERE pt.' . $joinCol . ' = :id
+               AND p.status = :status
+             ORDER BY p.created DESC, p.id DESC
+             LIMIT :limit OFFSET :offset'
+        );
+        $stmt->bindValue(':id', $id, PDO::PARAM_INT);
+        $stmt->bindValue(':status', 'published', PDO::PARAM_STR);
+        $stmt->bindValue(':limit', $safeLimit, PDO::PARAM_INT);
+        $stmt->bindValue(':offset', $safeOffset, PDO::PARAM_INT);
+        $stmt->execute();
+
+        return $this->hydrateTaxonomyPagedRows($stmt->fetchAll() ?: [], $safeOffset > 0 ? $fallbackCount : null);
+    }
+
+    /**
+     * Hydrates paginated taxonomy rows, preserving the window-count total.
+     *
+     * @param array<int, mixed>  $rows          Raw PDO rows including total_rows window column.
+     * @param callable|null      $fallbackCount Optional fallback count when an out-of-range page returns no rows.
+     * @return array{rows: array<int, array<string, mixed>>, total: int} Hydrated rows and total count.
+     */
+    private function hydrateTaxonomyPagedRows(array $rows, ?callable $fallbackCount): array
+    {
+        $channelsById = $this->channelsByIdMap();
+        $total = 0;
+        $resultRows = [];
+
+        foreach ($rows as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+
+            // Window counts avoid a second round-trip for the common page-one case.
+            if ($total === 0) {
+                $total = (int) ($row['total_rows'] ?? 0);
+            }
+
+            unset($row['total_rows']);
+            $resultRows[] = $this->withChannelContext($this->hydratePageRow($row), null, $channelsById);
+        }
+
+        if ($resultRows === [] && $fallbackCount !== null) {
+            $total = $fallbackCount();
+        }
+
+        return ['rows' => $resultRows, 'total' => $total];
     }
 }
