@@ -98,17 +98,6 @@ final class UserDataParser
     }
 
     /**
-     * Returns panel edit form data for one user by id, including group option rows.
-     *
-     * @param int|null $id User id in edit mode, or null in create mode.
-     * @return array{user: array<string, mixed>|null, group_options: array<int, array{id: int, name: string, slug: string, permissions: int, is_stock: int}>} Edit data.
-     */
-    public function editFormData(?int $id): array
-    {
-        return $this->userRepo()->editFormData($id);
-    }
-
-    /**
      * Returns one public user profile row by username.
      *
      * @param string $username Username to resolve.

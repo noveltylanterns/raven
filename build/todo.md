@@ -13,6 +13,90 @@ This is the default Build Mode backlog file. If the user asks about goals, roadm
 
 ## Short Term
 
+### Repository Read/Write Split
+
+Split every `*Repository` class into a `*Read` class (SELECT / lookup methods) and a `*Write`
+class (INSERT / UPDATE / DELETE methods). This keeps write-heavy panel logic out of the
+lightweight public-route bootstrap.
+
+#### Architecture contracts
+- Both classes live in `private/sys/Repository/`, namespace `Raven\Core\Repository`
+- Naming: `CategoryRead.php` / `CategoryWrite.php` etc.
+- `*Write` takes `*Read` as a constructor argument for validation lookups (slug-exists, path-exists)
+- Trivially-shared private helpers (`table()`, `authTable()`, etc.) are duplicated as 1-line private methods in both classes — no abstraction needed
+- Non-trivial utilities shared across BOTH sides go to `lib/Parser/{Name}RepoParser.php` as public statics
+- Old `*Repository.php` files are deleted only after all callers are confirmed updated
+- `ChannelRepoParser` and `TaxonomyRepoParser` are unchanged
+
+#### New RepoParser files needed
+- [ ] `lib/Parser/PageRepoParser.php` — two statics: `normalizeIds(mixed $ids): array<int>` (used by both `PageRead` and `PageWrite`), and `applySchedule(PDO $db, string $driver, string $prefix): void` (runs the published/expired schedule flip; called by public routes directly so it never needs to load `PageWrite`)
+
+#### Per-repo splits
+
+**Category** (`CategoryRepository` → `CategoryRead` + `CategoryWrite`)
+- [ ] `CategoryRead.php` — `listAll`, `countForPanel`, `listForPanel`, `listPageForPanel`, `listOptions`, `existingIds`, `findById`, `findBySlug`, `idBySlug`, `setIdsByIds`, `countsBySetId` + private: `table`, `hydrateRows`, `hydrateRow`, `setColumn`
+- [ ] `CategoryWrite.php` — `save`, `updateImageFiles`, `reassignSetToDefault`, `deleteById` (delegates to `TaxonomyScribe`); takes `CategoryRead` (no validation reads needed currently, but contract established for consistency)
+- [ ] Update every `CategoryRepository` use-site to `CategoryRead` or `CategoryWrite` as appropriate
+
+**Tag** (`TagRepository` → `TagRead` + `TagWrite`)
+- [ ] `TagRead.php` — same structure as `CategoryRead` with `tags`/`page_tags` table references
+- [ ] `TagWrite.php` — same structure as `CategoryWrite` (delegates to `TaxonomyScribe`)
+- [ ] Update every `TagRepository` use-site
+
+**Channel** (`ChannelRepository` → `ChannelRead` + `ChannelWrite`)
+- [ ] `ChannelRead.php` — `listRecords`, `listAll`, `countForPanel`, `listForPanel`, `listPageForPanel`, `listOptions`, `idFromSlug`, `idBySlug`, `findById`, `findBySlug`, `findByIdOrSlug`, `slugExists`, `countExplicitTaxonomySetAssignments`, `pageCountsByChannelId` + private: `table`, `normalizeChannelId`, `nextAvailableChannelId`, `channelsByIdMap`
+- [ ] `ChannelWrite.php` — `save`, `deleteById` (delegates to `ChannelRecordScribe` / `ChannelScribe`); takes `ChannelRead`; private: `nextChannelId`
+- [ ] Update every `ChannelRepository` use-site; note `TaxonomyRepoParser` still injects `ChannelRepository` → swap to `ChannelRead`
+
+**Redirect** (`RedirectRepository` → `RedirectRead` + `RedirectWrite`)
+- [ ] `RedirectRead.php` — `listAll`, `listForPanel`, `listPageForPanel`, `findById`, `idBySlug`, `findActiveByPath` + private: `withChannelContext`, `channelsByIdMap`, `table`
+- [ ] `RedirectWrite.php` — `save`, `deleteById` (delegates to `RedirectScribe`); takes `ChannelRead`
+- [ ] Update every `RedirectRepository` use-site
+
+**Group** (`GroupRepository` → `GroupRead` + `GroupWrite`)
+- [ ] `GroupRead.php` — `listAll`, `countForPanel`, `listForPanel`, `listPageForPanel`, `listOptions`, `findById`, `findBySlug`, `findPublicRouteDataBySlug`, `nameExistsForOtherGroup`, `slugExistsForOtherGroup` + private: `hydrateGroupRow`, `stockRoleSql`, `table`
+- [ ] `GroupWrite.php` — `save`, `deleteById`, `updateImageFiles` (delegates to `GroupScribe`); takes `GroupRead`
+- [ ] Update every `GroupRepository` use-site
+
+**Set** (`SetRepository` → `SetRead` + `SetWrite`)
+- [ ] `SetRead.php` — `listAll`, `listOptions`, `findById`, `existsId` + private: `canonicalizeRecord`, `rootRecord`
+- [ ] `SetWrite.php` — `save`, `deleteById`; takes `SetRead` (slug uniqueness check in `save` iterates `$read->listAll()`)
+- [ ] Update every `SetRepository` use-site
+
+**Invite** (`InviteRepository` → `InviteRead` + `InviteWrite`)
+- [ ] `InviteRead.php` — `listForPanel`, `findById`, `findByValue`, `countUses` + private: `hydratePanelRow`, `authTable`
+- [ ] `InviteWrite.php` — `save`, `recordUse`, `deleteById`, `deleteExpired` + private: `authTable` (duplicated 1-liner)
+- [ ] Update every `InviteRepository` use-site
+
+**PageImage** (`PageImageRepository` → `PageImageRead` + `PageImageWrite`)
+- [ ] `PageImageRead.php` — `pageExists`, `isGalleryEnabledForPage`, `nextSortOrderForPage`, `hasHashForPage`, `listForPage`, `listReadyForPublicPage`, `coverImageUrlForPage` + private: `table`
+- [ ] `PageImageWrite.php` — `insertImageWithVariants`, plus any update/delete methods (delegates to `PageImageScribe`) + private: `table`
+- [ ] Update every `PageImageRepository` use-site
+
+**Page** (`PageRepository` → `PageRead` + `PageWrite`)
+- [ ] Decide `applySchedule()` placement: it is called on every public request (not panel-only), so it should live in `PageWrite` and public routes inject `PageWrite` alongside `PageRead`. This is the correct boundary since scheduling IS a write.
+- [ ] `PageRepoParser::normalizeIds()` static extracted first (see RepoParser step above)
+- [ ] `PageRead.php` — `findHomepage`, `findChannelHomepage`, `findPublicPage`, `findPublicPageById`, `findBySlug`, `idBySlug`, `listRecentPublished`, `listRecentPublishedForChannels`, `countForPanel`, `listForPanel`, `listPageForPanel`, `listAllForRouting`, `channelHomepagesForRouting`, `findById`, `editFormDataById`, `assignedCategoryRowsForPage`, `assignedTagRowsForPage`, `taxonomyAssignmentIdsByPage`, `listByCategorySlug/Id/Page*`, `listByTagSlug/Id/Page*`, `countBy*` + all private query helpers (hydration, channel-context, taxonomy helpers, content-block codec); takes `ChannelRead`
+- [ ] `PageWrite.php` — `save`, `deleteById`, `applySchedule`; takes `PageRead` (for slug/channel validation) + `ChannelRead`
+- [ ] Update every `PageRepository` use-site
+
+**User** (`UserRepository` → `UserRead` + `UserWrite`)
+- [ ] `UserRead.php` — `listAll`, `listAllForRouting`, `listRoutingData`, `countForPanel`, `listForPanel`, `listPageForPanel`, `findById`, `findPublicProfileByUsername`, `findPublicProfileById`, `findPublicProfileByString`, `listPublicProfilesByGroupId`, `usernameExistsForOtherUser`, `emailExistsForOtherUser`, `groupIdsForUser`, `userStringById` + private: `groupEntriesByUserId`, `groupEntriesAndOptionsForUserIds`, `sortGroupOptions`, `hydratePanelUsers`, `decodeContactProfiles`, `authTable`, `appAuthTable`, `groupTable`
+- [ ] `UserWrite.php` — `save`, `deleteById`, `setUserGroups` + private: `attachUserToGroup`, `normalizeGroupIds`, `encodeContactProfiles`, `normalizeContactProfiles`, `authTable`, `appAuthTable`, `groupTable` (duplicated 1-liners)
+- [ ] Update every `UserRepository` use-site
+
+#### Caller updates (do after all pairs are created)
+- [ ] `PublicRuntimeBuilder` — inject `*Read` for public display routes; inject `*Write` only where writes actually happen (schedule flip, form submission); verify no write class enters pure read routes
+- [ ] `PanelRuntimeBuilder` — inject both `*Read` and `*Write` for panel controllers that do both; read-only panel helpers (parsers, breadcrumbs) get only `*Read`
+- [ ] All `lib/Parser/*DataParser.php` constructors — parsers are read-only wrappers; swap any injected `*Repository` to `*Read`
+- [ ] `lib/Parser/TaxonomyRepoParser.php` — swap `ChannelRepository` dep to `ChannelRead`
+- [ ] `debug/smoke/` scripts — update any direct repo injections
+- [ ] Search for remaining `*Repository` class imports; eliminate or justify each one
+
+#### Cleanup
+- [ ] Delete all 10 original `*Repository.php` files
+- [ ] Update `docs/filetree.md` to reflect the new `Repository/` structure (no longer one-class-per-entity)
+
 
 ## Long Term
 

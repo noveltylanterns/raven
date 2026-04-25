@@ -3,7 +3,7 @@
 /**
  * RAVEN CMS
  * ~/private/sys/Repository/UserRepository.php
- * Repository for database persistence operations.
+ * Data access for user accounts, group memberships, public profiles, and auth-routing payloads.
  * Docs: https://raven.lanterns.io
  */
 
@@ -671,119 +671,6 @@ final class UserRepository
     }
 
     /**
-     * Returns user-edit form data with one combined query in edit mode.
-     *
-     * @return array{
-     *   user: array<string, mixed>|null,
-     *   group_options: array<int, array{id: int, name: string, slug: string, permissions: int, is_stock: int}>
-     * }
-     */
-    public function editFormData(?int $id): array
-    {
-        if ($id === null || $id < 1) {
-            $groupPayload = $this->groupEntriesAndOptionsForUserIds([]);
-            return [
-                'user' => null,
-                'group_options' => $groupPayload['group_options'],
-            ];
-        }
-
-        $users = $this->appAuthTable('users');
-        $groups = $this->groupTable('groups');
-        $userGroups = $this->groupTable('user_groups');
-
-        $stmt = $this->rvnDb->prepare(
-            'SELECT u.id AS user_id,
-                    u.username,
-                    u.string,
-                    u.name,
-                    u.email,
-                    u.bio,
-                    u.theme,
-                    u.avatar,
-                    u.cover_image,
-                    u.contact,
-                    u."group" AS primary_group_id,
-                    g.id AS group_id,
-                    g.name AS group_name,
-                    g.slug AS group_slug,
-                    g.permissions AS group_permissions,
-                    CASE WHEN LOWER(g.slug) IN (\'admin\', \'user\', \'guest\', \'validating\', \'banned\') THEN 1 ELSE 0 END AS group_is_stock,
-                    CASE WHEN ug.user IS NULL THEN 0 ELSE 1 END AS group_selected
-             FROM ' . $users . ' u
-             LEFT JOIN ' . $groups . ' g ON 1 = 1
-             LEFT JOIN ' . $userGroups . ' ug
-               ON ug.user = u.id
-              AND ug."group" = g.id
-             WHERE u.id = :id
-             ORDER BY CASE WHEN LOWER(g.slug) IN (\'admin\', \'user\', \'guest\', \'validating\', \'banned\') THEN 1 ELSE 0 END DESC,
-                      LOWER(g.name) ASC,
-                      g.id ASC'
-        );
-        $stmt->execute([':id' => $id]);
-        $rows = $stmt->fetchAll() ?: [];
-        if ($rows === []) {
-            return [
-                'user' => null,
-                'group_options' => [],
-            ];
-        }
-
-        $first = $rows[0];
-        $rawPrimaryGroupId = (int) ($first['primary_group_id'] ?? 0);
-        $selectedGroupIds = [];
-        $groupOptions = [];
-        foreach ($rows as $row) {
-            $groupId = (int) ($row['group_id'] ?? 0);
-            if ($groupId < 1) {
-                continue;
-            }
-
-            $groupOptions[] = [
-                'id' => $groupId,
-                'name' => (string) ($row['group_name'] ?? ''),
-                'slug' => (string) ($row['group_slug'] ?? ''),
-                'permissions' => (int) ($row['group_permissions'] ?? 0),
-                'is_stock' => (int) ($row['group_is_stock'] ?? 0),
-            ];
-
-            if ((int) ($row['group_selected'] ?? 0) === 1) {
-                $selectedGroupIds[$groupId] = $groupId;
-            }
-        }
-
-        // Derive primary/secondary split: primary = users.group, secondary = remaining memberships.
-        $allGroupIds = array_values($selectedGroupIds);
-        $primaryGroupId = $rawPrimaryGroupId > 0 && isset($selectedGroupIds[$rawPrimaryGroupId])
-            ? $rawPrimaryGroupId
-            : ($allGroupIds[0] ?? 0);
-        $secondaryGroupIds = array_values(array_filter($allGroupIds, static fn (int $id): bool => $id !== $primaryGroupId));
-
-        return [
-            'user' => [
-                'id' => (int) ($first['user_id'] ?? 0),
-                'username' => (string) ($first['username'] ?? ''),
-                'string' => (string) ($first['string'] ?? ''),
-                'name' => (string) ($first['name'] ?? ''),
-                'email' => (string) ($first['email'] ?? ''),
-                'bio' => (string) ($first['bio'] ?? ''),
-                'theme' => (string) (($first['theme'] ?? '') !== '' ? $first['theme'] : 'default'),
-                'avatar' => isset($first['avatar']) && $first['avatar'] !== ''
-                    ? (string) $first['avatar']
-                    : null,
-                'cover_image' => isset($first['cover_image']) && $first['cover_image'] !== ''
-                    ? (string) $first['cover_image']
-                    : null,
-                'contact' => $this->decodeContactProfiles($first['contact'] ?? null),
-                'group_ids' => $allGroupIds,
-                'primary_group_id' => $primaryGroupId,
-                'secondary_group_ids' => $secondaryGroupIds,
-            ],
-            'group_options' => $groupOptions,
-        ];
-    }
-
-    /**
      * Returns one public-safe user profile by username.
      *
      * @return array{
@@ -870,6 +757,9 @@ final class UserRepository
     }
 
     /**
+     * Returns one public-safe user profile by unique user string token.
+     *
+     * @param string $userString Unique user string token to resolve.
      * @return array{
      *   id: int,
      *   username: string,
@@ -877,7 +767,7 @@ final class UserRepository
      *   name: string,
      *   avatar: string|null,
      *   contact: array<int, array{type: string, value: string}>
-     * }|null
+     * }|null Profile row, or null when not found.
      */
     public function findPublicProfileByString(string $userString): ?array
     {
@@ -1053,6 +943,12 @@ final class UserRepository
         );
     }
 
+    /**
+     * Returns the unique user string token for one user by id.
+     *
+     * @param int $id User id to look up.
+     * @return string|null The user's string token, or null when the user is not found.
+     */
     public function userStringById(int $id): ?string
     {
         return $this->userScribe->userStringById(

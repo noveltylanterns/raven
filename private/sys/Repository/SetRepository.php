@@ -26,6 +26,12 @@ final class SetRepository
     /** @var array<int, array<string, mixed>>|null */
     private ?array $cache = null;
 
+    /**
+     * Prepares the set repository for the given taxonomy type and file-backed storage directory.
+     *
+     * @param string $taxonomyType  Lowercase taxonomy type ('category' or 'tag').
+     * @param string $setDirectory  Absolute path to the directory holding set JSON files.
+     */
     public function __construct(string $taxonomyType, string $setDirectory)
     {
         $this->taxonomyType = strtolower(trim($taxonomyType));
@@ -34,7 +40,9 @@ final class SetRepository
     }
 
     /**
-     * @return array<int, array<string, mixed>>
+     * Returns all taxonomy set records, sorted with the default set first then alphabetically by name.
+     *
+     * @return array<int, array<string, mixed>> Canonicalized set records.
      */
     public function listAll(): array
     {
@@ -80,7 +88,9 @@ final class SetRepository
     }
 
     /**
-     * @return array<int, array{id: int, name: string, slug: string, is_root: bool}>
+     * Returns minimal set option rows suitable for select controls and parser lookups.
+     *
+     * @return array<int, array{id: int, name: string, slug: string, is_root: bool}> Set option rows.
      */
     public function listOptions(): array
     {
@@ -98,7 +108,10 @@ final class SetRepository
     }
 
     /**
-     * @return array<string, mixed>|null
+     * Returns one taxonomy set record by its numeric id.
+     *
+     * @param int $id Taxonomy set id to resolve.
+     * @return array<string, mixed>|null Set record, or null when not found.
      */
     public function findById(int $id): ?array
     {
@@ -111,11 +124,24 @@ final class SetRepository
         return null;
     }
 
+    /**
+     * Returns true when a taxonomy set with the given id exists.
+     *
+     * @param int $id Taxonomy set id to check.
+     * @return bool True when the set exists.
+     */
     public function existsId(int $id): bool
     {
         return $this->findById($id) !== null;
     }
 
+    /**
+     * Creates or updates one taxonomy set record and returns its id.
+     *
+     * @param array<string, mixed> $data Set fields; 'name' and a valid 'slug' are required for non-default sets.
+     * @return int The saved (or assigned) taxonomy set id.
+     * @throws \RuntimeException When required fields are missing or the slug conflicts with another set.
+     */
     public function save(array $data): int
     {
         $providedId = SetParser::normalizeSetId($data['id'] ?? null);
@@ -165,6 +191,12 @@ final class SetRepository
         return $setId;
     }
 
+    /**
+     * Deletes one taxonomy set record by id.
+     *
+     * @param int $id Taxonomy set id to delete.
+     * @throws \RuntimeException When attempting to delete the stock default set.
+     */
     public function deleteById(int $id): void
     {
         if ($id === SetParser::DEFAULT_SET_ID) {
@@ -176,8 +208,11 @@ final class SetRepository
     }
 
     /**
-     * @param array<string, mixed> $raw
-     * @return array<string, mixed>
+     * Normalizes raw file-record data into a canonical set array, filling in defaults for missing fields.
+     *
+     * @param int                  $id  Set id from the file path.
+     * @param array<string, mixed> $raw Raw key-value data from the set JSON file.
+     * @return array<string, mixed> Canonicalized set record.
      */
     private function canonicalizeRecord(int $id, array $raw): array
     {
@@ -217,7 +252,9 @@ final class SetRepository
     }
 
     /**
-     * @return array<string, mixed>
+     * Returns the canonical default-set seed record used to bootstrap the root set file.
+     *
+     * @return array<string, mixed> Default set record with stock id, name, slug, and description.
      */
     private function rootRecord(): array
     {

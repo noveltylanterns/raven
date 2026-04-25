@@ -3,7 +3,7 @@
 /**
  * RAVEN CMS
  * ~/private/sys/Repository/TagRepository.php
- * Repository for database persistence operations.
+ * Data access for page tag records and their taxonomy set assignments.
  * Docs: https://raven.lanterns.io
  */
 
@@ -19,7 +19,7 @@ use Raven\Lib\Media\Panel\TaxonomyImagePathResolver;
 use Raven\Lib\Scribe\TaxonomyScribe;
 
 /**
- * Data access for Tag CRUD operations in panel.
+ * Data access for page tag CRUD and taxonomy set assignments.
  */
 final class TagRepository
 {
@@ -66,7 +66,10 @@ final class TagRepository
     }
 
     /**
-     * Returns one total-count for panel tag index.
+     * Returns total tag count, optionally filtered by taxonomy set id.
+     *
+     * @param int|null $setId Optional taxonomy set id filter; null returns unfiltered count.
+     * @return int Total matching tag count.
      */
     public function countForPanel(?int $setId = null): int
     {
@@ -84,9 +87,12 @@ final class TagRepository
     }
 
     /**
-     * Returns paginated tags with linked page counts for panel listing.
+     * Returns paginated tags with linked page counts, optionally filtered by taxonomy set.
      *
-     * @return array<int, array<string, mixed>>
+     * @param int      $limit  Maximum number of rows to return.
+     * @param int      $offset Zero-based row offset for pagination.
+     * @param int|null $setId  Optional taxonomy set id filter; null returns all sets.
+     * @return array<int, array<string, mixed>> Hydrated tag rows with page counts.
      */
     public function listForPanel(int $limit = 50, int $offset = 0, ?int $setId = null): array
     {
@@ -124,7 +130,10 @@ final class TagRepository
     /**
      * Returns one paginated tag page plus total row count in one query.
      *
-     * @return array{rows: array<int, array<string, mixed>>, total: int}
+     * @param int      $limit  Maximum number of rows to return.
+     * @param int      $offset Zero-based row offset for pagination.
+     * @param int|null $setId  Optional taxonomy set id filter; null returns all sets.
+     * @return array{rows: array<int, array<string, mixed>>, total: int} Paginated rows and total count.
      */
     public function listPageForPanel(int $limit = 50, int $offset = 0, ?int $setId = null): array
     {
@@ -375,8 +384,10 @@ final class TagRepository
     }
 
     /**
-     * @param array<int> $ids
-     * @return array<int, int>
+     * Returns a map of tag id → set id for a given list of tag ids.
+     *
+     * @param array<int> $ids Tag ids to look up.
+     * @return array<int, int> Map of tag id to its taxonomy set id (0 when unassigned).
      */
     public function setIdsByIds(array $ids): array
     {
@@ -403,7 +414,9 @@ final class TagRepository
     }
 
     /**
-     * @return array<int, int>
+     * Returns tag counts grouped by taxonomy set id.
+     *
+     * @return array<int, int> Map of taxonomy set id to tag count.
      */
     public function countsBySetId(): array
     {
@@ -432,8 +445,10 @@ final class TagRepository
     }
 
     /**
-     * @param array<int, array<string, mixed>> $rows
-     * @return array<int, array<string, mixed>>
+     * Hydrates a batch of raw tag rows with image path data.
+     *
+     * @param array<int, array<string, mixed>> $rows Raw PDO tag rows.
+     * @return array<int, array<string, mixed>> Hydrated rows with resolved image paths.
      */
     private function hydrateRows(array $rows): array
     {
@@ -446,8 +461,10 @@ final class TagRepository
     }
 
     /**
-     * @param array<string, mixed> $row
-     * @return array<string, mixed>
+     * Hydrates one raw tag row with resolved image paths and normalized set id.
+     *
+     * @param array<string, mixed> $row Raw PDO tag row.
+     * @return array<string, mixed> Hydrated row with image URL keys appended.
      */
     private function hydrateRow(array $row): array
     {
@@ -464,6 +481,11 @@ final class TagRepository
         );
     }
 
+    /**
+     * Returns the backend-quoted `set` column reference, optionally prefixed with a table alias.
+     *
+     * The `set` keyword is reserved in MySQL, requiring backtick quoting on that driver.
+     */
     private function setColumn(?string $alias = null): string
     {
         $column = $this->driver === 'mysql' ? '`set`' : '"set"';

@@ -3,7 +3,7 @@
 /**
  * RAVEN CMS
  * ~/private/sys/Repository/RedirectRepository.php
- * Repository for panel-managed URL redirect records.
+ * Data access for URL redirect records used by both panel admin and public routing.
  * Docs: https://raven.lanterns.io
  */
 
@@ -174,7 +174,7 @@ final class RedirectRepository
     }
 
     /**
-     * Returns one redirect row by id for panel edit form.
+     * Returns one redirect row by id.
      *
      * @return array<string, mixed>|null
      */
@@ -271,40 +271,6 @@ final class RedirectRepository
         $value = $stmt->fetchColumn();
 
         return $value === false ? null : (int) $value;
-    }
-
-    /**
-     * Returns redirect-editor data (optional redirect row + channel options) in one query.
-     *
-     * @return array{
-     *   redirect: array<string, mixed>|null,
-     *   channel_options: array<int, array{id: int, name: string, slug: string}>
-     * }
-     */
-    public function editFormData(?int $id = null): array
-    {
-        $redirects = $this->table('redirects');
-        $channelOptions = $this->channelRepo->listOptions();
-        $redirectRow = null;
-        $normalizedId = $id !== null && $id > 0 ? $id : 0;
-        if ($normalizedId > 0) {
-            $stmt = $this->db->prepare(
-                'SELECT id, title, description, slug, channel, active, target, created, updated
-                 FROM ' . $redirects . '
-                 WHERE id = :id
-                 LIMIT 1'
-            );
-            $stmt->execute([':id' => $normalizedId]);
-            $row = $stmt->fetch();
-            if ($row !== false && is_array($row)) {
-                $redirectRow = $this->withChannelContext($row, $this->channelsByIdMap());
-            }
-        }
-
-        return [
-            'redirect' => $redirectRow,
-            'channel_options' => $channelOptions,
-        ];
     }
 
     /**

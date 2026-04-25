@@ -194,8 +194,7 @@ final class UserController
         }
 
         $activeTab = $this->editorTabs->normalizeEditorTab($_GET['tab'] ?? null, ['account', 'permissions', 'profile', 'security'], 'account');
-        $editData = $this->userParser()->editFormData($id);
-        $user = is_array($editData['user'] ?? null) ? $editData['user'] : null;
+        $user = $id !== null ? $this->userParser()->findById($id) : null;
         if (is_array($user)) {
             $normalizedTheme = $this->editor->normalizePanelThemeChoice((string) ($user['theme'] ?? 'default'), true);
             $user['theme'] = $normalizedTheme ?? 'default';
@@ -215,7 +214,7 @@ final class UserController
             Redirect::redirect($this->context->panelUrl('/user'));
         }
 
-        $groupOptions = is_array($editData['group_options'] ?? null) ? $editData['group_options'] : [];
+        $groupOptions = $this->groupDataParser->listOptions();
         $actorIsAdmin = $this->context->auth()->isAdmin();
         $primaryGroupId = (int) ($user['primary_group_id'] ?? 0);
         $secondaryGroupIds = array_map('intval', (array) ($user['secondary_group_ids'] ?? []));

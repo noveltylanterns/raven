@@ -105,9 +105,8 @@ final class RedirectController
             return;
         }
 
-        $editorData = $this->redirectParser->editFormData($id);
-        $redirectRow = is_array($editorData['redirect'] ?? null) ? $editorData['redirect'] : null;
-        $channelOptions = is_array($editorData['channel_options'] ?? null) ? $editorData['channel_options'] : [];
+        $redirectRow = $id !== null ? $this->redirectParser->findById($id) : null;
+        $channelOptions = $this->channelParser->listOptions();
 
         if ($id !== null && $redirectRow === null) {
             $this->context->flash('error', 'Redirect not found.');

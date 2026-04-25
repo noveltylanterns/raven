@@ -47,7 +47,14 @@ final class PageImageRepository
     }
 
     /**
-     * Returns one page's gallery-enabled flag.
+     * Returns true when the given page exists and is therefore eligible to hold gallery images.
+     *
+     * Gallery image storage is always available for any existing page; the per-page
+     * `gallery_enabled` flag on the pages table controls whether the gallery block is
+     * rendered publicly, not whether images may be uploaded.
+     *
+     * @param int $pageId Page id to check.
+     * @return bool True when the page exists.
      */
     public function isGalleryEnabledForPage(int $pageId): bool
     {
@@ -103,9 +110,12 @@ final class PageImageRepository
     }
 
     /**
-     * Returns all images + variants for one page, sorted for panel editing.
+     * Returns all images and variants for one page, sorted by sort_order then id.
      *
-     * @return array<int, array<string, mixed>>
+     * Used by both the panel editor and public cover-image detection.
+     *
+     * @param int $pageId Page id whose images to load.
+     * @return array<int, array<string, mixed>> Hydrated image rows with inline variant arrays.
      */
     public function listForPage(int $pageId): array
     {

@@ -3,7 +3,7 @@
 /**
  * RAVEN CMS
  * ~/private/sys/Repository/PageRepository.php
- * Repository for database persistence operations.
+ * Data access for page records, public listing, taxonomy filters, and scheduled publish/expire.
  * Docs: https://raven.lanterns.io
  */
 
@@ -783,9 +783,10 @@ final class PageRepository
     }
 
     /**
-     * Returns one page by id for panel edit form.
+     * Returns one page by id.
      *
-     * @return array<string, mixed>|null
+     * @param int $id Page id to resolve.
+     * @return array<string, mixed>|null Hydrated page row with channel context, or null when not found.
      */
     public function findById(int $id): ?array
     {
@@ -888,9 +889,11 @@ final class PageRepository
     }
 
     /**
-     * Creates or updates page row from panel form payload.
+     * Creates or updates a page row from a normalized form payload.
      *
-     * @param array<string, mixed> $data
+     * @param array<string, mixed> $data Normalized page fields from any caller (panel, CLI, or extension).
+     * @return int The saved page id.
+     * @throws \RuntimeException When slug is missing, the channel slug is invalid, or the path already exists.
      */
     public function save(array $data): int
     {
@@ -1484,8 +1487,8 @@ final class PageRepository
      * @param array<int, string> $where Mutable WHERE-clause fragment list.
      * @param array<string, int|string> $params Mutable prepared-statement parameter map.
      * @param int|null $channelId Optional channel id filter resolved before repository entry.
-     * @param int|null $categoryId Optional category id filter from the panel UI.
-     * @param int|null $tagId Optional tag id filter from the panel UI.
+     * @param int|null $categoryId Optional category id filter (from any caller).
+     * @param int|null $tagId Optional tag id filter (from any caller).
      * @param string $pageCategoriesTable Resolved page-category junction table name.
      * @param string $pageTagsTable Resolved page-tag junction table name.
      * @param string $placeholderPrefix Prefix used to namespace generated placeholders.

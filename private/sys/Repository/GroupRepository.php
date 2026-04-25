@@ -3,7 +3,7 @@
 /**
  * RAVEN CMS
  * ~/private/sys/Repository/GroupRepository.php
- * Repository for database persistence operations.
+ * Data access for user-group records, membership assignments, and public route resolution.
  * Docs: https://raven.lanterns.io
  */
 
@@ -15,12 +15,11 @@ use PDO;
 use Raven\Lib\Auth\Public\GroupPublicRouteService;
 use Raven\Lib\Auth\GroupRolePolicy;
 use Raven\Lib\Database\TableNameResolver;
-use Raven\Lib\Media\Panel\TaxonomyImagePathResolver;
 use Raven\Lib\Scribe\GroupScribe;
 use RuntimeException;
 
 /**
- * Data access for Usergroup CRUD operations and membership safety rules.
+ * Data access for user-group CRUD operations and membership safety rules.
  */
 final class GroupRepository
 {
@@ -387,18 +386,6 @@ final class GroupRepository
     }
 
     /**
-     * Returns public image paths for one group record.
-     *
-     * @param array<string, mixed>|null $record
-     * @return array<string, string|null>
-     */
-    public function imagePathsFromRecord(int $groupId, ?array $record): array
-    {
-        $storage = TaxonomyImagePathResolver::storagePayloadFromRecord('groups', $record);
-        return TaxonomyImagePathResolver::pathsFromStoragePayload('groups', $groupId, $storage);
-    }
-
-    /**
      * Deletes one non-stock group and reassigns affected users to `User`
      * when they would otherwise have zero memberships.
      */
@@ -449,60 +436,6 @@ final class GroupRepository
         ]);
 
         return $stmt->fetchColumn() !== false;
-    }
-
-    /**
-     * Returns the number of group memberships the given user currently holds.
-     *
-     * @param int $userId User id to count memberships for.
-     * @return int Current membership count for the user.
-     */
-    private function membershipCountForUser(int $userId): int
-    {
-        $stmt = $this->db->prepare(
-            'SELECT COUNT(*)
-             FROM ' . $this->table('user_groups') . '
-             WHERE user = :user'
-        );
-        $stmt->execute([':user' => $userId]);
-
-        return (int) $stmt->fetchColumn();
-    }
-
-    /**
-     * Inserts one user-group link idempotently, ignoring pre-existing rows.
-     *
-     * Uses backend-specific INSERT … DO NOTHING / INSERT IGNORE syntax to avoid
-     * a separate EXISTS check that could race under concurrent requests.
-     *
-     * @param int $userId  User id to attach.
-     * @param int $groupId Group id to attach the user to.
-     * @return void
-     */
-    private function attachUserToGroup(int $userId, int $groupId): void
-    {
-        $table = $this->table('user_groups');
-        $driver = strtolower(trim($this->driver));
-        if ($driver === 'mysql') {
-            $stmt = $this->db->prepare(
-                'INSERT IGNORE INTO ' . $table . ' (user, `group`)
-                 VALUES (:user_id, :group_id)'
-            );
-        } elseif ($driver === 'pgsql') {
-            $stmt = $this->db->prepare(
-                'INSERT INTO ' . $table . ' ("user", "group")
-                 VALUES (:user_id, :group_id)
-                 ON CONFLICT ("user", "group") DO NOTHING'
-            );
-        } else {
-            $stmt = $this->db->prepare(
-                'INSERT INTO ' . $table . ' (user, "group")
-                 VALUES (:user_id, :group_id)
-                 ON CONFLICT(user, "group") DO NOTHING'
-            );
-        }
-
-        $stmt->execute([':user_id' => $userId, ':group_id' => $groupId]);
     }
 
     /**

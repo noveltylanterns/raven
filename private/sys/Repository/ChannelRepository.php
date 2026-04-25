@@ -52,7 +52,7 @@ final class ChannelRepository
     }
 
     /**
-     * Returns all channels with attached page counts for panel listing.
+     * Returns all channels with attached page counts, sorted with the root channel last.
      *
      * @return array<int, array<string, mixed>>
      */
@@ -174,7 +174,9 @@ final class ChannelRepository
     }
 
     /**
-     * Returns one total-count for panel channel index.
+     * Returns total channel count including the root channel record.
+     *
+     * @return int Total channel count.
      */
     public function countForPanel(): int
     {
@@ -182,9 +184,11 @@ final class ChannelRepository
     }
 
     /**
-     * Returns paginated channels with attached page counts for panel listing.
+     * Returns paginated channels with attached page counts.
      *
-     * @return array<int, array<string, mixed>>
+     * @param int $limit  Maximum number of rows to return.
+     * @param int $offset Zero-based row offset for pagination.
+     * @return array<int, array<string, mixed>> Hydrated channel rows with page counts.
      */
     public function listForPanel(int $limit = 50, int $offset = 0): array
     {
@@ -198,7 +202,9 @@ final class ChannelRepository
     /**
      * Returns one paginated channel page plus total row count.
      *
-     * @return array{rows: array<int, array<string, mixed>>, total: int}
+     * @param int $limit  Maximum number of rows to return.
+     * @param int $offset Zero-based row offset for pagination.
+     * @return array{rows: array<int, array<string, mixed>>, total: int} Paginated rows and total count.
      */
     public function listPageForPanel(int $limit = 50, int $offset = 0): array
     {
@@ -213,7 +219,7 @@ final class ChannelRepository
     }
 
     /**
-     * Returns minimal channel options for panel select controls.
+     * Returns minimal channel option rows suitable for select controls and parser lookups.
      *
      * @return array<int, array{id: int, name: string, slug: string, category_sets: array<int, int|string>, tag_sets: array<int, int|string>, editor_override: string, route_mode: string, route_separator: string}>
      */
@@ -291,6 +297,9 @@ final class ChannelRepository
 
     /**
      * Returns true when one channel exists by slug.
+     *
+     * @param string $slug Normalized slug to check.
+     * @return bool True when a channel with this slug is found.
      */
     public function slugExists(string $slug): bool
     {
@@ -366,6 +375,15 @@ final class ChannelRepository
         return $channelId;
     }
 
+    /**
+     * Counts channels that explicitly include a given taxonomy set id in their configuration.
+     *
+     * Used before deleting a set to confirm no channels still reference it.
+     *
+     * @param string $kind  Taxonomy type: 'category' or 'tag'.
+     * @param int    $setId Taxonomy set id to check for explicit assignments.
+     * @return int Number of channels that list this set id in their category_sets or tag_sets field.
+     */
     public function countExplicitTaxonomySetAssignments(string $kind, int $setId): int
     {
         $field = strtolower(trim($kind)) === 'tag' ? 'tag_sets' : 'category_sets';
@@ -441,7 +459,11 @@ final class ChannelRepository
     }
 
     /**
-     * @param array<int, bool> $usedIds
+     * Returns the next available channel id, skipping any ids already in use.
+     *
+     * @param array<int, bool> $usedIds Mutable set of already-allocated ids.
+     * @param int              $maxId   Mutable high-water mark for id allocation.
+     * @return int Next allocatable channel id.
      */
     private function nextAvailableChannelId(array &$usedIds, int &$maxId): int
     {
@@ -455,6 +477,11 @@ final class ChannelRepository
         return $candidate;
     }
 
+    /**
+     * Returns the next channel id as max(existing ids) + 1.
+     *
+     * @return int Next sequential channel id.
+     */
     private function nextChannelId(): int
     {
         $maxId = 0;
@@ -468,6 +495,12 @@ final class ChannelRepository
         return $maxId + 1;
     }
 
+    /**
+     * Normalizes a raw channel id value from a file record to a typed int, or null when invalid.
+     *
+     * @param mixed $value Raw value from the channel record file.
+     * @return int|null Normalized channel id, or null when the value is not a valid id.
+     */
     private function normalizeChannelId(mixed $value): ?int
     {
         return ChannelRepoParser::normalizeChannelId($value);

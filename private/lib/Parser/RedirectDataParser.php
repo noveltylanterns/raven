@@ -117,21 +117,6 @@ final class RedirectDataParser
     }
 
     /**
-     * Returns redirect edit-form data with normalized selector handling.
-     *
-     * @param int|null $id Redirect id in edit mode, or null in create mode.
-     * @return array{
-     *   redirect: array<string, mixed>|null,
-     *   channel_options: array<int, array{id: int, name: string, slug: string}>
-     * } Redirect row plus channel option rows.
-     */
-    public function editFormData(?int $id = null): array
-    {
-        $normalizedId = is_int($id) && $id > 0 ? $id : null;
-        return $this->redirectRepo()->editFormData($normalizedId);
-    }
-
-    /**
      * Returns the injected redirect repository for repo-backed reads.
      *
      * @return RedirectRepository Repository backing canonical read methods.
