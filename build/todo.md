@@ -74,10 +74,9 @@ lightweight public-route bootstrap.
 - [ ] Update every `PageImageRepository` use-site
 
 **Page** (`PageRepository` → `PageRead` + `PageWrite`)
-- [ ] Decide `applySchedule()` placement: it is called on every public request (not panel-only), so it should live in `PageWrite` and public routes inject `PageWrite` alongside `PageRead`. This is the correct boundary since scheduling IS a write.
-- [ ] `PageRepoParser::normalizeIds()` static extracted first (see RepoParser step above)
+- [ ] `PageRepoParser::normalizeIds()` and `PageRepoParser::applySchedule()` statics extracted first (see RepoParser step above)
 - [ ] `PageRead.php` — `findHomepage`, `findChannelHomepage`, `findPublicPage`, `findPublicPageById`, `findBySlug`, `idBySlug`, `listRecentPublished`, `listRecentPublishedForChannels`, `countForPanel`, `listForPanel`, `listPageForPanel`, `listAllForRouting`, `channelHomepagesForRouting`, `findById`, `editFormDataById`, `assignedCategoryRowsForPage`, `assignedTagRowsForPage`, `taxonomyAssignmentIdsByPage`, `listByCategorySlug/Id/Page*`, `listByTagSlug/Id/Page*`, `countBy*` + all private query helpers (hydration, channel-context, taxonomy helpers, content-block codec); takes `ChannelRead`
-- [ ] `PageWrite.php` — `save`, `deleteById`, `applySchedule`; takes `PageRead` (for slug/channel validation) + `ChannelRead`
+- [ ] `PageWrite.php` — `save`, `deleteById`; takes `PageRead` (for slug/channel validation) + `ChannelRead`; `applySchedule` is now on `PageRepoParser` — remove from here
 - [ ] Update every `PageRepository` use-site
 
 **User** (`UserRepository` → `UserRead` + `UserWrite`)
@@ -86,7 +85,7 @@ lightweight public-route bootstrap.
 - [ ] Update every `UserRepository` use-site
 
 #### Caller updates (do after all pairs are created)
-- [ ] `PublicRuntimeBuilder` — inject `*Read` for public display routes; inject `*Write` only where writes actually happen (schedule flip, form submission); verify no write class enters pure read routes
+- [ ] `PublicRuntimeBuilder` — inject only `*Read` classes for all public display routes; call `PageRepoParser::applySchedule()` directly (no `PageWrite` needed in public routes); inject `*Write` only for any public-facing form submission routes
 - [ ] `PanelRuntimeBuilder` — inject both `*Read` and `*Write` for panel controllers that do both; read-only panel helpers (parsers, breadcrumbs) get only `*Read`
 - [ ] All `lib/Parser/*DataParser.php` constructors — parsers are read-only wrappers; swap any injected `*Repository` to `*Read`
 - [ ] `lib/Parser/TaxonomyRepoParser.php` — swap `ChannelRepository` dep to `ChannelRead`
