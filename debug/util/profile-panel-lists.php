@@ -9,13 +9,14 @@
 
 declare(strict_types=1);
 
-use Raven\Core\Repository\CategoryRepository;
-use Raven\Core\Repository\ChannelRepository;
-use Raven\Core\Repository\GroupRepository;
-use Raven\Core\Repository\PageRepository;
-use Raven\Core\Repository\RedirectRepository;
-use Raven\Core\Repository\TagRepository;
-use Raven\Core\Repository\UserRepository;
+use Raven\Core\Repository\CategoryRead;
+use Raven\Core\Repository\ChannelRead;
+use Raven\Core\Repository\GroupRead;
+use Raven\Core\Repository\PageRead;
+use Raven\Core\Repository\RedirectRead;
+use Raven\Core\Repository\TagRead;
+use Raven\Core\Repository\UserRead;
+use Raven\Core\Repository\UserWrite;
 use Raven\Core\Debug\RequestProfiler;
 use Raven\Lib\Parser\ChannelDataParser;
 use Raven\Lib\Parser\ConfigParser;
@@ -78,6 +79,12 @@ final class PanelListProfilerRunner
             /** @var callable(): array<string, mixed> $bootExtensions */
             $bootExtensions = $rvn['boot_extensions'];
             $rvn = $bootExtensions();
+        }
+        if (is_callable($rvn['auth_db'] ?? null)) {
+            $rvn['auth_db'] = ($rvn['auth_db'])();
+        }
+        if (is_callable($rvn['auth'] ?? null)) {
+            $rvn['auth'] = ($rvn['auth'])();
         }
         $this->createTempSuperUser($rvn);
 
@@ -160,11 +167,11 @@ final class PanelListProfilerRunner
      * Builds category storage only when profiler routes actually need category data.
      *
      * @param array<string, mixed> $rvn
-     * @return CategoryRepository
+     * @return CategoryRead
      */
-    private function categoryRepository(array $rvn): CategoryRepository
+    private function categoryRepository(array $rvn): CategoryRead
     {
-        return new CategoryRepository(
+        return new CategoryRead(
             $rvn['db'],
             (string) $rvn['driver'],
             (string) $rvn['prefix']
@@ -175,11 +182,11 @@ final class PanelListProfilerRunner
      * Builds tag storage only when profiler routes actually need tag data.
      *
      * @param array<string, mixed> $rvn
-     * @return TagRepository
+     * @return TagRead
      */
-    private function tagRepository(array $rvn): TagRepository
+    private function tagRepository(array $rvn): TagRead
     {
-        return new TagRepository(
+        return new TagRead(
             $rvn['db'],
             (string) $rvn['driver'],
             (string) $rvn['prefix']
@@ -204,8 +211,8 @@ final class PanelListProfilerRunner
      */
     private function createTempSuperUser(array $rvn): void
     {
-        $groupRepo = new GroupRepository($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix']);
-        $userRepo = new UserRepository($rvn['auth_db'], $rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix']);
+        $groupRepo = new GroupRead($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix']);
+        $userRepo = new UserWrite($rvn['auth_db'], $rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix']);
         // Admin group is canonical ID 1; keep slug lookup fallback so older local
         // installs that renamed stock labels still resolve the profiling user role.
         $superGroupId = $groupRepo->idBySlug('admin') ?? 1;
@@ -239,7 +246,10 @@ final class PanelListProfilerRunner
 
         require_once $this->root . '/private/Raven.php';
         $rvn = \Raven\Raven::boot();
-        $userRepo = new UserRepository($rvn['auth_db'], $rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix']);
+        if (is_callable($rvn['auth_db'] ?? null)) {
+            $rvn['auth_db'] = ($rvn['auth_db'])();
+        }
+        $userRepo = new UserWrite($rvn['auth_db'], $rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix']);
         $userRepo->deleteById($this->tempUserId);
         $this->events[] = 'temp_user_deleted=' . $this->tempUserId;
     }
@@ -281,12 +291,12 @@ final class PanelListProfilerRunner
         $categoryEnabled = $this->featureEnabled($rvn, 'category.enabled', true);
         $tagEnabled = $this->featureEnabled($rvn, 'tag.enabled', true);
         // Build repos directly; the shared bootstrap service map was removed.
-        $channelRepo = new ChannelRepository($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix'], (string) $rvn['root'] . '/private/dat/channel');
+        $channelRepo = new ChannelRead($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix'], (string) $rvn['root'] . '/private/dat/channel');
         $channelParser = new ChannelDataParser($rvn['config'], $rvn['input'], $channelRepo);
-        $pageRepo = new PageRepository($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix'], $channelRepo, $categoryEnabled, $tagEnabled);
-        $redirectRepo = new RedirectRepository($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix'], $channelRepo);
-        $groupRepo = new GroupRepository($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix']);
-        $userRepo = new UserRepository($rvn['auth_db'], $rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix']);
+        $pageRepo = new PageRead($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix'], $channelRepo, $categoryEnabled, $tagEnabled);
+        $redirectRepo = new RedirectRead($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix'], $channelRepo);
+        $groupRepo = new GroupRead($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix']);
+        $userRepo = new UserRead($rvn['auth_db'], $rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix']);
         $categoryRepo = $categoryEnabled ? $this->categoryRepository($rvn) : null;
         $tagRepo = $tagEnabled ? $this->tagRepository($rvn) : null;
 
@@ -319,7 +329,7 @@ final class PanelListProfilerRunner
             }
         }
 
-        $categoryOptions = $categoryRepo instanceof CategoryRepository ? $categoryRepo->listOptions() : [];
+        $categoryOptions = $categoryRepo instanceof CategoryRead ? $categoryRepo->listOptions() : [];
         if ($categoryOptions !== []) {
             $categoryId = (int) ($categoryOptions[0]['id'] ?? 0);
             if ($categoryId > 0) {
@@ -327,7 +337,7 @@ final class PanelListProfilerRunner
             }
         }
 
-        $tagOptions = $tagRepo instanceof TagRepository ? $tagRepo->listOptions() : [];
+        $tagOptions = $tagRepo instanceof TagRead ? $tagRepo->listOptions() : [];
         if ($tagOptions !== []) {
             $tagId = (int) ($tagOptions[0]['id'] ?? 0);
             if ($tagId > 0) {
@@ -423,11 +433,11 @@ final class PanelListProfilerRunner
         $categoryEnabled = $this->featureEnabled($rvn, 'category.enabled', true);
         $tagEnabled = $this->featureEnabled($rvn, 'tag.enabled', true);
         // Build repos directly; the shared bootstrap service map was removed.
-        $channelRepo = new ChannelRepository($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix'], (string) $rvn['root'] . '/private/dat/channel');
-        $pageRepo = new PageRepository($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix'], $channelRepo, $categoryEnabled, $tagEnabled);
-        $redirectRepo = new RedirectRepository($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix'], $channelRepo);
-        $groupRepo = new GroupRepository($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix']);
-        $userRepo = new UserRepository($rvn['auth_db'], $rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix']);
+        $channelRepo = new ChannelRead($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix'], (string) $rvn['root'] . '/private/dat/channel');
+        $pageRepo = new PageRead($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix'], $channelRepo, $categoryEnabled, $tagEnabled);
+        $redirectRepo = new RedirectRead($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix'], $channelRepo);
+        $groupRepo = new GroupRead($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix']);
+        $userRepo = new UserRead($rvn['auth_db'], $rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix']);
         $categoryRepo = $categoryEnabled ? $this->categoryRepository($rvn) : null;
         $tagRepo = $tagEnabled ? $this->tagRepository($rvn) : null;
 
@@ -443,14 +453,14 @@ final class PanelListProfilerRunner
                 $channelSlug = $value;
             }
         }
-        $categoryOptions = $categoryRepo instanceof CategoryRepository ? $categoryRepo->listOptions() : [];
+        $categoryOptions = $categoryRepo instanceof CategoryRead ? $categoryRepo->listOptions() : [];
         if ($categoryOptions !== []) {
             $value = (int) ($categoryOptions[0]['id'] ?? 0);
             if ($value > 0) {
                 $categoryId = $value;
             }
         }
-        $tagOptions = $tagRepo instanceof TagRepository ? $tagRepo->listOptions() : [];
+        $tagOptions = $tagRepo instanceof TagRead ? $tagRepo->listOptions() : [];
         if ($tagOptions !== []) {
             $value = (int) ($tagOptions[0]['id'] ?? 0);
             if ($value > 0) {
@@ -477,10 +487,10 @@ final class PanelListProfilerRunner
             'users' => static fn () => $userRepo->listAll(),
         ];
 
-        if ($categoryRepo instanceof CategoryRepository) {
+        if ($categoryRepo instanceof CategoryRead) {
             $legacyFlows['category'] = static fn () => $categoryRepo->listAll();
         }
-        if ($tagRepo instanceof TagRepository) {
+        if ($tagRepo instanceof TagRead) {
             $legacyFlows['tag'] = static fn () => $tagRepo->listAll();
         }
 
@@ -519,13 +529,13 @@ final class PanelListProfilerRunner
             },
         ];
 
-        if ($categoryRepo instanceof CategoryRepository) {
+        if ($categoryRepo instanceof CategoryRead) {
             $currentFlows['categories'] = static function () use ($categoryRepo): void {
                 $categoryRepo->countForPanel();
                 $categoryRepo->listForPanel(50, 0);
             };
         }
-        if ($tagRepo instanceof TagRepository) {
+        if ($tagRepo instanceof TagRead) {
             $currentFlows['tags'] = static function () use ($tagRepo): void {
                 $tagRepo->countForPanel();
                 $tagRepo->listForPanel(50, 0);

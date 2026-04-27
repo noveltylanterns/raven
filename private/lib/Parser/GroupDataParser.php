@@ -11,7 +11,7 @@ declare(strict_types=1);
 
 namespace Raven\Lib\Parser;
 
-use Raven\Core\Repository\GroupRepository;
+use Raven\Core\Repository\GroupRead;
 use Raven\Lib\Security\InputSanitizer;
 use RuntimeException;
 
@@ -24,15 +24,15 @@ use RuntimeException;
 final class GroupDataParser
 {
     private InputSanitizer $input;
-    private ?GroupRepository $groupRepo;
+    private ?GroupRead $groupRepo;
 
     /**
      * Initializes the group data reader.
      *
      * @param InputSanitizer       $input     Input normalizer used when validating slugs.
-     * @param GroupRepository|null $groupRepo Optional group repository for read-only group lookups.
+     * @param GroupRead|null $groupRepo Optional group repository for read-only group lookups.
      */
-    public function __construct(InputSanitizer $input, ?GroupRepository $groupRepo = null)
+    public function __construct(InputSanitizer $input, ?GroupRead $groupRepo = null)
     {
         $this->input = $input;
         $this->groupRepo = $groupRepo;
@@ -141,13 +141,13 @@ final class GroupDataParser
     /**
      * Returns the injected group repository for repo-backed reads.
      *
-     * @return GroupRepository Repository backing canonical read methods.
+     * @return GroupRead Repository backing canonical read methods.
      * @throws RuntimeException When no repository was injected at construction time.
      */
-    private function groupRepo(): GroupRepository
+    private function groupRepo(): GroupRead
     {
-        if (!$this->groupRepo instanceof GroupRepository) {
-            throw new RuntimeException('GroupDataParser requires a GroupRepository for repository-backed reads.');
+        if (!$this->groupRepo instanceof GroupRead) {
+            throw new RuntimeException('GroupDataParser requires a GroupRead for repository-backed reads.');
         }
 
         return $this->groupRepo;

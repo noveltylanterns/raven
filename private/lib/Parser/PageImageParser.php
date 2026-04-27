@@ -3,7 +3,7 @@
 /**
  * RAVEN CMS
  * ~/private/lib/Parser/PageImageParser.php
- * Read-only page-image lookup helper backed by PageImageRepository.
+ * Read-only page-image lookup helper backed by PageImageRead.
  * Docs: https://raven.lanterns.io
  */
 
@@ -11,7 +11,7 @@ declare(strict_types=1);
 
 namespace Raven\Lib\Parser;
 
-use Raven\Core\Repository\PageImageRepository;
+use Raven\Core\Repository\PageImageRead;
 use RuntimeException;
 
 /**
@@ -23,14 +23,14 @@ use RuntimeException;
  */
 final class PageImageParser
 {
-    private ?PageImageRepository $pageImageRepo;
+    private ?PageImageRead $pageImageRepo;
 
     /**
      * Prepares the page-image parser for read-only image lookups.
      *
-     * @param PageImageRepository|null $pageImageRepo Optional repository for read-only page-image queries.
+     * @param PageImageRead|null $pageImageRepo Optional repository for read-only page-image queries.
      */
-    public function __construct(?PageImageRepository $pageImageRepo = null)
+    public function __construct(?PageImageRead $pageImageRepo = null)
     {
         $this->pageImageRepo = $pageImageRepo;
     }
@@ -120,13 +120,13 @@ final class PageImageParser
     /**
      * Returns the injected page-image repository for repo-backed reads.
      *
-     * @return PageImageRepository Repository backing canonical read methods.
+     * @return PageImageRead Repository backing canonical read methods.
      * @throws RuntimeException When no repository was injected at construction time.
      */
-    private function repo(): PageImageRepository
+    private function repo(): PageImageRead
     {
-        if (!$this->pageImageRepo instanceof PageImageRepository) {
-            throw new RuntimeException('PageImageParser requires a PageImageRepository for repository-backed reads.');
+        if (!$this->pageImageRepo instanceof PageImageRead) {
+            throw new RuntimeException('PageImageParser requires a PageImageRead for repository-backed reads.');
         }
 
         return $this->pageImageRepo;

@@ -18,8 +18,8 @@ use Raven\Lib\Database\TableNameResolver;
 /**
  * Owns page mutation writes and transactional cleanup rules.
  *
- * PageRepository keeps the read-heavy public/panel listing queries, while this
- * class centralizes page save/delete persistence plus category/tag assignment
+ * PageRead owns the read-heavy public/panel listing queries, while this class
+ * centralizes page save/delete persistence plus category/tag assignment
  * replacement so the page write seam lives under the canonical scribe layer.
  */
 final class PageScribe

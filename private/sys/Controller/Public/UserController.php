@@ -11,7 +11,7 @@ declare(strict_types=1);
 
 namespace Raven\Core\Controller\Public;
 
-use Raven\Core\Repository\UserRepository;
+use Raven\Core\Repository\UserRead;
 use Raven\Lib\Auth\LoginIdentifierResolver;
 use Raven\Lib\Parser\UserDataParser;
 use Raven\Lib\View\Public\RouteRenderService;
@@ -30,12 +30,12 @@ final class UserController
 
     /**
      * @param SharedController $context Shared public request context.
-     * @param UserRepository $userRepo User repository for public profile routes.
+     * @param UserRead $userRepo User repository read side for public profile routes.
      * @return void
      */
     public function __construct(
         SharedController $context,
-        UserRepository $userRepo
+        UserRead $userRepo
     ) {
         $this->context = $context;
         $this->loginIdentifierResolver = new LoginIdentifierResolver();

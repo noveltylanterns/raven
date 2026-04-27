@@ -1,9 +1,8 @@
 <?php
-
 /**
  * RAVEN CMS
- * ~/private/sys/Repository/SetRepository.php
- * Filesystem-backed category/tag taxonomy set repository.
+ * ~/private/sys/Repository/SetRead.php
+ * Read-only data access for filesystem-backed taxonomy set records.
  * Docs: https://raven.lanterns.io
  */
 
@@ -13,12 +12,14 @@ namespace Raven\Core\Repository;
 
 use Raven\Lib\Parser\SetParser;
 use Raven\Lib\Scribe\SetScribe;
-use RuntimeException;
 
 /**
- * Filesystem-backed repository for category/tag taxonomy sets.
+ * SELECT and lookup methods for taxonomy set records.
+ *
+ * Write operations (save, delete) live in SetWrite.
+ * The in-process record cache lives here; SetWrite calls clearCache() after mutations.
  */
-final class SetRepository
+class SetRead
 {
     private string $taxonomyType;
     private SetParser $fileStore;
@@ -27,10 +28,8 @@ final class SetRepository
     private ?array $cache = null;
 
     /**
-     * Prepares the set repository for the given taxonomy type and file-backed storage directory.
-     *
-     * @param string $taxonomyType  Lowercase taxonomy type ('category' or 'tag').
-     * @param string $setDirectory  Absolute path to the directory holding set JSON files.
+     * @param string $taxonomyType Lowercase taxonomy type ('category' or 'tag').
+     * @param string $setDirectory Absolute path to the directory holding set JSON files.
      */
     public function __construct(string $taxonomyType, string $setDirectory)
     {
@@ -41,6 +40,8 @@ final class SetRepository
 
     /**
      * Returns all taxonomy set records, sorted with the default set first then alphabetically by name.
+     *
+     * Maintains an in-process cache; call clearCache() after any write to invalidate it.
      *
      * @return array<int, array<string, mixed>> Canonicalized set records.
      */
@@ -136,74 +137,13 @@ final class SetRepository
     }
 
     /**
-     * Creates or updates one taxonomy set record and returns its id.
+     * Clears the in-process record cache.
      *
-     * @param array<string, mixed> $data Set fields; 'name' and a valid 'slug' are required for non-default sets.
-     * @return int The saved (or assigned) taxonomy set id.
-     * @throws \RuntimeException When required fields are missing or the slug conflicts with another set.
+     * Must be called by SetWrite after any mutation so subsequent reads
+     * reflect the new state from disk.
      */
-    public function save(array $data): int
+    public function clearCache(): void
     {
-        $providedId = SetParser::normalizeSetId($data['id'] ?? null);
-        $setId = $providedId ?? $this->fileStore->nextAvailableId();
-        $name = trim((string) ($data['name'] ?? ''));
-        $description = trim((string) ($data['description'] ?? ''));
-        $slug = SetParser::normalizeSlug((string) ($data['slug'] ?? ''));
-
-        if ($setId === SetParser::DEFAULT_SET_ID) {
-            $name = SetParser::defaultSetName($this->taxonomyType);
-            $slug = SetParser::DEFAULT_SET_SLUG;
-            $description = SetParser::defaultSetDescription($this->taxonomyType);
-        }
-
-        if ($name === '' || !SetParser::isValidSlug($slug)) {
-            throw new RuntimeException('Set name and valid slug are required.');
-        }
-
-        foreach ($this->listAll() as $existing) {
-            $existingId = (int) ($existing['id'] ?? -1);
-            if ($existingId === $setId) {
-                continue;
-            }
-
-            if (strtolower(trim((string) ($existing['slug'] ?? ''))) === $slug) {
-                throw new RuntimeException('A ' . $this->taxonomyType . ' set with that slug already exists.');
-            }
-        }
-
-        $existing = $this->findById($setId);
-        $createdAt = trim((string) ($existing['created_at'] ?? ''));
-        if ($createdAt === '') {
-            $createdAt = gmdate('Y-m-d H:i:s');
-        }
-
-        $record = [
-            'id' => $setId,
-            'name' => $name,
-            'slug' => $slug,
-            'description' => $description,
-            'is_stock' => $setId === SetParser::DEFAULT_SET_ID,
-            'created_at' => $createdAt,
-        ];
-
-        $this->fileScribe->writeRecordById($setId, $record);
-        $this->cache = null;
-        return $setId;
-    }
-
-    /**
-     * Deletes one taxonomy set record by id.
-     *
-     * @param int $id Taxonomy set id to delete.
-     * @throws \RuntimeException When attempting to delete the stock default set.
-     */
-    public function deleteById(int $id): void
-    {
-        if ($id === SetParser::DEFAULT_SET_ID) {
-            throw new RuntimeException('The stock default set cannot be deleted.');
-        }
-
-        $this->fileScribe->deleteById($id);
         $this->cache = null;
     }
 

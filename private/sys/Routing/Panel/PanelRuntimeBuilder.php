@@ -29,16 +29,27 @@ use Raven\Core\Controller\Panel\SystemController;
 use Raven\Core\Controller\Panel\TagController;
 use Raven\Core\Controller\Panel\UpdateController;
 use Raven\Core\Controller\Panel\UserController;
-use Raven\Core\Repository\CategoryRepository;
-use Raven\Core\Repository\ChannelRepository;
-use Raven\Core\Repository\GroupRepository;
-use Raven\Core\Repository\InviteRepository;
+use Raven\Core\Repository\CategoryRead;
+use Raven\Core\Repository\CategoryWrite;
+use Raven\Core\Repository\ChannelRead;
+use Raven\Core\Repository\ChannelWrite;
+use Raven\Core\Repository\GroupRead;
+use Raven\Core\Repository\GroupWrite;
+use Raven\Core\Repository\InviteRead;
+use Raven\Core\Repository\InviteWrite;
+use Raven\Core\Repository\PageImageRead;
 use Raven\Core\Repository\PageImageRepository;
-use Raven\Core\Repository\PageRepository;
-use Raven\Core\Repository\RedirectRepository;
-use Raven\Core\Repository\TagRepository;
-use Raven\Core\Repository\SetRepository;
-use Raven\Core\Repository\UserRepository;
+use Raven\Core\Repository\PageImageWrite;
+use Raven\Core\Repository\PageRead;
+use Raven\Core\Repository\PageWrite;
+use Raven\Core\Repository\RedirectRead;
+use Raven\Core\Repository\RedirectWrite;
+use Raven\Core\Repository\SetRead;
+use Raven\Core\Repository\SetWrite;
+use Raven\Core\Repository\TagRead;
+use Raven\Core\Repository\TagWrite;
+use Raven\Core\Repository\UserRead;
+use Raven\Core\Repository\UserWrite;
 use Raven\Core\Logger;
 use Raven\Core\Renderer;
 use Raven\Lib\Auth\AuthService;
@@ -124,25 +135,36 @@ final class PanelRuntimeBuilder
         $tagController = null;
         $updateController = null;
         $userController = null;
-        $categorySetRepository = null;
-        $tagSetRepository = null;
-        $inviteTokenRepository = null;
+        $categoryRead = null;
+        $categoryWrite = null;
+        $categorySetRead = null;
+        $categorySetWrite = null;
+        $tagRead = null;
+        $tagWrite = null;
+        $tagSetRead = null;
+        $tagSetWrite = null;
+        $inviteRead = null;
+        $inviteWrite = null;
+        $pageImageRead = null;
+        $pageImageWrite = null;
         $pageImageManager = null;
         $logger = null;
-        $categoryRepository = null;
-        $tagRepository = null;
         $taxonomyLookupRepository = null;
-        $channelRepository = null;
+        $channelRead = null;
+        $channelWrite = null;
         $extensionStateStore = null;
         $extensionPermissionCatalogService = null;
         $extensionCatalogService = null;
         $extensionEditorCatalogService = null;
         $themeCatalogService = null;
-        $groupRepository = null;
-        $pageImageRepository = null;
-        $pageRepository = null;
-        $redirectRepository = null;
-        $userRepository = null;
+        $groupRead = null;
+        $groupWrite = null;
+        $pageRead = null;
+        $pageWrite = null;
+        $redirectRead = null;
+        $redirectWrite = null;
+        $userRead = null;
+        $userWrite = null;
 
         $rvn['view'] = new Renderer((string) $rvn['root'] . '/private/tpl');
         $categoryEnabled = ConfigParser::bool($rvn['config']->get('category.enabled', true), true);
@@ -216,123 +238,249 @@ final class PanelRuntimeBuilder
         };
 
         /**
-         * Builds channel storage for panel content and routing flows.
+         * Builds channel read side for panel content and routing flows.
          */
-        $channelFactory = $memoize(static function () use (&$channelRepository, $rvn): ChannelRepository {
-            $channelRepository = new ChannelRepository(
+        $channelReadFactory = $memoize(static function () use (&$channelRead, $rvn): ChannelRead {
+            $channelRead = new ChannelRead(
                 $rvn['db'],
                 (string) $rvn['driver'],
                 (string) $rvn['prefix'],
                 (string) $rvn['root'] . '/private/dat/channel'
             );
 
-            return $channelRepository;
+            return $channelRead;
         });
 
         /**
-         * Builds group storage for panel account/group management flows.
+         * Builds channel write side for panel channel-save and delete routes.
          */
-        $groupFactory = $memoize(static function () use (&$groupRepository, $rvn): GroupRepository {
-            $groupRepository = new GroupRepository(
-                $rvn['db'],
-                (string) $rvn['driver'],
-                (string) $rvn['prefix']
-            );
-
-            return $groupRepository;
-        });
-
-        /**
-         * Builds page-image storage for panel content/media flows.
-         */
-        $pageImagesFactory = $memoize(static function () use (&$pageImageRepository, $rvn): PageImageRepository {
-            $pageImageRepository = new PageImageRepository(
-                $rvn['db'],
-                (string) $rvn['driver'],
-                (string) $rvn['prefix']
-            );
-
-            return $pageImageRepository;
-        });
-
-        /**
-         * Builds page storage for panel content/routing flows.
-         */
-        $pageFactory = $memoize(static function () use (&$pageRepository, $rvn, $channelFactory, $categoryEnabled, $tagEnabled): PageRepository {
-            $pageRepository = new PageRepository(
+        $channelWriteFactory = $memoize(static function () use (&$channelWrite, $rvn, $channelReadFactory): ChannelWrite {
+            $channelWrite = new ChannelWrite(
                 $rvn['db'],
                 (string) $rvn['driver'],
                 (string) $rvn['prefix'],
-                $channelFactory(),
+                $channelReadFactory(),
+                (string) $rvn['root'] . '/private/dat/channel'
+            );
+
+            return $channelWrite;
+        });
+
+        /**
+         * Builds group read side for panel group-listing flows.
+         */
+        $groupReadFactory = $memoize(static function () use (&$groupRead, $rvn): GroupRead {
+            $groupRead = new GroupRead(
+                $rvn['db'],
+                (string) $rvn['driver'],
+                (string) $rvn['prefix']
+            );
+
+            return $groupRead;
+        });
+
+        /**
+         * Builds group write side for panel group-save and delete routes.
+         */
+        $groupWriteFactory = $memoize(static function () use (&$groupWrite, $rvn, $groupReadFactory): GroupWrite {
+            $groupWrite = new GroupWrite(
+                $rvn['db'],
+                (string) $rvn['driver'],
+                (string) $rvn['prefix'],
+                $groupReadFactory()
+            );
+
+            return $groupWrite;
+        });
+
+        /**
+         * Builds page-image read side for panel gallery renders and existence checks.
+         */
+        $pageImagesReadFactory = $memoize(static function () use (&$pageImageRead, $rvn): PageImageRead {
+            $pageImageRead = new PageImageRead(
+                $rvn['db'],
+                (string) $rvn['driver'],
+                (string) $rvn['prefix']
+            );
+
+            return $pageImageRead;
+        });
+
+        /**
+         * Builds page-image write side for panel gallery persistence.
+         */
+        $pageImagesWriteFactory = $memoize(static function () use (&$pageImageWrite, $rvn): PageImageWrite {
+            $pageImageWrite = new PageImageWrite(
+                $rvn['db'],
+                (string) $rvn['driver'],
+                (string) $rvn['prefix']
+            );
+
+            return $pageImageWrite;
+        });
+
+        /**
+         * Builds page read side for panel content/routing flows.
+         */
+        $pageReadFactory = $memoize(static function () use (&$pageRead, $rvn, $channelReadFactory, $categoryEnabled, $tagEnabled): PageRead {
+            $pageRead = new PageRead(
+                $rvn['db'],
+                (string) $rvn['driver'],
+                (string) $rvn['prefix'],
+                $channelReadFactory(),
                 $categoryEnabled,
                 $tagEnabled
             );
 
-            return $pageRepository;
+            return $pageRead;
         });
 
         /**
-         * Builds redirect storage for panel routing management flows.
+         * Builds page write side for panel page-save and delete routes.
          */
-        $redirectFactory = $memoize(static function () use (&$redirectRepository, $rvn, $channelFactory): RedirectRepository {
-            $redirectRepository = new RedirectRepository(
+        $pageWriteFactory = $memoize(static function () use (&$pageWrite, $rvn, $pageReadFactory, $channelReadFactory, $categoryEnabled, $tagEnabled): PageWrite {
+            $pageWrite = new PageWrite(
                 $rvn['db'],
                 (string) $rvn['driver'],
                 (string) $rvn['prefix'],
-                $channelFactory()
+                $channelReadFactory(),
+                $categoryEnabled,
+                $tagEnabled
             );
 
-            return $redirectRepository;
+            return $pageWrite;
         });
 
         /**
-         * Builds user storage for panel user/preferences flows.
+         * Builds redirect read side for panel routing inventory flows.
          */
-        $userFactory = $memoize(static function () use (&$userRepository, $rvn, $resolveAuthDb): UserRepository {
-            $userRepository = new UserRepository(
+        $redirectReadFactory = $memoize(static function () use (&$redirectRead, $rvn, $channelReadFactory): RedirectRead {
+            $redirectRead = new RedirectRead(
+                $rvn['db'],
+                (string) $rvn['driver'],
+                (string) $rvn['prefix'],
+                $channelReadFactory()
+            );
+
+            return $redirectRead;
+        });
+
+        /**
+         * Builds redirect write side for panel redirect-save and delete routes.
+         */
+        $redirectWriteFactory = $memoize(static function () use (&$redirectWrite, $rvn, $channelReadFactory): RedirectWrite {
+            $redirectWrite = new RedirectWrite(
+                $rvn['db'],
+                (string) $rvn['driver'],
+                (string) $rvn['prefix'],
+                $channelReadFactory()
+            );
+
+            return $redirectWrite;
+        });
+
+        /**
+         * Builds user read side for panel user listings and parser seams.
+         */
+        $userReadFactory = $memoize(static function () use (&$userRead, $rvn, $resolveAuthDb): UserRead {
+            $userRead = new UserRead(
                 $resolveAuthDb(),
                 $rvn['db'],
                 (string) $rvn['driver'],
                 (string) $rvn['prefix']
             );
 
-            return $userRepository;
+            return $userRead;
         });
 
         /**
-         * Builds the file-backed category set repository only for panel taxonomy editors.
+         * Builds user write side for panel user-save and delete routes.
          */
-        $categorySetFactory = $memoize(static function () use (&$categorySetRepository, $rvn): SetRepository {
-            $categorySetRepository = new SetRepository('category', (string) $rvn['root'] . '/private/dat/category-set');
-            return $categorySetRepository;
+        $userWriteFactory = $memoize(static function () use (&$userWrite, $rvn, $resolveAuthDb): UserWrite {
+            $userWrite = new UserWrite(
+                $resolveAuthDb(),
+                $rvn['db'],
+                (string) $rvn['driver'],
+                (string) $rvn['prefix']
+            );
+
+            return $userWrite;
         });
 
         /**
-         * Builds the file-backed tag set repository only for panel taxonomy editors.
+         * Builds the file-backed category set read side only for panel taxonomy editors.
          */
-        $tagSetFactory = $memoize(static function () use (&$tagSetRepository, $rvn): SetRepository {
-            $tagSetRepository = new SetRepository('tag', (string) $rvn['root'] . '/private/dat/tag-set');
-            return $tagSetRepository;
+        $categorySetFactory = $memoize(static function () use (&$categorySetRead, $rvn): SetRead {
+            $categorySetRead = new SetRead('category', (string) $rvn['root'] . '/private/dat/category-set');
+            return $categorySetRead;
         });
 
         /**
-         * Builds invite-token storage only for panel invite management.
+         * Builds the file-backed tag set read side only for panel taxonomy editors.
          */
-        $inviteTokenFactory = $memoize(static function () use (&$inviteTokenRepository, $rvn, $resolveAuthDb): InviteRepository {
-            $inviteTokenRepository = new InviteRepository(
+        $tagSetFactory = $memoize(static function () use (&$tagSetRead, $rvn): SetRead {
+            $tagSetRead = new SetRead('tag', (string) $rvn['root'] . '/private/dat/tag-set');
+            return $tagSetRead;
+        });
+
+        /**
+         * Builds the file-backed category set write side only for panel category-set save and delete routes.
+         */
+        $categorySetWriteFactory = $memoize(static function () use (&$categorySetWrite, $rvn, $categorySetFactory): SetWrite {
+            $categorySetWrite = new SetWrite('category', (string) $rvn['root'] . '/private/dat/category-set', $categorySetFactory());
+            return $categorySetWrite;
+        });
+
+        /**
+         * Builds the file-backed tag set write side only for panel tag-set save and delete routes.
+         */
+        $tagSetWriteFactory = $memoize(static function () use (&$tagSetWrite, $rvn, $tagSetFactory): SetWrite {
+            $tagSetWrite = new SetWrite('tag', (string) $rvn['root'] . '/private/dat/tag-set', $tagSetFactory());
+            return $tagSetWrite;
+        });
+
+        /**
+         * Builds invite read side only for panel invite listing.
+         */
+        $inviteReadFactory = $memoize(static function () use (&$inviteRead, $rvn, $resolveAuthDb): InviteRead {
+            $inviteRead = new InviteRead(
                 $resolveAuthDb(),
                 (string) $rvn['driver'],
                 (string) $rvn['prefix']
             );
 
-            return $inviteTokenRepository;
+            return $inviteRead;
+        });
+
+        /**
+         * Builds invite write side only for panel invite creation/deletion.
+         */
+        $inviteWriteFactory = $memoize(static function () use (&$inviteWrite, $rvn, $resolveAuthDb, $inviteReadFactory): InviteWrite {
+            $inviteWrite = new InviteWrite(
+                $resolveAuthDb(),
+                (string) $rvn['driver'],
+                (string) $rvn['prefix'],
+                $inviteReadFactory()
+            );
+
+            return $inviteWrite;
         });
 
         /**
          * Builds the panel page-image helper only when page editing enters media flows.
+         *
+         * PageImageManager is a justified holdout: it needs both hasHashForPage/nextSortOrderForPage
+         * (read-side) and insertImageWithVariants/deleteImageForPage (write-side) in one object.
+         * Keep using PageImageRepository bridge until PageImageManager is refactored to accept
+         * separate read+write injections.
          */
-        $pageImageManagerFactory = $memoize(static function () use (&$pageImageManager, $rvn, $pageImagesFactory): PageImageManager {
-            $pageImageManager = new PageImageManager($rvn['config'], $rvn['input'], $pageImagesFactory(), (string) $rvn['root']);
+        $pageImageManagerFactory = $memoize(static function () use (&$pageImageManager, $rvn): PageImageManager {
+            $bridge = new PageImageRepository(
+                $rvn['db'],
+                (string) $rvn['driver'],
+                (string) $rvn['prefix']
+            );
+            $pageImageManager = new PageImageManager($rvn['config'], $rvn['input'], $bridge, (string) $rvn['root']);
 
             return $pageImageManager;
         });
@@ -352,41 +500,69 @@ final class PanelRuntimeBuilder
         });
 
         /**
-         * Builds category storage only for panel taxonomy flows that actually use categories.
+         * Builds category read side only for panel taxonomy flows that actually use categories.
          */
-        $categoryFactory = $memoize(static function () use (&$categoryRepository, $rvn): CategoryRepository {
-            $categoryRepository = new CategoryRepository(
+        $categoryReadFactory = $memoize(static function () use (&$categoryRead, $rvn): CategoryRead {
+            $categoryRead = new CategoryRead(
                 $rvn['db'],
                 (string) $rvn['driver'],
                 (string) $rvn['prefix']
             );
 
-            return $categoryRepository;
+            return $categoryRead;
         });
 
         /**
-         * Builds tag storage only for panel taxonomy flows that actually use tags.
+         * Builds category write side only for panel category-save and delete routes.
          */
-        $tagFactory = $memoize(static function () use (&$tagRepository, $rvn): TagRepository {
-            $tagRepository = new TagRepository(
+        $categoryWriteFactory = $memoize(static function () use (&$categoryWrite, $rvn, $categoryReadFactory): CategoryWrite {
+            $categoryWrite = new CategoryWrite(
+                $rvn['db'],
+                (string) $rvn['driver'],
+                (string) $rvn['prefix'],
+                $categoryReadFactory()
+            );
+
+            return $categoryWrite;
+        });
+
+        /**
+         * Builds tag read side only for panel taxonomy flows that actually use tags.
+         */
+        $tagReadFactory = $memoize(static function () use (&$tagRead, $rvn): TagRead {
+            $tagRead = new TagRead(
                 $rvn['db'],
                 (string) $rvn['driver'],
                 (string) $rvn['prefix']
             );
 
-            return $tagRepository;
+            return $tagRead;
+        });
+
+        /**
+         * Builds tag write side only for panel tag-save and delete routes.
+         */
+        $tagWriteFactory = $memoize(static function () use (&$tagWrite, $rvn, $tagReadFactory): TagWrite {
+            $tagWrite = new TagWrite(
+                $rvn['db'],
+                (string) $rvn['driver'],
+                (string) $rvn['prefix'],
+                $tagReadFactory()
+            );
+
+            return $tagWrite;
         });
 
         /**
          * Builds taxonomy lookup parsing only for routing and page-editor flows
          * that need category/tag option lookups beyond channel routing.
          */
-        $taxonomyLookupFactory = $memoize(static function () use (&$taxonomyLookupRepository, $rvn, $channelFactory): TaxonomyRepoParser {
+        $taxonomyLookupFactory = $memoize(static function () use (&$taxonomyLookupRepository, $rvn, $channelReadFactory): TaxonomyRepoParser {
             $taxonomyLookupRepository = new TaxonomyRepoParser(
                 $rvn['db'],
                 (string) $rvn['driver'],
                 (string) $rvn['prefix'],
-                $channelFactory()
+                $channelReadFactory()
             );
 
             return $taxonomyLookupRepository;
@@ -400,18 +576,22 @@ final class PanelRuntimeBuilder
          * @return array<string, mixed>
          */
         $panelContentDomain = $memoize(static function () use (
-            $channelFactory,
-            $pageFactory,
-            $pageImagesFactory,
+            $channelReadFactory,
+            $pageReadFactory,
+            $pageWriteFactory,
+            $pageImagesReadFactory,
+            $pageImagesWriteFactory,
             $pageImageManagerFactory,
-            $userFactory
+            $userReadFactory
         ): array {
             return [
-                'channel' => $channelFactory(),
-                'page' => $pageFactory(),
-                'page_images' => $pageImagesFactory(),
+                'channel_read' => $channelReadFactory(),
+                'page_read' => $pageReadFactory(),
+                'page_write' => $pageWriteFactory(),
+                'page_images_read' => $pageImagesReadFactory(),
+                'page_images_write' => $pageImagesWriteFactory(),
                 'page_image_manager' => $pageImageManagerFactory,
-                'user' => $userFactory(),
+                'user_read' => $userReadFactory(),
             ];
         });
 
@@ -422,23 +602,35 @@ final class PanelRuntimeBuilder
          * @return array<string, mixed>
          */
         $panelTaxonomyDomain = $memoize(static function () use (
-            $channelFactory,
-            $redirectFactory,
-            $categoryFactory,
+            $channelReadFactory,
+            $channelWriteFactory,
+            $redirectReadFactory,
+            $redirectWriteFactory,
+            $categoryReadFactory,
+            $categoryWriteFactory,
             $categorySetFactory,
-            $tagFactory,
+            $categorySetWriteFactory,
+            $tagReadFactory,
+            $tagWriteFactory,
             $tagSetFactory,
+            $tagSetWriteFactory,
             $taxonomyLookupFactory,
             $categoryEnabled,
             $tagEnabled
         ): array {
             return [
-                'channel' => $channelFactory(),
-                'redirect' => $redirectFactory(),
-                'category' => $categoryFactory,
+                'channel_read' => $channelReadFactory(),
+                'channel_write' => $channelWriteFactory(),
+                'redirect_read' => $redirectReadFactory(),
+                'redirect_write' => $redirectWriteFactory(),
+                'category' => $categoryReadFactory,
+                'category_write' => $categoryWriteFactory,
                 'category_set' => $categorySetFactory,
-                'tag' => $tagFactory,
+                'category_set_write' => $categorySetWriteFactory,
+                'tag' => $tagReadFactory,
+                'tag_write' => $tagWriteFactory,
                 'tag_set' => $tagSetFactory,
+                'tag_set_write' => $tagSetWriteFactory,
                 'taxonomy_lookup' => $taxonomyLookupFactory,
                 'category_enabled' => $categoryEnabled,
                 'tag_enabled' => $tagEnabled,
@@ -451,11 +643,21 @@ final class PanelRuntimeBuilder
          *
          * @return array<string, mixed>
          */
-        $panelUserDomain = $memoize(static function () use ($groupFactory, $userFactory, $inviteTokenFactory): array {
+        $panelUserDomain = $memoize(static function () use (
+            $groupReadFactory,
+            $groupWriteFactory,
+            $userReadFactory,
+            $userWriteFactory,
+            $inviteReadFactory,
+            $inviteWriteFactory
+        ): array {
             return [
-                'group' => $groupFactory(),
-                'user' => $userFactory(),
-                'invite_tokens' => $inviteTokenFactory,
+                'group_read' => $groupReadFactory(),
+                'group_write' => $groupWriteFactory(),
+                'user_read' => $userReadFactory(),
+                'user_write' => $userWriteFactory(),
+                'invite_read' => $inviteReadFactory,
+                'invite_write' => $inviteWriteFactory,
             ];
         });
 
@@ -472,23 +674,23 @@ final class PanelRuntimeBuilder
          * @return array<string, mixed>
          */
         $panelSystemDomain = $memoize(static function () use (
-            $channelFactory,
+            $channelReadFactory,
             $categorySetFactory,
-            $pageFactory,
-            $redirectFactory,
+            $pageReadFactory,
+            $redirectReadFactory,
             $tagSetFactory,
             $taxonomyLookupFactory,
-            $userFactory,
+            $userReadFactory,
             $loggerFactory
         ): array {
             return [
-                'channel' => $channelFactory(),
+                'channel' => $channelReadFactory(),
                 'category_set' => $categorySetFactory,
-                'page' => $pageFactory(),
-                'redirect' => $redirectFactory(),
+                'page' => $pageReadFactory(),
+                'redirect' => $redirectReadFactory(),
                 'tag_set' => $tagSetFactory,
                 'taxonomy_lookup' => $taxonomyLookupFactory,
-                'user' => $userFactory(),
+                'user' => $userReadFactory(),
             ];
         });
 
@@ -740,16 +942,18 @@ final class PanelRuntimeBuilder
                 $requestContextFactory(),
                 $rvn['config'],
                 $rvn['input'],
-                $contentDomain['page'],
-                $contentDomain['page_images'],
+                $contentDomain['page_read'],
+                $contentDomain['page_write'],
+                $contentDomain['page_images_read'],
+                $contentDomain['page_images_write'],
                 $contentDomain['page_image_manager'],
                 $taxonomyDomain['category'],
                 $taxonomyDomain['category_set'],
                 $taxonomyDomain['tag'],
                 $taxonomyDomain['tag_set'],
                 $taxonomyDomain['taxonomy_lookup'],
-                $contentDomain['user'],
-                new ChannelDataParser($rvn['config'], $rvn['input'], $contentDomain['channel']),
+                $contentDomain['user_read'],
+                new ChannelDataParser($rvn['config'], $rvn['input'], $contentDomain['channel_read']),
                 $rvn['panel_editor_tabs'],
                 $rvn['panel_editor'],
                 $rvn['panel_editor_blocks'],
@@ -781,14 +985,14 @@ final class PanelRuntimeBuilder
             $channelController = new ChannelController(
                 $requestContextFactory(),
                 $rvn['input'],
-                $taxonomyDomain['channel'],
+                $taxonomyDomain['channel_write'],
                 $taxonomyDomain['category_set'],
                 $taxonomyDomain['tag_set'],
                 $taxonomyDomain['category_enabled'],
                 $taxonomyDomain['tag_enabled'],
                 new TaxonomyImageService($rvn['config']),
                 new TaxonomyImageScribe($rvn['config'], (string) $rvn['root']),
-                new ChannelDataParser($rvn['config'], $rvn['input'], $taxonomyDomain['channel']),
+                new ChannelDataParser($rvn['config'], $rvn['input'], $taxonomyDomain['channel_read']),
                 new FeedRouteParser($rvn['config'], $rvn['input']),
                 $rvn['panel_editor_tabs'],
                 $rvn['panel_editor'],
@@ -814,11 +1018,13 @@ final class PanelRuntimeBuilder
                 $requestContextFactory(),
                 $rvn['input'],
                 $taxonomyDomain['category'],
+                $taxonomyDomain['category_write'],
                 $taxonomyDomain['category_set'],
+                $taxonomyDomain['category_set_write'],
                 $taxonomyDomain['category_enabled'],
                 new TaxonomyImageService($rvn['config']),
                 new TaxonomyImageScribe($rvn['config'], (string) $rvn['root']),
-                new ChannelDataParser($rvn['config'], $rvn['input'], $taxonomyDomain['channel']),
+                new ChannelDataParser($rvn['config'], $rvn['input'], $taxonomyDomain['channel_read']),
                 $rvn['panel_editor_tabs'],
                 new Upload()
             );
@@ -841,9 +1047,9 @@ final class PanelRuntimeBuilder
             $redirectController = new RedirectController(
                 $requestContextFactory(),
                 $rvn['input'],
-                new ChannelDataParser($rvn['config'], $rvn['input'], $taxonomyDomain['channel']),
-                $taxonomyDomain['redirect'],
-                new RedirectDataParser($rvn['input'], $taxonomyDomain['redirect']),
+                new ChannelDataParser($rvn['config'], $rvn['input'], $taxonomyDomain['channel_read']),
+                $taxonomyDomain['redirect_write'],
+                new RedirectDataParser($rvn['input'], $taxonomyDomain['redirect_read']),
                 $rvn['panel_editor']
             );
 
@@ -866,11 +1072,13 @@ final class PanelRuntimeBuilder
                 $requestContextFactory(),
                 $rvn['input'],
                 $taxonomyDomain['tag'],
+                $taxonomyDomain['tag_write'],
                 $taxonomyDomain['tag_set'],
+                $taxonomyDomain['tag_set_write'],
                 $taxonomyDomain['tag_enabled'],
                 new TaxonomyImageService($rvn['config']),
                 new TaxonomyImageScribe($rvn['config'], (string) $rvn['root']),
-                new ChannelDataParser($rvn['config'], $rvn['input'], $taxonomyDomain['channel']),
+                new ChannelDataParser($rvn['config'], $rvn['input'], $taxonomyDomain['channel_read']),
                 $rvn['panel_editor_tabs'],
                 new Upload()
             );
@@ -894,9 +1102,11 @@ final class PanelRuntimeBuilder
                 $rvn['config'],
                 $rvn['input'],
                 (string) $rvn['root'],
-                new GroupDataParser($rvn['input'], $userDomain['group']),
-                $userDomain['user'],
-                $userDomain['invite_tokens'],
+                new GroupDataParser($rvn['input'], $userDomain['group_read']),
+                $userDomain['user_read'],
+                $userDomain['user_write'],
+                $userDomain['invite_read'],
+                $userDomain['invite_write'],
                 new SessionFlash('_raven_flash_list'),
                 new GroupRouteParser($rvn['config'], $rvn['input']),
                 new PanelInvitePolicyService($rvn['input']),
@@ -928,8 +1138,8 @@ final class PanelRuntimeBuilder
             $groupController = new GroupController(
                 $requestContextFactory(),
                 $rvn['input'],
-                $groupDomain['group'],
-                new GroupDataParser($rvn['input'], $groupDomain['group']),
+                $groupDomain['group_write'],
+                new GroupDataParser($rvn['input'], $groupDomain['group_read']),
                 new GroupRouteParser($rvn['config'], $rvn['input']),
                 $rvn['panel_editor_tabs'],
                 $rvn['panel_editor'],

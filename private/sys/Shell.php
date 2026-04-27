@@ -10,11 +10,16 @@
 declare(strict_types=1);
 
 use Raven\Core\Config;
-use Raven\Core\Repository\CategoryRepository;
-use Raven\Core\Repository\ChannelRepository;
-use Raven\Core\Repository\GroupRepository;
-use Raven\Core\Repository\RedirectRepository;
-use Raven\Core\Repository\TagRepository;
+use Raven\Core\Repository\CategoryRead;
+use Raven\Core\Repository\CategoryWrite;
+use Raven\Core\Repository\ChannelRead;
+use Raven\Core\Repository\ChannelWrite;
+use Raven\Core\Repository\GroupRead;
+use Raven\Core\Repository\GroupWrite;
+use Raven\Core\Repository\RedirectRead;
+use Raven\Core\Repository\RedirectWrite;
+use Raven\Core\Repository\TagRead;
+use Raven\Core\Repository\TagWrite;
 use Raven\Lib\Archive\Install as ArchiveInstall;
 use Raven\Lib\Archive\Package as ArchivePackage;
 use Raven\Lib\Auth\Panel\PanelAccess;
@@ -942,12 +947,9 @@ function raven_cli_command_category(RavenCliContext $context, array $tokens): in
 
     try {
         $rvn = $context->rvn();
-        $repo = new CategoryRepository(
-            $rvn['db'],
-            (string) $rvn['driver'],
-            (string) $rvn['prefix']
-        );
-        $parser = new CategoryDataParser($rvn['input'], $repo);
+        $repoRead = new CategoryRead($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix']);
+        $repo = new CategoryWrite($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix'], $repoRead);
+        $parser = new CategoryDataParser($rvn['input'], $repoRead);
 
         if ($action === 'list') {
             $rows = $parser->listAll();
@@ -1103,12 +1105,9 @@ function raven_cli_command_tag(RavenCliContext $context, array $tokens): int
 
     try {
         $rvn = $context->rvn();
-        $repo = new TagRepository(
-            $rvn['db'],
-            (string) $rvn['driver'],
-            (string) $rvn['prefix']
-        );
-        $parser = new TagDataParser($rvn['input'], $repo);
+        $repoRead = new TagRead($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix']);
+        $repo = new TagWrite($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix'], $repoRead);
+        $parser = new TagDataParser($rvn['input'], $repoRead);
 
         if ($action === 'list') {
             $rows = $parser->listAll();
@@ -1264,8 +1263,9 @@ function raven_cli_command_channel(RavenCliContext $context, array $tokens): int
 
     try {
         $rvn = $context->rvn();
-        $repo = new ChannelRepository($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix'], (string) $rvn['root'] . '/private/dat/channel');
-        $parser = new ChannelDataParser($rvn['config'], $rvn['input'], $repo);
+        $repoRead = new ChannelRead($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix'], (string) $rvn['root'] . '/private/dat/channel');
+        $repo = new ChannelWrite($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix'], $repoRead, (string) $rvn['root'] . '/private/dat/channel');
+        $parser = new ChannelDataParser($rvn['config'], $rvn['input'], $repoRead);
 
         if ($action === 'list') {
             $rows = $parser->listAll();
@@ -1428,8 +1428,9 @@ function raven_cli_command_group(RavenCliContext $context, array $tokens): int
 
     try {
         $rvn = $context->rvn();
-        $repo = new GroupRepository($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix']);
-        $parser = new GroupDataParser($rvn['input'], $repo);
+        $repoRead = new GroupRead($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix']);
+        $repo = new GroupWrite($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix'], $repoRead);
+        $parser = new GroupDataParser($rvn['input'], $repoRead);
 
         $orderedPermissions = [
             'view_public' => PanelAccess::VIEW_PUBLIC_SITE,
@@ -1693,10 +1694,11 @@ function raven_cli_command_redirect(RavenCliContext $context, array $tokens): in
 
     try {
         $rvn = $context->rvn();
-        // RedirectRepository depends on ChannelRepository for channel-slug validation.
-        $channelRepo = new ChannelRepository($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix'], (string) $rvn['root'] . '/private/dat/channel');
-        $repo = new RedirectRepository($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix'], $channelRepo);
-        $parser = new RedirectDataParser($rvn['input'], $repo);
+        // RedirectWrite depends on ChannelRead for channel-slug validation.
+        $channelRepo = new ChannelRead($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix'], (string) $rvn['root'] . '/private/dat/channel');
+        $repoRead = new RedirectRead($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix'], $channelRepo);
+        $repo = new RedirectWrite($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix'], $channelRepo);
+        $parser = new RedirectDataParser($rvn['input'], $repoRead);
 
         $findRedirect = static function (array $options) use ($parser): ?array {
             $idRaw = raven_cli_option($options, 'id', null);

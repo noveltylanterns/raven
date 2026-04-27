@@ -15,7 +15,7 @@ declare(strict_types=1);
 namespace Raven\Lib\Parser;
 
 use PDO;
-use Raven\Core\Repository\ChannelRepository;
+use Raven\Core\Repository\ChannelRead;
 use Raven\Lib\Database\TableNameResolver;
 use Raven\Lib\Media\Panel\TaxonomyImagePathResolver;
 
@@ -27,9 +27,9 @@ final class TaxonomyRepoParser
     private PDO $db;
     private string $driver;
     private string $prefix;
-    private ChannelRepository $channelRepo;
+    private ChannelRead $channelRepo;
 
-    public function __construct(PDO $db, string $driver, string $prefix, ChannelRepository $channelRepo)
+    public function __construct(PDO $db, string $driver, string $prefix, ChannelRead $channelRepo)
     {
         $this->db = $db;
         $this->driver = $driver;

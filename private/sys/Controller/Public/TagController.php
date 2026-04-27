@@ -11,7 +11,7 @@ declare(strict_types=1);
 
 namespace Raven\Core\Controller\Public;
 
-use Raven\Core\Repository\PageRepository;
+use Raven\Core\Repository\PageRead;
 use Raven\Core\Routing\Public\PublicChannelPageRouteService;
 use Raven\Lib\Parser\ChannelRouteParser;
 use Raven\Lib\Parser\PageDataParser;
@@ -35,14 +35,14 @@ final class TagController
 
     /**
      * @param SharedController $context Shared public request context.
-     * @param PageRepository $pageRepo Page repository for public tag page lists.
+     * @param PageRead $pageRepo Page repository read side for public tag page lists.
      * @param TaxonomyRepoParser $taxonomyLookupRepo Taxonomy lookup parser for tag resolution.
      * @param ThemeCatalog $themeCatalogService Shared public-theme catalog for template resolution.
      * @return void
      */
     public function __construct(
         SharedController $context,
-        PageRepository $pageRepo,
+        PageRead $pageRepo,
         TaxonomyRepoParser $taxonomyLookupRepo,
         ThemeCatalog $themeCatalogService
     ) {

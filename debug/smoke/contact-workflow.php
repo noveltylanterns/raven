@@ -9,8 +9,8 @@
 
 declare(strict_types=1);
 
-use Raven\Core\Repository\GroupRepository;
-use Raven\Core\Repository\UserRepository;
+use Raven\Core\Repository\GroupRead;
+use Raven\Core\Repository\UserWrite;
 
 error_reporting(E_ALL & ~E_WARNING & ~E_NOTICE & ~E_DEPRECATED);
 ini_set('display_errors', '0');
@@ -372,8 +372,8 @@ final class ContactWorkflowSmokeRunner
     {
         require_once $this->root . '/private/Raven.php';
         $rvn = \Raven\Raven::boot();
-        $groupRepo = new GroupRepository($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix']);
-        $userRepo = new UserRepository($rvn['auth_db'], $rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix']);
+        $groupRepo = new GroupRead($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix']);
+        $userRepo = new UserWrite($rvn['auth_db'], $rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix']);
 
         // Admin group is canonical ID 1; fall back to slug lookup for resilience.
         $groupId = $groupRepo->idBySlug('admin');
@@ -411,7 +411,7 @@ final class ContactWorkflowSmokeRunner
 
         require_once $this->root . '/private/Raven.php';
         $rvn = \Raven\Raven::boot();
-        $userRepo = new UserRepository($rvn['auth_db'], $rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix']);
+        $userRepo = new UserWrite($rvn['auth_db'], $rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix']);
         $userRepo->deleteById($this->tempUserId);
         $this->events[] = 'deleted_temp_user=' . $this->tempUserId;
     }

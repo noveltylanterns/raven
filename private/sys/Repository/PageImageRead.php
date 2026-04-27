@@ -1,9 +1,8 @@
 <?php
-
 /**
  * RAVEN CMS
- * ~/private/sys/Repository/PageImageRepository.php
- * Repository for per-page gallery images and generated variants.
+ * ~/private/sys/Repository/PageImageRead.php
+ * Read-only data access for page gallery images and their size variants.
  * Docs: https://raven.lanterns.io
  */
 
@@ -13,31 +12,36 @@ namespace Raven\Core\Repository;
 
 use PDO;
 use Raven\Lib\Database\TableNameResolver;
-use Raven\Lib\Scribe\PageImageScribe;
 
 /**
- * Data access for page gallery images and their size variants.
+ * SELECT and lookup methods for per-page gallery images and size variants.
  *
- * @extends PageImageRead Extends the read-only side as a migration bridge; controllers
- *   that still type-hint PageImageRepository remain compatible while callers are updated.
+ * Write operations (insert, update, delete) live in PageImageWrite.
+ * Both the panel editor and public cover-image detection use methods here.
  */
-class PageImageRepository extends PageImageRead
+class PageImageRead
 {
     private PDO $db;
     private string $driver;
     private string $prefix;
-    private PageImageScribe $pageImageScribe;
 
+    /**
+     * @param PDO    $db     Active database connection.
+     * @param string $driver Database driver string ('mysql', 'sqlite', 'pgsql').
+     * @param string $prefix Table name prefix for this Raven installation.
+     */
     public function __construct(PDO $db, string $driver, string $prefix)
     {
         $this->db = $db;
         $this->driver = $driver;
         $this->prefix = preg_replace('/[^a-zA-Z0-9_]/', '', $prefix) ?? '';
-        $this->pageImageScribe = new PageImageScribe($db, $driver, $prefix);
     }
 
     /**
-     * Returns true when one page id exists.
+     * Returns true when a page with the given id exists.
+     *
+     * @param int $pageId Page id to check.
+     * @return bool True when the page row is found.
      */
     public function pageExists(int $pageId): bool
     {
@@ -66,6 +70,9 @@ class PageImageRepository extends PageImageRead
 
     /**
      * Returns the next sort order value for one page's image list.
+     *
+     * @param int $pageId Page whose current maximum sort order is inspected.
+     * @return int Next available sort order value (at least 1).
      */
     public function nextSortOrderForPage(int $pageId): int
     {
@@ -80,7 +87,11 @@ class PageImageRepository extends PageImageRead
     }
 
     /**
-     * Returns true when one page already has an image with the same hash.
+     * Returns true when one page already has an image with the same SHA-256 hash.
+     *
+     * @param int    $pageId  Page id to scope the duplicate check.
+     * @param string $sha256  SHA-256 hash of the candidate image file.
+     * @return bool True when an exact duplicate exists on this page.
      */
     public function hasHashForPage(int $pageId, string $sha256): bool
     {
@@ -99,17 +110,6 @@ class PageImageRepository extends PageImageRead
         ]);
 
         return $stmt->fetchColumn() !== false;
-    }
-
-    /**
-     * Inserts one source image row and all generated variant rows.
-     *
-     * @param array<string, scalar|null> $image
-     * @param array<int, array<string, scalar|null>> $variants
-     */
-    public function insertImageWithVariants(array $image, array $variants): int
-    {
-        return $this->pageImageScribe->insertImageWithVariants($image, $variants);
     }
 
     /**
@@ -248,7 +248,11 @@ class PageImageRepository extends PageImageRead
     /**
      * Returns public-ready gallery images for one page.
      *
-     * @return array<int, array<string, mixed>>
+     * Filters to status=ready and include_in_gallery=true, then places the cover image first
+     * while preserving explicit manual order for the rest.
+     *
+     * @param int $pageId Page whose public gallery images to load.
+     * @return array<int, array<string, mixed>> Filtered and sorted image rows.
      */
     public function listReadyForPublicPage(int $pageId): array
     {
@@ -293,6 +297,9 @@ class PageImageRepository extends PageImageRead
      * Only an explicit ready cover image can override site-level meta image config.
      * When present, the public wrapper uses that image's large variant for both
      * OpenGraph and X/Twitter tags via the shared `meta:image` template value.
+     *
+     * @param int $pageId Page whose cover image URL to resolve.
+     * @return string|null Public URL of the large cover image variant, or null when absent.
      */
     public function coverImageUrlForPage(int $pageId): ?string
     {
@@ -317,37 +324,10 @@ class PageImageRepository extends PageImageRead
     }
 
     /**
-     * Updates one page's gallery toggle and per-image metadata.
-     *
-     * @param array<int, array<string, scalar|null>> $imageUpdates
-     */
-    public function updateGalleryForPage(int $pageId, bool $enabled, array $imageUpdates): void
-    {
-        $this->pageImageScribe->updateGalleryForPage($pageId, $enabled, $imageUpdates);
-    }
-
-    /**
-     * Deletes one gallery image + variants and returns stored file paths.
-     *
-     * @return array{stored_paths: array<int, string>}|null
-     */
-    public function deleteImageForPage(int $pageId, int $imageId): ?array
-    {
-        return $this->pageImageScribe->deleteImageForPage($pageId, $imageId);
-    }
-
-    /**
-     * Deletes all gallery rows for one page and returns all file paths.
-     *
-     * @return array<int, string>
-     */
-    public function deleteAllForPage(int $pageId): array
-    {
-        return $this->pageImageScribe->deleteAllForPage($pageId);
-    }
-
-    /**
      * Converts one stored relative path into a public URL path.
+     *
+     * @param string $storedPath Relative storage path from the database.
+     * @return string Absolute-rooted public URL path.
      */
     private function publicUrlFromStoredPath(string $storedPath): string
     {

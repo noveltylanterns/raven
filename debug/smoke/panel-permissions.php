@@ -25,8 +25,9 @@ require_once __DIR__ . '/../../private/lib/Extension/ExtensionBootstrapContractR
 require_once __DIR__ . '/../../private/lib/Security/InputSanitizer.php';
 
 use Raven\Core\Config;
-use Raven\Core\Repository\GroupRepository;
-use Raven\Core\Repository\UserRepository;
+use Raven\Core\Repository\GroupRead;
+use Raven\Core\Repository\GroupWrite;
+use Raven\Core\Repository\UserWrite;
 use Raven\Lib\Auth\PanelAccess;
 use Raven\Lib\Extension\ExtensionCatalogService;
 use Raven\Lib\Extension\ExtensionPermissionCatalogService;
@@ -444,8 +445,8 @@ PHP;
     {
         require_once $this->root . '/private/Raven.php';
         $rvn = \Raven\Raven::boot();
-        $groupRepo = new GroupRepository($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix']);
-        $userRepo = new UserRepository($rvn['auth_db'], $rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix']);
+        $groupRepo = new GroupWrite($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix'], new GroupRead($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix']));
+        $userRepo = new UserWrite($rvn['auth_db'], $rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix']);
         $groupSlug = 'nav-smoke-' . $suffix . '-' . $this->runId;
         $groupId = (int) $groupRepo->save([
             'id' => null,
@@ -944,7 +945,7 @@ PHP;
 
         require_once $this->root . '/private/Raven.php';
         $rvn = \Raven\Raven::boot();
-        $userRepo = new UserRepository($rvn['auth_db'], $rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix']);
+        $userRepo = new UserWrite($rvn['auth_db'], $rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix']);
         foreach (array_reverse($this->createdUsers) as $userId) {
             try {
                 $userRepo->deleteById((int) $userId);
@@ -961,7 +962,7 @@ PHP;
 
         require_once $this->root . '/private/Raven.php';
         $rvn = \Raven\Raven::boot();
-        $groupRepo = new GroupRepository($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix']);
+        $groupRepo = new GroupWrite($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix'], new GroupRead($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix']));
         foreach (array_reverse($this->createdGroups) as $groupId) {
             try {
                 $groupRepo->deleteById((int) $groupId);

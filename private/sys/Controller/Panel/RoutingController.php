@@ -13,10 +13,10 @@ namespace Raven\Core\Controller\Panel;
 
 use Closure;
 use Raven\Core\Config;
-use Raven\Core\Repository\ChannelRepository;
-use Raven\Core\Repository\PageRepository;
-use Raven\Core\Repository\RedirectRepository;
-use Raven\Core\Repository\UserRepository;
+use Raven\Core\Repository\ChannelRead;
+use Raven\Core\Repository\PageRead;
+use Raven\Core\Repository\RedirectRead;
+use Raven\Core\Repository\UserRead;
 use Raven\Core\Routing\Panel\RoutingInventoryBuilder;
 use Raven\Lib\Auth\LoginIdentifierResolver;
 use Raven\Lib\Auth\Panel\PanelAccess;
@@ -48,10 +48,10 @@ final class RoutingController
     private Config $config;
     private InputSanitizer $input;
     private string $root;
-    private ChannelRepository $channelRepo;
-    private PageRepository $pageRepo;
-    private RedirectRepository $redirectRepo;
-    private UserRepository $userRepo;
+    private ChannelRead $channelRepo;
+    private PageRead $pageRepo;
+    private RedirectRead $redirectRepo;
+    private UserRead $userRepo;
     /** @var Closure(): TaxonomyRepoParser */
     private Closure $taxonomyLookupRepoResolver;
     private ?TaxonomyRepoParser $taxonomyLookupRepo = null;
@@ -72,10 +72,10 @@ final class RoutingController
      * @param Config $config Runtime configuration reader for public route state.
      * @param InputSanitizer $input Shared request input sanitizer.
      * @param string $root Project root path for routing preview/theme lookups.
-     * @param ChannelRepository $channelRepo Channel repository for routing option rows.
-     * @param PageRepository $pageRepo Page repository for routing inventory rows.
-     * @param RedirectRepository $redirectRepo Redirect repository for routing inventory rows.
-     * @param UserRepository $userRepo User repository for routing inventory rows.
+     * @param ChannelRead $channelRepo Channel repository read side for routing option rows.
+     * @param PageRead $pageRepo Page repository read side for routing inventory rows.
+     * @param RedirectRead $redirectRepo Redirect repository read side for routing inventory rows.
+     * @param UserRead $userRepo User repository read side for routing inventory rows.
      * @param callable(): TaxonomyRepoParser $taxonomyLookupRepoResolver Lazy taxonomy lookup parser resolver.
      * @param ThemeCatalog $themeCatalogService Shared public-theme catalog for route preview rendering.
      * @return void
@@ -85,10 +85,10 @@ final class RoutingController
         Config $config,
         InputSanitizer $input,
         string $root,
-        ChannelRepository $channelRepo,
-        PageRepository $pageRepo,
-        RedirectRepository $redirectRepo,
-        UserRepository $userRepo,
+        ChannelRead $channelRepo,
+        PageRead $pageRepo,
+        RedirectRead $redirectRepo,
+        UserRead $userRepo,
         callable $taxonomyLookupRepoResolver,
         ThemeCatalog $themeCatalogService
     ) {

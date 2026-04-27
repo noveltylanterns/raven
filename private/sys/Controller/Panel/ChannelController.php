@@ -12,8 +12,8 @@ declare(strict_types=1);
 namespace Raven\Core\Controller\Panel;
 
 use Closure;
-use Raven\Core\Repository\ChannelRepository;
-use Raven\Core\Repository\SetRepository;
+use Raven\Core\Repository\ChannelWrite;
+use Raven\Core\Repository\SetRead;
 use Raven\Lib\Media\Panel\TaxonomyImageService;
 use Raven\Lib\Parser\ChannelDataParser;
 use Raven\Lib\Parser\ChannelRouteParser;
@@ -37,13 +37,13 @@ final class ChannelController
 {
     private SharedController $context;
     private InputSanitizer $input;
-    private ChannelRepository $channelRepo;
-    /** @var Closure(): SetRepository */
+    private ChannelWrite $channelRepo;
+    /** @var Closure(): SetRead */
     private Closure $categorySetRepoResolver;
-    private ?SetRepository $categorySetRepo = null;
-    /** @var Closure(): SetRepository */
+    private ?SetRead $categorySetRepo = null;
+    /** @var Closure(): SetRead */
     private Closure $tagSetRepoResolver;
-    private ?SetRepository $tagSetRepo = null;
+    private ?SetRead $tagSetRepo = null;
     private bool $categoryEnabled;
     private bool $tagEnabled;
     private TaxonomyImageService $taxonomyImageService;
@@ -57,7 +57,7 @@ final class ChannelController
     /**
      * @param SharedController $context Shared panel request context.
      * @param InputSanitizer $input Shared request input sanitizer.
-     * @param ChannelRepository $channelRepo Channel repository for channel writes.
+     * @param ChannelWrite $channelRepo Channel repository write side for channel saves and deletes.
      * @param callable $categorySetRepoResolver Lazy category-set repository resolver for channel set selection.
      * @param callable $tagSetRepoResolver Lazy tag-set repository resolver for channel set selection.
      * @param bool $categoryEnabled Whether category features are enabled in runtime config.
@@ -74,7 +74,7 @@ final class ChannelController
     public function __construct(
         SharedController $context,
         InputSanitizer $input,
-        ChannelRepository $channelRepo,
+        ChannelWrite $channelRepo,
         callable $categorySetRepoResolver,
         callable $tagSetRepoResolver,
         bool $categoryEnabled,
@@ -455,16 +455,16 @@ final class ChannelController
     /**
      * Returns the category-set repository on first use for channel set selection.
      *
-     * @return SetRepository Category-set repository.
+     * @return SetRead Category-set repository read side.
      */
-    private function categorySetRepo(): SetRepository
+    private function categorySetRepo(): SetRead
     {
-        if ($this->categorySetRepo instanceof SetRepository) {
+        if ($this->categorySetRepo instanceof SetRead) {
             return $this->categorySetRepo;
         }
 
         $repo = ($this->categorySetRepoResolver)();
-        if (!$repo instanceof SetRepository) {
+        if (!$repo instanceof SetRead) {
             throw new \RuntimeException('Panel category-set repository resolver returned an invalid value.');
         }
 
@@ -475,16 +475,16 @@ final class ChannelController
     /**
      * Returns the tag-set repository on first use for channel set selection.
      *
-     * @return SetRepository Tag-set repository.
+     * @return SetRead Tag-set repository read side.
      */
-    private function tagSetRepo(): SetRepository
+    private function tagSetRepo(): SetRead
     {
-        if ($this->tagSetRepo instanceof SetRepository) {
+        if ($this->tagSetRepo instanceof SetRead) {
             return $this->tagSetRepo;
         }
 
         $repo = ($this->tagSetRepoResolver)();
-        if (!$repo instanceof SetRepository) {
+        if (!$repo instanceof SetRead) {
             throw new \RuntimeException('Panel tag-set repository resolver returned an invalid value.');
         }
 

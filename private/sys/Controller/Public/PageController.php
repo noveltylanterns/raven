@@ -12,8 +12,8 @@ declare(strict_types=1);
 namespace Raven\Core\Controller\Public;
 
 use Closure;
-use Raven\Core\Repository\PageRepository;
-use Raven\Core\Repository\UserRepository;
+use Raven\Core\Repository\PageRead;
+use Raven\Core\Repository\UserRead;
 use Raven\Lib\Parser\PageImageParser;
 use Raven\Lib\Extension\Public\EmbeddedFormRuntimeInterface;
 use Raven\Lib\Extension\Public\EmbeddedFormRuntimeService;
@@ -67,9 +67,9 @@ final class PageController
      * @param SharedController $context Shared public request context.
      * @param ChannelDataParser $channelParser Channel data parser for public channel-route lookups.
      * @param PageImageParser $pageImages Page-image parser for read-only gallery rendering and page meta images.
-     * @param PageRepository $pageRepo Page repository for homepage, channel, and page lookups.
+     * @param PageRead $pageRepo Page repository read side for homepage, channel, and page lookups.
      * @param RedirectDataParser $redirectParser Redirect data parser for public redirect fallbacks.
-     * @param UserRepository $userRepo User repository for author profile lookups in page meta.
+     * @param UserRead $userRepo User repository read side for author profile lookups in page meta.
      * @param ThemeCatalog $themeCatalogService Shared public-theme catalog for template resolution and meta reads.
      * @param ExtensionEditorCatalogService $extensionEditorCatalogService Shared extension editor catalog for public block definitions.
      * @param callable(?string=): array<string, mixed> $extensionServicesProvider Lazy extension-services resolver for shortcode runtimes.
@@ -79,9 +79,9 @@ final class PageController
         SharedController $context,
         ChannelDataParser $channelParser,
         PageImageParser $pageImages,
-        PageRepository $pageRepo,
+        PageRead $pageRepo,
         RedirectDataParser $redirectParser,
-        UserRepository $userRepo,
+        UserRead $userRepo,
         ThemeCatalog $themeCatalogService,
         ExtensionEditorCatalogService $extensionEditorCatalogService,
         callable $extensionServicesProvider

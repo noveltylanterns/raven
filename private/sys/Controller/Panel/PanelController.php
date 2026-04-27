@@ -371,7 +371,7 @@ final class PanelController
             // Provide channel-aware shortcuts for Create Page sidebar/mobile accordion sublinks.
             $pageCreateChannelItems = [];
             if ($hasPanelPermissionBit(PanelAccess::PAGES_CREATE)) {
-                foreach ($rvn['panel_domain_content']()['channel']->listOptions() as $channelOption) {
+                foreach ($rvn['panel_domain_content']()['channel_read']->listOptions() as $channelOption) {
                     if (!is_array($channelOption)) {
                         continue;
                     }

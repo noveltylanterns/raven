@@ -9,10 +9,11 @@
 
 declare(strict_types=1);
 
-use Raven\Core\Repository\ChannelRepository;
-use Raven\Core\Repository\GroupRepository;
-use Raven\Core\Repository\RedirectRepository;
-use Raven\Core\Repository\UserRepository;
+use Raven\Core\Repository\ChannelRead;
+use Raven\Core\Repository\GroupRead;
+use Raven\Core\Repository\RedirectRead;
+use Raven\Core\Repository\RedirectWrite;
+use Raven\Core\Repository\UserWrite;
 
 error_reporting(E_ALL & ~E_WARNING & ~E_NOTICE & ~E_DEPRECATED);
 ini_set('display_errors', '0');
@@ -315,7 +316,7 @@ final class SecuritySmokeRunner
     {
         require_once $this->root . '/private/Raven.php';
         $rvn = \Raven\Raven::boot();
-        $groupRepo = new GroupRepository($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix']);
+        $groupRepo = new GroupRead($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix']);
         $rows = $groupRepo->listAll();
         return is_array($rows) ? count($rows) : 0;
     }
@@ -327,8 +328,8 @@ final class SecuritySmokeRunner
     {
         require_once $this->root . '/private/Raven.php';
         $rvn = \Raven\Raven::boot();
-        $channelRepo = new ChannelRepository($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix'], (string) $rvn['root'] . '/private/dat/channel');
-        $rows = (new RedirectRepository($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix'], $channelRepo))->listAll();
+        $channelRepo = new ChannelRead($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix'], (string) $rvn['root'] . '/private/dat/channel');
+        $rows = (new RedirectRead($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix'], $channelRepo))->listAll();
         if (!is_array($rows)) {
             return null;
         }
@@ -367,16 +368,16 @@ final class SecuritySmokeRunner
 
         require_once $this->root . '/private/Raven.php';
         $rvn = \Raven\Raven::boot();
-        $channelRepo = new ChannelRepository($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix'], (string) $rvn['root'] . '/private/dat/channel');
-        (new RedirectRepository($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix'], $channelRepo))->deleteById($id);
+        $channelRepo = new ChannelRead($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix'], (string) $rvn['root'] . '/private/dat/channel');
+        (new RedirectWrite($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix'], $channelRepo))->deleteById($id);
     }
 
     private function createTempSuperUser(): void
     {
         require_once $this->root . '/private/Raven.php';
         $rvn = \Raven\Raven::boot();
-        $groupRepo = new GroupRepository($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix']);
-        $userRepo = new UserRepository($rvn['auth_db'], $rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix']);
+        $groupRepo = new GroupRead($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix']);
+        $userRepo = new UserWrite($rvn['auth_db'], $rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix']);
 
         // Admin group is canonical ID 1; slug lookup kept as fallback.
         $superGroupId = $groupRepo->idBySlug('admin') ?? 1;
@@ -411,7 +412,7 @@ final class SecuritySmokeRunner
 
         require_once $this->root . '/private/Raven.php';
         $rvn = \Raven\Raven::boot();
-        $userRepo = new UserRepository($rvn['auth_db'], $rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix']);
+        $userRepo = new UserWrite($rvn['auth_db'], $rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix']);
         $userRepo->deleteById($this->tempUserId);
         $this->events[] = 'deleted_temp_user=' . $this->tempUserId;
     }

@@ -3,7 +3,7 @@
 /**
  * RAVEN CMS
  * ~/private/lib/Parser/CategoryDataParser.php
- * Read-only category lookup and panel-list parser backed by CategoryRepository.
+ * Read-only category lookup and panel-list parser backed by CategoryRead.
  * Docs: https://raven.lanterns.io
  */
 
@@ -11,7 +11,7 @@ declare(strict_types=1);
 
 namespace Raven\Lib\Parser;
 
-use Raven\Core\Repository\CategoryRepository;
+use Raven\Core\Repository\CategoryRead;
 use Raven\Lib\Security\InputSanitizer;
 use RuntimeException;
 
@@ -24,15 +24,15 @@ use RuntimeException;
 final class CategoryDataParser
 {
     private InputSanitizer $input;
-    private ?CategoryRepository $categoryRepo;
+    private ?CategoryRead $categoryRepo;
 
     /**
      * Initializes the category data reader.
      *
      * @param InputSanitizer          $input        Input normalizer used when validating slugs and ids.
-     * @param CategoryRepository|null $categoryRepo Optional category repository for read-only category lookups.
+     * @param CategoryRead|null $categoryRepo Optional category repository for read-only category lookups.
      */
-    public function __construct(InputSanitizer $input, ?CategoryRepository $categoryRepo = null)
+    public function __construct(InputSanitizer $input, ?CategoryRead $categoryRepo = null)
     {
         $this->input = $input;
         $this->categoryRepo = $categoryRepo;
@@ -187,13 +187,13 @@ final class CategoryDataParser
     /**
      * Returns the injected category repository for repo-backed reads.
      *
-     * @return CategoryRepository Repository backing canonical read methods.
+     * @return CategoryRead Repository backing canonical read methods.
      * @throws RuntimeException When no repository was injected at construction time.
      */
-    private function categoryRepo(): CategoryRepository
+    private function categoryRepo(): CategoryRead
     {
-        if (!$this->categoryRepo instanceof CategoryRepository) {
-            throw new RuntimeException('CategoryDataParser requires a CategoryRepository for repository-backed reads.');
+        if (!$this->categoryRepo instanceof CategoryRead) {
+            throw new RuntimeException('CategoryDataParser requires a CategoryRead for repository-backed reads.');
         }
 
         return $this->categoryRepo;

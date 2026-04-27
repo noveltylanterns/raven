@@ -1,13 +1,10 @@
 <?php
-
 /**
  * RAVEN CMS
- * ~/private/sys/Repository/TagRepository.php
- * Data access for page tag records and their taxonomy set assignments.
+ * ~/private/sys/Repository/TagRead.php
+ * Read-only data access for page tag records and taxonomy set assignments.
  * Docs: https://raven.lanterns.io
  */
-
-// Inline note: Repository methods encapsulate SQL details and keep callers storage-agnostic.
 
 declare(strict_types=1);
 
@@ -16,24 +13,29 @@ namespace Raven\Core\Repository;
 use PDO;
 use Raven\Lib\Database\TableNameResolver;
 use Raven\Lib\Media\Panel\TaxonomyImagePathResolver;
-use Raven\Lib\Scribe\TaxonomyScribe;
 
 /**
- * Data access for page tag CRUD and taxonomy set assignments.
+ * SELECT and lookup methods for page tags.
+ *
+ * Write operations (INSERT, UPDATE, DELETE) live in TagWrite.
+ * Shared only between the read and write sides — no panel-view logic here.
  */
-final class TagRepository
+class TagRead
 {
     private PDO $db;
     private string $driver;
     private string $prefix;
-    private TaxonomyScribe $tagScribe;
 
+    /**
+     * @param PDO    $db     Active database connection.
+     * @param string $driver Database driver string ('mysql', 'sqlite', 'pgsql').
+     * @param string $prefix Table name prefix for this Raven installation.
+     */
     public function __construct(PDO $db, string $driver, string $prefix)
     {
         $this->db = $db;
         $this->driver = $driver;
         $this->prefix = preg_replace('/[^a-zA-Z0-9_]/', '', $prefix) ?? '';
-        $this->tagScribe = new TaxonomyScribe($db, $driver, $prefix, 'tag');
     }
 
     /**
@@ -210,7 +212,7 @@ final class TagRepository
     }
 
     /**
-     * Returns minimal tag options for panel select controls.
+     * Returns minimal tag options suitable for select controls and parser lookups.
      *
      * @return array<int, array{id: int, name: string, slug: string, set: int}>
      */
@@ -242,8 +244,10 @@ final class TagRepository
     /**
      * Returns only ids that currently exist in storage.
      *
-     * @param array<int> $ids
-     * @return array<int>
+     * Used by TagWrite to filter incoming save payloads before delegating to TaxonomyScribe.
+     *
+     * @param array<int> $ids Candidate id list; non-positive values are ignored.
+     * @return array<int> Subset of ids that match rows in the tags table.
      */
     public function existingIds(array $ids): array
     {
@@ -283,7 +287,8 @@ final class TagRepository
     /**
      * Returns one tag by id.
      *
-     * @return array<string, mixed>|null
+     * @param int $id Tag id to resolve.
+     * @return array<string, mixed>|null Hydrated tag row, or null when not found.
      */
     public function findById(int $id): ?array
     {
@@ -306,7 +311,8 @@ final class TagRepository
     /**
      * Returns one tag by slug.
      *
-     * @return array<string, mixed>|null
+     * @param string $slug Tag slug to resolve.
+     * @return array<string, mixed>|null Hydrated tag row, or null when not found.
      */
     public function findBySlug(string $slug): ?array
     {
@@ -328,6 +334,9 @@ final class TagRepository
 
     /**
      * Returns one tag id by slug, or null when not found.
+     *
+     * @param string $slug Tag slug to resolve.
+     * @return int|null Tag id, or null when no match exists.
      */
     public function idBySlug(string $slug): ?int
     {
@@ -341,46 +350,6 @@ final class TagRepository
         $value = $stmt->fetchColumn();
 
         return $value === false ? null : (int) $value;
-    }
-
-    /**
-     * Creates or updates one tag and returns tag id.
-     *
-     * @param array{id: int|null, name: string, slug: string, set: int, description: string} $data
-     */
-    public function save(array $data): int
-    {
-        return $this->tagScribe->save($data);
-    }
-
-    /**
-     * Updates one tag's cover/preview/icon image files.
-     *
-     * @param array{
-     *   cover_image?: string|null,
-     *   preview_image?: string|null,
-     *   icon_image?: string|null
-     * } $files
-     */
-    public function updateImageFiles(int $id, array $files): void
-    {
-        $this->tagScribe->updateImageFiles($id, $files);
-    }
-
-    /**
-     * Moves all tags in the given set to the default set.
-     */
-    public function reassignSetToDefault(int $fromSetId, int $defaultSetId): void
-    {
-        $this->tagScribe->reassignSetToDefault($fromSetId, $defaultSetId);
-    }
-
-    /**
-     * Deletes one tag and removes page-tag links.
-     */
-    public function deleteById(int $id): void
-    {
-        $this->tagScribe->deleteById($id);
     }
 
     /**
@@ -485,6 +454,9 @@ final class TagRepository
      * Returns the backend-quoted `set` column reference, optionally prefixed with a table alias.
      *
      * The `set` keyword is reserved in MySQL, requiring backtick quoting on that driver.
+     *
+     * @param string|null $alias Optional table alias to prepend (e.g. 't' → 't.`set`').
+     * @return string Quoted column expression ready for embedding in SQL.
      */
     private function setColumn(?string $alias = null): string
     {

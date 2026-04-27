@@ -12,8 +12,9 @@ declare(strict_types=1);
 namespace Raven\Core\Controller\Public;
 
 use Closure;
-use Raven\Core\Repository\InviteRepository;
-use Raven\Core\Repository\UserRepository;
+use Raven\Core\Repository\InviteRead;
+use Raven\Core\Repository\InviteWrite;
+use Raven\Core\Repository\UserWrite;
 use Raven\Lib\Parser\GroupDataParser;
 use Raven\Lib\Auth\LoginAttemptPolicy;
 use Raven\Lib\Auth\LoginAttemptWorkflowService;
@@ -31,9 +32,11 @@ final class AuthController
 {
     private SharedController $context;
     private GroupDataParser $groupDataParser;
-    private UserRepository $userRepo;
-    private Closure $inviteTokensResolver;
-    private ?InviteRepository $inviteTokens = null;
+    private UserWrite $userRepo;
+    private Closure $inviteReadResolver;
+    private Closure $inviteWriteResolver;
+    private ?InviteRead $inviteRead = null;
+    private ?InviteWrite $inviteWrite = null;
     private LoginIdentifierResolver $identifierResolver;
     private ?LoginUiStateService $loginUiState = null;
     private ?LoginAttemptPolicy $loginAttemptPolicy = null;
@@ -43,20 +46,23 @@ final class AuthController
     /**
      * @param SharedController $context Shared public request context.
      * @param GroupDataParser $groupDataParser Group data parser for registration target-group resolution.
-     * @param UserRepository $userRepo User repository for registration persistence.
-     * @param callable(): InviteRepository $inviteTokensResolver Lazy invite-token repository resolver.
+     * @param UserWrite $userRepo User repository write side for registration persistence.
+     * @param callable(): InviteRead $inviteReadResolver Lazy invite-token read resolver for token validation.
+     * @param callable(): InviteWrite $inviteWriteResolver Lazy invite-token write resolver for token consumption.
      * @return void
      */
     public function __construct(
         SharedController $context,
         GroupDataParser $groupDataParser,
-        UserRepository $userRepo,
-        callable $inviteTokensResolver
+        UserWrite $userRepo,
+        callable $inviteReadResolver,
+        callable $inviteWriteResolver
     ) {
         $this->context = $context;
         $this->groupDataParser = $groupDataParser;
         $this->userRepo = $userRepo;
-        $this->inviteTokensResolver = Closure::fromCallable($inviteTokensResolver);
+        $this->inviteReadResolver = Closure::fromCallable($inviteReadResolver);
+        $this->inviteWriteResolver = Closure::fromCallable($inviteWriteResolver);
         $this->identifierResolver = new LoginIdentifierResolver();
     }
 
@@ -386,7 +392,7 @@ final class AuthController
             if ($inviteToken === '') {
                 $errors[] = 'Invite token is required in invite-only mode.';
             } else {
-                $usableInvite = $this->inviteTokens()->findUsableByToken($inviteToken, $now);
+                $usableInvite = $this->inviteRead()->findUsableByToken($inviteToken, $now);
                 if ($usableInvite === null) {
                     $errors[] = 'Invite token is invalid, expired, or already used.';
                 }
@@ -423,7 +429,7 @@ final class AuthController
             if (is_array($usableInvite)) {
                 $inviteId = (int) ($usableInvite['id'] ?? 0);
                 $isReusable = (int) ($usableInvite['reusable'] ?? 0) === 1;
-                if ($inviteId < 1 || !$this->inviteTokens()->consume($inviteId, $isReusable, $now)) {
+                if ($inviteId < 1 || !$this->inviteWrite()->consume($inviteId, $isReusable, $now)) {
                     // Consume failure means the token became unavailable between
                     // validation and save, so roll back the just-created account.
                     if (is_int($savedUserId) && $savedUserId > 0) {
@@ -457,23 +463,43 @@ final class AuthController
     }
 
     /**
-     * Returns invite-token storage on first use so login-only requests skip it.
+     * Returns invite-token read storage on first use so login-only requests skip it.
      *
-     * @return InviteRepository Invite-token repository for invite-only registration.
+     * @return InviteRead Invite-token read side for token validation lookups.
      */
-    private function inviteTokens(): InviteRepository
+    private function inviteRead(): InviteRead
     {
-        if ($this->inviteTokens instanceof InviteRepository) {
-            return $this->inviteTokens;
+        if ($this->inviteRead instanceof InviteRead) {
+            return $this->inviteRead;
         }
 
-        $inviteTokens = ($this->inviteTokensResolver)();
-        if (!$inviteTokens instanceof InviteRepository) {
-            throw new \RuntimeException('Public invite-token repository resolver returned an invalid value.');
+        $repo = ($this->inviteReadResolver)();
+        if (!$repo instanceof InviteRead) {
+            throw new \RuntimeException('Public invite-token read resolver returned an invalid value.');
         }
 
-        $this->inviteTokens = $inviteTokens;
-        return $this->inviteTokens;
+        $this->inviteRead = $repo;
+        return $this->inviteRead;
+    }
+
+    /**
+     * Returns invite-token write storage on first use so login-only requests skip it.
+     *
+     * @return InviteWrite Invite-token write side for token consumption.
+     */
+    private function inviteWrite(): InviteWrite
+    {
+        if ($this->inviteWrite instanceof InviteWrite) {
+            return $this->inviteWrite;
+        }
+
+        $repo = ($this->inviteWriteResolver)();
+        if (!$repo instanceof InviteWrite) {
+            throw new \RuntimeException('Public invite-token write resolver returned an invalid value.');
+        }
+
+        $this->inviteWrite = $repo;
+        return $this->inviteWrite;
     }
 
     /**

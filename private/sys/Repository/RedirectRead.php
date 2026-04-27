@@ -1,13 +1,10 @@
 <?php
-
 /**
  * RAVEN CMS
- * ~/private/sys/Repository/RedirectRepository.php
- * Data access for URL redirect records used by both panel admin and public routing.
+ * ~/private/sys/Repository/RedirectRead.php
+ * Read-only data access for URL redirect records.
  * Docs: https://raven.lanterns.io
  */
-
-// Inline note: RedirectRepository keeps redirect storage rules in one place.
 
 declare(strict_types=1);
 
@@ -16,31 +13,37 @@ namespace Raven\Core\Repository;
 use PDO;
 use Raven\Lib\Parser\ChannelRepoParser;
 use Raven\Lib\Database\TableNameResolver;
-use Raven\Lib\Scribe\RedirectScribe;
-use RuntimeException;
 
 /**
- * Data access for Redirect CRUD operations and public redirect lookups.
+ * SELECT and lookup methods for redirect records.
+ *
+ * Write operations (INSERT, UPDATE, DELETE) live in RedirectWrite.
+ * Both panel listing and public-route redirect resolution live here since
+ * redirects are read on every public request.
  */
-final class RedirectRepository
+class RedirectRead
 {
     private PDO $db;
     private string $driver;
     private string $prefix;
-    private ChannelRepository $channelRepo;
-    private RedirectScribe $redirectScribe;
+    private ChannelRead $channelRepo;
 
-    public function __construct(PDO $db, string $driver, string $prefix, ChannelRepository $channelRepo)
+    /**
+     * @param PDO         $db          Active database connection.
+     * @param string      $driver      Database driver string ('mysql', 'sqlite', 'pgsql').
+     * @param string      $prefix      Table name prefix for this Raven installation.
+     * @param ChannelRead $channelRepo Channel read instance for slug/id resolution and context hydration.
+     */
+    public function __construct(PDO $db, string $driver, string $prefix, ChannelRead $channelRepo)
     {
         $this->db = $db;
         $this->driver = $driver;
         $this->prefix = preg_replace('/[^a-zA-Z0-9_]/', '', $prefix) ?? '';
         $this->channelRepo = $channelRepo;
-        $this->redirectScribe = new RedirectScribe($db, $driver, $prefix, $channelRepo);
     }
 
     /**
-     * Returns all redirects with optional linked channel metadata.
+     * Returns all redirect rows with optional linked channel metadata.
      *
      * @return array<int, array<string, mixed>>
      */
@@ -69,7 +72,9 @@ final class RedirectRepository
     }
 
     /**
-     * Returns one total-count for panel redirect index.
+     * Returns total redirect count.
+     *
+     * @return int Total redirect row count.
      */
     public function countForPanel(): int
     {
@@ -81,8 +86,10 @@ final class RedirectRepository
     }
 
     /**
-     * Returns paginated redirects with optional linked channel metadata.
+     * Returns paginated redirect rows with optional linked channel metadata.
      *
+     * @param int $limit  Maximum number of rows to return.
+     * @param int $offset Zero-based row offset for pagination.
      * @return array<int, array<string, mixed>>
      */
     public function listForPanel(int $limit = 50, int $offset = 0): array
@@ -115,7 +122,9 @@ final class RedirectRepository
     /**
      * Returns one paginated redirect page plus total row count in one query.
      *
-     * @return array{rows: array<int, array<string, mixed>>, total: int}
+     * @param int $limit  Maximum number of rows to return.
+     * @param int $offset Zero-based row offset for pagination.
+     * @return array{rows: array<int, array<string, mixed>>, total: int} Paginated rows and total count.
      */
     public function listPageForPanel(int $limit = 50, int $offset = 0): array
     {
@@ -176,7 +185,8 @@ final class RedirectRepository
     /**
      * Returns one redirect row by id.
      *
-     * @return array<string, mixed>|null
+     * @param int $id Redirect id to resolve.
+     * @return array<string, mixed>|null Redirect row with channel context, or null when not found.
      */
     public function findById(int $id): ?array
     {
@@ -199,50 +209,14 @@ final class RedirectRepository
     }
 
     /**
-     * Returns one redirect by slug and optional channel scope.
-     *
-     * $channel accepts a channel ID (int), a channel slug (string), or null for root scope.
-     * Root scope matches redirects that do not belong to any channel.
-     * Matches regardless of active status — use findActiveByPath for public routing.
-     *
-     * @return array<string, mixed>|null
-     */
-    public function findBySlug(string $slug, int|string|null $channel = null): ?array
-    {
-        $redirects = $this->table('redirects');
-        $sql = 'SELECT r.id, r.title, r.description, r.slug, r.channel, r.active, r.target, r.created, r.updated
-                FROM ' . $redirects . ' r
-                WHERE r.slug = :slug';
-        $params = [':slug' => $slug];
-
-        if (is_string($channel)) {
-            $channelId = $this->channelRepo->idFromSlug($channel);
-            if ($channelId < 1) {
-                return null;
-            }
-            $sql .= ' AND r.channel = :channel';
-            $params[':channel'] = $channelId;
-        } elseif (is_int($channel) && $channel > 0) {
-            $sql .= ' AND r.channel = :channel';
-            $params[':channel'] = $channel;
-        } else {
-            // null or 0 = root scope
-            $sql .= ' AND r.channel = 0';
-        }
-
-        $sql .= ' LIMIT 1';
-        $stmt = $this->db->prepare($sql);
-        $stmt->execute($params);
-
-        $row = $stmt->fetch();
-
-        return $row === false ? null : $this->withChannelContext($row, $this->channelsByIdMap());
-    }
-
-    /**
      * Returns one redirect id by slug and optional channel scope, or null when not found.
      *
      * $channel accepts a channel ID (int), a channel slug (string), or null for root scope.
+     * Root scope matches redirects that do not belong to any channel.
+     *
+     * @param string           $slug    Redirect slug to look up.
+     * @param int|string|null  $channel Optional channel scope; null means root scope.
+     * @return int|null Redirect id, or null when not found.
      */
     public function idBySlug(string $slug, int|string|null $channel = null): ?int
     {
@@ -276,7 +250,11 @@ final class RedirectRepository
     /**
      * Resolves one active redirect for public URL matching.
      *
-     * @return array<string, mixed>|null
+     * Returns null when no active redirect exists for the given slug/channel combination.
+     *
+     * @param string      $slug        URL slug to match against redirect records.
+     * @param string|null $channelSlug Optional channel slug scope; null matches root redirects.
+     * @return array<string, mixed>|null Active redirect row with channel context, or null.
      */
     public function findActiveByPath(string $slug, ?string $channelSlug = null): ?array
     {
@@ -291,15 +269,11 @@ final class RedirectRepository
             ':active' => 1,
         ];
 
-        // Root redirects match only channelless rows; channel routes must match channel slug.
+        // Root redirects match only channelless rows; channel routes must match by id.
         if ($channelSlug === null) {
             $sql .= ' AND r.channel = 0';
         } else {
-            try {
-                $channelId = $this->channelIdBySlug($channelSlug);
-            } catch (RuntimeException) {
-                return null;
-            }
+            $channelId = $this->channelRepo->idBySlug($channelSlug);
             if ($channelId === null || $channelId < 1) {
                 return null;
             }
@@ -321,32 +295,8 @@ final class RedirectRepository
     }
 
     /**
-     * Creates or updates one redirect and returns redirect id.
+     * Returns all channel records indexed by id for O(1) context hydration.
      *
-     * @param array{
-     *   id: int|null,
-     *   title: string,
-     *   description: string,
-     *   slug: string,
-     *   channel_slug: string|null,
-     *   active: int,
-     *   target: string
-     * } $data
-     */
-    public function save(array $data): int
-    {
-        return $this->redirectScribe->save($data);
-    }
-
-    /**
-     * Deletes one redirect by id.
-     */
-    public function deleteById(int $id): void
-    {
-        $this->redirectScribe->deleteById($id);
-    }
-
-    /**
      * @return array<int, array<string, mixed>>
      */
     private function channelsByIdMap(): array
@@ -355,9 +305,11 @@ final class RedirectRepository
     }
 
     /**
-     * @param array<string, mixed> $row
-     * @param array<int, array<string, mixed>> $channelsById
-     * @return array<string, mixed>
+     * Hydrates one redirect row with normalized types and channel metadata.
+     *
+     * @param array<string, mixed>          $row        Raw PDO redirect row.
+     * @param array<int, array<string,mixed>> $channelsById Channel map keyed by id.
+     * @return array<string, mixed> Hydrated row with channel context applied.
      */
     private function withChannelContext(array $row, array $channelsById): array
     {

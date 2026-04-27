@@ -18,7 +18,7 @@ use Raven\Ext\Cron\CronTaskStore;
  *
  * @return array<int, array{name: string, interval: int, run: callable}>
  */
-$root = dirname(__DIR__, 4);
+$root = dirname(__DIR__, 3);
 $localRoot = $root . '/private/dat/ext/cron';
 $service = new CronTaskService(
     $root,

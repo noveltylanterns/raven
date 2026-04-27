@@ -1,9 +1,8 @@
 <?php
-
 /**
  * RAVEN CMS
- * ~/private/sys/Repository/GroupRepository.php
- * Data access for user-group records, membership assignments, and public route resolution.
+ * ~/private/sys/Repository/GroupRead.php
+ * Read-only data access for user-group records, membership assignments, and public route resolution.
  * Docs: https://raven.lanterns.io
  */
 
@@ -15,13 +14,14 @@ use PDO;
 use Raven\Lib\Auth\Public\GroupPublicRouteService;
 use Raven\Lib\Auth\GroupRolePolicy;
 use Raven\Lib\Database\TableNameResolver;
-use Raven\Lib\Scribe\GroupScribe;
-use RuntimeException;
 
 /**
- * Data access for user-group CRUD operations and membership safety rules.
+ * SELECT and lookup methods for user groups.
+ *
+ * Write operations (INSERT, UPDATE, DELETE) live in GroupWrite.
+ * Public-route group data and panel listing both live here since both are read-only paths.
  */
-final class GroupRepository
+class GroupRead
 {
     /** Custom groups start at id 100; ids 1-99 are reserved for stock/system use. */
     private const CUSTOM_GROUP_ID_START = 100;
@@ -31,8 +31,12 @@ final class GroupRepository
     private string $prefix;
     private GroupRolePolicy $rolePolicy;
     private GroupPublicRouteService $groupPublicRouteService;
-    private GroupScribe $groupScribe;
 
+    /**
+     * @param PDO    $db     Active database connection.
+     * @param string $driver Database driver string ('mysql', 'sqlite', 'pgsql').
+     * @param string $prefix Table name prefix for this Raven installation.
+     */
     public function __construct(PDO $db, string $driver, string $prefix)
     {
         $this->db = $db;
@@ -40,7 +44,6 @@ final class GroupRepository
         $this->prefix = preg_replace('/[^a-zA-Z0-9_]/', '', $prefix) ?? '';
         $this->rolePolicy = new GroupRolePolicy();
         $this->groupPublicRouteService = new GroupPublicRouteService();
-        $this->groupScribe = new GroupScribe($db, $driver, $prefix);
     }
 
     /**
@@ -88,7 +91,9 @@ final class GroupRepository
     }
 
     /**
-     * Returns one total-count for panel group index.
+     * Returns total group count.
+     *
+     * @return int Total group row count.
      */
     public function countForPanel(): int
     {
@@ -102,6 +107,8 @@ final class GroupRepository
     /**
      * Returns paginated groups with member counts for panel listing.
      *
+     * @param int $limit  Maximum number of rows to return.
+     * @param int $offset Zero-based row offset for pagination.
      * @return array<int, array<string, mixed>>
      */
     public function listForPanel(int $limit = 50, int $offset = 0): array
@@ -148,7 +155,9 @@ final class GroupRepository
     /**
      * Returns one paginated group page plus total row count in one query.
      *
-     * @return array{rows: array<int, array<string, mixed>>, total: int}
+     * @param int $limit  Maximum number of rows to return.
+     * @param int $offset Zero-based row offset for pagination.
+     * @return array{rows: array<int, array<string, mixed>>, total: int} Paginated rows and total count.
      */
     public function listPageForPanel(int $limit = 50, int $offset = 0): array
     {
@@ -227,7 +236,7 @@ final class GroupRepository
     }
 
     /**
-     * Returns minimal group options for user assignment forms.
+     * Returns minimal group option rows suitable for user assignment forms and select controls.
      *
      * @return array<int, array{id: int, name: string, slug: string, permissions: int, is_stock: int}>
      */
@@ -248,7 +257,6 @@ final class GroupRepository
         $stmt->execute();
 
         $rows = $stmt->fetchAll() ?: [];
-
         $result = [];
         foreach ($rows as $row) {
             $result[] = [
@@ -266,7 +274,8 @@ final class GroupRepository
     /**
      * Returns one group by id.
      *
-     * @return array<string, mixed>|null
+     * @param int $id Group id to resolve.
+     * @return array<string, mixed>|null Hydrated group row, or null when not found.
      */
     public function findById(int $id): ?array
     {
@@ -300,12 +309,47 @@ final class GroupRepository
     }
 
     /**
+     * Returns one group by slug.
+     *
+     * @param string $slug Group slug to resolve (case-insensitive).
+     * @return array<string, mixed>|null Hydrated group row, or null when not found.
+     */
+    public function findBySlug(string $slug): ?array
+    {
+        $groups = $this->table('groups');
+        $stockCase = $this->stockRoleSql();
+
+        $stmt = $this->db->prepare(
+            'SELECT id,
+                    name,
+                    slug,
+                    description,
+                    route,
+                    permissions,
+                    ' . $stockCase . ' AS is_stock,
+                    cover_image,
+                    icon_image,
+                    created,
+                    updated
+             FROM ' . $groups . '
+             WHERE LOWER(slug) = :slug
+             LIMIT 1'
+        );
+        $stmt->execute([':slug' => strtolower(trim($slug))]);
+
+        $row = $stmt->fetch();
+
+        return $row === false ? null : $this->hydrateGroupRow($row);
+    }
+
+    /**
      * Returns one public group row and member profiles in one query.
      *
+     * @param string $slug Group slug to resolve.
      * @return array{
      *   group: array<string, mixed>,
      *   members: array<int, array{id: int, username: string, name: string, avatar: string|null}>
-     * }|null
+     * }|null Group with member list, or null when the group is not found or has no public route.
      */
     public function findPublicRouteDataBySlug(string $slug): ?array
     {
@@ -320,6 +364,9 @@ final class GroupRepository
 
     /**
      * Finds group id by exact name.
+     *
+     * @param string $name Group name to look up.
+     * @return int|null Group id, or null when not found.
      */
     public function idByName(string $name): ?int
     {
@@ -339,7 +386,10 @@ final class GroupRepository
     }
 
     /**
-     * Finds group id by exact slug.
+     * Finds group id by exact slug (case-insensitive).
+     *
+     * @param string $slug Group slug to look up.
+     * @return int|null Group id, or null when not found.
      */
     public function idBySlug(string $slug): ?int
     {
@@ -359,43 +409,11 @@ final class GroupRepository
     }
 
     /**
-     * Creates or updates one group and returns group id.
-     *
-     * Stock-group slugs are immutable; stock names are editable.
-     * Stock flag cannot be changed through normal save flow.
-     *
-     * @param array{id: int|null, name: string, slug?: string, description?: string, route?: int|bool, permissions?: int} $data
-     */
-    public function save(array $data): int
-    {
-        return $this->groupScribe->save($data);
-    }
-
-    /**
-     * Updates one group's cover and icon image files.
-     * Groups use filename storage (same as categories/tags) — preview slot is not supported.
-     *
-     * @param array{
-     *   cover_image?: string|null,
-     *   icon_image?: string|null
-     * } $files
-     */
-    public function updateImageFiles(int $id, array $files): void
-    {
-        $this->groupScribe->updateImageFiles($id, $files);
-    }
-
-    /**
-     * Deletes one non-stock group and reassigns affected users to `User`
-     * when they would otherwise have zero memberships.
-     */
-    public function deleteById(int $id): void
-    {
-        $this->groupScribe->deleteById($id);
-    }
-
-    /**
      * Returns true when one group name already exists on another row.
+     *
+     * @param int    $id   Group id to exclude from the check (the group being edited).
+     * @param string $name Proposed group name to test for uniqueness.
+     * @return bool True when another group already uses this name.
      */
     public function nameExistsForOtherGroup(int $id, string $name): bool
     {
@@ -418,6 +436,10 @@ final class GroupRepository
 
     /**
      * Returns true when one group slug already exists on another row.
+     *
+     * @param int    $id   Group id to exclude from the check (the group being edited).
+     * @param string $slug Proposed group slug to test for uniqueness.
+     * @return bool True when another group already uses this slug.
      */
     public function slugExistsForOtherGroup(int $id, string $slug): bool
     {
@@ -447,12 +469,15 @@ final class GroupRepository
     }
 
     /**
-     * @param array<string, mixed> $row
-     * @return array<string, mixed>
+     * Hydrates one raw group row with normalized types and role-policy enforcement.
+     *
+     * @param array<string, mixed> $row Raw PDO group row.
+     * @return array<string, mixed> Hydrated row with enforced route flag and typed columns.
      */
     private function hydrateGroupRow(array $row): array
     {
         if ($this->rolePolicy->isRouteDisabledRoleSlug((string) ($row['slug'] ?? ''))) {
+            // Stock system roles cannot have public profile routes enabled.
             $row['route'] = 0;
         } else {
             $row['route'] = (int) ($row['route'] ?? 0);
@@ -466,6 +491,15 @@ final class GroupRepository
         return $row;
     }
 
+    /**
+     * Returns a SQL CASE expression that evaluates to 1 for stock system roles.
+     *
+     * Stock slugs are hard-coded rather than stored in a flag column to prevent
+     * operators from accidentally reclassifying system roles.
+     *
+     * @param string $tableAlias Optional table alias to prefix the slug column (e.g. 'g').
+     * @return string SQL CASE expression string.
+     */
     private function stockRoleSql(string $tableAlias = ''): string
     {
         $slugColumn = $tableAlias !== ''

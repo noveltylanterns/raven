@@ -12,7 +12,7 @@ declare(strict_types=1);
 namespace Raven\Lib\Scribe;
 
 use PDO;
-use Raven\Core\Repository\ChannelRepository;
+use Raven\Core\Repository\ChannelRead;
 use Raven\Lib\Database\TableNameResolver;
 use Raven\Lib\Parser\ChannelRepoParser;
 use Raven\Lib\Parser\PageDuplicateParser;
@@ -30,7 +30,7 @@ final class RedirectScribe
     private PDO $db;
     private string $driver;
     private string $prefix;
-    private ChannelRepository $channelRepo;
+    private ChannelRead $channelRepo;
 
     /**
      * Prepares the redirect scribe for redirect writes.
@@ -38,9 +38,9 @@ final class RedirectScribe
      * @param PDO               $db          App database connection used for redirect writes.
      * @param string            $driver      Active PDO driver name for table resolution.
      * @param string            $prefix      Application table prefix before sanitization.
-     * @param ChannelRepository $channelRepo Channel repository used to resolve channel slugs to ids.
+     * @param ChannelRead $channelRepo Channel repository used to resolve channel slugs to ids.
      */
-    public function __construct(PDO $db, string $driver, string $prefix, ChannelRepository $channelRepo)
+    public function __construct(PDO $db, string $driver, string $prefix, ChannelRead $channelRepo)
     {
         $this->db = $db;
         $this->driver = $driver;

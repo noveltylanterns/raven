@@ -12,8 +12,10 @@ declare(strict_types=1);
 namespace Raven\Core\Controller\Panel;
 
 use Closure;
-use Raven\Core\Repository\TagRepository;
-use Raven\Core\Repository\SetRepository;
+use Raven\Core\Repository\TagRead;
+use Raven\Core\Repository\TagWrite;
+use Raven\Core\Repository\SetRead;
+use Raven\Core\Repository\SetWrite;
 use Raven\Lib\Media\Panel\TaxonomyImageService;
 use Raven\Lib\Parser\ChannelDataParser;
 use Raven\Lib\Parser\SetParser;
@@ -36,14 +38,20 @@ final class TagController
 {
     private SharedController $context;
     private InputSanitizer $input;
-    /** @var ?TagRepository */
-    private ?TagRepository $tagRepo = null;
+    /** @var ?TagRead */
+    private ?TagRead $tagRead = null;
+    /** @var ?TagWrite */
+    private ?TagWrite $tagWrite = null;
     /** @var ?TagDataParser */
     private ?TagDataParser $tagParser = null;
-    private Closure $tagRepoResolver;
-    /** @var ?SetRepository */
-    private ?SetRepository $tagSetRepo = null;
+    private Closure $tagReadResolver;
+    private Closure $tagWriteResolver;
+    /** @var ?SetRead */
+    private ?SetRead $tagSetRepo = null;
     private Closure $tagSetRepoResolver;
+    /** @var ?SetWrite */
+    private ?SetWrite $tagSetWrite = null;
+    private Closure $tagSetWriteResolver;
     private bool $tagEnabled;
     private TaxonomyImageService $taxonomyImageService;
     private TaxonomyImageScribe $taxonomyImageScribe;
@@ -54,8 +62,10 @@ final class TagController
     /**
      * @param SharedController $context Shared panel request context.
      * @param InputSanitizer $input Shared request input sanitizer.
-     * @param callable $tagRepoResolver Lazy tag repository resolver; only resolved on tag routes.
-     * @param callable $tagSetRepoResolver Lazy tag-set repository resolver; resolved for tag set routes.
+     * @param callable $tagReadResolver Lazy tag read resolver; only resolved on tag routes.
+     * @param callable $tagWriteResolver Lazy tag write resolver; only resolved on tag save/delete routes.
+     * @param callable $tagSetRepoResolver Lazy tag-set read resolver; resolved for tag set listing and validation.
+     * @param callable $tagSetWriteResolver Lazy tag-set write resolver; resolved for tag set save and delete routes.
      * @param bool $tagEnabled Whether tag features are enabled in runtime config.
      * @param TaxonomyImageService $taxonomyImageService Read-side taxonomy image config and path helper.
      * @param TaxonomyImageScribe $taxonomyImageScribe Write-side taxonomy image upload and cleanup helper.
@@ -67,8 +77,10 @@ final class TagController
     public function __construct(
         SharedController $context,
         InputSanitizer $input,
-        callable $tagRepoResolver,
+        callable $tagReadResolver,
+        callable $tagWriteResolver,
         callable $tagSetRepoResolver,
+        callable $tagSetWriteResolver,
         bool $tagEnabled,
         TaxonomyImageService $taxonomyImageService,
         TaxonomyImageScribe $taxonomyImageScribe,
@@ -78,8 +90,10 @@ final class TagController
     ) {
         $this->context = $context;
         $this->input = $input;
-        $this->tagRepoResolver = Closure::fromCallable($tagRepoResolver);
+        $this->tagReadResolver = Closure::fromCallable($tagReadResolver);
+        $this->tagWriteResolver = Closure::fromCallable($tagWriteResolver);
         $this->tagSetRepoResolver = Closure::fromCallable($tagSetRepoResolver);
+        $this->tagSetWriteResolver = Closure::fromCallable($tagSetWriteResolver);
         $this->tagEnabled = $tagEnabled;
         $this->taxonomyImageService = $taxonomyImageService;
         $this->taxonomyImageScribe = $taxonomyImageScribe;
@@ -245,7 +259,7 @@ final class TagController
 
         // Persist one tag; uniqueness conflicts are surfaced by repository.
         try {
-            $savedId = $this->tagRepo()->save([
+            $savedId = $this->tagWrite()->save([
                 'id' => $id,
                 'name' => $name,
                 'slug' => $slug,
@@ -350,7 +364,7 @@ final class TagController
         }
 
         try {
-            $this->tagRepo()->updateImageFiles($savedId, $nextStorage);
+            $this->tagWrite()->updateImageFiles($savedId, $nextStorage);
         } catch (\Throwable) {
             // Keep DB and filesystem in sync when image-path persistence fails.
             $this->taxonomyImageScribe->cleanupPathSets('tags', $savedId, $newPathSets);
@@ -393,7 +407,7 @@ final class TagController
             $record = $this->tagParser()->findById($id);
             // Single-row delete path (row action button).
             try {
-                $this->tagRepo()->deleteById($id);
+                $this->tagWrite()->deleteById($id);
             } catch (\Throwable) {
                 $this->context->flash('error', 'Failed to delete tag.');
                 Redirect::redirect($this->context->panelUrl('/tag'));
@@ -425,7 +439,7 @@ final class TagController
             $record = $this->tagParser()->findById($selectedId);
             try {
                 // Continue deleting remaining ids even if one operation throws.
-                $this->tagRepo()->deleteById($selectedId);
+                $this->tagWrite()->deleteById($selectedId);
                 if ($record !== null) {
                     $this->taxonomyImageScribe->deleteStoredPaths(
                         'tags',
@@ -563,7 +577,7 @@ final class TagController
         }
 
         try {
-            $savedId = $this->tagSetRepo()->save([
+            $savedId = $this->tagSetWrite()->save([
                 'id' => $id,
                 'name' => $name,
                 'slug' => $slug ?? '',
@@ -615,11 +629,11 @@ final class TagController
         // Reassign any remaining tags in this set to the default set before deleting.
         $tagCount = (int) ($this->tagParser()->countsBySetId()[$id] ?? 0);
         if ($tagCount > 0) {
-            $this->tagRepo()->reassignSetToDefault($id, SetParser::DEFAULT_SET_ID);
+            $this->tagWrite()->reassignSetToDefault($id, SetParser::DEFAULT_SET_ID);
         }
 
         try {
-            $this->tagSetRepo()->deleteById($id);
+            $this->tagSetWrite()->deleteById($id);
         } catch (\Throwable $exception) {
             $message = trim($exception->getMessage());
             $this->context->flash('error', $message !== '' ? $message : 'Failed to delete tag set.');
@@ -635,24 +649,45 @@ final class TagController
     // -------------------------------------------------------------------------
 
     /**
-     * Returns the tag repository on first use so non-tag routes do not
+     * Returns the tag read side on first use so non-tag routes do not
      * instantiate DB-backed taxonomy storage.
      *
-     * @return TagRepository Tag repository.
+     * @return TagRead Tag repository read side.
      */
-    private function tagRepo(): TagRepository
+    private function tagRead(): TagRead
     {
-        if ($this->tagRepo instanceof TagRepository) {
-            return $this->tagRepo;
+        if ($this->tagRead instanceof TagRead) {
+            return $this->tagRead;
         }
 
-        $repo = ($this->tagRepoResolver)();
-        if (!$repo instanceof TagRepository) {
-            throw new \RuntimeException('Panel tag repository resolver returned an invalid value.');
+        $repo = ($this->tagReadResolver)();
+        if (!$repo instanceof TagRead) {
+            throw new \RuntimeException('Panel tag read resolver returned an invalid value.');
         }
 
-        $this->tagRepo = $repo;
-        return $this->tagRepo;
+        $this->tagRead = $repo;
+        return $this->tagRead;
+    }
+
+    /**
+     * Returns the tag write side on first use so read-only tag routes do not
+     * instantiate the write layer.
+     *
+     * @return TagWrite Tag repository write side.
+     */
+    private function tagWrite(): TagWrite
+    {
+        if ($this->tagWrite instanceof TagWrite) {
+            return $this->tagWrite;
+        }
+
+        $repo = ($this->tagWriteResolver)();
+        if (!$repo instanceof TagWrite) {
+            throw new \RuntimeException('Panel tag write resolver returned an invalid value.');
+        }
+
+        $this->tagWrite = $repo;
+        return $this->tagWrite;
     }
 
     /**
@@ -667,7 +702,7 @@ final class TagController
             return $this->tagParser;
         }
 
-        $this->tagParser = new TagDataParser($this->input, $this->tagRepo());
+        $this->tagParser = new TagDataParser($this->input, $this->tagRead());
         return $this->tagParser;
     }
 
@@ -675,21 +710,44 @@ final class TagController
      * Returns the tag-set repository on first use so non-taxonomy routes do not
      * instantiate file-backed taxonomy set storage.
      *
-     * @return SetRepository Tag-set repository.
+     * @return SetRead Tag-set repository read side.
      */
-    private function tagSetRepo(): SetRepository
+    private function tagSetRepo(): SetRead
     {
-        if ($this->tagSetRepo instanceof SetRepository) {
+        if ($this->tagSetRepo instanceof SetRead) {
             return $this->tagSetRepo;
         }
 
         $repo = ($this->tagSetRepoResolver)();
-        if (!$repo instanceof SetRepository) {
+        if (!$repo instanceof SetRead) {
             throw new \RuntimeException('Panel tag-set repository resolver returned an invalid value.');
         }
 
         $this->tagSetRepo = $repo;
         return $this->tagSetRepo;
+    }
+
+    /**
+     * Resolves the tag-set write repository on first use.
+     *
+     * Separated from the read side so tag set listing and validation routes
+     * do not instantiate the write layer unnecessarily.
+     *
+     * @return SetWrite Tag-set repository write side for set save and delete.
+     */
+    private function tagSetWrite(): SetWrite
+    {
+        if ($this->tagSetWrite instanceof SetWrite) {
+            return $this->tagSetWrite;
+        }
+
+        $repo = ($this->tagSetWriteResolver)();
+        if (!$repo instanceof SetWrite) {
+            throw new \RuntimeException('Panel tag-set write resolver returned an invalid value.');
+        }
+
+        $this->tagSetWrite = $repo;
+        return $this->tagSetWrite;
     }
 
     /**

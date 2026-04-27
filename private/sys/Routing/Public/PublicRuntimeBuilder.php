@@ -22,13 +22,15 @@ use Raven\Core\Controller\Public\PageController as PublicPageController;
 use Raven\Core\Controller\Public\SharedController;
 use Raven\Core\Controller\Public\TagController as PublicTagController;
 use Raven\Core\Controller\Public\UserController as PublicUserController;
-use Raven\Core\Repository\ChannelRepository;
-use Raven\Core\Repository\GroupRepository;
-use Raven\Core\Repository\InviteRepository;
-use Raven\Core\Repository\PageImageRepository;
-use Raven\Core\Repository\PageRepository;
-use Raven\Core\Repository\RedirectRepository;
-use Raven\Core\Repository\UserRepository;
+use Raven\Core\Repository\ChannelRead;
+use Raven\Core\Repository\GroupRead;
+use Raven\Core\Repository\InviteRead;
+use Raven\Core\Repository\InviteWrite;
+use Raven\Core\Repository\PageImageRead;
+use Raven\Core\Repository\PageRead;
+use Raven\Core\Repository\RedirectRead;
+use Raven\Core\Repository\UserRead;
+use Raven\Core\Repository\UserWrite;
 use Raven\Core\Renderer;
 use Raven\Lib\Auth\AuthService;
 use Raven\Lib\Extension\ExtensionEditorCatalogService;
@@ -72,17 +74,19 @@ final class PublicRuntimeBuilder
         $publicUserController = null;
         $publicSharedController = null;
         $extensionServices = null;
-        $inviteTokens = null;
+        $inviteRead = null;
+        $inviteWrite = null;
         $taxonomyLookup = null;
-        $channelRepository = null;
+        $channelRead = null;
         $channelDataParser = null;
         $extensionEditorCatalogService = null;
-        $groupRepository = null;
-        $pageImageRepository = null;
-        $pageRepository = null;
-        $redirectRepository = null;
+        $groupRead = null;
+        $pageImageRead = null;
+        $pageRead = null;
+        $redirectRead = null;
         $themeCatalogService = null;
-        $userRepository = null;
+        $userRead = null;
+        $userWrite = null;
 
         $rvn['view'] = new Renderer((string) $rvn['root'] . '/private/tpl');
         $categoryEnabled = ConfigParser::bool($rvn['config']->get('category.enabled', false), false);
@@ -155,125 +159,153 @@ final class PublicRuntimeBuilder
         };
 
         /**
-         * Builds channel storage for public routing/content flows.
+         * Builds channel read side for public routing/content flows.
          */
-        $channelRepositoryFactory = $memoize(static function () use (&$channelRepository, $rvn): ChannelRepository {
-            $channelRepository = new ChannelRepository(
+        $channelReadFactory = $memoize(static function () use (&$channelRead, $rvn): ChannelRead {
+            $channelRead = new ChannelRead(
                 $rvn['db'],
                 (string) $rvn['driver'],
                 (string) $rvn['prefix'],
                 (string) $rvn['root'] . '/private/dat/channel'
             );
 
-            return $channelRepository;
+            return $channelRead;
         });
 
         /**
          * Builds one shared channel parser for public read-side channel lookups.
          */
-        $channelDataParserFactory = $memoize(static function () use (&$channelDataParser, $rvn, $channelRepositoryFactory): ChannelDataParser {
+        $channelDataParserFactory = $memoize(static function () use (&$channelDataParser, $rvn, $channelReadFactory): ChannelDataParser {
             $channelDataParser = new ChannelDataParser(
                 $rvn['config'],
                 $rvn['input'],
-                $channelRepositoryFactory()
+                $channelReadFactory()
             );
 
             return $channelDataParser;
         });
 
         /**
-         * Builds group storage for public auth/profile flows.
+         * Builds group read side for public auth/profile flows.
          */
-        $groupRepositoryFactory = $memoize(static function () use (&$groupRepository, $rvn): GroupRepository {
-            $groupRepository = new GroupRepository(
+        $groupReadFactory = $memoize(static function () use (&$groupRead, $rvn): GroupRead {
+            $groupRead = new GroupRead(
                 $rvn['db'],
                 (string) $rvn['driver'],
                 (string) $rvn['prefix']
             );
 
-            return $groupRepository;
+            return $groupRead;
         });
 
         /**
-         * Builds page-image storage only when public rendering needs media rows.
+         * Builds page-image read side only when public rendering needs media rows.
          */
-        $pageImageRepositoryFactory = $memoize(static function () use (&$pageImageRepository, $rvn): PageImageRepository {
-            $pageImageRepository = new PageImageRepository(
+        $pageImageReadFactory = $memoize(static function () use (&$pageImageRead, $rvn): PageImageRead {
+            $pageImageRead = new PageImageRead(
                 $rvn['db'],
                 (string) $rvn['driver'],
                 (string) $rvn['prefix']
             );
 
-            return $pageImageRepository;
+            return $pageImageRead;
         });
 
         /**
-         * Builds page storage for public content routes without leaning on shared bootstrap wiring.
+         * Builds page read side for public content routes.
          */
-        $pageRepositoryFactory = $memoize(static function () use (&$pageRepository, $rvn, $channelRepositoryFactory, $categoryEnabled, $tagEnabled): PageRepository {
-            $pageRepository = new PageRepository(
+        $pageReadFactory = $memoize(static function () use (&$pageRead, $rvn, $channelReadFactory, $categoryEnabled, $tagEnabled): PageRead {
+            $pageRead = new PageRead(
                 $rvn['db'],
                 (string) $rvn['driver'],
                 (string) $rvn['prefix'],
-                $channelRepositoryFactory(),
+                $channelReadFactory(),
                 $categoryEnabled,
                 $tagEnabled
             );
 
-            return $pageRepository;
+            return $pageRead;
         });
 
         /**
-         * Builds redirect storage for public redirect fallbacks and routing helpers.
+         * Builds redirect read side for public redirect fallbacks and routing helpers.
          */
-        $redirectRepositoryFactory = $memoize(static function () use (&$redirectRepository, $rvn, $channelRepositoryFactory): RedirectRepository {
-            $redirectRepository = new RedirectRepository(
+        $redirectReadFactory = $memoize(static function () use (&$redirectRead, $rvn, $channelReadFactory): RedirectRead {
+            $redirectRead = new RedirectRead(
                 $rvn['db'],
                 (string) $rvn['driver'],
                 (string) $rvn['prefix'],
-                $channelRepositoryFactory()
+                $channelReadFactory()
             );
 
-            return $redirectRepository;
+            return $redirectRead;
         });
 
         /**
-         * Builds user storage for public login/register/profile flows.
+         * Builds user read side for public author lookups and profile flows.
          */
-        $userRepositoryFactory = $memoize(static function () use (&$userRepository, $rvn, $resolveAuthDb): UserRepository {
-            $userRepository = new UserRepository(
+        $userReadFactory = $memoize(static function () use (&$userRead, $rvn, $resolveAuthDb): UserRead {
+            $userRead = new UserRead(
                 $resolveAuthDb(),
                 $rvn['db'],
                 (string) $rvn['driver'],
                 (string) $rvn['prefix']
             );
 
-            return $userRepository;
+            return $userRead;
         });
 
         /**
-         * Builds invite-token storage only for the registration flows that need it.
+         * Builds user write side for public login/register flows.
          */
-        $inviteTokenRepository = $memoize(static function () use (&$inviteTokens, $rvn, $resolveAuthDb): InviteRepository {
-            $inviteTokens = new InviteRepository(
+        $userWriteFactory = $memoize(static function () use (&$userWrite, $rvn, $resolveAuthDb): UserWrite {
+            $userWrite = new UserWrite(
+                $resolveAuthDb(),
+                $rvn['db'],
+                (string) $rvn['driver'],
+                (string) $rvn['prefix']
+            );
+
+            return $userWrite;
+        });
+
+        /**
+         * Builds invite-token read side only for the registration flows that validate tokens.
+         */
+        $inviteReadFactory = $memoize(static function () use (&$inviteRead, $rvn, $resolveAuthDb): InviteRead {
+            $inviteRead = new InviteRead(
                 $resolveAuthDb(),
                 (string) $rvn['driver'],
                 (string) $rvn['prefix']
             );
 
-            return $inviteTokens;
+            return $inviteRead;
+        });
+
+        /**
+         * Builds invite-token write side only for the registration flows that consume tokens.
+         */
+        $inviteWriteFactory = $memoize(static function () use (&$inviteWrite, $rvn, $resolveAuthDb, $inviteReadFactory): InviteWrite {
+            $inviteWrite = new InviteWrite(
+                $resolveAuthDb(),
+                (string) $rvn['driver'],
+                (string) $rvn['prefix'],
+                $inviteReadFactory()
+            );
+
+            return $inviteWrite;
         });
 
         /**
          * Builds taxonomy lookup parsing only for public routes that actually
          * resolve channel/category/tag slugs.
          */
-        $taxonomyLookupRepository = $memoize(static function () use (&$taxonomyLookup, $rvn, $channelRepositoryFactory): TaxonomyRepoParser {
+        $taxonomyLookupRepository = $memoize(static function () use (&$taxonomyLookup, $rvn, $channelReadFactory): TaxonomyRepoParser {
             $taxonomyLookup = new TaxonomyRepoParser(
                 $rvn['db'],
                 (string) $rvn['driver'],
                 (string) $rvn['prefix'],
-                $channelRepositoryFactory()
+                $channelReadFactory()
             );
 
             return $taxonomyLookup;
@@ -313,27 +345,24 @@ final class PublicRuntimeBuilder
         };
 
         /**
-         * Wraps the redirect repository in the read-only parser seam for public controllers.
-         * The underlying RedirectRepository is still available for any other wiring that needs it.
+         * Wraps the redirect read side in the parser seam for public controllers.
          */
-        $redirectDataParserFactory = $memoize(static function () use ($redirectRepositoryFactory, $rvn): RedirectDataParser {
-            return new RedirectDataParser($rvn['input'], $redirectRepositoryFactory());
+        $redirectDataParserFactory = $memoize(static function () use ($redirectReadFactory, $rvn): RedirectDataParser {
+            return new RedirectDataParser($rvn['input'], $redirectReadFactory());
         });
 
         /**
-         * Wraps the page-image repository in the read-only parser seam for public rendering.
-         * The underlying PageImageRepository is still available for panel wiring that needs writes.
+         * Wraps the page-image read side in the parser seam for public rendering.
          */
-        $pageImageParserFactory = $memoize(static function () use ($pageImageRepositoryFactory): PageImageParser {
-            return new PageImageParser($pageImageRepositoryFactory());
+        $pageImageParserFactory = $memoize(static function () use ($pageImageReadFactory): PageImageParser {
+            return new PageImageParser($pageImageReadFactory());
         });
 
         /**
-         * Wraps the group repository in the read-only parser seam for public auth/group routes.
-         * The underlying GroupRepository is still available for panel wiring that needs writes.
+         * Wraps the group read side in the parser seam for public auth/group routes.
          */
-        $groupDataParserFactory = $memoize(static function () use ($groupRepositoryFactory, $rvn): GroupDataParser {
-            return new GroupDataParser($rvn['input'], $groupRepositoryFactory());
+        $groupDataParserFactory = $memoize(static function () use ($groupReadFactory, $rvn): GroupDataParser {
+            return new GroupDataParser($rvn['input'], $groupReadFactory());
         });
 
         /**
@@ -371,17 +400,17 @@ final class PublicRuntimeBuilder
          */
         $publicContentDomain = $memoize(static function () use (
             $channelDataParserFactory,
-            $channelRepositoryFactory,
+            $channelReadFactory,
             $pageImageParserFactory,
-            $pageRepositoryFactory,
+            $pageReadFactory,
             $redirectDataParserFactory,
             $taxonomyLookupRepository
         ): array {
             return [
-                'channel' => $channelRepositoryFactory(),
+                'channel' => $channelReadFactory(),
                 'channel_parser' => $channelDataParserFactory(),
                 'page_images' => $pageImageParserFactory(),
-                'page' => $pageRepositoryFactory(),
+                'page' => $pageReadFactory(),
                 'redirect' => $redirectDataParserFactory(),
                 'taxonomy_lookup' => $taxonomyLookupRepository,
             ];
@@ -395,13 +424,17 @@ final class PublicRuntimeBuilder
          */
         $publicAuthDomain = $memoize(static function () use (
             $groupDataParserFactory,
-            $userRepositoryFactory,
-            $inviteTokenRepository
+            $userReadFactory,
+            $userWriteFactory,
+            $inviteReadFactory,
+            $inviteWriteFactory
         ): array {
             return [
                 'group' => $groupDataParserFactory(),
-                'user' => $userRepositoryFactory(),
-                'invite_tokens' => $inviteTokenRepository,
+                'user_read' => $userReadFactory(),
+                'user_write' => $userWriteFactory(),
+                'invite_read' => $inviteReadFactory,
+                'invite_write' => $inviteWriteFactory,
             ];
         });
 
@@ -461,8 +494,9 @@ final class PublicRuntimeBuilder
             $publicAuthController = new PublicAuthController(
                 $requestContextFactory(),
                 $authDomain['group'],
-                $authDomain['user'],
-                $authDomain['invite_tokens']
+                $authDomain['user_write'],
+                $authDomain['invite_read'],
+                $authDomain['invite_write']
             );
 
             return $publicAuthController;
@@ -486,7 +520,7 @@ final class PublicRuntimeBuilder
                 $contentDomain['page_images'],
                 $contentDomain['page'],
                 $contentDomain['redirect'],
-                $authDomain['user'],
+                $authDomain['user_read'],
                 $themeCatalogFactory(),
                 $extensionEditorCatalogFactory(),
                 $formDomain['extension_services']
@@ -548,7 +582,7 @@ final class PublicRuntimeBuilder
             $authDomain = $publicAuthDomain();
             $publicUserController = new PublicUserController(
                 $requestContextFactory(),
-                $authDomain['user']
+                $authDomain['user_read']
             );
 
             return $publicUserController;
@@ -615,7 +649,7 @@ final class PublicRuntimeBuilder
                 $contentDomain['page_images'],
                 $contentDomain['page'],
                 $contentDomain['redirect'],
-                $authDomain['user'],
+                $authDomain['user_read'],
                 $themeCatalogFactory(),
                 $extensionEditorCatalogFactory(),
                 $formDomain['extension_services']

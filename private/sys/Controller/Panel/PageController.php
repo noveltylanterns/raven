@@ -13,12 +13,14 @@ namespace Raven\Core\Controller\Panel;
 
 use Closure;
 use Raven\Core\Config;
-use Raven\Core\Repository\CategoryRepository;
-use Raven\Core\Repository\PageImageRepository;
-use Raven\Core\Repository\PageRepository;
-use Raven\Core\Repository\TagRepository;
-use Raven\Core\Repository\SetRepository;
-use Raven\Core\Repository\UserRepository;
+use Raven\Core\Repository\CategoryRead;
+use Raven\Core\Repository\PageImageRead;
+use Raven\Core\Repository\PageImageWrite;
+use Raven\Core\Repository\PageRead;
+use Raven\Core\Repository\PageWrite;
+use Raven\Core\Repository\TagRead;
+use Raven\Core\Repository\SetRead;
+use Raven\Core\Repository\UserRead;
 use Raven\Lib\Auth\LoginIdentifierResolver;
 use Raven\Lib\Extension\Panel\ExtensionCatalogService;
 use Raven\Lib\Extension\ExtensionEditorCatalogService;
@@ -58,9 +60,11 @@ final class PageController
     private SharedController $context;
     private Config $config;
     private InputSanitizer $input;
-    private PageRepository $pageRepo;
-    private PageImageRepository $pageImages;
-    private UserRepository $userRepo;
+    private PageRead $pageRead;
+    private PageWrite $pageWrite;
+    private PageImageRead $pageImages;
+    private PageImageWrite $pageImagesWrite;
+    private UserRead $userRepo;
     private ChannelDataParser $channelParser;
     private EditorTabs $editorTabs;
     private Editor $editor;
@@ -71,20 +75,20 @@ final class PageController
     private Closure $pageImageManagerResolver;
     private ?PageImageManager $pageImageManager = null;
     private ?PageDataParser $pageParser = null;
-    /** @var Closure(): CategoryRepository */
+    /** @var Closure(): CategoryRead */
     private Closure $categoryRepoResolver;
-    private ?CategoryRepository $categoryRepo = null;
+    private ?CategoryRead $categoryRepo = null;
     private ?CategoryDataParser $categoryParser = null;
-    /** @var Closure(): SetRepository */
+    /** @var Closure(): SetRead */
     private Closure $categorySetRepoResolver;
-    private ?SetRepository $categorySetRepo = null;
-    /** @var Closure(): TagRepository */
+    private ?SetRead $categorySetRepo = null;
+    /** @var Closure(): TagRead */
     private Closure $tagRepoResolver;
-    private ?TagRepository $tagRepo = null;
+    private ?TagRead $tagRepo = null;
     private ?TagDataParser $tagParser = null;
-    /** @var Closure(): SetRepository */
+    /** @var Closure(): SetRead */
     private Closure $tagSetRepoResolver;
-    private ?SetRepository $tagSetRepo = null;
+    private ?SetRead $tagSetRepo = null;
     /** @var Closure(): TaxonomyRepoParser */
     private Closure $taxonomyLookupRepoResolver;
     private ?TaxonomyRepoParser $taxonomyLookupRepo = null;
@@ -107,15 +111,17 @@ final class PageController
      * @param SharedController $context Shared panel request context for auth, CSRF, flash, and rendering.
      * @param Config $config Runtime configuration reader for media and content settings.
      * @param InputSanitizer $input Shared input sanitizer for panel request values.
-     * @param PageRepository $pageRepo Page repository for content CRUD.
-     * @param PageImageRepository $pageImages Page-image repository for gallery persistence and page-existence checks.
+     * @param PageRead $pageRead Page repository read side for content list and edit-form reads.
+     * @param PageWrite $pageWrite Page repository write side for page saves and deletes.
+     * @param PageImageRead $pageImages Page-image repository read side for gallery renders and page-existence checks.
+     * @param PageImageWrite $pageImagesWrite Page-image repository write side for gallery persistence.
      * @param callable $pageImageManagerResolver Lazy page-image manager resolver; resolved only on gallery upload/delete routes.
-     * @param callable $categoryRepoResolver Lazy category repository resolver; resolved only on taxonomy-aware page routes.
-     * @param callable $categorySetRepoResolver Lazy category-set repository resolver; resolved only on set-validation flows.
-     * @param callable $tagRepoResolver Lazy tag repository resolver; resolved only on taxonomy-aware page routes.
-     * @param callable $tagSetRepoResolver Lazy tag-set repository resolver; resolved only on set-validation flows.
+     * @param callable $categoryRepoResolver Lazy category read resolver; resolved only on taxonomy-aware page routes.
+     * @param callable $categorySetRepoResolver Lazy category-set read resolver; resolved only on set-validation flows.
+     * @param callable $tagRepoResolver Lazy tag read resolver; resolved only on taxonomy-aware page routes.
+     * @param callable $tagSetRepoResolver Lazy tag-set read resolver; resolved only on set-validation flows.
      * @param callable $taxonomyLookupRepoResolver Lazy taxonomy lookup resolver; resolved only on page-editor option-set queries.
-     * @param UserRepository $userRepo User repository for author validation and author select options.
+     * @param UserRead $userRepo User repository read side for author validation and author select options.
      * @param ChannelDataParser $channelParser Channel data reader for channel-scope and slug lookups.
      * @param EditorTabs $editorTabs Panel editor tab normalization and tab-preserving URL builder.
      * @param Editor $editor Shared panel editor utility methods (body-text editor normalization).
@@ -132,15 +138,17 @@ final class PageController
         SharedController $context,
         Config $config,
         InputSanitizer $input,
-        PageRepository $pageRepo,
-        PageImageRepository $pageImages,
+        PageRead $pageRead,
+        PageWrite $pageWrite,
+        PageImageRead $pageImages,
+        PageImageWrite $pageImagesWrite,
         callable $pageImageManagerResolver,
         callable $categoryRepoResolver,
         callable $categorySetRepoResolver,
         callable $tagRepoResolver,
         callable $tagSetRepoResolver,
         callable $taxonomyLookupRepoResolver,
-        UserRepository $userRepo,
+        UserRead $userRepo,
         ChannelDataParser $channelParser,
         EditorTabs $editorTabs,
         Editor $editor,
@@ -155,8 +163,10 @@ final class PageController
         $this->context = $context;
         $this->config = $config;
         $this->input = $input;
-        $this->pageRepo = $pageRepo;
+        $this->pageRead = $pageRead;
+        $this->pageWrite = $pageWrite;
         $this->pageImages = $pageImages;
+        $this->pageImagesWrite = $pageImagesWrite;
         $this->pageImageManagerResolver = Closure::fromCallable($pageImageManagerResolver);
         $this->categoryRepoResolver = Closure::fromCallable($categoryRepoResolver);
         $this->categorySetRepoResolver = Closure::fromCallable($categorySetRepoResolver);
@@ -511,7 +521,7 @@ final class PageController
 
         // Normalize panel form input into repository payload shape.
         try {
-            $savedId = $this->pageRepo->save([
+            $savedId = $this->pageWrite->save([
                 'id' => $id,
                 'title' => $title,
                 'slug' => $slug,
@@ -529,7 +539,7 @@ final class PageController
             ]);
 
             // Keep Media tab metadata and page-level gallery toggle in sync with save.
-            $this->pageImages->updateGalleryForPage(
+            $this->pageImagesWrite->updateGalleryForPage(
                 $savedId,
                 $galleryEnabled,
                 $galleryImageUpdates
@@ -759,7 +769,7 @@ final class PageController
             // Single-row delete path (row action button).
             try {
                 $this->pageImageManager()->deleteAllForPage($id);
-                $this->pageRepo->deleteById($id);
+                $this->pageWrite->deleteById($id);
             } catch (\Throwable) {
                 $this->context->flash('error', 'Failed to delete page.');
                 Redirect::redirect($this->context->panelUrl('/page'));
@@ -783,7 +793,7 @@ final class PageController
             try {
                 // Keep processing all selected ids even when one delete fails.
                 $this->pageImageManager()->deleteAllForPage($selectedId);
-                $this->pageRepo->deleteById($selectedId);
+                $this->pageWrite->deleteById($selectedId);
                 $deletedCount++;
             } catch (\Throwable) {
                 $failedCount++;
@@ -829,20 +839,20 @@ final class PageController
     }
 
     /**
-     * Returns the category repository on first use so non-category page routes
+     * Returns the category read side on first use so non-category page routes
      * avoid constructing taxonomy storage helpers entirely.
      *
-     * @return CategoryRepository Category repository.
+     * @return CategoryRead Category repository read side.
      */
-    private function categoryRepo(): CategoryRepository
+    private function categoryRepo(): CategoryRead
     {
-        if ($this->categoryRepo instanceof CategoryRepository) {
+        if ($this->categoryRepo instanceof CategoryRead) {
             return $this->categoryRepo;
         }
 
         $categoryRepo = ($this->categoryRepoResolver)();
-        if (!$categoryRepo instanceof CategoryRepository) {
-            throw new \RuntimeException('Content controller category repository resolver returned an invalid value.');
+        if (!$categoryRepo instanceof CategoryRead) {
+            throw new \RuntimeException('Content controller category read resolver returned an invalid value.');
         }
 
         $this->categoryRepo = $categoryRepo;
@@ -862,20 +872,20 @@ final class PageController
     }
 
     /**
-     * Returns the category-set repository on first use so non-taxonomy routes
+     * Returns the category-set read side on first use so non-taxonomy routes
      * do not instantiate file-backed taxonomy set storage.
      *
-     * @return SetRepository Category-set repository.
+     * @return SetRead Category-set repository read side.
      */
-    private function categorySetRepo(): SetRepository
+    private function categorySetRepo(): SetRead
     {
-        if ($this->categorySetRepo instanceof SetRepository) {
+        if ($this->categorySetRepo instanceof SetRead) {
             return $this->categorySetRepo;
         }
 
         $categorySetRepo = ($this->categorySetRepoResolver)();
-        if (!$categorySetRepo instanceof SetRepository) {
-            throw new \RuntimeException('Content controller category-set repository resolver returned an invalid value.');
+        if (!$categorySetRepo instanceof SetRead) {
+            throw new \RuntimeException('Content controller category-set read resolver returned an invalid value.');
         }
 
         $this->categorySetRepo = $categorySetRepo;
@@ -883,20 +893,20 @@ final class PageController
     }
 
     /**
-     * Returns the tag repository on first use so non-tag page routes avoid
+     * Returns the tag read side on first use so non-tag page routes avoid
      * constructing taxonomy storage helpers entirely.
      *
-     * @return TagRepository Tag repository.
+     * @return TagRead Tag repository read side.
      */
-    private function tagRepo(): TagRepository
+    private function tagRepo(): TagRead
     {
-        if ($this->tagRepo instanceof TagRepository) {
+        if ($this->tagRepo instanceof TagRead) {
             return $this->tagRepo;
         }
 
         $tagRepo = ($this->tagRepoResolver)();
-        if (!$tagRepo instanceof TagRepository) {
-            throw new \RuntimeException('Content controller tag repository resolver returned an invalid value.');
+        if (!$tagRepo instanceof TagRead) {
+            throw new \RuntimeException('Content controller tag read resolver returned an invalid value.');
         }
 
         $this->tagRepo = $tagRepo;
@@ -916,20 +926,20 @@ final class PageController
     }
 
     /**
-     * Returns the tag-set repository on first use so non-taxonomy routes do not
+     * Returns the tag-set read side on first use so non-taxonomy routes do not
      * instantiate file-backed taxonomy set storage.
      *
-     * @return SetRepository Tag-set repository.
+     * @return SetRead Tag-set repository read side.
      */
-    private function tagSetRepo(): SetRepository
+    private function tagSetRepo(): SetRead
     {
-        if ($this->tagSetRepo instanceof SetRepository) {
+        if ($this->tagSetRepo instanceof SetRead) {
             return $this->tagSetRepo;
         }
 
         $tagSetRepo = ($this->tagSetRepoResolver)();
-        if (!$tagSetRepo instanceof SetRepository) {
-            throw new \RuntimeException('Content controller tag-set repository resolver returned an invalid value.');
+        if (!$tagSetRepo instanceof SetRead) {
+            throw new \RuntimeException('Content controller tag-set read resolver returned an invalid value.');
         }
 
         $this->tagSetRepo = $tagSetRepo;
@@ -1273,7 +1283,7 @@ final class PageController
     private function pageParser(): PageDataParser
     {
         if (!$this->pageParser instanceof PageDataParser) {
-            $this->pageParser = new PageDataParser($this->input, $this->pageRepo);
+            $this->pageParser = new PageDataParser($this->input, $this->pageRead);
         }
 
         return $this->pageParser;

@@ -38,8 +38,8 @@ spl_autoload_register(static function (string $class) use ($root): void {
 });
 
 use Raven\Core\Config;
-use Raven\Core\Repository\ChannelRepository;
-use Raven\Core\Repository\PageRepository;
+use Raven\Core\Repository\ChannelRead;
+use Raven\Core\Repository\PageRead;
 use Raven\Core\Routing\Public\PublicChannelPageRouteService;
 use Raven\Lib\Parser\ChannelRouteParser;
 use Raven\Lib\Scribe\ConfigScribe;
@@ -86,8 +86,8 @@ final class RoutingSmokeRunner
         $config = new Config($configPath);
         $input = new InputSanitizer();
         $routeService = new PublicChannelPageRouteService($input);
-        $channels = new ChannelRepository($db, 'sqlite', '', $channelDirectory);
-        $pages = new PageRepository($db, 'sqlite', '', $channels, false, false);
+        $channels = new ChannelRead($db, 'sqlite', '', $channelDirectory);
+        $pages = new PageRead($db, 'sqlite', '', $channels, false, false);
 
         $rootSlug = $this->resolvePublicPath($config, $routeService, $channels, $pages, 'hello-world', null);
         $this->assert((int) ($rootSlug['page']['id'] ?? 0) === 7, 'Global slug mode should resolve root slug page.');
@@ -236,8 +236,8 @@ PHP;
     private function resolvePublicPath(
         Config $config,
         PublicChannelPageRouteService $routeService,
-        ChannelRepository $channels,
-        PageRepository $pages,
+        ChannelRead $channels,
+        PageRead $pages,
         string $requestedSegment,
         ?string $channelSlug
     ): array {

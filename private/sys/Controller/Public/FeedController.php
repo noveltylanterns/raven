@@ -11,7 +11,7 @@ declare(strict_types=1);
 
 namespace Raven\Core\Controller\Public;
 
-use Raven\Core\Repository\PageRepository;
+use Raven\Core\Repository\PageRead;
 use Raven\Core\Routing\Public\PublicChannelPageRouteService;
 use Raven\Lib\Parser\CategoryRouteParser;
 use Raven\Lib\Parser\ChannelDataParser;
@@ -34,14 +34,14 @@ final class FeedController
     /**
      * @param SharedController $context Shared public request context.
      * @param ChannelDataParser $channelParser Channel data parser for feed/channel label lookups.
-     * @param PageRepository $pageRepo Page repository for feed and taxonomy listing rows.
+     * @param PageRead $pageRepo Page repository read side for feed and taxonomy listing rows.
      * @param TaxonomyRepoParser $taxonomyLookupRepo Taxonomy lookup parser for category/tag resolution.
      * @return void
      */
     public function __construct(
         SharedController $context,
         ChannelDataParser $channelParser,
-        PageRepository $pageRepo,
+        PageRead $pageRepo,
         TaxonomyRepoParser $taxonomyLookupRepo
     ) {
         $this->context = $context;

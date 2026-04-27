@@ -1,9 +1,8 @@
 <?php
-
 /**
  * RAVEN CMS
- * ~/private/sys/Repository/ChannelRepository.php
- * Filesystem-backed channel metadata repository.
+ * ~/private/sys/Repository/ChannelRead.php
+ * Read-only data access for filesystem-backed channel metadata.
  * Docs: https://raven.lanterns.io
  */
 
@@ -17,31 +16,39 @@ use Raven\Lib\Parser\ChannelRepoParser;
 use Raven\Lib\Database\TableNameResolver;
 use Raven\Lib\Scribe\ChannelRecordScribe;
 use Raven\Lib\Scribe\ChannelScribe;
-use RuntimeException;
 
 /**
+ * SELECT and lookup methods for channel records.
+ *
  * Channel metadata is persisted as one PHP file per channel under `private/dat/channel/`.
+ * Write operations (save, delete, image updates) live in ChannelWrite.
+ * The in-process record cache lives here; ChannelWrite calls clearCache() after mutations.
  */
-final class ChannelRepository
+class ChannelRead
 {
     private PDO $db;
     private string $driver;
     private string $prefix;
-    private string $channelDirectory;
     private ChannelContextParser $channelFileParser;
     private ChannelScribe $channelFileScribe;
     private ChannelRecordScribe $channelRecordScribe;
     /** @var array<int, array<string, mixed>>|null */
     private ?array $channelsCache = null;
 
+    /**
+     * @param PDO         $db               Active database connection.
+     * @param string      $driver           Database driver string ('mysql', 'sqlite', 'pgsql').
+     * @param string      $prefix           Table name prefix for this Raven installation.
+     * @param string|null $channelDirectory Absolute path to the channel file directory; defaults to private/dat/channel.
+     */
     public function __construct(PDO $db, string $driver, string $prefix, ?string $channelDirectory = null)
     {
         $this->db = $db;
         $this->driver = $driver;
         $this->prefix = preg_replace('/[^a-zA-Z0-9_]/', '', $prefix) ?? '';
-        $this->channelDirectory = $channelDirectory ?? (dirname(__DIR__, 3) . '/dat/channel');
-        $this->channelFileParser = new ChannelContextParser($this->channelDirectory);
-        $this->channelFileScribe = new ChannelScribe($this->channelDirectory);
+        $resolvedDir = $channelDirectory ?? (dirname(__DIR__, 3) . '/dat/channel');
+        $this->channelFileParser = new ChannelContextParser($resolvedDir);
+        $this->channelFileScribe = new ChannelScribe($resolvedDir);
         $this->channelRecordScribe = new ChannelRecordScribe(
             $db,
             $driver,
@@ -69,7 +76,8 @@ final class ChannelRepository
             $aIsRoot = ChannelRepoParser::isRootChannelId((int) ($a['id'] ?? -1));
             $bIsRoot = ChannelRepoParser::isRootChannelId((int) ($b['id'] ?? -1));
             if ($aIsRoot !== $bIsRoot) {
-                return $aIsRoot ? -1 : 1;
+                // Root channel sorts last in listings.
+                return $aIsRoot ? 1 : -1;
             }
 
             $nameCompare = strcasecmp((string) ($a['name'] ?? ''), (string) ($b['name'] ?? ''));
@@ -85,6 +93,9 @@ final class ChannelRepository
 
     /**
      * Returns all channel records without page-count joins.
+     *
+     * Maintains an in-process cache; call clearCache() after any write to invalidate it.
+     * Also auto-repairs missing root records and normalizes the storage layout on first load.
      *
      * @return array<int, array<string, mixed>>
      */
@@ -119,6 +130,7 @@ final class ChannelRepository
                 continue;
             }
 
+            // Id collision or missing id — assign a fresh one after first pass.
             $pendingRecords[] = [
                 'path' => $path,
                 'record' => $record,
@@ -145,7 +157,21 @@ final class ChannelRepository
     }
 
     /**
-     * Resolves one channel id from existing records by slug.
+     * Clears the in-process record cache.
+     *
+     * Must be called by ChannelWrite after any mutation so subsequent reads
+     * reflect the new state from disk.
+     */
+    public function clearCache(): void
+    {
+        $this->channelsCache = null;
+    }
+
+    /**
+     * Resolves one channel id by slug, returning 0 when not found.
+     *
+     * @param string $slug Slug to resolve.
+     * @return int Channel id, or 0 when no matching channel exists.
      */
     public function idFromSlug(string $slug): int
     {
@@ -153,7 +179,10 @@ final class ChannelRepository
     }
 
     /**
-     * Resolves one channel id from existing records by slug.
+     * Resolves one channel id by slug, or null when not found.
+     *
+     * @param string $slug Slug to resolve.
+     * @return int|null Channel id, or null when no matching channel exists.
      */
     public function idBySlug(string $slug): ?int
     {
@@ -220,6 +249,8 @@ final class ChannelRepository
 
     /**
      * Returns minimal channel option rows suitable for select controls and parser lookups.
+     *
+     * Excludes the root channel, which is not selectable as a page destination.
      *
      * @return array<int, array{id: int, name: string, slug: string, category_sets: array<int, int|string>, tag_sets: array<int, int|string>, editor_override: string, route_mode: string, route_separator: string}>
      */
@@ -296,7 +327,7 @@ final class ChannelRepository
     }
 
     /**
-     * Returns true when one channel exists by slug.
+     * Returns true when a channel with the given slug exists.
      *
      * @param string $slug Normalized slug to check.
      * @return bool True when a channel with this slug is found.
@@ -309,7 +340,8 @@ final class ChannelRepository
     /**
      * Returns one channel by id.
      *
-     * @return array<string, mixed>|null
+     * @param int $id Channel id to resolve; must be >= ROOT_CHANNEL_ID (0).
+     * @return array<string, mixed>|null Channel record, or null when not found.
      */
     public function findById(int $id): ?array
     {
@@ -329,7 +361,8 @@ final class ChannelRepository
     /**
      * Returns one channel by slug.
      *
-     * @return array<string, mixed>|null
+     * @param string $slug Channel slug to resolve.
+     * @return array<string, mixed>|null Channel record, or null when not found.
      */
     public function findBySlug(string $slug): ?array
     {
@@ -348,31 +381,26 @@ final class ChannelRepository
     }
 
     /**
-     * Creates or updates one channel and returns channel id.
+     * Returns one channel by either a numeric id or a slug string.
      *
-     * @param array{
-     *   id: int|null,
-     *   name: string,
-     *   slug: string,
-     *   description: string,
-     *   feed_enabled?: bool,
-     *   category_sets?: array<int, int|string>,
-     *   tag_sets?: array<int, int|string>,
-     *   editor_override?: string,
-     *   route_mode?: string,
-     *   route_separator?: string
-     * } $data
+     * A numeric string (e.g. '3') is treated as an id. A non-numeric string is
+     * resolved as a slug.
+     *
+     * @param int|string $idOrSlug Channel id (int) or slug (string).
+     * @return array<string, mixed>|null Channel record, or null when not found.
      */
-    public function save(array $data): int
+    public function findByIdOrSlug(int|string $idOrSlug): ?array
     {
-        $channelId = $this->channelRecordScribe->save(
-            $data,
-            fn (string $slug): ?array => $this->findBySlug($slug),
-            fn (int $id): ?array => $this->findById($id),
-            fn (): int => $this->nextChannelId()
-        );
-        $this->channelsCache = null;
-        return $channelId;
+        if (is_int($idOrSlug)) {
+            return $this->findById($idOrSlug);
+        }
+
+        $trimmed = trim($idOrSlug);
+        if (ctype_digit($trimmed)) {
+            return $this->findById((int) $trimmed);
+        }
+
+        return $this->findBySlug($trimmed);
     }
 
     /**
@@ -400,46 +428,13 @@ final class ChannelRepository
     }
 
     /**
-     * Updates one channel's cover/preview image path set.
+     * Returns a page-count map keyed by channel id.
      *
-     * @param array{
-     *   cover_image_path: string|null,
-     *   cover_image_sm_path: string|null,
-     *   cover_image_md_path: string|null,
-     *   cover_image_lg_path: string|null,
-     *   preview_image_path: string|null,
-     *   preview_image_sm_path: string|null,
-     *   preview_image_md_path: string|null,
-     *   preview_image_lg_path: string|null
-     * } $paths
+     * Public so ChannelWrite can pass it as a closure argument to ChannelRecordScribe.
+     *
+     * @return array<int, int> Map of channel id to page count.
      */
-    public function updateImagePaths(int $id, array $paths): void
-    {
-        $this->channelRecordScribe->updateImagePaths(
-            $id,
-            $paths,
-            fn (int $channelId): ?array => $this->findById($channelId)
-        );
-        $this->channelsCache = null;
-    }
-
-    /**
-     * Deletes one channel. Throws if the channel still has pages or redirects assigned.
-     */
-    public function deleteById(int $id): void
-    {
-        $this->channelRecordScribe->deleteById(
-            $id,
-            fn (int $channelId): ?array => $this->findById($channelId),
-            fn (): array => $this->pageCountsByChannelId()
-        );
-        $this->channelsCache = null;
-    }
-
-    /**
-     * @return array<int, int>
-     */
-    private function pageCountsByChannelId(): array
+    public function pageCountsByChannelId(): array
     {
         $pages = $this->table('pages');
         $stmt = $this->db->prepare(
@@ -459,10 +454,20 @@ final class ChannelRepository
     }
 
     /**
+     * Returns all channel records indexed by id for O(1) lookup during page hydration.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function channelsByIdMap(): array
+    {
+        return ChannelRepoParser::channelsByIdMap($this->listRecords());
+    }
+
+    /**
      * Returns the next available channel id, skipping any ids already in use.
      *
-     * @param array<int, bool> $usedIds Mutable set of already-allocated ids.
-     * @param int              $maxId   Mutable high-water mark for id allocation.
+     * @param array<int, bool> $usedIds Mutable set of already-allocated ids (updated in place).
+     * @param int              $maxId   Mutable high-water mark for id allocation (updated in place).
      * @return int Next allocatable channel id.
      */
     private function nextAvailableChannelId(array &$usedIds, int &$maxId): int
@@ -475,24 +480,6 @@ final class ChannelRepository
         $usedIds[$candidate] = true;
         $maxId = max($maxId, $candidate);
         return $candidate;
-    }
-
-    /**
-     * Returns the next channel id as max(existing ids) + 1.
-     *
-     * @return int Next sequential channel id.
-     */
-    private function nextChannelId(): int
-    {
-        $maxId = 0;
-        foreach ($this->listRecords() as $record) {
-            $recordId = (int) ($record['id'] ?? 0);
-            if ($recordId > $maxId) {
-                $maxId = $recordId;
-            }
-        }
-
-        return $maxId + 1;
     }
 
     /**

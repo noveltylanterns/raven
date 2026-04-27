@@ -3,7 +3,7 @@
 /**
  * RAVEN CMS
  * ~/private/lib/Parser/InviteParser.php
- * Extension-author read wrapper around InviteRepository for invite-token access.
+ * Extension-author read wrapper around InviteRead for invite-token access.
  * Docs: https://raven.lanterns.io
  */
 
@@ -11,23 +11,23 @@ declare(strict_types=1);
 
 namespace Raven\Lib\Parser;
 
-use Raven\Core\Repository\InviteRepository;
+use Raven\Core\Repository\InviteRead;
 
 /**
  * Read-side extension-author wrapper for invite-token operations.
  *
- * All SQL and normalization logic lives in `Raven\Core\Repository\InviteRepository`. This class
+ * All SQL and normalization logic lives in `Raven\Core\Repository\InviteRead`. This class
  * is a thin delegation layer so extension authors and brace-tag handlers can reach invite data
  * through the parser library surface without depending on a repository class directly.
  */
 final class InviteParser
 {
-    private InviteRepository $inviteRepo;
+    private InviteRead $inviteRepo;
 
     /**
-     * @param InviteRepository $inviteRepo Canonical invite-token repository for all read operations.
+     * @param InviteRead $inviteRepo Canonical invite-token repository for all read operations.
      */
-    public function __construct(InviteRepository $inviteRepo)
+    public function __construct(InviteRead $inviteRepo)
     {
         $this->inviteRepo = $inviteRepo;
     }

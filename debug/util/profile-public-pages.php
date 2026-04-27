@@ -14,10 +14,10 @@ use Raven\Core\Controller\Public\FeedController;
 use Raven\Core\Controller\Public\ProfileController;
 use Raven\Core\Controller\Public\SharedController;
 use Raven\Core\Debug\RequestProfiler;
-use Raven\Core\Repository\ChannelRepository;
-use Raven\Core\Repository\GroupRepository;
-use Raven\Core\Repository\PageRepository;
-use Raven\Core\Repository\UserRepository;
+use Raven\Core\Repository\ChannelRead;
+use Raven\Core\Repository\GroupRead;
+use Raven\Core\Repository\PageRead;
+use Raven\Core\Repository\UserRead;
 use Raven\Core\Routing\Public\PublicRuntimeBuilder;
 use Raven\Lib\Parser\ChannelDataParser;
 use Raven\Lib\Parser\TaxonomyRepoParser;
@@ -164,16 +164,16 @@ final class PublicRouteProfilerRunner
         /** @var array<string, mixed> $configSnapshot */
         $configSnapshot = $rvn['config']->all();
         // Build repos directly; the shared bootstrap service map was removed.
-        $channelRepo = new ChannelRepository($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix'], (string) $rvn['root'] . '/private/dat/channel');
+        $channelRepo = new ChannelRead($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix'], (string) $rvn['root'] . '/private/dat/channel');
         $channelParser = new ChannelDataParser($rvn['config'], $rvn['input'], $channelRepo);
         $categoryEnabled = (bool) ($configSnapshot['category']['enabled'] ?? false);
         $tagEnabled = (bool) ($configSnapshot['tag']['enabled'] ?? false);
-        /** @var PageRepository $pages */
-        $pages = new PageRepository($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix'], $channelRepo, $categoryEnabled, $tagEnabled);
-        /** @var UserRepository $users */
-        $users = new UserRepository($rvn['auth_db'], $rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix']);
-        /** @var GroupRepository $groups */
-        $groups = new GroupRepository($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix']);
+        /** @var PageRead $pages */
+        $pages = new PageRead($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix'], $channelRepo, $categoryEnabled, $tagEnabled);
+        /** @var UserRead $users */
+        $users = new UserRead($rvn['auth_db'], $rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix']);
+        /** @var GroupRead $groups */
+        $groups = new GroupRead($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix']);
 
         $categoryPrefix = $this->normalizedOptionalPrefix(
             (string) (($configSnapshot['category']['prefix'] ?? 'cat')),

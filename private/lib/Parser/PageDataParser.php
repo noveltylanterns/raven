@@ -11,7 +11,7 @@ declare(strict_types=1);
 
 namespace Raven\Lib\Parser;
 
-use Raven\Core\Repository\PageRepository;
+use Raven\Core\Repository\PageRead;
 use Raven\Lib\Media\Panel\PageEditorGalleryHydrator;
 use Raven\Lib\Security\InputSanitizer;
 use RuntimeException;
@@ -25,16 +25,16 @@ use RuntimeException;
 final class PageDataParser
 {
     private InputSanitizer $input;
-    private ?PageRepository $pageRepo;
+    private ?PageRead $pageRepo;
     private PageEditorGalleryHydrator $galleryHydrator;
 
     /**
      * Initializes the page data reader.
      *
      * @param InputSanitizer      $input    Input normalizer used when validating slugs and ids.
-     * @param PageRepository|null $pageRepo Optional page repository for read-only page lookups.
+     * @param PageRead|null $pageRepo Optional page repository for read-only page lookups.
      */
-    public function __construct(InputSanitizer $input, ?PageRepository $pageRepo = null)
+    public function __construct(InputSanitizer $input, ?PageRead $pageRepo = null)
     {
         $this->input = $input;
         $this->pageRepo = $pageRepo;
@@ -254,7 +254,7 @@ final class PageDataParser
      * Returns the panel edit form data for one page by id, including hydrated gallery images.
      *
      * The repository returns raw image/variant join rows; gallery hydration is applied here
-     * so `PageRepository` stays free of panel-media concerns.
+     * so `PageRead` stays free of panel-media concerns.
      *
      * @param int $id Page id to load.
      * @return array{page: array<string, mixed>, gallery_images: array<int, array<string, mixed>>}|null Edit data, or null when not found.
@@ -398,13 +398,13 @@ final class PageDataParser
     /**
      * Returns the injected page repository for repo-backed reads.
      *
-     * @return PageRepository Repository backing canonical read methods.
+     * @return PageRead Repository backing canonical read methods.
      * @throws RuntimeException When no repository was injected at construction time.
      */
-    private function pageRepo(): PageRepository
+    private function pageRepo(): PageRead
     {
-        if (!$this->pageRepo instanceof PageRepository) {
-            throw new RuntimeException('PageDataParser requires a PageRepository for repository-backed reads.');
+        if (!$this->pageRepo instanceof PageRead) {
+            throw new RuntimeException('PageDataParser requires a PageRead for repository-backed reads.');
         }
 
         return $this->pageRepo;

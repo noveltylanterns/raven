@@ -13,8 +13,8 @@ namespace Raven\Core\Controller\Panel;
 
 use Closure;
 use Raven\Core\Config;
-use Raven\Core\Repository\ChannelRepository;
-use Raven\Core\Repository\SetRepository;
+use Raven\Core\Repository\ChannelRead;
+use Raven\Core\Repository\SetRead;
 use Raven\Lib\Parser\ChannelDataParser;
 use Raven\Lib\Parser\ChannelRouteParser;
 use Raven\Lib\Parser\ConfigParser;
@@ -132,14 +132,14 @@ final class ConfigController
     private SharedController $context;
     private Config $config;
     private InputSanitizer $input;
-    private ChannelRepository $channelRepo;
+    private ChannelRead $channelRepo;
     private ?ChannelDataParser $channelParser = null;
-    /** @var Closure(): SetRepository */
+    /** @var Closure(): SetRead */
     private Closure $categorySetRepoResolver;
-    private ?SetRepository $categorySetRepo = null;
-    /** @var Closure(): SetRepository */
+    private ?SetRead $categorySetRepo = null;
+    /** @var Closure(): SetRead */
     private Closure $tagSetRepoResolver;
-    private ?SetRepository $tagSetRepo = null;
+    private ?SetRead $tagSetRepo = null;
     private UserDataParser $profileContacts;
     private EditorTabs $editorTabs;
     private Editor $editor;
@@ -158,9 +158,9 @@ final class ConfigController
      * @param SharedController $context Shared panel request context.
      * @param Config $config Runtime configuration reader for cross-field validation.
      * @param InputSanitizer $input Shared input sanitizer for config forms.
-     * @param ChannelRepository $channelRepo Channel repository for feed-channel options.
-     * @param callable(): SetRepository $categorySetRepoResolver Lazy category-set resolver.
-     * @param callable(): SetRepository $tagSetRepoResolver Lazy tag-set resolver.
+     * @param ChannelRead $channelRepo Channel repository read side for feed-channel options.
+     * @param callable(): SetRead $categorySetRepoResolver Lazy category-set read resolver.
+     * @param callable(): SetRead $tagSetRepoResolver Lazy tag-set read resolver.
      * @param EditorTabs $editorTabs Shared panel editor-tab normalization and URL builder.
      * @param Editor $editor Shared panel editor utility methods (body-text editor, theme normalization).
      * @param EditorBlocks $editorBlocks Shared repeater-block view helper for modular panel rows.
@@ -171,7 +171,7 @@ final class ConfigController
         SharedController $context,
         Config $config,
         InputSanitizer $input,
-        ChannelRepository $channelRepo,
+        ChannelRead $channelRepo,
         callable $categorySetRepoResolver,
         callable $tagSetRepoResolver,
         EditorTabs $editorTabs,
@@ -373,16 +373,16 @@ final class ConfigController
     /**
      * Returns the category-set repository on first use.
      *
-     * @return SetRepository Category-set repository.
+     * @return SetRead Category-set repository read side.
      */
-    private function categorySetRepo(): SetRepository
+    private function categorySetRepo(): SetRead
     {
-        if ($this->categorySetRepo instanceof SetRepository) {
+        if ($this->categorySetRepo instanceof SetRead) {
             return $this->categorySetRepo;
         }
 
         $categorySetRepo = ($this->categorySetRepoResolver)();
-        if (!$categorySetRepo instanceof SetRepository) {
+        if (!$categorySetRepo instanceof SetRead) {
             throw new \RuntimeException('Panel category-set repository resolver returned an invalid value.');
         }
 
@@ -393,16 +393,16 @@ final class ConfigController
     /**
      * Returns the tag-set repository on first use.
      *
-     * @return SetRepository Tag-set repository.
+     * @return SetRead Tag-set repository read side.
      */
-    private function tagSetRepo(): SetRepository
+    private function tagSetRepo(): SetRead
     {
-        if ($this->tagSetRepo instanceof SetRepository) {
+        if ($this->tagSetRepo instanceof SetRead) {
             return $this->tagSetRepo;
         }
 
         $tagSetRepo = ($this->tagSetRepoResolver)();
-        if (!$tagSetRepo instanceof SetRepository) {
+        if (!$tagSetRepo instanceof SetRead) {
             throw new \RuntimeException('Panel tag-set repository resolver returned an invalid value.');
         }
 

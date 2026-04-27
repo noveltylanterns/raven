@@ -11,7 +11,7 @@ declare(strict_types=1);
 
 namespace Raven\Lib\Parser;
 
-use Raven\Core\Repository\UserRepository;
+use Raven\Core\Repository\UserRead;
 use Raven\Lib\Security\InputSanitizer;
 use RuntimeException;
 
@@ -28,15 +28,15 @@ final class UserDataParser
     ];
 
     private InputSanitizer $input;
-    private ?UserRepository $userRepo;
+    private ?UserRead $userRepo;
 
     /**
      * Prepares the user data parser for contact normalization and optional user reads.
      *
      * @param InputSanitizer      $input    Shared input sanitizer for contact/profile value normalization.
-     * @param UserRepository|null $userRepo Optional user repository used for read-only user/profile lookups.
+     * @param UserRead|null $userRepo Optional user repository used for read-only user/profile lookups.
      */
-    public function __construct(InputSanitizer $input, ?UserRepository $userRepo = null)
+    public function __construct(InputSanitizer $input, ?UserRead $userRepo = null)
     {
         $this->input = $input;
         $this->userRepo = $userRepo;
@@ -576,13 +576,13 @@ final class UserDataParser
     /**
      * Returns the injected user repository for repo-backed reads.
      *
-     * @return UserRepository Repository backing canonical read methods.
+     * @return UserRead Repository backing canonical read methods.
      * @throws RuntimeException When no repository was injected at construction time.
      */
-    private function userRepo(): UserRepository
+    private function userRepo(): UserRead
     {
-        if (!$this->userRepo instanceof UserRepository) {
-            throw new RuntimeException('UserDataParser requires a UserRepository for repository-backed reads.');
+        if (!$this->userRepo instanceof UserRead) {
+            throw new RuntimeException('UserDataParser requires a UserRead for repository-backed reads.');
         }
 
         return $this->userRepo;

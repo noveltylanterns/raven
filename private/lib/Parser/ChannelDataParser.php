@@ -12,7 +12,7 @@ declare(strict_types=1);
 namespace Raven\Lib\Parser;
 
 use Raven\Core\Config;
-use Raven\Core\Repository\ChannelRepository;
+use Raven\Core\Repository\ChannelRead;
 use Raven\Lib\Security\InputSanitizer;
 use RuntimeException;
 
@@ -27,16 +27,16 @@ final class ChannelDataParser
 {
     private Config $config;
     private InputSanitizer $input;
-    private ?ChannelRepository $channelRepo;
+    private ?ChannelRead $channelRepo;
 
     /**
      * Initializes the channel data reader.
      *
      * @param Config                 $config      Runtime site configuration.
      * @param InputSanitizer         $input       Input normalizer used when validating slugs.
-     * @param ChannelRepository|null $channelRepo Optional channel repository for read-only channel lookups.
+     * @param ChannelRead|null $channelRepo Optional channel repository for read-only channel lookups.
      */
-    public function __construct(Config $config, InputSanitizer $input, ?ChannelRepository $channelRepo = null)
+    public function __construct(Config $config, InputSanitizer $input, ?ChannelRead $channelRepo = null)
     {
         $this->config = $config;
         $this->input = $input;
@@ -197,13 +197,13 @@ final class ChannelDataParser
     /**
      * Returns the injected channel repository for repo-backed reads.
      *
-     * @return ChannelRepository Repository backing canonical read methods.
+     * @return ChannelRead Repository backing canonical read methods.
      * @throws RuntimeException When no repository was injected at construction time.
      */
-    private function channelRepo(): ChannelRepository
+    private function channelRepo(): ChannelRead
     {
-        if (!$this->channelRepo instanceof ChannelRepository) {
-            throw new RuntimeException('ChannelDataParser requires a ChannelRepository for repository-backed reads.');
+        if (!$this->channelRepo instanceof ChannelRead) {
+            throw new RuntimeException('ChannelDataParser requires a ChannelRead for repository-backed reads.');
         }
 
         return $this->channelRepo;

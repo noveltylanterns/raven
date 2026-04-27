@@ -12,8 +12,10 @@ declare(strict_types=1);
 namespace Raven\Core\Controller\Panel;
 
 use Closure;
-use Raven\Core\Repository\CategoryRepository;
-use Raven\Core\Repository\SetRepository;
+use Raven\Core\Repository\CategoryRead;
+use Raven\Core\Repository\CategoryWrite;
+use Raven\Core\Repository\SetRead;
+use Raven\Core\Repository\SetWrite;
 use Raven\Lib\Media\Panel\TaxonomyImageService;
 use Raven\Lib\Parser\CategoryDataParser;
 use Raven\Lib\Parser\CategoryRouteParser;
@@ -36,14 +38,20 @@ final class CategoryController
 {
     private SharedController $context;
     private InputSanitizer $input;
-    /** @var ?CategoryRepository */
-    private ?CategoryRepository $categoryRepo = null;
+    /** @var ?CategoryRead */
+    private ?CategoryRead $categoryRead = null;
+    /** @var ?CategoryWrite */
+    private ?CategoryWrite $categoryWrite = null;
     /** @var ?CategoryDataParser */
     private ?CategoryDataParser $categoryParser = null;
-    private Closure $categoryRepoResolver;
-    /** @var ?SetRepository */
-    private ?SetRepository $categorySetRepo = null;
+    private Closure $categoryReadResolver;
+    private Closure $categoryWriteResolver;
+    /** @var ?SetRead */
+    private ?SetRead $categorySetRepo = null;
     private Closure $categorySetRepoResolver;
+    /** @var ?SetWrite */
+    private ?SetWrite $categorySetWrite = null;
+    private Closure $categorySetWriteResolver;
     private bool $categoryEnabled;
     private TaxonomyImageService $taxonomyImageService;
     private TaxonomyImageScribe $taxonomyImageScribe;
@@ -54,8 +62,10 @@ final class CategoryController
     /**
      * @param SharedController $context Shared panel request context.
      * @param InputSanitizer $input Shared request input sanitizer.
-     * @param callable $categoryRepoResolver Lazy category repository resolver; only resolved on category routes.
-     * @param callable $categorySetRepoResolver Lazy category-set repository resolver; resolved for category set routes.
+     * @param callable $categoryReadResolver Lazy category read resolver; only resolved on category routes.
+     * @param callable $categoryWriteResolver Lazy category write resolver; only resolved on category save/delete routes.
+     * @param callable $categorySetRepoResolver Lazy category-set read resolver; resolved for category set listing and validation.
+     * @param callable $categorySetWriteResolver Lazy category-set write resolver; resolved for category set save and delete routes.
      * @param bool $categoryEnabled Whether category features are enabled in runtime config.
      * @param TaxonomyImageService $taxonomyImageService Read-side taxonomy image config and path helper.
      * @param TaxonomyImageScribe $taxonomyImageScribe Write-side taxonomy image upload and cleanup helper.
@@ -67,8 +77,10 @@ final class CategoryController
     public function __construct(
         SharedController $context,
         InputSanitizer $input,
-        callable $categoryRepoResolver,
+        callable $categoryReadResolver,
+        callable $categoryWriteResolver,
         callable $categorySetRepoResolver,
+        callable $categorySetWriteResolver,
         bool $categoryEnabled,
         TaxonomyImageService $taxonomyImageService,
         TaxonomyImageScribe $taxonomyImageScribe,
@@ -78,8 +90,10 @@ final class CategoryController
     ) {
         $this->context = $context;
         $this->input = $input;
-        $this->categoryRepoResolver = Closure::fromCallable($categoryRepoResolver);
+        $this->categoryReadResolver = Closure::fromCallable($categoryReadResolver);
+        $this->categoryWriteResolver = Closure::fromCallable($categoryWriteResolver);
         $this->categorySetRepoResolver = Closure::fromCallable($categorySetRepoResolver);
+        $this->categorySetWriteResolver = Closure::fromCallable($categorySetWriteResolver);
         $this->categoryEnabled = $categoryEnabled;
         $this->taxonomyImageService = $taxonomyImageService;
         $this->taxonomyImageScribe = $taxonomyImageScribe;
@@ -241,7 +255,7 @@ final class CategoryController
 
         // Persist one category; uniqueness conflicts are surfaced by repository.
         try {
-            $savedId = $this->categoryRepo()->save([
+            $savedId = $this->categoryWrite()->save([
                 'id' => $id,
                 'name' => $name,
                 'slug' => $slug,
@@ -346,7 +360,7 @@ final class CategoryController
         }
 
         try {
-            $this->categoryRepo()->updateImageFiles($savedId, $nextStorage);
+            $this->categoryWrite()->updateImageFiles($savedId, $nextStorage);
         } catch (\Throwable) {
             // Keep DB and filesystem in sync when image-path persistence fails.
             $this->taxonomyImageScribe->cleanupPathSets('categories', $savedId, $newPathSets);
@@ -389,7 +403,7 @@ final class CategoryController
             $record = $this->categoryParser()->findById($id);
             // Single-row delete path (row action button).
             try {
-                $this->categoryRepo()->deleteById($id);
+                $this->categoryWrite()->deleteById($id);
             } catch (\Throwable) {
                 $this->context->flash('error', 'Failed to delete category.');
                 Redirect::redirect($this->context->panelUrl('/category'));
@@ -421,7 +435,7 @@ final class CategoryController
             $record = $this->categoryParser()->findById($selectedId);
             try {
                 // Continue deleting remaining ids even if one operation throws.
-                $this->categoryRepo()->deleteById($selectedId);
+                $this->categoryWrite()->deleteById($selectedId);
                 if ($record !== null) {
                     $this->taxonomyImageScribe->deleteStoredPaths(
                         'categories',
@@ -561,7 +575,7 @@ final class CategoryController
         }
 
         try {
-            $savedId = $this->categorySetRepo()->save([
+            $savedId = $this->categorySetWrite()->save([
                 'id' => $id,
                 'name' => $name,
                 'slug' => $slug ?? '',
@@ -613,11 +627,11 @@ final class CategoryController
         // Reassign any remaining categories in this set to the default set before deleting.
         $categoryCount = (int) ($this->categoryParser()->countsBySetId()[$id] ?? 0);
         if ($categoryCount > 0) {
-            $this->categoryRepo()->reassignSetToDefault($id, SetParser::DEFAULT_SET_ID);
+            $this->categoryWrite()->reassignSetToDefault($id, SetParser::DEFAULT_SET_ID);
         }
 
         try {
-            $this->categorySetRepo()->deleteById($id);
+            $this->categorySetWrite()->deleteById($id);
         } catch (\Throwable $exception) {
             $message = trim($exception->getMessage());
             $this->context->flash('error', $message !== '' ? $message : 'Failed to delete category set.');
@@ -629,24 +643,45 @@ final class CategoryController
     }
 
     /**
-     * Returns the category repository on first use so non-category routes do not
+     * Returns the category read side on first use so non-category routes do not
      * instantiate DB-backed taxonomy storage.
      *
-     * @return CategoryRepository Category repository.
+     * @return CategoryRead Category repository read side.
      */
-    private function categoryRepo(): CategoryRepository
+    private function categoryRead(): CategoryRead
     {
-        if ($this->categoryRepo instanceof CategoryRepository) {
-            return $this->categoryRepo;
+        if ($this->categoryRead instanceof CategoryRead) {
+            return $this->categoryRead;
         }
 
-        $repo = ($this->categoryRepoResolver)();
-        if (!$repo instanceof CategoryRepository) {
-            throw new \RuntimeException('Panel category repository resolver returned an invalid value.');
+        $repo = ($this->categoryReadResolver)();
+        if (!$repo instanceof CategoryRead) {
+            throw new \RuntimeException('Panel category read resolver returned an invalid value.');
         }
 
-        $this->categoryRepo = $repo;
-        return $this->categoryRepo;
+        $this->categoryRead = $repo;
+        return $this->categoryRead;
+    }
+
+    /**
+     * Returns the category write side on first use so read-only category routes do not
+     * instantiate the write layer.
+     *
+     * @return CategoryWrite Category repository write side.
+     */
+    private function categoryWrite(): CategoryWrite
+    {
+        if ($this->categoryWrite instanceof CategoryWrite) {
+            return $this->categoryWrite;
+        }
+
+        $repo = ($this->categoryWriteResolver)();
+        if (!$repo instanceof CategoryWrite) {
+            throw new \RuntimeException('Panel category write resolver returned an invalid value.');
+        }
+
+        $this->categoryWrite = $repo;
+        return $this->categoryWrite;
     }
 
     /**
@@ -661,7 +696,7 @@ final class CategoryController
             return $this->categoryParser;
         }
 
-        $this->categoryParser = new CategoryDataParser($this->input, $this->categoryRepo());
+        $this->categoryParser = new CategoryDataParser($this->input, $this->categoryRead());
         return $this->categoryParser;
     }
 
@@ -669,21 +704,44 @@ final class CategoryController
      * Returns the category-set repository on first use so non-taxonomy routes
      * do not instantiate file-backed taxonomy set storage.
      *
-     * @return SetRepository Category-set repository.
+     * @return SetRead Category-set repository read side.
      */
-    private function categorySetRepo(): SetRepository
+    private function categorySetRepo(): SetRead
     {
-        if ($this->categorySetRepo instanceof SetRepository) {
+        if ($this->categorySetRepo instanceof SetRead) {
             return $this->categorySetRepo;
         }
 
         $repo = ($this->categorySetRepoResolver)();
-        if (!$repo instanceof SetRepository) {
+        if (!$repo instanceof SetRead) {
             throw new \RuntimeException('Panel category-set repository resolver returned an invalid value.');
         }
 
         $this->categorySetRepo = $repo;
         return $this->categorySetRepo;
+    }
+
+    /**
+     * Resolves the category-set write repository on first use.
+     *
+     * Separated from the read side so category set listing and validation routes
+     * do not instantiate the write layer unnecessarily.
+     *
+     * @return SetWrite Category-set repository write side for set save and delete.
+     */
+    private function categorySetWrite(): SetWrite
+    {
+        if ($this->categorySetWrite instanceof SetWrite) {
+            return $this->categorySetWrite;
+        }
+
+        $repo = ($this->categorySetWriteResolver)();
+        if (!$repo instanceof SetWrite) {
+            throw new \RuntimeException('Panel category-set write resolver returned an invalid value.');
+        }
+
+        $this->categorySetWrite = $repo;
+        return $this->categorySetWrite;
     }
 
     /**

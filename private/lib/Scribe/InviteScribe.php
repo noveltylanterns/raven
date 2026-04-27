@@ -3,7 +3,7 @@
 /**
  * RAVEN CMS
  * ~/private/lib/Scribe/InviteScribe.php
- * Extension-author write wrapper around InviteRepository for invite-token operations.
+ * Extension-author write wrapper around InviteWrite for invite-token operations.
  * Docs: https://raven.lanterns.io
  */
 
@@ -11,23 +11,23 @@ declare(strict_types=1);
 
 namespace Raven\Lib\Scribe;
 
-use Raven\Core\Repository\InviteRepository;
+use Raven\Core\Repository\InviteWrite;
 
 /**
  * Write-side extension-author wrapper for invite-token operations.
  *
- * All SQL and generation logic lives in `Raven\Core\Repository\InviteRepository`. This class
+ * All SQL and generation logic lives in `Raven\Core\Repository\InviteWrite`. This class
  * is a thin delegation layer so extension authors and brace-tag handlers can reach invite write
  * operations through the scribe library surface without depending on a repository class directly.
  */
 final class InviteScribe
 {
-    private InviteRepository $inviteRepo;
+    private InviteWrite $inviteRepo;
 
     /**
-     * @param InviteRepository $inviteRepo Canonical invite-token repository for all write operations.
+     * @param InviteWrite $inviteRepo Invite-token write side for all token create/consume/delete operations.
      */
-    public function __construct(InviteRepository $inviteRepo)
+    public function __construct(InviteWrite $inviteRepo)
     {
         $this->inviteRepo = $inviteRepo;
     }

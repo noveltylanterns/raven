@@ -1,13 +1,10 @@
 <?php
-
 /**
  * RAVEN CMS
- * ~/private/sys/Repository/UserRepository.php
- * Data access for user accounts, group memberships, public profiles, and auth-routing payloads.
+ * ~/private/sys/Repository/UserRead.php
+ * Read-only data access for user accounts, group memberships, public profiles, and routing payloads.
  * Docs: https://raven.lanterns.io
  */
-
-// Inline note: Repository methods encapsulate SQL details and keep callers storage-agnostic.
 
 declare(strict_types=1);
 
@@ -18,12 +15,14 @@ use Raven\Lib\Auth\AuthPayloadCodec;
 use Raven\Lib\Auth\ContactProfileNormalizer;
 use Raven\Lib\Auth\Panel\UserPanelHydrator;
 use Raven\Lib\Database\TableNameResolver;
-use Raven\Lib\Scribe\UserScribe;
 
 /**
- * Data access for User CRUD and user-group membership assignments.
+ * SELECT and lookup methods for users, group memberships, and public profiles.
+ *
+ * Write operations (save, delete, setUserGroups) live in UserWrite.
+ * Auth rows (users/passwords) and app rows (group memberships) can live in different DB handles.
  */
-final class UserRepository
+class UserRead
 {
     private PDO $authDb;
     private PDO $rvnDb;
@@ -31,8 +30,13 @@ final class UserRepository
     private string $prefix;
     private AuthPayloadCodec $authPayloadCodec;
     private UserPanelHydrator $panelHydrator;
-    private UserScribe $userScribe;
 
+    /**
+     * @param PDO    $authDb Auth-database connection (users/passwords).
+     * @param PDO    $rvnDb  App-database connection (group memberships, routing data).
+     * @param string $driver Database driver string ('mysql', 'sqlite', 'pgsql').
+     * @param string $prefix Table name prefix for this Raven installation.
+     */
     public function __construct(PDO $authDb, PDO $rvnDb, string $driver, string $prefix)
     {
         // Auth rows (users/passwords) and app rows (group memberships) can live in different DB handles.
@@ -42,7 +46,6 @@ final class UserRepository
         $this->prefix = preg_replace('/[^a-zA-Z0-9_]/', '', $prefix) ?? '';
         $this->authPayloadCodec = new AuthPayloadCodec(new ContactProfileNormalizer());
         $this->panelHydrator = new UserPanelHydrator();
-        $this->userScribe = new UserScribe();
     }
 
     /**
@@ -71,6 +74,9 @@ final class UserRepository
 
     /**
      * Returns routing-safe user rows with group summaries in one query.
+     *
+     * Uses the app database connection to join memberships inline, avoiding a
+     * second query-and-merge step.
      *
      * @return array<int, array<string, mixed>>
      */
@@ -144,11 +150,13 @@ final class UserRepository
     }
 
     /**
-     * Returns routing-table auth payload (group/user rows) using one auth query.
+     * Returns routing-table auth payload (group/user rows) using one combined query.
      *
      * Query branches are included only for requested route families, keeping SQL
      * shorter when either group or user routing is disabled.
      *
+     * @param bool $includeGroups Whether to include group routing rows in the result.
+     * @param bool $includeUsers  Whether to include user routing rows in the result.
      * @return array{
      *   group_rows: array<int, array<string, mixed>>,
      *   user_rows: array<int, array<string, mixed>>
@@ -313,6 +321,9 @@ final class UserRepository
 
     /**
      * Returns one total-count for panel user index with optional group-name filter.
+     *
+     * @param string|null $groupNameFilter Optional group name to filter results by membership.
+     * @return int Total matching user count.
      */
     public function countForPanel(?string $groupNameFilter = null): int
     {
@@ -613,7 +624,8 @@ final class UserRepository
     /**
      * Returns one user by id including assigned group ids.
      *
-     * @return array<string, mixed>|null
+     * @param int $id User id to resolve.
+     * @return array<string, mixed>|null Hydrated user row with group ids, or null when not found.
      */
     public function findById(int $id): ?array
     {
@@ -673,14 +685,8 @@ final class UserRepository
     /**
      * Returns one public-safe user profile by username.
      *
-     * @return array{
-     *   id: int,
-     *   username: string,
-     *   string: string,
-     *   name: string,
-     *   avatar: string|null,
-     *   contact: array<int, array{type: string, value: string}>
-     * }|null
+     * @param string $username Exact username to look up.
+     * @return array{id: int, username: string, string: string, name: string, avatar: string|null, contact: array<int, array{type: string, value: string}>}|null
      */
     public function findPublicProfileByUsername(string $username): ?array
     {
@@ -714,14 +720,8 @@ final class UserRepository
     /**
      * Returns one public-safe user profile by numeric user id.
      *
-     * @return array{
-     *   id: int,
-     *   username: string,
-     *   string: string,
-     *   name: string,
-     *   avatar: string|null,
-     *   contact: array<int, array{type: string, value: string}>
-     * }|null
+     * @param int $userId User id to resolve.
+     * @return array{id: int, username: string, string: string, name: string, avatar: string|null, contact: array<int, array{type: string, value: string}>}|null
      */
     public function findPublicProfileById(int $userId): ?array
     {
@@ -760,14 +760,7 @@ final class UserRepository
      * Returns one public-safe user profile by unique user string token.
      *
      * @param string $userString Unique user string token to resolve.
-     * @return array{
-     *   id: int,
-     *   username: string,
-     *   string: string,
-     *   name: string,
-     *   avatar: string|null,
-     *   contact: array<int, array{type: string, value: string}>
-     * }|null Profile row, or null when not found.
+     * @return array{id: int, username: string, string: string, name: string, avatar: string|null, contact: array<int, array{type: string, value: string}>}|null
      */
     public function findPublicProfileByString(string $userString): ?array
     {
@@ -806,12 +799,8 @@ final class UserRepository
     /**
      * Returns public-safe user profiles assigned to one group id.
      *
-     * @return array<int, array{
-     *   id: int,
-     *   username: string,
-     *   name: string,
-     *   avatar: string|null
-     * }>
+     * @param int $groupId Group id to look up members for.
+     * @return array<int, array{id: int, username: string, string: string, name: string, avatar: string|null}>
      */
     public function listPublicProfilesByGroupId(int $groupId): array
     {
@@ -878,69 +867,76 @@ final class UserRepository
     }
 
     /**
-     * Creates or updates one user and sets group memberships.
+     * Returns true when a username already exists on another user row.
      *
-     * @param array{
-     *   id: int|null,
-     *   username: string,
-     *   display_name: string,
-     *   email: string,
-     *   bio?: string,
-     *   theme: string,
-     *   password: string|null,
-     *   primary_group_id: int,
-     *   group_ids: array<int>,
-     *   contact_profiles?: array<int, array{type: string, value: string}>,
-     *   set_avatar?: bool,
-     *   avatar_path?: string|null,
-     *   cover_image?: string|null,
-     *   string_length?: int
-     * } $data
+     * @param int    $id       User id to exclude from the check (the user being edited).
+     * @param string $username Proposed username to test for uniqueness.
+     * @return bool True when another user already uses this username.
      */
-    public function save(array $data): int
+    public function usernameExistsForOtherUser(int $id, string $username): bool
     {
-        $id = isset($data['id']) ? (int) $data['id'] : null;
-        $username = trim((string) ($data['username'] ?? ''));
-        $displayName = trim((string) ($data['display_name'] ?? ''));
-        $email = trim((string) ($data['email'] ?? ''));
-        $bio = trim((string) ($data['bio'] ?? ''));
-        $theme = trim((string) ($data['theme'] ?? ''));
-        $password = isset($data['password']) && is_string($data['password']) ? $data['password'] : null;
-        $primaryGroupId = isset($data['primary_group_id']) ? (int) $data['primary_group_id'] : 0;
-        $groupIds = $this->normalizeGroupIds(is_array($data['group_ids'] ?? null) ? $data['group_ids'] : []);
-        $contactProfiles = $this->normalizeContactProfiles((array) ($data['contact_profiles'] ?? []));
-        $contactProfilesEncoded = $this->encodeContactProfiles($contactProfiles);
-        $setAvatar = (bool) ($data['set_avatar'] ?? false);
-        $avatarPath = isset($data['avatar_path']) && is_string($data['avatar_path']) ? $data['avatar_path'] : null;
-        $coverImage = isset($data['cover_image']) && is_string($data['cover_image']) ? trim($data['cover_image']) : '';
-        $coverImage = $coverImage !== '' ? $coverImage : null;
-        $stringLength = isset($data['string_length']) ? (int) $data['string_length'] : 28;
-
-        return $this->userScribe->saveUser(
-            $this->authDb,
-            $this->rvnDb,
-            $this->authTable('users'),
-            $this->groupTable('user_groups'),
-            [
-                'id' => $id,
-                'username' => $username,
-                'display_name' => $displayName,
-                'email' => $email,
-                'bio' => $bio,
-                'theme' => $theme,
-                'password' => $password,
-                'primary_group_id' => $primaryGroupId > 0 ? $primaryGroupId : null,
-                'group_ids' => $groupIds,
-                'contact_profiles' => $contactProfilesEncoded,
-                'set_avatar' => $setAvatar,
-                'avatar_path' => $avatarPath,
-                'cover_image' => $coverImage,
-                'string_length' => $stringLength,
-            ],
-            function (int $userId, int $groupId): void {
-                $this->attachUserToGroup($userId, $groupId);
-            }
+        $usersTable = $this->authTable('users');
+        $stmt = $this->authDb->prepare(
+            'SELECT 1
+             FROM ' . $usersTable . '
+             WHERE username = :username
+               AND id <> :id
+             LIMIT 1'
         );
+        $stmt->execute([':username' => $username, ':id' => $id]);
+
+        return $stmt->fetchColumn() !== false;
+    }
+
+    /**
+     * Returns true when an email already exists on another user row.
+     *
+     * @param int    $id    User id to exclude from the check (the user being edited).
+     * @param string $email Proposed email to test for uniqueness.
+     * @return bool True when another user already uses this email.
+     */
+    public function emailExistsForOtherUser(int $id, string $email): bool
+    {
+        $usersTable = $this->authTable('users');
+        $stmt = $this->authDb->prepare(
+            'SELECT 1
+             FROM ' . $usersTable . '
+             WHERE email = :email
+               AND id <> :id
+             LIMIT 1'
+        );
+        $stmt->execute([':email' => $email, ':id' => $id]);
+
+        return $stmt->fetchColumn() !== false;
+    }
+
+    /**
+     * Returns assigned group ids for one user.
+     *
+     * @param int $userId User id to look up group memberships for.
+     * @return array<int> Ordered list of group ids assigned to this user.
+     */
+    public function groupIdsForUser(int $userId): array
+    {
+        $ugTable = $this->groupTable('user_groups');
+        $stmt = $this->rvnDb->prepare(
+            'SELECT "group" AS group_id
+             FROM ' . $ugTable . '
+             WHERE user = :user_id
+             ORDER BY "group" ASC'
+        );
+        $stmt->execute([':user_id' => $userId]);
+
+        $rows = $stmt->fetchAll() ?: [];
+        $ids = [];
+        foreach ($rows as $row) {
+            $gid = (int) ($row['group_id'] ?? 0);
+            if ($gid > 0) {
+                $ids[] = $gid;
+            }
+        }
+
+        return $ids;
     }
 
     /**
@@ -951,92 +947,23 @@ final class UserRepository
      */
     public function userStringById(int $id): ?string
     {
-        return $this->userScribe->userStringById(
-            $this->authDb,
-            $this->authTable('users'),
-            $id
+        $stmt = $this->authDb->prepare(
+            'SELECT string FROM ' . $this->authTable('users') . ' WHERE id = :id LIMIT 1'
         );
-    }
+        $stmt->execute([':id' => $id]);
 
-    /**
-     * Deletes one user and its group memberships.
-     */
-    public function deleteById(int $id): void
-    {
-        $this->userScribe->deleteUserById(
-            $this->authDb,
-            $this->rvnDb,
-            $this->authTable('users'),
-            $this->groupTable('user_groups'),
-            $id
-        );
-    }
+        $value = $stmt->fetchColumn();
 
-    /**
-     * Returns true when username exists on another user row.
-     */
-    public function usernameExistsForOtherUser(int $id, string $username): bool
-    {
-        return $this->userScribe->usernameExistsForOtherUser(
-            $this->authDb,
-            $this->authTable('users'),
-            $id,
-            $username
-        );
-    }
-
-    /**
-     * Returns true when email exists on another user row.
-     */
-    public function emailExistsForOtherUser(int $id, string $email): bool
-    {
-        return $this->userScribe->emailExistsForOtherUser(
-            $this->authDb,
-            $this->authTable('users'),
-            $id,
-            $email
-        );
-    }
-
-    /**
-     * Returns assigned group ids for one user.
-     *
-     * @return array<int>
-     */
-    public function groupIdsForUser(int $userId): array
-    {
-        return $this->userScribe->groupIdsForUser(
-            $this->rvnDb,
-            $this->groupTable('user_groups'),
-            $userId
-        );
-    }
-
-    /**
-     * Replaces one user's group memberships.
-     *
-     * @param array<int> $groupIds
-     */
-    public function setUserGroups(int $userId, array $groupIds): void
-    {
-        $this->userScribe->setUserGroups(
-            $this->rvnDb,
-            $this->groupTable('user_groups'),
-            $userId,
-            $this->normalizeGroupIds($groupIds),
-            function (int $memberUserId, int $groupId): void {
-                $this->attachUserToGroup($memberUserId, $groupId);
-            }
-        );
+        return $value === false ? null : (string) $value;
     }
 
     /**
      * Builds a map of user_id to assigned group entries for the given user ids.
      *
-     * When the list is empty all group memberships are returned, which supports the
-     * edit-form path where the full catalog must be loaded for a single known user.
+     * When the list is empty all group memberships are returned, which supports
+     * the listAll() path where no pre-filter is needed.
      *
-     * @param array<int> $userIds User ids to query group memberships for.
+     * @param array<int> $userIds User ids to query group memberships for; empty returns all.
      * @return array<int, array<int, array{name: string, permissions: int}>> Map of user id to group entry list.
      */
     private function groupEntriesByUserId(array $userIds = []): array
@@ -1079,159 +1006,11 @@ final class UserRepository
     }
 
     /**
-     * Returns group-membership map and full group catalog for a set of user ids.
-     *
-     * Used by the edit-form path to produce both the selected-group display and
-     * the complete group options for the assignment picker in one query pass.
-     *
-     * @param array<int> $userIds User ids to resolve memberships for.
-     * @return array{
-     *   group_map: array<int, array<int, array{name: string, permissions: int}>>,
-     *   group_options: array<int, array{id: int, name: string, slug: string, permissions: int, is_stock: int}>
-     * }
-     */
-    private function groupEntriesAndOptionsForUserIds(array $userIds): array
-    {
-        $groupsTable = $this->groupTable('groups');
-        $ugTable     = $this->groupTable('user_groups');
-        $normalizedUserIds = array_values(array_unique(array_filter($userIds, static fn (int $id): bool => $id > 0)));
-
-        if ($normalizedUserIds === []) {
-            // No users on this page — return all group options with an empty membership map
-            // so the edit-form assignment picker is still populated.
-            $stmt = $this->rvnDb->prepare(
-                'SELECT g.id AS group_id,
-                        g.name AS group_name,
-                        g.slug AS group_slug,
-                        g.permissions AS group_permissions,
-                        CASE WHEN LOWER(g.slug) IN (\'admin\', \'user\', \'guest\', \'validating\', \'banned\') THEN 1 ELSE 0 END AS group_is_stock
-                 FROM ' . $groupsTable . ' g
-                 ORDER BY g.id ASC'
-            );
-            $stmt->execute();
-
-            $rows = $stmt->fetchAll() ?: [];
-            $groupOptions = [];
-            foreach ($rows as $row) {
-                $groupId = (int) ($row['group_id'] ?? 0);
-                if ($groupId < 1) {
-                    continue;
-                }
-
-                $groupOptions[] = [
-                    'id'          => $groupId,
-                    'name'        => (string) ($row['group_name'] ?? ''),
-                    'slug'        => (string) ($row['group_slug'] ?? ''),
-                    'permissions' => (int) ($row['group_permissions'] ?? 0),
-                    'is_stock'    => (int) ($row['group_is_stock'] ?? 0),
-                ];
-            }
-
-            return [
-                'group_map'     => [],
-                'group_options' => $this->sortGroupOptions($groupOptions),
-            ];
-        }
-
-        $params       = [];
-        $placeholders = [];
-        foreach ($normalizedUserIds as $index => $userId) {
-            $placeholder = ':user_' . $index;
-            $placeholders[] = $placeholder;
-            $params[$placeholder] = $userId;
-        }
-
-        // LEFT JOIN keeps all groups visible so the options picker shows the full catalog
-        // even when none of the current page users belong to a given group.
-        $stmt = $this->rvnDb->prepare(
-            'SELECT g.id AS group_id,
-                    g.name AS group_name,
-                    g.slug AS group_slug,
-                    g.permissions AS group_permissions,
-                    CASE WHEN LOWER(g.slug) IN (\'admin\', \'user\', \'guest\', \'validating\', \'banned\') THEN 1 ELSE 0 END AS group_is_stock,
-                    ug.user
-             FROM ' . $groupsTable . ' g
-             LEFT JOIN ' . $ugTable . ' ug
-               ON ug."group" = g.id
-              AND ug.user IN (' . implode(', ', $placeholders) . ')
-             ORDER BY g.id ASC, ug.user ASC'
-        );
-        $stmt->execute($params);
-
-        $rows           = $stmt->fetchAll() ?: [];
-        $groupMap       = [];
-        $groupOptionsById = [];
-
-        foreach ($rows as $row) {
-            $groupId = (int) ($row['group_id'] ?? 0);
-            if ($groupId < 1) {
-                continue;
-            }
-
-            if (!isset($groupOptionsById[$groupId])) {
-                $groupOptionsById[$groupId] = [
-                    'id'          => $groupId,
-                    'name'        => (string) ($row['group_name'] ?? ''),
-                    'slug'        => (string) ($row['group_slug'] ?? ''),
-                    'permissions' => (int) ($row['group_permissions'] ?? 0),
-                    'is_stock'    => (int) ($row['group_is_stock'] ?? 0),
-                ];
-            }
-
-            $userId = (int) ($row['user'] ?? 0);
-            if ($userId < 1) {
-                continue;
-            }
-
-            $groupMap[$userId] ??= [];
-            $groupMap[$userId][] = [
-                'name'        => (string) ($row['group_name'] ?? ''),
-                'permissions' => (int) ($row['group_permissions'] ?? 0),
-            ];
-        }
-
-        return [
-            'group_map'     => $groupMap,
-            'group_options' => $this->sortGroupOptions(array_values($groupOptionsById)),
-        ];
-    }
-
-    /**
-     * Sorts group options: stock groups first, then alphabetically by name, then by id.
-     *
-     * @param array<int, array{id: int, name: string, slug: string, permissions: int, is_stock: int}> $groupOptions Unsorted group option rows.
-     * @return array<int, array{id: int, name: string, slug: string, permissions: int, is_stock: int}> Sorted group option rows.
-     */
-    private function sortGroupOptions(array $groupOptions): array
-    {
-        usort(
-            $groupOptions,
-            static function (array $a, array $b): int {
-                $aIsStock = (int) ($a['is_stock'] ?? 0);
-                $bIsStock = (int) ($b['is_stock'] ?? 0);
-                if ($aIsStock !== $bIsStock) {
-                    return $bIsStock <=> $aIsStock;
-                }
-
-                $aName = strtolower(trim((string) ($a['name'] ?? '')));
-                $bName = strtolower(trim((string) ($b['name'] ?? '')));
-                if ($aName !== $bName) {
-                    return $aName <=> $bName;
-                }
-
-                return ((int) ($a['id'] ?? 0)) <=> ((int) ($b['id'] ?? 0));
-            }
-        );
-
-        return $groupOptions;
-    }
-
-    /**
      * Hydrates panel-facing user rows with group display metadata.
      *
-     * @param array<int, array<string, mixed>> $users
-     * @param array<int, array<int, array{name: string, permissions: int}>> $groupMap
-     * @return array<int, array<string, mixed>>
+     * @param array<int, array<string, mixed>> $users    Raw user rows from the auth database.
+     * @param array<int, array<int, array{name: string, permissions: int}>> $groupMap User id to group entry map.
+     * @return array<int, array<string, mixed>> Hydrated user rows with group display fields.
      */
     private function hydratePanelUsers(array $users, array $groupMap): array
     {
@@ -1239,68 +1018,10 @@ final class UserRepository
     }
 
     /**
-     * Inserts one user-group link idempotently, ignoring pre-existing rows.
-     *
-     * Uses backend-specific INSERT … DO NOTHING / INSERT IGNORE syntax to avoid
-     * a separate EXISTS check that could race under concurrent requests.
-     *
-     * @param int $userId  User id to attach.
-     * @param int $groupId Group id to attach the user to.
-     * @return void
-     */
-    private function attachUserToGroup(int $userId, int $groupId): void
-    {
-        $table  = $this->groupTable('user_groups');
-        $driver = strtolower(trim($this->driver));
-        if ($driver === 'mysql') {
-            $stmt = $this->rvnDb->prepare(
-                'INSERT IGNORE INTO ' . $table . ' (user, `group`)
-                 VALUES (:user_id, :group_id)'
-            );
-        } elseif ($driver === 'pgsql') {
-            $stmt = $this->rvnDb->prepare(
-                'INSERT INTO ' . $table . ' ("user", "group")
-                 VALUES (:user_id, :group_id)
-                 ON CONFLICT ("user", "group") DO NOTHING'
-            );
-        } else {
-            $stmt = $this->rvnDb->prepare(
-                'INSERT INTO ' . $table . ' (user, "group")
-                 VALUES (:user_id, :group_id)
-                 ON CONFLICT(user, "group") DO NOTHING'
-            );
-        }
-
-        $stmt->execute([':user_id' => $userId, ':group_id' => $groupId]);
-    }
-
-    /**
-     * Normalizes group ids into unique positive integers.
-     *
-     * @param array<int> $groupIds
-     *
-     * @return array<int>
-     */
-    private function normalizeGroupIds(array $groupIds): array
-    {
-        $normalized = [];
-
-        foreach ($groupIds as $groupId) {
-            $value = (int) $groupId;
-            if ($value > 0) {
-                // Associative keying removes duplicates while preserving positive integers only.
-                $normalized[$value] = $value;
-            }
-        }
-
-        return array_values($normalized);
-    }
-
-    /**
      * Decodes stored contact-profile JSON into normalized rows.
      *
-     * @param mixed $raw
-     * @return array<int, array{type: string, value: string}>
+     * @param mixed $raw Raw contact JSON value from the database.
+     * @return array<int, array{type: string, value: string}> Decoded contact profile entries.
      */
     private function decodeContactProfiles(mixed $raw): array
     {
@@ -1308,28 +1029,7 @@ final class UserRepository
     }
 
     /**
-     * Encodes normalized contact rows for database storage.
-     *
-     * @param array<int, array{type: string, value: string}> $profiles
-     */
-    private function encodeContactProfiles(array $profiles): ?string
-    {
-        return $this->authPayloadCodec->encodeContactProfiles($profiles);
-    }
-
-    /**
-     * Normalizes contact rows into deterministic `{type, value}` entries.
-     *
-     * @param array<int, mixed> $profiles
-     * @return array<int, array{type: string, value: string}>
-     */
-    private function normalizeContactProfiles(array $profiles): array
-    {
-        return $this->authPayloadCodec->normalizeContactProfiles($profiles);
-    }
-
-    /**
-     * Maps auth table names for current backend mode.
+     * Maps auth table names for current backend mode (auth database).
      */
     private function authTable(string $table): string
     {
@@ -1337,7 +1037,7 @@ final class UserRepository
     }
 
     /**
-     * Maps auth table names for usage through app connection.
+     * Maps auth table names for usage through the app database connection.
      */
     private function appAuthTable(string $table): string
     {

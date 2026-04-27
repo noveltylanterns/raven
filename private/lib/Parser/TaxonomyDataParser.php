@@ -3,7 +3,7 @@
 /**
  * RAVEN CMS
  * ~/private/lib/Parser/TaxonomyDataParser.php
- * Extension-author read wrapper around PageRepository for taxonomy page-list queries.
+ * Extension-author read wrapper around PageRead for taxonomy page-list queries.
  * Docs: https://raven.lanterns.io
  */
 
@@ -11,23 +11,23 @@ declare(strict_types=1);
 
 namespace Raven\Lib\Parser;
 
-use Raven\Core\Repository\PageRepository;
+use Raven\Core\Repository\PageRead;
 
 /**
  * Extension-author wrapper for taxonomy-filtered page-list queries.
  *
- * All SQL lives in `Raven\Core\Repository\PageRepository`. This class is a thin delegation
+ * All SQL lives in `Raven\Core\Repository\PageRead`. This class is a thin delegation
  * layer so extension authors and brace-tag handlers can query taxonomy page lists through
  * the parser library surface without depending on a repository class directly.
  */
 final class TaxonomyDataParser
 {
-    private PageRepository $pageRepo;
+    private PageRead $pageRepo;
 
     /**
-     * @param PageRepository $pageRepo Canonical page repository for all taxonomy page-list reads.
+     * @param PageRead $pageRepo Canonical page repository for all taxonomy page-list reads.
      */
-    public function __construct(PageRepository $pageRepo)
+    public function __construct(PageRead $pageRepo)
     {
         $this->pageRepo = $pageRepo;
     }

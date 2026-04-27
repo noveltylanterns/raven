@@ -12,7 +12,7 @@ declare(strict_types=1);
 namespace Raven\Core\Controller\Panel;
 
 use Closure;
-use Raven\Core\Repository\GroupRepository;
+use Raven\Core\Repository\GroupWrite;
 use Raven\Lib\Auth\Panel\PanelAccess;
 use Raven\Lib\Auth\Panel\PanelPermissionDefinitionCatalog;
 use Raven\Lib\Media\Panel\TaxonomyImageService;
@@ -32,7 +32,7 @@ final class GroupController
 {
     private SharedController $context;
     private InputSanitizer $input;
-    private GroupRepository $groupRepo;
+    private GroupWrite $groupRepo;
     private GroupDataParser $groupDataParser;
     private GroupRouteParser $groupRouteParser;
     private EditorTabs $editorTabs;
@@ -46,7 +46,7 @@ final class GroupController
     /**
      * @param SharedController $context Shared panel request context.
      * @param InputSanitizer $input Shared request input sanitizer.
-     * @param GroupRepository $groupRepo Group repository for panel CRUD.
+     * @param GroupWrite $groupRepo Group repository write side for group saves and deletes.
      * @param GroupDataParser $groupDataParser Group data parser for repo-backed group reads.
      * @param GroupRouteParser $groupRouteParser Group route parser for routing-policy reads.
      * @param EditorTabs $editorTabs Panel editor tab normalization and tab-preserving URL builder.
@@ -61,7 +61,7 @@ final class GroupController
     public function __construct(
         SharedController $context,
         InputSanitizer $input,
-        GroupRepository $groupRepo,
+        GroupWrite $groupRepo,
         GroupDataParser $groupDataParser,
         GroupRouteParser $groupRouteParser,
         EditorTabs $editorTabs,

@@ -13,8 +13,9 @@ declare(strict_types=1);
 
 use Raven\Core\Database\ConnectionFactory;
 use Raven\Core\Database\SchemaManager;
-use Raven\Core\Repository\GroupRepository;
-use Raven\Core\Repository\UserRepository;
+use Raven\Core\Repository\GroupRead;
+use Raven\Core\Repository\UserRead;
+use Raven\Core\Repository\UserWrite;
 use Raven\Lib\Parser\UserDataParser;
 use Raven\Lib\Security\InputSanitizer;
 
@@ -752,13 +753,14 @@ if ($isPost) {
             $schema = new SchemaManager();
             $schema->ensure($rvnDb, $authDb, $driverName, $prefix);
 
-            $users = new UserRepository($authDb, $rvnDb, $driverName, $prefix);
-            $userParser = new UserDataParser(new InputSanitizer(), $users);
+            $userRead = new UserRead($authDb, $rvnDb, $driverName, $prefix);
+            $users = new UserWrite($authDb, $rvnDb, $driverName, $prefix);
+            $userParser = new UserDataParser(new InputSanitizer(), $userRead);
             if ($userParser->listAll() !== []) {
                 throw new RuntimeException('Installer can only create the initial admin on an empty user database.');
             }
 
-            $groups = new GroupRepository($rvnDb, $driverName, $prefix);
+            $groups = new GroupRead($rvnDb, $driverName, $prefix);
 
             // Raven now uses the canonical `admin` stock group for the first installed operator.
             // The legacy `super` slug no longer exists in fresh installs.

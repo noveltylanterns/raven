@@ -3,7 +3,7 @@
 /**
  * RAVEN CMS
  * ~/private/lib/Parser/TagDataParser.php
- * Read-only tag lookup and panel-list parser backed by TagRepository.
+ * Read-only tag lookup and panel-list parser backed by TagRead.
  * Docs: https://raven.lanterns.io
  */
 
@@ -11,7 +11,7 @@ declare(strict_types=1);
 
 namespace Raven\Lib\Parser;
 
-use Raven\Core\Repository\TagRepository;
+use Raven\Core\Repository\TagRead;
 use Raven\Lib\Security\InputSanitizer;
 use RuntimeException;
 
@@ -24,15 +24,15 @@ use RuntimeException;
 final class TagDataParser
 {
     private InputSanitizer $input;
-    private ?TagRepository $tagRepo;
+    private ?TagRead $tagRepo;
 
     /**
      * Initializes the tag data reader.
      *
      * @param InputSanitizer     $input   Input normalizer used when validating slugs and ids.
-     * @param TagRepository|null $tagRepo Optional tag repository for read-only tag lookups.
+     * @param TagRead|null $tagRepo Optional tag repository for read-only tag lookups.
      */
-    public function __construct(InputSanitizer $input, ?TagRepository $tagRepo = null)
+    public function __construct(InputSanitizer $input, ?TagRead $tagRepo = null)
     {
         $this->input = $input;
         $this->tagRepo = $tagRepo;
@@ -187,13 +187,13 @@ final class TagDataParser
     /**
      * Returns the injected tag repository for repo-backed reads.
      *
-     * @return TagRepository Repository backing canonical read methods.
+     * @return TagRead Repository backing canonical read methods.
      * @throws RuntimeException When no repository was injected at construction time.
      */
-    private function tagRepo(): TagRepository
+    private function tagRepo(): TagRead
     {
-        if (!$this->tagRepo instanceof TagRepository) {
-            throw new RuntimeException('TagDataParser requires a TagRepository for repository-backed reads.');
+        if (!$this->tagRepo instanceof TagRead) {
+            throw new RuntimeException('TagDataParser requires a TagRead for repository-backed reads.');
         }
 
         return $this->tagRepo;

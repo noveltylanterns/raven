@@ -3,7 +3,7 @@
 /**
  * RAVEN CMS
  * ~/private/lib/Parser/RedirectDataParser.php
- * Read-only redirect lookup and panel-list parser backed by RedirectRepository.
+ * Read-only redirect lookup and panel-list parser backed by RedirectRead.
  * Docs: https://raven.lanterns.io
  */
 
@@ -11,7 +11,7 @@ declare(strict_types=1);
 
 namespace Raven\Lib\Parser;
 
-use Raven\Core\Repository\RedirectRepository;
+use Raven\Core\Repository\RedirectRead;
 use Raven\Lib\Security\InputSanitizer;
 use RuntimeException;
 
@@ -21,15 +21,15 @@ use RuntimeException;
 final class RedirectDataParser
 {
     private InputSanitizer $input;
-    private ?RedirectRepository $redirectRepo;
+    private ?RedirectRead $redirectRepo;
 
     /**
      * Prepares the redirect data parser for normalized read-only redirect lookups.
      *
      * @param InputSanitizer          $input        Shared input sanitizer for redirect selector normalization.
-     * @param RedirectRepository|null $redirectRepo Optional redirect repository used for read-only redirect lookups.
+     * @param RedirectRead|null $redirectRepo Optional redirect repository used for read-only redirect lookups.
      */
-    public function __construct(InputSanitizer $input, ?RedirectRepository $redirectRepo = null)
+    public function __construct(InputSanitizer $input, ?RedirectRead $redirectRepo = null)
     {
         $this->input = $input;
         $this->redirectRepo = $redirectRepo;
@@ -119,13 +119,13 @@ final class RedirectDataParser
     /**
      * Returns the injected redirect repository for repo-backed reads.
      *
-     * @return RedirectRepository Repository backing canonical read methods.
+     * @return RedirectRead Repository backing canonical read methods.
      * @throws RuntimeException When no repository was injected at construction time.
      */
-    private function redirectRepo(): RedirectRepository
+    private function redirectRepo(): RedirectRead
     {
-        if (!$this->redirectRepo instanceof RedirectRepository) {
-            throw new RuntimeException('RedirectDataParser requires a RedirectRepository for repository-backed reads.');
+        if (!$this->redirectRepo instanceof RedirectRead) {
+            throw new RuntimeException('RedirectDataParser requires a RedirectRead for repository-backed reads.');
         }
 
         return $this->redirectRepo;

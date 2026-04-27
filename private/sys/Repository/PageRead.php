@@ -1,9 +1,8 @@
 <?php
-
 /**
  * RAVEN CMS
- * ~/private/sys/Repository/PageRepository.php
- * Data access for page records, public listing, taxonomy filters, and scheduled publish/expire.
+ * ~/private/sys/Repository/PageRead.php
+ * Read-only data access for page records, public listing, and taxonomy filter queries.
  * Docs: https://raven.lanterns.io
  */
 
@@ -14,34 +13,42 @@ namespace Raven\Core\Repository;
 use PDO;
 use Raven\Lib\Parser\ChannelRepoParser;
 use Raven\Lib\Parser\PageBlockParser;
-use Raven\Lib\Scribe\PageScribe;
+use Raven\Lib\Parser\PageRepoParser;
 use Raven\Lib\Database\TableNameResolver;
-use Raven\Lib\Parser\PageDuplicateParser;
-use RuntimeException;
 
 /**
- * Data access for pages and their public listing queries.
+ * SELECT and lookup methods for pages, public listings, and taxonomy filters.
+ *
+ * Write operations (save, deleteById) live in PageWrite.
+ * Schedule flipping (applySchedule) lives in PageRepoParser so public routes
+ * can call it without loading this class or PageWrite.
  */
-final class PageRepository
+class PageRead
 {
     private PDO $db;
     private string $driver;
     private string $prefix;
-    private ChannelRepository $channelRepo;
+    private ChannelRead $channelRepo;
     private bool $categoryEnabled;
     private bool $tagEnabled;
     private PageBlockParser $pageBlockParser;
-    private PageScribe $pageScribe;
 
+    /**
+     * @param PDO         $db               Active database connection.
+     * @param string      $driver           Database driver string ('mysql', 'sqlite', 'pgsql').
+     * @param string      $prefix           Table name prefix for this Raven installation.
+     * @param ChannelRead $channelRepo      Channel read-side repository for channel resolution.
+     * @param bool        $categoryEnabled  Whether category taxonomy support is active.
+     * @param bool        $tagEnabled       Whether tag taxonomy support is active.
+     */
     public function __construct(
         PDO $db,
         string $driver,
         string $prefix,
-        ChannelRepository $channelRepo,
+        ChannelRead $channelRepo,
         bool $categoryEnabled = true,
         bool $tagEnabled = true
-    )
-    {
+    ) {
         $this->db = $db;
         $this->driver = $driver;
         $this->prefix = preg_replace('/[^a-zA-Z0-9_]/', '', $prefix) ?? '';
@@ -49,31 +56,30 @@ final class PageRepository
         $this->categoryEnabled = $categoryEnabled;
         $this->tagEnabled = $tagEnabled;
         $this->pageBlockParser = new PageBlockParser();
-        $this->pageScribe = new PageScribe($db, $driver, $prefix, $categoryEnabled, $tagEnabled);
     }
 
     /**
-     * Finds homepage by slug priority: `home` first, then `index`.
+     * Finds the root homepage by slug priority: `home` first, then `index`.
      *
      * Page must not belong to any channel.
      *
-     * @return array<string, mixed>|null
+     * @return array<string, mixed>|null Hydrated page row, or null when no root homepage is published.
      */
     public function findHomepage(): ?array
     {
         $pages = $this->table('pages');
 
-        $sql = 'SELECT p.*
-                FROM ' . $pages . ' p
-                WHERE p.channel = 0
-                  AND p.status = :status
-                  AND p.slug IN (:slug_home, :slug_index)
-                ORDER BY CASE p.slug WHEN :slug_home_order THEN 0 ELSE 1 END,
-                         p.created DESC
-                LIMIT 1';
-
         // CASE ordering guarantees `home` wins over `index` when both exist.
-        $stmt = $this->db->prepare($sql);
+        $stmt = $this->db->prepare(
+            'SELECT p.*
+             FROM ' . $pages . ' p
+             WHERE p.channel = 0
+               AND p.status = :status
+               AND p.slug IN (:slug_home, :slug_index)
+             ORDER BY CASE p.slug WHEN :slug_home_order THEN 0 ELSE 1 END,
+                      p.created DESC
+             LIMIT 1'
+        );
         $stmt->execute([
             ':status' => 'published',
             ':slug_home' => 'home',
@@ -82,28 +88,19 @@ final class PageRepository
         ]);
 
         $row = $stmt->fetch();
-
-        if ($row === false) {
-            return null;
-        }
-
-        return $this->hydratePageRow($row);
+        return $row === false ? null : $this->hydratePageRow($row);
     }
 
     /**
-     * Finds channel homepage by slug priority: `home` first, then `index`.
+     * Finds the channel homepage by slug priority: `home` first, then `index`.
      *
      * Returns the resolved channel and its homepage as a named-key tuple so the
      * caller can reuse the already-fetched channel row without a second DB round-trip.
      * Returns null when the channel slug does not resolve to a known channel.
      * When the channel exists but has no published homepage, `page` is null.
      *
-     * Channel page must be published and belong to the requested channel slug.
-     *
      * @param string $channelSlug Normalized channel slug to look up.
-     * @return array{channel: array<string,mixed>, page: ?array<string,mixed>}|null
-     *         Null when the channel itself is not found; otherwise an array with
-     *         'channel' (the resolved channel row) and 'page' (the homepage row or null).
+     * @return array{channel: array<string,mixed>, page: ?array<string,mixed>}|null Null when channel not found.
      */
     public function findChannelHomepage(string $channelSlug): ?array
     {
@@ -118,16 +115,16 @@ final class PageRepository
             return null;
         }
 
-        $sql = 'SELECT p.*
-                FROM ' . $pages . ' p
-                WHERE p.channel = :channel
-                  AND p.status = :status
-                  AND p.slug IN (:slug_home, :slug_index)
-                ORDER BY CASE p.slug WHEN :slug_home_order THEN 0 ELSE 1 END,
-                         p.created DESC
-                LIMIT 1';
-
-        $stmt = $this->db->prepare($sql);
+        $stmt = $this->db->prepare(
+            'SELECT p.*
+             FROM ' . $pages . ' p
+             WHERE p.channel = :channel
+               AND p.status = :status
+               AND p.slug IN (:slug_home, :slug_index)
+             ORDER BY CASE p.slug WHEN :slug_home_order THEN 0 ELSE 1 END,
+                      p.created DESC
+             LIMIT 1'
+        );
         $stmt->execute([
             ':channel' => $channelId,
             ':status' => 'published',
@@ -149,7 +146,11 @@ final class PageRepository
     /**
      * Finds one public page by slug and optional channel slug.
      *
-     * @return array<string, mixed>|null
+     * Unchanneled pages resolve at root; channeled pages require an explicit channel slug match.
+     *
+     * @param string      $pageSlug    Exact page slug to look up.
+     * @param string|null $channelSlug Optional channel slug to scope the lookup.
+     * @return array<string, mixed>|null Hydrated page row with channel context, or null when not found.
      */
     public function findPublicPage(string $pageSlug, ?string $channelSlug = null): ?array
     {
@@ -158,13 +159,11 @@ final class PageRepository
                 FROM ' . $pages . ' p
                 WHERE p.slug = :page_slug
                   AND p.status = :status';
-
         $params = [
             ':page_slug' => $pageSlug,
             ':status' => 'published',
         ];
 
-        // Unchanneled pages resolve at root; channeled pages require explicit channel slug match.
         $channel = null;
         if ($channelSlug === null) {
             $sql .= ' AND p.channel = 0';
@@ -189,17 +188,15 @@ final class PageRepository
         $stmt->execute($params);
 
         $row = $stmt->fetch();
-        if ($row === false) {
-            return null;
-        }
-
-        return $this->withChannelContext($this->hydratePageRow($row), $channel);
+        return $row === false ? null : $this->withChannelContext($this->hydratePageRow($row), $channel);
     }
 
     /**
      * Finds one public page by id and optional channel slug.
      *
-     * @return array<string, mixed>|null
+     * @param int         $pageId      Page id to resolve.
+     * @param string|null $channelSlug Optional channel slug to scope the lookup.
+     * @return array<string, mixed>|null Hydrated page row with channel context, or null when not found.
      */
     public function findPublicPageById(int $pageId, ?string $channelSlug = null): ?array
     {
@@ -212,7 +209,6 @@ final class PageRepository
                 FROM ' . $pages . ' p
                 WHERE p.id = :page_id
                   AND p.status = :status';
-
         $params = [
             ':page_id' => $pageId,
             ':status' => 'published',
@@ -242,20 +238,18 @@ final class PageRepository
         $stmt->execute($params);
 
         $row = $stmt->fetch();
-        if ($row === false) {
-            return null;
-        }
-
-        return $this->withChannelContext($this->hydratePageRow($row), $channel);
+        return $row === false ? null : $this->withChannelContext($this->hydratePageRow($row), $channel);
     }
 
     /**
      * Returns one page by slug and optional channel scope.
      *
-     * $channel accepts a channel ID (int), a channel slug (string), or null for root scope.
+     * $channel accepts a channel id (int), a channel slug (string), or null for root scope.
      * Root scope matches pages that do not belong to any channel.
      *
-     * @return array<string, mixed>|null
+     * @param string           $pageSlug Exact page slug to look up.
+     * @param int|string|null  $channel  Channel id, slug, or null for root.
+     * @return array<string, mixed>|null Hydrated page row, or null when not found.
      */
     public function findBySlug(string $pageSlug, int|string|null $channel = null): ?array
     {
@@ -283,14 +277,17 @@ final class PageRepository
         $stmt->execute($params);
 
         $row = $stmt->fetch();
-
         return $row === false ? null : $this->hydratePageRow($row);
     }
 
     /**
      * Returns one page id by slug and optional channel scope, or null when not found.
      *
-     * $channel accepts a channel ID (int), a channel slug (string), or null for root scope.
+     * $channel accepts a channel id (int), a channel slug (string), or null for root scope.
+     *
+     * @param string           $pageSlug Exact page slug to look up.
+     * @param int|string|null  $channel  Channel id, slug, or null for root.
+     * @return int|null Matching page id, or null when not found.
      */
     public function idBySlug(string $pageSlug, int|string|null $channel = null): ?int
     {
@@ -317,7 +314,6 @@ final class PageRepository
         $stmt->execute($params);
 
         $value = $stmt->fetchColumn();
-
         return $value === false ? null : (int) $value;
     }
 
@@ -329,7 +325,9 @@ final class PageRepository
      * - `root`: root-scope pages only
      * - any other slug: only that channel
      *
-     * @return array<int, array<string, mixed>>
+     * @param int         $limit       Maximum number of rows to return.
+     * @param string|null $channelSlug Optional channel slug to scope results.
+     * @return array<int, array<string, mixed>> Hydrated published page rows.
      */
     public function listRecentPublished(int $limit, ?string $channelSlug = null): array
     {
@@ -339,9 +337,7 @@ final class PageRepository
         $sql = 'SELECT p.*
                 FROM ' . $pages . ' p
                 WHERE p.status = :status';
-        $params = [
-            ':status' => 'published',
-        ];
+        $params = [':status' => 'published'];
 
         $channel = null;
         if ($normalizedChannelSlug === ChannelRepoParser::ROOT_CHANNEL_SLUG) {
@@ -390,10 +386,11 @@ final class PageRepository
     }
 
     /**
-     * Returns newest published pages scoped to an explicit list of channels.
+     * Returns newest published pages scoped to an explicit list of channel slugs.
      *
-     * @param array<int, string> $channelSlugs
-     * @return array<int, array<string, mixed>>
+     * @param int            $limit        Maximum number of rows to return.
+     * @param array<int, string> $channelSlugs Channel slugs to restrict the query to.
+     * @return array<int, array<string, mixed>> Hydrated published page rows.
      */
     public function listRecentPublishedForChannels(int $limit, array $channelSlugs): array
     {
@@ -416,9 +413,7 @@ final class PageRepository
         $sql = 'SELECT p.*
                 FROM ' . $pages . ' p
                 WHERE p.status = :status';
-        $params = [
-            ':status' => 'published',
-        ];
+        $params = [':status' => 'published'];
 
         $clauses = [];
         $includeRoot = isset($normalizedSlugs[ChannelRepoParser::ROOT_CHANNEL_SLUG]);
@@ -488,9 +483,9 @@ final class PageRepository
     /**
      * Returns one total-count for panel page index with optional prefilters.
      *
-     * @param int|null $channelId Optional channel id filter resolved before repository entry.
+     * @param int|null $channelId  Optional channel id filter resolved before repository entry.
      * @param int|null $categoryId Optional category id filter from the panel UI.
-     * @param int|null $tagId Optional tag id filter from the panel UI.
+     * @param int|null $tagId      Optional tag id filter from the panel UI.
      * @return int Total matching page count.
      */
     public function countForPanel(?int $channelId = null, ?int $categoryId = null, ?int $tagId = null): int
@@ -527,12 +522,12 @@ final class PageRepository
     /**
      * Returns paginated page list for panel page index with optional prefilters.
      *
-     * @param int $limit Maximum number of rows to return.
-     * @param int $offset Zero-based row offset for pagination.
-     * @param int|null $channelId Optional channel id filter resolved before repository entry.
+     * @param int      $limit      Maximum number of rows to return.
+     * @param int      $offset     Zero-based row offset for pagination.
+     * @param int|null $channelId  Optional channel id filter resolved before repository entry.
      * @param int|null $categoryId Optional category id filter from the panel UI.
-     * @param int|null $tagId Optional tag id filter from the panel UI.
-     * @return array<int, array<string, mixed>>
+     * @param int|null $tagId      Optional tag id filter from the panel UI.
+     * @return array<int, array<string, mixed>> Panel page rows with channel context.
      */
     public function listForPanel(
         int $limit = 50,
@@ -592,12 +587,12 @@ final class PageRepository
     /**
      * Returns one paginated panel page-list page plus total row count.
      *
-     * @param int $limit Maximum number of rows to return.
-     * @param int $offset Zero-based row offset for pagination.
-     * @param int|null $channelId Optional channel id filter resolved before repository entry.
+     * @param int      $limit      Maximum number of rows to return.
+     * @param int      $offset     Zero-based row offset for pagination.
+     * @param int|null $channelId  Optional channel id filter resolved before repository entry.
      * @param int|null $categoryId Optional category id filter from the panel UI.
-     * @param int|null $tagId Optional tag id filter from the panel UI.
-     * @return array{rows: array<int, array<string, mixed>>, total: int}
+     * @param int|null $tagId      Optional tag id filter from the panel UI.
+     * @return array{rows: array<int, array<string, mixed>>, total: int} Paginated rows and total count.
      */
     public function listPageForPanel(
         int $limit = 50,
@@ -701,7 +696,7 @@ final class PageRepository
     /**
      * Returns all pages with channel context for routing inventory screens.
      *
-     * @return array<int, array<string, mixed>>
+     * @return array<int, array<string, mixed>> Flat page rows with id, title, slug, status, created, channel.
      */
     public function listAllForRouting(): array
     {
@@ -720,11 +715,9 @@ final class PageRepository
     /**
      * Returns one landing-page slug map keyed by channel slug for routing inventory.
      *
-     * Landing priority per channel:
-     * - `home` first
-     * - fallback `index`
+     * Landing priority per channel: `home` first, fallback `index`.
      *
-     * @return array<string, string>
+     * @return array<string, string> Channel slug to homepage slug map; empty string means no homepage found.
      */
     public function channelHomepagesForRouting(): array
     {
@@ -783,7 +776,7 @@ final class PageRepository
     }
 
     /**
-     * Returns one page by id.
+     * Returns one page by id with channel context.
      *
      * @param int $id Page id to resolve.
      * @return array<string, mixed>|null Hydrated page row with channel context, or null when not found.
@@ -798,16 +791,10 @@ final class PageRepository
              WHERE p.id = :id
              LIMIT 1'
         );
-
         $stmt->execute([':id' => $id]);
 
         $row = $stmt->fetch();
-
-        if ($row === false) {
-            return null;
-        }
-
-        return $this->withChannelContext($this->hydratePageRow($row));
+        return $row === false ? null : $this->withChannelContext($this->hydratePageRow($row));
     }
 
     /**
@@ -817,7 +804,7 @@ final class PageRepository
      * `PageEditorGalleryHydrator::hydrate()` to produce the final `gallery_images` array.
      *
      * @param int $id Page id to load.
-     * @return array{page: array<string, mixed>, gallery_rows: array<int, array<string, mixed>>}|null Null when no page matches.
+     * @return array{page: array<string, mixed>, gallery_rows: array<int, array<string, mixed>>}|null Null when not found.
      */
     public function editFormDataById(int $id): ?array
     {
@@ -883,159 +870,16 @@ final class PageRepository
         }
 
         return [
-            'page'       => $this->withChannelContext($this->hydratePageRow($pageRow)),
+            'page'         => $this->withChannelContext($this->hydratePageRow($pageRow)),
             'gallery_rows' => $rows,
         ];
     }
 
     /**
-     * Creates or updates a page row from a normalized form payload.
-     *
-     * @param array<string, mixed> $data Normalized page fields from any caller (panel, CLI, or extension).
-     * @return int The saved page id.
-     * @throws \RuntimeException When slug is missing, the channel slug is invalid, or the path already exists.
-     */
-    public function save(array $data): int
-    {
-        $id = isset($data['id']) ? (int) $data['id'] : 0;
-        $title = (string) ($data['title'] ?? 'Untitled');
-        $slug = (string) ($data['slug'] ?? '');
-        $contentBlocks = $this->normalizeContentBlocks($data['content_blocks'] ?? []);
-        $content = $this->encodeContentBlocks($contentBlocks);
-        $description = (string) ($data['description'] ?? '');
-        $displayTitle = !array_key_exists('display_title', $data) || !empty($data['display_title']) ? 1 : 0;
-        $status = strtolower(trim((string) ($data['status'] ?? '')));
-        if (!in_array($status, ['published', 'draft'], true)) {
-            $status = 'draft';
-        }
-        $author = isset($data['author']) ? (int) $data['author'] : 0;
-        if ($author < 1) {
-            $author = null;
-        }
-        $now = gmdate('Y-m-d H:i:s');
-        $publishAt = $this->normalizeDateTimeField($data['published'] ?? null);
-        $expireAt = $this->normalizeDateTimeField($data['expires'] ?? null);
-        $categoryIds = $this->categoryEnabled ? $this->normalizeIds($data['category_ids'] ?? []) : [];
-        $tagIds = $this->tagEnabled ? $this->normalizeIds($data['tag_ids'] ?? []) : [];
-
-        // Optional channel binding by slug; channel id `0` is the stock root scope.
-        $channelId = 0;
-        if (!empty($data['channel_slug'])) {
-            $channelId = $this->channelIdBySlug((string) $data['channel_slug']);
-            if ($channelId !== null && $channelId < 1) {
-                throw new \RuntimeException('The stock <root> channel placeholder cannot be selected directly.');
-            }
-        }
-
-        if ($slug === '') {
-            throw new \RuntimeException('Page slug is required.');
-        }
-
-        // Path uniqueness is scoped to (channel, slug) pairs.
-        if ($this->pathExists($slug, $channelId, $id > 0 ? $id : null)) {
-            throw new \RuntimeException('A page already exists for that slug/channel path.');
-        }
-
-        return $this->pageScribe->save([
-            'id' => $id,
-            'title' => $title,
-            'slug' => $slug,
-            'content' => $content,
-            'description' => $description,
-            'display_title' => $displayTitle,
-            'status' => $status,
-            'published' => $publishAt,
-            'expires' => $expireAt,
-            'author' => $author,
-            'channel' => $channelId,
-            'now' => $now,
-            'category_ids' => $categoryIds,
-            'tag_ids' => $tagIds,
-        ]);
-    }
-
-    /**
-     * Flips page statuses based on published / expires schedule columns.
-     *
-     * - draft pages whose published is in the past become published.
-     * - published pages whose expires is in the past become draft.
-     *
-     * Safe to call on every public request; only updates rows that need flipping.
-     */
-    public function applySchedule(): void
-    {
-        $pages = $this->table('pages');
-        $now = gmdate('Y-m-d H:i:s');
-
-        $this->db->prepare(
-            'UPDATE ' . $pages . '
-             SET status = \'published\', updated = :now
-             WHERE status = \'draft\'
-               AND published IS NOT NULL
-               AND published <= :now2'
-        )->execute([':now' => $now, ':now2' => $now]);
-
-        $this->db->prepare(
-            'UPDATE ' . $pages . '
-             SET status = \'draft\', updated = :now
-             WHERE status = \'published\'
-               AND expires IS NOT NULL
-               AND expires <= :now2'
-        )->execute([':now' => $now, ':now2' => $now]);
-    }
-
-    /**
-     * Normalises a datetime string from panel input to Y-m-d H:i:s DB format, or null.
-     *
-     * Accepts `Y-m-d H:i:s`, `Y-m-d H:i`, and HTML datetime-local format `Y-m-d\TH:i`.
-     */
-    private function normalizeDateTimeField(mixed $raw): ?string
-    {
-        if ($raw === null || $raw === '') {
-            return null;
-        }
-
-        $value = trim((string) $raw);
-        if ($value === '') {
-            return null;
-        }
-
-        // datetime-local browser format: 2026-03-27T14:30 or 2026-03-27T14:30:00
-        $value = str_replace('T', ' ', $value);
-
-        // Append seconds if missing (H:i → H:i:s)
-        if (preg_match('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/', $value)) {
-            $value .= ':00';
-        }
-
-        // Validate basic Y-m-d H:i:s shape
-        if (!preg_match('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/', $value)) {
-            return null;
-        }
-
-        return $value;
-    }
-
-    /**
-     * Returns true when another page already uses the same path scope.
-     */
-    private function pathExists(string $slug, ?int $channelId, ?int $excludeId = null): bool
-    {
-        return PageDuplicateParser::exists(
-            $this->db,
-            $this->table('pages'),
-            $slug,
-            $channelId,
-            $excludeId,
-            'exclude_id',
-            'channel'
-        );
-    }
-
-    /**
      * Returns assigned categories for one page.
      *
-     * @return array<int, array{id: int, name: string, slug: string}>
+     * @param int $pageId Page id to query assigned categories for.
+     * @return array<int, array{id: int, name: string, slug: string}> Category rows assigned to the page.
      */
     public function assignedCategoryRowsForPage(int $pageId): array
     {
@@ -1057,10 +901,9 @@ final class PageRepository
 
         $rows = $stmt->fetchAll() ?: [];
         $result = [];
-
         foreach ($rows as $row) {
             $result[] = [
-                'id' => (int) $row['id'],
+                'id'   => (int) $row['id'],
                 'name' => (string) $row['name'],
                 'slug' => (string) $row['slug'],
             ];
@@ -1072,7 +915,8 @@ final class PageRepository
     /**
      * Returns assigned tags for one page.
      *
-     * @return array<int, array{id: int, name: string, slug: string}>
+     * @param int $pageId Page id to query assigned tags for.
+     * @return array<int, array{id: int, name: string, slug: string}> Tag rows assigned to the page.
      */
     public function assignedTagRowsForPage(int $pageId): array
     {
@@ -1094,10 +938,9 @@ final class PageRepository
 
         $rows = $stmt->fetchAll() ?: [];
         $result = [];
-
         foreach ($rows as $row) {
             $result[] = [
-                'id' => (int) $row['id'],
+                'id'   => (int) $row['id'],
                 'name' => (string) $row['name'],
                 'slug' => (string) $row['slug'],
             ];
@@ -1109,12 +952,12 @@ final class PageRepository
     /**
      * Returns category/tag assignment ids grouped by page id.
      *
-     * @param array<int> $pageIds
-     * @return array<int, array{categories: array<int>, tags: array<int>}>
+     * @param array<int> $pageIds Page ids to query taxonomy assignments for.
+     * @return array<int, array{categories: array<int>, tags: array<int>}> Assignments keyed by page id.
      */
     public function taxonomyAssignmentIdsByPage(array $pageIds): array
     {
-        $normalizedPageIds = $this->normalizeIds($pageIds);
+        $normalizedPageIds = PageRepoParser::normalizeIds($pageIds);
         if ($normalizedPageIds === []) {
             return [];
         }
@@ -1186,19 +1029,12 @@ final class PageRepository
     }
 
     /**
-     * Deletes one page and clears its category/tag links first.
-     *
-     * @param int $id
-     */
-    public function deleteById(int $id): void
-    {
-        $this->pageScribe->deleteById($id);
-    }
-
-    /**
      * Returns paginated pages for one category slug ordered newest-first.
      *
-     * @return array<int, array<string, mixed>>
+     * @param string $slug   Normalized category slug to query.
+     * @param int    $limit  Maximum rows to return.
+     * @param int    $offset Zero-based row offset.
+     * @return array<int, array<string, mixed>> Hydrated published page rows.
      */
     public function listByCategorySlug(string $slug, int $limit, int $offset): array
     {
@@ -1211,6 +1047,9 @@ final class PageRepository
 
     /**
      * Counts total pages linked to a category slug.
+     *
+     * @param string $slug Normalized category slug to count pages for.
+     * @return int Published page count for this category.
      */
     public function countByCategorySlug(string $slug): int
     {
@@ -1224,7 +1063,10 @@ final class PageRepository
     /**
      * Returns paginated pages for one tag slug ordered newest-first.
      *
-     * @return array<int, array<string, mixed>>
+     * @param string $slug   Normalized tag slug to query.
+     * @param int    $limit  Maximum rows to return.
+     * @param int    $offset Zero-based row offset.
+     * @return array<int, array<string, mixed>> Hydrated published page rows.
      */
     public function listByTagSlug(string $slug, int $limit, int $offset): array
     {
@@ -1237,6 +1079,9 @@ final class PageRepository
 
     /**
      * Counts total pages linked to a tag slug.
+     *
+     * @param string $slug Normalized tag slug to count pages for.
+     * @return int Published page count for this tag.
      */
     public function countByTagSlug(string $slug): int
     {
@@ -1250,7 +1095,10 @@ final class PageRepository
     /**
      * Returns one paginated category-page result with total count.
      *
-     * @return array{rows: array<int, array<string, mixed>>, total: int}
+     * @param string $slug   Normalized category slug to query.
+     * @param int    $limit  Maximum rows to return.
+     * @param int    $offset Zero-based row offset.
+     * @return array{rows: array<int, array<string, mixed>>, total: int} Paginated rows and total count.
      */
     public function listPageByCategorySlug(string $slug, int $limit, int $offset): array
     {
@@ -1258,13 +1106,24 @@ final class PageRepository
             return ['rows' => [], 'total' => 0];
         }
 
-        return $this->listTaxonomyPagedBySlug($this->table('categories'), $this->table('page_categories'), 'category', $slug, $limit, $offset, fn (): int => $this->countByCategorySlug($slug));
+        return $this->listTaxonomyPagedBySlug(
+            $this->table('categories'),
+            $this->table('page_categories'),
+            'category',
+            $slug,
+            $limit,
+            $offset,
+            fn (): int => $this->countByCategorySlug($slug)
+        );
     }
 
     /**
      * Returns one paginated tag-page result with total count.
      *
-     * @return array{rows: array<int, array<string, mixed>>, total: int}
+     * @param string $slug   Normalized tag slug to query.
+     * @param int    $limit  Maximum rows to return.
+     * @param int    $offset Zero-based row offset.
+     * @return array{rows: array<int, array<string, mixed>>, total: int} Paginated rows and total count.
      */
     public function listPageByTagSlug(string $slug, int $limit, int $offset): array
     {
@@ -1272,13 +1131,24 @@ final class PageRepository
             return ['rows' => [], 'total' => 0];
         }
 
-        return $this->listTaxonomyPagedBySlug($this->table('tags'), $this->table('page_tags'), 'tag', $slug, $limit, $offset, fn (): int => $this->countByTagSlug($slug));
+        return $this->listTaxonomyPagedBySlug(
+            $this->table('tags'),
+            $this->table('page_tags'),
+            'tag',
+            $slug,
+            $limit,
+            $offset,
+            fn (): int => $this->countByTagSlug($slug)
+        );
     }
 
     /**
      * Returns paginated pages for one category id ordered newest-first.
      *
-     * @return array<int, array<string, mixed>>
+     * @param int $categoryId Category id to scope results to.
+     * @param int $limit      Maximum rows to return.
+     * @param int $offset     Zero-based row offset.
+     * @return array<int, array<string, mixed>> Hydrated published page rows.
      */
     public function listByCategoryId(int $categoryId, int $limit, int $offset): array
     {
@@ -1291,6 +1161,9 @@ final class PageRepository
 
     /**
      * Counts total pages linked to a category id.
+     *
+     * @param int $categoryId Category id to count pages for.
+     * @return int Published page count for this category.
      */
     public function countByCategoryId(int $categoryId): int
     {
@@ -1304,7 +1177,10 @@ final class PageRepository
     /**
      * Returns one paginated category-page result with total count by category id.
      *
-     * @return array{rows: array<int, array<string, mixed>>, total: int}
+     * @param int $categoryId Category id to scope results to.
+     * @param int $limit      Maximum rows to return.
+     * @param int $offset     Zero-based row offset.
+     * @return array{rows: array<int, array<string, mixed>>, total: int} Paginated rows and total count.
      */
     public function listPageByCategoryId(int $categoryId, int $limit, int $offset): array
     {
@@ -1312,13 +1188,23 @@ final class PageRepository
             return ['rows' => [], 'total' => 0];
         }
 
-        return $this->listTaxonomyPagedById($this->table('page_categories'), 'category', $categoryId, $limit, $offset, fn (): int => $this->countByCategoryId($categoryId));
+        return $this->listTaxonomyPagedById(
+            $this->table('page_categories'),
+            'category',
+            $categoryId,
+            $limit,
+            $offset,
+            fn (): int => $this->countByCategoryId($categoryId)
+        );
     }
 
     /**
      * Returns paginated pages for one tag id ordered newest-first.
      *
-     * @return array<int, array<string, mixed>>
+     * @param int $tagId  Tag id to scope results to.
+     * @param int $limit  Maximum rows to return.
+     * @param int $offset Zero-based row offset.
+     * @return array<int, array<string, mixed>> Hydrated published page rows.
      */
     public function listByTagId(int $tagId, int $limit, int $offset): array
     {
@@ -1331,6 +1217,9 @@ final class PageRepository
 
     /**
      * Counts total pages linked to a tag id.
+     *
+     * @param int $tagId Tag id to count pages for.
+     * @return int Published page count for this tag.
      */
     public function countByTagId(int $tagId): int
     {
@@ -1344,7 +1233,10 @@ final class PageRepository
     /**
      * Returns one paginated tag-page result with total count by tag id.
      *
-     * @return array{rows: array<int, array<string, mixed>>, total: int}
+     * @param int $tagId  Tag id to scope results to.
+     * @param int $limit  Maximum rows to return.
+     * @param int $offset Zero-based row offset.
+     * @return array{rows: array<int, array<string, mixed>>, total: int} Paginated rows and total count.
      */
     public function listPageByTagId(int $tagId, int $limit, int $offset): array
     {
@@ -1352,14 +1244,21 @@ final class PageRepository
             return ['rows' => [], 'total' => 0];
         }
 
-        return $this->listTaxonomyPagedById($this->table('page_tags'), 'tag', $tagId, $limit, $offset, fn (): int => $this->countByTagId($tagId));
+        return $this->listTaxonomyPagedById(
+            $this->table('page_tags'),
+            'tag',
+            $tagId,
+            $limit,
+            $offset,
+            fn (): int => $this->countByTagId($tagId)
+        );
     }
 
     /**
-     * Hydrates page row with repeatable content-block metadata.
+     * Hydrates page row with decoded content-block metadata.
      *
-     * @param array<string, mixed> $row
-     * @return array<string, mixed>
+     * @param array<string, mixed> $row Raw PDO row from the pages table.
+     * @return array<string, mixed> Hydrated row with `content_blocks` and `gallery_enabled` fields.
      */
     private function hydratePageRow(array $row): array
     {
@@ -1368,36 +1267,16 @@ final class PageRepository
         }
 
         $rawContent = (string) ($row['content'] ?? '');
-        $contentBlocks = $this->decodeContentBlocks($rawContent);
-        $row['content_blocks'] = $contentBlocks;
+        $row['content_blocks'] = $this->decodeContentBlocks($rawContent);
 
         return $row;
     }
 
     /**
-     * Normalizes body-block payload into typed, persistable rows.
-     *
-     * @return array<int, array{type: string, content: string, css_id: string, css_class: string}>
-     */
-    private function normalizeContentBlocks(mixed $raw): array
-    {
-        return $this->pageBlockParser->normalizeStoredBlocks($raw);
-    }
-
-    /**
-     * Encodes content blocks as JSON for DB persistence.
-     *
-     * @param array<int, array{type: string, content: string, css_id: string, css_class: string}> $blocks
-     */
-    private function encodeContentBlocks(array $blocks): string
-    {
-        return $this->pageBlockParser->encodeStoredBlocks($blocks);
-    }
-
-    /**
      * Decodes stored content JSON payload into typed body blocks.
      *
-     * @return array<int, array{type: string, content: string, css_id: string, css_class: string}>
+     * @param string $raw JSON-encoded content blocks string from the database.
+     * @return array<int, array{type: string, content: string, css_id: string, css_class: string}> Decoded content blocks.
      */
     private function decodeContentBlocks(string $raw): array
     {
@@ -1405,7 +1284,9 @@ final class PageRepository
     }
 
     /**
-     * @return array<int, array<string, mixed>>
+     * Builds a map of channel id to channel row for context hydration.
+     *
+     * @return array<int, array<string, mixed>> Channel rows keyed by channel id.
      */
     private function channelsByIdMap(): array
     {
@@ -1415,10 +1296,13 @@ final class PageRepository
     /**
      * Hydrates one page row with channel metadata resolved from file-backed channels.
      *
-     * @param array<string, mixed> $row
-     * @param array<string, mixed>|null $channel
-     * @param array<int, array<string, mixed>>|null $channelsById
-     * @return array<string, mixed>
+     * Resolves the channel row from the channels-by-id map when not provided directly,
+     * then delegates context injection to ChannelRepoParser.
+     *
+     * @param array<string, mixed>      $row          Hydrated page row.
+     * @param array<string, mixed>|null $channel      Pre-resolved channel row, or null to auto-resolve.
+     * @param array<int, array<string, mixed>>|null $channelsById Optional pre-fetched channel map.
+     * @return array<string, mixed> Page row with channel context fields added.
      */
     private function withChannelContext(array $row, ?array $channel = null, ?array $channelsById = null): array
     {
@@ -1435,46 +1319,10 @@ final class PageRepository
     }
 
     /**
-     * Resolves channel id by slug for page save operations.
-     */
-    private function channelIdBySlug(string $slug): ?int
-    {
-        if (ChannelRepoParser::isRootChannelSlug($slug)) {
-            throw new RuntimeException('The stock <root> channel placeholder cannot be selected directly.');
-        }
-
-        return ChannelRepoParser::resolveChannelIdBySlug(
-            $slug,
-            fn (string $normalized): ?int => $this->channelRepo->idBySlug($normalized),
-            'Selected channel does not exist.'
-        );
-    }
-
-    /**
-     * Normalizes ids into unique positive integers.
-     *
-     * @param mixed $ids
-     * @return array<int>
-     */
-    private function normalizeIds(mixed $ids): array
-    {
-        if (!is_array($ids)) {
-            return [];
-        }
-
-        $normalized = [];
-        foreach ($ids as $id) {
-            $value = (int) $id;
-            if ($value > 0) {
-                $normalized[$value] = $value;
-            }
-        }
-
-        return array_values($normalized);
-    }
-
-    /**
      * Maps logical table names into backend-specific physical names.
+     *
+     * @param string $table Logical table name.
+     * @return string Physical table name for the active driver/prefix.
      */
     private function table(string $table): string
     {
@@ -1484,16 +1332,16 @@ final class PageRepository
     /**
      * Appends shared panel-filter SQL clauses for page list/count queries.
      *
-     * @param array<int, string> $where Mutable WHERE-clause fragment list.
-     * @param array<string, int|string> $params Mutable prepared-statement parameter map.
-     * @param int|null $channelId Optional channel id filter resolved before repository entry.
-     * @param int|null $categoryId Optional category id filter (from any caller).
-     * @param int|null $tagId Optional tag id filter (from any caller).
-     * @param string $pageCategoriesTable Resolved page-category junction table name.
-     * @param string $pageTagsTable Resolved page-tag junction table name.
-     * @param string $placeholderPrefix Prefix used to namespace generated placeholders.
-     * @param bool $includeCategoryFilters Whether category filter clauses should be emitted.
-     * @param bool $includeTagFilters Whether tag filter clauses should be emitted.
+     * @param array<int, string>        $where                 Mutable WHERE-clause fragment list.
+     * @param array<string, int|string> $params                Mutable prepared-statement parameter map.
+     * @param int|null                  $channelId             Optional channel id filter.
+     * @param int|null                  $categoryId            Optional category id filter.
+     * @param int|null                  $tagId                 Optional tag id filter.
+     * @param string                    $pageCategoriesTable   Resolved page-category junction table name.
+     * @param string                    $pageTagsTable         Resolved page-tag junction table name.
+     * @param string                    $placeholderPrefix     Prefix used to namespace generated placeholders.
+     * @param bool                      $includeCategoryFilters Whether category filter clauses should be emitted.
+     * @param bool                      $includeTagFilters      Whether tag filter clauses should be emitted.
      * @return void
      */
     private function appendPanelFilterClauses(
@@ -1530,18 +1378,14 @@ final class PageRepository
         }
     }
 
-    // -------------------------------------------------------------------------
-    // Taxonomy page-query helpers (formerly TaxonomyDataParser)
-    // -------------------------------------------------------------------------
-
     /**
      * Counts published pages linked to one taxonomy term by slug.
      *
-     * @param string $taxonomyTable  Prefixed taxonomy table name (categories or tags).
-     * @param string $linkTable      Prefixed page-taxonomy link table name.
-     * @param string $joinCol        Link-table join column name ('category' or 'tag').
-     * @param string $slug           Normalized taxonomy slug.
-     * @return int                   Published page count for the term.
+     * @param string $taxonomyTable Prefixed taxonomy table name (categories or tags).
+     * @param string $linkTable     Prefixed page-taxonomy link table name.
+     * @param string $joinCol       Link-table join column name ('category' or 'tag').
+     * @param string $slug          Normalized taxonomy slug.
+     * @return int Published page count for the term.
      */
     private function countTaxonomyPagesBySlug(string $taxonomyTable, string $linkTable, string $joinCol, string $slug): int
     {
@@ -1562,7 +1406,7 @@ final class PageRepository
      * @param string $linkTable Prefixed page-taxonomy link table name.
      * @param string $joinCol   Link-table join column name ('category' or 'tag').
      * @param int    $id        Taxonomy id to query.
-     * @return int              Published page count for the term.
+     * @return int Published page count for the term.
      */
     private function countTaxonomyPagesById(string $linkTable, string $joinCol, int $id): int
     {
@@ -1659,13 +1503,13 @@ final class PageRepository
      * When $offset > 0 and no rows come back (past the last page), $fallbackCount is
      * invoked to return the true total without a separate round-trip on page one.
      *
-     * @param string   $taxonomyTable  Prefixed taxonomy table name.
-     * @param string   $linkTable      Prefixed page-taxonomy link table name.
-     * @param string   $joinCol        Link-table join column name.
-     * @param string   $slug           Normalized taxonomy slug.
-     * @param int      $limit          Maximum rows to return.
-     * @param int      $offset         Zero-based row offset.
-     * @param callable $fallbackCount  Invoked when a paged query returns no rows past the end.
+     * @param string   $taxonomyTable Prefixed taxonomy table name.
+     * @param string   $linkTable     Prefixed page-taxonomy link table name.
+     * @param string   $joinCol       Link-table join column name.
+     * @param string   $slug          Normalized taxonomy slug.
+     * @param int      $limit         Maximum rows to return.
+     * @param int      $offset        Zero-based row offset.
+     * @param callable $fallbackCount Invoked when a paged query returns no rows past the end.
      * @return array{rows: array<int, array<string, mixed>>, total: int} Paginated rows and total count.
      */
     private function listTaxonomyPagedBySlug(string $taxonomyTable, string $linkTable, string $joinCol, string $slug, int $limit, int $offset, callable $fallbackCount): array
@@ -1695,12 +1539,12 @@ final class PageRepository
     /**
      * Returns one paginated taxonomy listing by id using a window-count SELECT.
      *
-     * @param string   $linkTable      Prefixed page-taxonomy link table name.
-     * @param string   $joinCol        Link-table join column name.
-     * @param int      $id             Taxonomy id to query.
-     * @param int      $limit          Maximum rows to return.
-     * @param int      $offset         Zero-based row offset.
-     * @param callable $fallbackCount  Invoked when a paged query returns no rows past the end.
+     * @param string   $linkTable     Prefixed page-taxonomy link table name.
+     * @param string   $joinCol       Link-table join column name.
+     * @param int      $id            Taxonomy id to query.
+     * @param int      $limit         Maximum rows to return.
+     * @param int      $offset        Zero-based row offset.
+     * @param callable $fallbackCount Invoked when a paged query returns no rows past the end.
      * @return array{rows: array<int, array<string, mixed>>, total: int} Paginated rows and total count.
      */
     private function listTaxonomyPagedById(string $linkTable, string $joinCol, int $id, int $limit, int $offset, callable $fallbackCount): array
@@ -1729,8 +1573,11 @@ final class PageRepository
     /**
      * Hydrates paginated taxonomy rows, preserving the window-count total.
      *
-     * @param array<int, mixed>  $rows          Raw PDO rows including total_rows window column.
-     * @param callable|null      $fallbackCount Optional fallback count when an out-of-range page returns no rows.
+     * Window counts avoid a second round-trip for the common page-one case. When an
+     * out-of-range offset returns no rows, $fallbackCount is invoked to recover the total.
+     *
+     * @param array<int, mixed>  $rows          Raw PDO rows including `total_rows` window column.
+     * @param callable|null      $fallbackCount Optional fallback count invoked when an empty page is past the end.
      * @return array{rows: array<int, array<string, mixed>>, total: int} Hydrated rows and total count.
      */
     private function hydrateTaxonomyPagedRows(array $rows, ?callable $fallbackCount): array
@@ -1744,7 +1591,6 @@ final class PageRepository
                 continue;
             }
 
-            // Window counts avoid a second round-trip for the common page-one case.
             if ($total === 0) {
                 $total = (int) ($row['total_rows'] ?? 0);
             }

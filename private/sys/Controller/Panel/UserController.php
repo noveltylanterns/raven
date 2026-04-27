@@ -13,9 +13,11 @@ namespace Raven\Core\Controller\Panel;
 
 use Closure;
 use Raven\Core\Config;
-use Raven\Core\Repository\InviteRepository;
+use Raven\Core\Repository\InviteRead;
+use Raven\Core\Repository\InviteWrite;
 use Raven\Lib\Parser\GroupDataParser;
-use Raven\Core\Repository\UserRepository;
+use Raven\Core\Repository\UserRead;
+use Raven\Core\Repository\UserWrite;
 use Raven\Lib\Auth\LoginIdentifierResolver;
 use Raven\Lib\Auth\Panel\PanelAccess;
 use Raven\Lib\Auth\Panel\PanelInvitePolicyService;
@@ -48,9 +50,12 @@ final class UserController
     private InputSanitizer $input;
     private string $root;
     private GroupDataParser $groupDataParser;
-    private UserRepository $userRepo;
-    private Closure $inviteTokensResolver;
-    private ?InviteRepository $inviteTokens = null;
+    private UserRead $userRead;
+    private UserWrite $userWrite;
+    private Closure $inviteReadResolver;
+    private Closure $inviteWriteResolver;
+    private ?InviteRead $inviteRead = null;
+    private ?InviteWrite $inviteWrite = null;
     private SessionFlash $flashList;
     private GroupRouteParser $groupParser;
     private PanelInvitePolicyService $panelInvitePolicyService;
@@ -71,8 +76,10 @@ final class UserController
      * @param InputSanitizer $input Shared request input sanitizer.
      * @param string $root Project root path for user-media storage helpers.
      * @param GroupDataParser $groupDataParser Group data parser for group option reads and slug lookups.
-     * @param UserRepository $userRepo User repository for panel user CRUD.
-     * @param callable(): InviteRepository $inviteTokensResolver Lazy invite-token repository resolver.
+     * @param UserRead $userRead User repository read side for panel user list/find and author lookups.
+     * @param UserWrite $userWrite User repository write side for panel user saves and deletes.
+     * @param callable(): InviteRead $inviteReadResolver Lazy invite read resolver for token listings.
+     * @param callable(): InviteWrite $inviteWriteResolver Lazy invite write resolver for token creation/deletion.
      * @param SessionFlash $flashList List-style flash store for generated token batches.
      * @param GroupRouteParser $groupParser Shared group/profile routing-policy parser.
      * @param PanelInvitePolicyService $panelInvitePolicyService Shared invite-form parsing helper.
@@ -93,8 +100,10 @@ final class UserController
         InputSanitizer $input,
         string $root,
         GroupDataParser $groupDataParser,
-        UserRepository $userRepo,
-        callable $inviteTokensResolver,
+        UserRead $userRead,
+        UserWrite $userWrite,
+        callable $inviteReadResolver,
+        callable $inviteWriteResolver,
         SessionFlash $flashList,
         GroupRouteParser $groupParser,
         PanelInvitePolicyService $panelInvitePolicyService,
@@ -113,8 +122,10 @@ final class UserController
         $this->input = $input;
         $this->root = rtrim($root, '/\\');
         $this->groupDataParser = $groupDataParser;
-        $this->userRepo = $userRepo;
-        $this->inviteTokensResolver = Closure::fromCallable($inviteTokensResolver);
+        $this->userRead = $userRead;
+        $this->userWrite = $userWrite;
+        $this->inviteReadResolver = Closure::fromCallable($inviteReadResolver);
+        $this->inviteWriteResolver = Closure::fromCallable($inviteWriteResolver);
         $this->flashList = $flashList;
         $this->groupParser = $groupParser;
         $this->panelInvitePolicyService = $panelInvitePolicyService;
@@ -543,7 +554,7 @@ final class UserController
 
         $createdUserId = null;
         try {
-            $savedId = $this->userRepo->save([
+            $savedId = $this->userWrite->save([
                 'id' => $id,
                 'username' => is_string($username) ? $username : '',
                 'display_name' => $displayName,
@@ -561,7 +572,7 @@ final class UserController
             ]);
 
             if ($id === null) {
-                $this->userRepo->save([
+                $this->userWrite->save([
                     'id' => $savedId,
                     'username' => is_string($username) ? $username : '',
                     'display_name' => $displayName,
@@ -579,7 +590,7 @@ final class UserController
                 ]);
 
                 $createdUserId = $savedId;
-                $createdUserString = $this->userRepo->userStringById($savedId);
+                $createdUserString = $this->userRead->userStringById($savedId);
                 if ($createdUserString === null) {
                     throw new \RuntimeException('Failed to resolve generated user string.');
                 }
@@ -606,7 +617,7 @@ final class UserController
                 }
 
                 if ($avatarSet || $uploadedCoverFilename !== null) {
-                    $this->userRepo->save([
+                    $this->userWrite->save([
                         'id' => $savedId,
                         'username' => is_string($username) ? $username : '',
                         'display_name' => $displayName,
@@ -634,7 +645,7 @@ final class UserController
 
             if ($id === null && $createdUserId !== null) {
                 try {
-                    $this->userRepo->deleteById($createdUserId);
+                    $this->userWrite->deleteById($createdUserId);
                 } catch (\Throwable) {
                     // Preserve the original save failure when cleanup also fails.
                 }
@@ -723,7 +734,7 @@ final class UserController
             }
 
             try {
-                $this->userRepo->deleteById($id);
+                $this->userWrite->deleteById($id);
             } catch (\Throwable $exception) {
                 $this->context->flash('error', $exception->getMessage() ?: 'Failed to delete user.');
                 Redirect::redirect($this->context->panelUrl('/user'));
@@ -750,7 +761,7 @@ final class UserController
             }
 
             try {
-                $this->userRepo->deleteById($selectedId);
+                $this->userWrite->deleteById($selectedId);
                 $deletedCount++;
             } catch (\Throwable) {
                 $failedCount++;
@@ -793,7 +804,7 @@ final class UserController
         }
 
         $this->context->renderPanel('panel/user/invites', [
-            'inviteRows' => $this->inviteTokens()->listForPanel(),
+            'inviteRows' => $this->inviteRead()->listForPanel(),
             'inviteCreatorMap' => $this->inviteCreatorMap(),
             'inviteGeneratedTokens' => $this->pullFlashList('generated_invites'),
             'inviteRegistrationMode' => $this->registrationMode(),
@@ -843,7 +854,7 @@ final class UserController
         }
 
         try {
-            $token = $this->inviteTokens()->createToken($isReusable, $expiresAt, $this->context->auth()->userId(), $manualToken);
+            $token = $this->inviteWrite()->createToken($isReusable, $expiresAt, $this->context->auth()->userId(), $manualToken);
         } catch (\Throwable $exception) {
             $this->context->flash('error', 'Failed to create invite token: ' . ($exception->getMessage() ?: 'Unknown error.'));
             Redirect::redirect($this->context->panelUrl('/user/invites'));
@@ -885,7 +896,7 @@ final class UserController
         }
 
         try {
-            $tokens = $this->inviteTokens()->createSingleUseBatch($count, $expiresAt, $this->context->auth()->userId());
+            $tokens = $this->inviteWrite()->createSingleUseBatch($count, $expiresAt, $this->context->auth()->userId());
         } catch (\Throwable $exception) {
             $this->context->flash('error', 'Failed to generate invite tokens: ' . ($exception->getMessage() ?: 'Unknown error.'));
             Redirect::redirect($this->context->panelUrl('/user/invites'));
@@ -923,7 +934,7 @@ final class UserController
             Redirect::redirect($this->context->panelUrl('/user/invites'));
         }
 
-        if (!$this->inviteTokens()->deleteById($id)) {
+        if (!$this->inviteWrite()->deleteById($id)) {
             $this->context->flash('error', 'Invite token was not found.');
             Redirect::redirect($this->context->panelUrl('/user/invites'));
         }
@@ -1024,7 +1035,7 @@ final class UserController
     private function userParser(): UserDataParser
     {
         if (!$this->userParser instanceof UserDataParser) {
-            $this->userParser = new UserDataParser($this->input, $this->userRepo);
+            $this->userParser = new UserDataParser($this->input, $this->userRead);
         }
 
         return $this->userParser;
@@ -1258,19 +1269,42 @@ final class UserController
     }
 
     /**
-     * Resolves the invite-token repository only when invite routes are hit.
+     * Resolves the invite read side only when invite list routes are hit.
      *
-     * @return InviteRepository Invite-token repository for panel invite CRUD.
+     * @return InviteRead Invite-token read side for token listings.
      */
-    private function inviteTokens(): InviteRepository
+    private function inviteRead(): InviteRead
     {
-        if ($this->inviteTokens instanceof InviteRepository) {
-            return $this->inviteTokens;
+        if ($this->inviteRead instanceof InviteRead) {
+            return $this->inviteRead;
         }
 
-        /** @var callable(): InviteRepository $resolver */
-        $resolver = $this->inviteTokensResolver;
-        $this->inviteTokens = $resolver();
-        return $this->inviteTokens;
+        $repo = ($this->inviteReadResolver)();
+        if (!$repo instanceof InviteRead) {
+            throw new \RuntimeException('Panel invite read resolver returned an invalid value.');
+        }
+
+        $this->inviteRead = $repo;
+        return $this->inviteRead;
+    }
+
+    /**
+     * Resolves the invite write side only when invite create/delete routes are hit.
+     *
+     * @return InviteWrite Invite-token write side for token creation and deletion.
+     */
+    private function inviteWrite(): InviteWrite
+    {
+        if ($this->inviteWrite instanceof InviteWrite) {
+            return $this->inviteWrite;
+        }
+
+        $repo = ($this->inviteWriteResolver)();
+        if (!$repo instanceof InviteWrite) {
+            throw new \RuntimeException('Panel invite write resolver returned an invalid value.');
+        }
+
+        $this->inviteWrite = $repo;
+        return $this->inviteWrite;
     }
 }

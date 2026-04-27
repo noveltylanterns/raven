@@ -11,7 +11,7 @@ declare(strict_types=1);
 
 namespace Raven\Core\Controller\Panel;
 
-use Raven\Core\Repository\RedirectRepository;
+use Raven\Core\Repository\RedirectWrite;
 use Raven\Lib\Parser\ChannelDataParser;
 use Raven\Lib\Parser\RedirectDataParser;
 use Raven\Lib\Transport\Redirect;
@@ -29,7 +29,7 @@ final class RedirectController
     private SharedController $context;
     private InputSanitizer $input;
     private ChannelDataParser $channelParser;
-    private RedirectRepository $redirectRepo;
+    private RedirectWrite $redirectRepo;
     private RedirectDataParser $redirectParser;
     private Editor $editor;
 
@@ -37,7 +37,7 @@ final class RedirectController
      * @param SharedController $context Shared panel request context.
      * @param InputSanitizer $input Shared request input sanitizer.
      * @param ChannelDataParser $channelParser Channel data parser for redirect scope validation.
-     * @param RedirectRepository $redirectRepo Redirect repository for redirect CRUD.
+     * @param RedirectWrite $redirectRepo Redirect repository write side for redirect saves and deletes.
      * @param RedirectDataParser $redirectParser Canonical parser for read-only redirect listings and edit-form reads.
      * @param Editor $editor Shared panel editor utility methods.
      * @return void
@@ -46,7 +46,7 @@ final class RedirectController
         SharedController $context,
         InputSanitizer $input,
         ChannelDataParser $channelParser,
-        RedirectRepository $redirectRepo,
+        RedirectWrite $redirectRepo,
         RedirectDataParser $redirectParser,
         Editor $editor
     ) {

@@ -18,9 +18,9 @@ use RuntimeException;
 /**
  * Owns write-side SQL for category/tag taxonomy records.
  *
- * CategoryRepository and TagRepository keep the read-heavy listing and lookup
- * queries close to their callers, while this class centralizes the mutation
- * paths that touch the shared taxonomy table shape and page-link cleanup rules.
+ * CategoryRead and TagRead own the read-heavy listing and lookup queries while
+ * this class centralizes the mutation paths that touch the shared taxonomy
+ * table shape and page-link cleanup rules.
  */
 final class TaxonomyScribe
 {
