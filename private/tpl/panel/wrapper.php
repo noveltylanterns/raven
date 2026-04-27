@@ -506,7 +506,9 @@ $navConfig = [
 
         <main id="rvnp-main" class="<?= $showSidebar ? 'col-12 col-md-9 col-lg-9 col-xl-10' : 'col-12 rvnp-login-main' ?>">
             <?= $content ?>
+            <?php if ($section !== 'login'): ?>
             <?= Footer::render() ?>
+            <?php endif; ?>
         </main>
     </div>
 </div>
