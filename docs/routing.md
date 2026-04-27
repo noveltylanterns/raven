@@ -81,15 +81,15 @@ Export fields include:
   - `private/sys/Controller/Panel/RoutingController.php`
 - Public route bootstrap:
   - `private/sys/Controller/Public/PublicController.php`
-  - `private/sys/Routing/Public/Public*RouteRegistrar.php`
+  - `private/sys/Routing/Public/*Router.php`
 - Panel route bootstrap:
   - `private/sys/Controller/Panel/PanelController.php`
-  - `private/sys/Routing/Panel/Panel*RouteRegistrar.php`
-  - Channel/category/tag panel routes are now registered through their own `PanelChannelRouteRegistrar.php`, `PanelCategoryRouteRegistrar.php`, and `PanelTagRouteRegistrar.php` files instead of a shared taxonomy registrar bundle.
-  - Event-log routes are now registered through `PanelLogRouteRegistrar.php` instead of riding through the broader system-route registrar.
-  - Routing diagnostics routes are now registered through `PanelRoutingRouteRegistrar.php` instead of riding through the broader system-route registrar.
-  - Updater routes are now registered through `PanelUpdateRouteRegistrar.php` instead of riding through the broader system-route registrar.
-  - `private/sys/Debug/ToolbarResponseHook.php`
+  - `private/sys/Routing/Panel/*Router.php`
+  - Channel/category/tag panel routes are now registered through their own `ChannelRouter.php`, `CategoryRouter.php`, and `TagRouter.php` files instead of a shared taxonomy registrar bundle.
+  - Event-log routes are now registered through `LogRouter.php` instead of riding through the broader system-route registrar.
+  - Routing diagnostics routes are now registered through `RoutingRouter.php` instead of riding through the broader system-route registrar.
+  - Updater routes are now registered through `UpdateRouter.php` instead of riding through the broader system-route registrar.
+  - Output profiler response hook (`OutputProfilerResponseHook`, `private/sys/Debug`)
   - `private/lib/Scheduler/Cron.php`
 - Public auth controller:
   - `private/sys/Controller/Public/AuthController.php`

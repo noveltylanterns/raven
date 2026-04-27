@@ -26,7 +26,7 @@ use Raven\Lib\Parser\PageDataParser;
 use Raven\Lib\Parser\RedirectDataParser;
 use Raven\Lib\Parser\UserDataParser;
 use Raven\Lib\Transport\Redirect;
-use Raven\Core\Routing\Public\PublicChannelPageRouteService;
+use Raven\Core\Routing\Public\ChannelPageRouter;
 use Raven\Lib\View\Public\MetaService;
 use Raven\Lib\View\Public\PageBlocks;
 use Raven\Lib\View\Public\PageMarkdown;
@@ -61,7 +61,7 @@ final class PageController
     private ExtensionEditorCatalogService $extensionEditorCatalogService;
     private ?EmbeddedFormRuntimeService $embeddedFormRuntimeService = null;
     private ?UserDataParser $profileContactService = null;
-    private ?PublicChannelPageRouteService $publicChannelPageRouteService = null;
+    private ?ChannelPageRouter $publicChannelPageRouteService = null;
 
     /**
      * @param SharedController $context Shared public request context.
@@ -504,12 +504,12 @@ final class PageController
     /**
      * Returns the shared public channel/page routing helper.
      *
-     * @return PublicChannelPageRouteService Shared public channel/page routing helper.
+     * @return ChannelPageRouter Shared public channel/page routing helper.
      */
-    private function publicChannelPageRouteService(): PublicChannelPageRouteService
+    private function publicChannelPageRouteService(): ChannelPageRouter
     {
-        if (!$this->publicChannelPageRouteService instanceof PublicChannelPageRouteService) {
-            $this->publicChannelPageRouteService = new PublicChannelPageRouteService($this->context->input());
+        if (!$this->publicChannelPageRouteService instanceof ChannelPageRouter) {
+            $this->publicChannelPageRouteService = new ChannelPageRouter($this->context->input());
         }
 
         return $this->publicChannelPageRouteService;

@@ -114,19 +114,15 @@ This file is the fast system map for Raven CMS. Use it to quickly understand the
   - `Raven\Core\Renderer` — core PHP template renderer. Captures output from isolated template includes, injects named variables, and supports layout/wrapper composition. Used by controllers across both panel and public routes.
 - `private/sys/Logger.php`
   - `Raven\Core\Logger` — event logging subsystem. Writes severity-gated entries to the `{prefix}event_log` table, supports syslog mirroring, and exposes query/count/prune/export/clear APIs.
-- `private/sys/Debug/`
+- `private/sys/Debug`
   - Debug and profiling infrastructure (`Raven\Core\Debug`).
-  - `OutputProfilerConfigResolver`, `OutputProfilerDataSanitizer`, `OutputProfilerMarkupBuilder`, `OutputProfilerRenderer`, and `OutputProfilerResponseHook` own the fixed-bottom HTML output-profiler UI injected into eligible responses.
-  - `RequestProfiler`, `RequestQueryProfilerAdapter`, and `RequestProfilerOutput` own request-scoped query/render collection plus pluggable custom request-profiler outputs used by the output profiler and profiled PDO wrappers.
+  - `OutputProfilerConfigResolver`, `OutputProfilerDataSanitizer`, `OutputProfilerRenderer`, and `OutputProfilerResponseHook` own the fixed-bottom HTML output-profiler UI injected into eligible responses.
+  - `RequestProfiler`, `RequestProfilerAdapter`, and `RequestProfilerOutput` own request-scoped query/render collection plus pluggable custom request-profiler outputs used by the output profiler and profiled PDO wrappers.
 - `private/sys/Controller/`
   - Public/panel/auth controllers and request flow coordination.
+  - `DatabaseController` — bootstrap-only database connection factory at the `Controller/` root level; creates app and auth PDO connections from config using the `lib/Database/Connection/` helpers. Not for extension use.
   - `Controller/Panel/` now holds both the panel front controller (`PanelController`) and the split panel sub-controllers, all coordinated through `SharedController`; `AuthController`, `DashboardController`, `PageController`, `ChannelController`, `CategoryController`, `TaxonomyController`, `RedirectController`, `UserController`, `GroupController`, `LogsController`, `RoutingController`, `UpdateController`, `PreferencesController`, `ConfigController`, and `SystemController` own the panel route seams. `PageController` owns the `/page*` route family, `ChannelController` owns `/channel*`, `CategoryController` owns `/category*`, `TaxonomyController` is now narrowed to `/tag*`, `LogsController` owns `/logs*`, `RoutingController` owns `/routing*`, and `UpdateController` owns `/update*`.
   - `Controller/Public/` now holds both the public front controller (`PublicController`) and the split public sub-controllers, all coordinated through `SharedController`; `AuthController`, `UserController`, `GroupController`, `CategoryController`, `ChannelController`, `TagController`, `FeedController`, and `PageController` own the public route seams. `UserController` owns public profile routes, `GroupController` owns public group routes, `CategoryController` owns `/{category.prefix}/*`, `ChannelController` owns the single-segment `/{slug}` landing/root-page seam, `TagController` owns `/{tag.prefix}/*`, `FeedController` is narrowed to feed/XML routes, and `PageController` owns homepage plus channel-qualified page routes and embedded-form submission.
-- `private/sys/Database/`
-  - Bootstrap-only database machinery. Not for extension use.
-  - `ConnectionFactory` — creates app and auth PDO connections from config; uses `Connection/` helpers.
-  - `Connection/` — low-level DSN builders and driver-specific connection bootstrapping (`DsnBuilder`, `DriverConfigNormalizer`, `SqliteConnectionBootstrap`, `SqlitePathResolver`).
-  - `Schema/` — schema ensure pipeline, schema builders, introspector, state store, seed installer, and extension schema runner. All schema orchestration lives here; the old `sys/Database/SchemaManager` shim has been removed.
 - `private/sys/Repository/`
   - Core content/taxonomy/auth-facing persistence split into `*Read` (SELECT/lookup) and `*Write` (INSERT/UPDATE/DELETE) classes for each domain.
   - Read classes: `PageRead`, `ChannelRead`, `UserRead`, `GroupRead`, `CategoryRead`, `TagRead`, `SetRead`, `RedirectRead`, `PageImageRead`, `InviteRead`.
@@ -137,8 +133,8 @@ This file is the fast system map for Raven CMS. Use it to quickly understand the
   - Raven-owned request-dispatch primitives, runtime builders, and route registrars. Not for extension use.
   - `Router.php` — `Raven\Core\Routing\Router`, the core dispatcher: registers routes via `add()`, compiles `{param}` patterns to named-capture regex, and resolves requests via `dispatch()`.
   - `Request.php` / `Response.php` — the immutable routing request/response value objects used by the dispatcher.
-  - `Routing/Public/` — `PublicRuntimeBuilder`, controller-aligned public route registrars (including extension-route loading), `PublicRouteConfig`, and `PublicChannelPageRouteService` (wraps `Raven\Lib\Parser\ModeParser` for public content controllers: lookup-target resolution and canonical segment building).
-  - `Routing/Panel/` — `PanelRuntimeBuilder`, controller-aligned panel route registrars (including dedicated `PanelChannelRouteRegistrar`, `PanelCategoryRouteRegistrar`, `PanelTagRouteRegistrar`, `PanelLogRouteRegistrar`, `PanelRoutingRouteRegistrar`, and `PanelUpdateRouteRegistrar` files for the split panel route families), extension-route loading, panel theme-asset fast path, and `RoutingInventoryBuilder` (builds the normalized routing inventory row set for the panel routing diagnostics view).
+  - `Routing/Public/` — `PublicRuntimeBuilder`, controller-aligned public route registrars (including extension-route loading), `RouteConfig`, and `ChannelPageRouter` (wraps `Raven\Lib\Parser\ModeParser` for public content controllers: lookup-target resolution and canonical segment building).
+  - `Routing/Panel/` — `PanelRuntimeBuilder`, controller-aligned panel route routers (including dedicated `ChannelRouter`, `CategoryRouter`, `TagRouter`, `LogRouter`, `RoutingRouter`, and `UpdateRouter` files for the split panel route families), extension-route loading, panel theme-asset fast path, and `RoutingInventoryBuilder` (builds the normalized routing inventory row set for the panel routing diagnostics view).
   - Note: the actual public/panel front controllers now live under `private/sys/Controller/Public/PublicController.php` and `private/sys/Controller/Panel/PanelController.php`; `sys/Routing/` now owns only shared routing primitives plus scope-specific builders/registrars.
 
 ### private/lib/
@@ -200,7 +196,8 @@ This file is the fast system map for Raven CMS. Use it to quickly understand the
   - `ProfiledPDO` and `ProfiledPDOStatement` wrap PDO for query-level profiling; `QueryProfilerInterface` is the shared contract.
   - `TableNameResolver` — resolves logical table names to physical prefixed names for both app-db and auth-db contexts; available to extensions.
   - `SqlUpsertPolicy.php` — driver-aware upsert helper available to extensions.
-  - Connection setup and schema orchestration have moved to `sys/Database/` as they are core-only bootstrap concerns.
+  - `Connection/` — low-level DSN builders and driver-specific connection bootstrapping (`DsnBuilder`, `DriverConfigNormalizer`, `SqliteConnectionBootstrap`, `SqlitePathResolver`). Used by `DatabaseController` in `sys/Controller/`; not for direct extension use.
+  - `Schema/` — schema ensure pipeline, schema builders, introspector, state store, seed installer, and extension schema runner. All schema orchestration lives here; `sys/Controller/DatabaseController` is the sole core caller.
 - `private/lib/Scheduler/`
   - Shared scheduler runtime for core and extensions.
   - `Registry` — system-wide scheduler registry. Registers named jobs, lazy-loads extension `cron.php` sources, tracks last-run state under `.tmp/cron/`, exposes `getStatus()`, and executes due jobs via `runDue()`.

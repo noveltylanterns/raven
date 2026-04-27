@@ -15,24 +15,24 @@ use Raven\Core\Debug\OutputProfilerConfigResolver;
 use Raven\Core\Debug\OutputProfilerResponseHook;
 use Raven\Core\Routing\Request;
 use Raven\Core\Routing\Router;
-use Raven\Core\Routing\Panel\PanelAuthRouteRegistrar;
-use Raven\Core\Routing\Panel\PanelCategoryRouteRegistrar;
-use Raven\Core\Routing\Panel\PanelChannelRouteRegistrar;
-use Raven\Core\Routing\Panel\PanelConfigRouteRegistrar;
-use Raven\Core\Routing\Panel\PanelContentRouteRegistrar;
-use Raven\Core\Routing\Panel\PanelDashboardRouteRegistrar;
-use Raven\Core\Routing\Panel\PanelExtensionRouteRegistrar;
-use Raven\Core\Routing\Panel\PanelGroupRouteRegistrar;
-use Raven\Core\Routing\Panel\PanelLogRouteRegistrar;
-use Raven\Core\Routing\Panel\PanelPreferencesRouteRegistrar;
-use Raven\Core\Routing\Panel\PanelRedirectRouteRegistrar;
-use Raven\Core\Routing\Panel\PanelRoutingRouteRegistrar;
+use Raven\Core\Routing\Panel\AuthRouter;
+use Raven\Core\Routing\Panel\CategoryRouter;
+use Raven\Core\Routing\Panel\ChannelRouter;
+use Raven\Core\Routing\Panel\ConfigRouter;
+use Raven\Core\Routing\Panel\ContentRouter;
+use Raven\Core\Routing\Panel\DashboardRouter;
+use Raven\Core\Routing\Panel\ExtensionRouter;
+use Raven\Core\Routing\Panel\GroupRouter;
+use Raven\Core\Routing\Panel\LogRouter;
+use Raven\Core\Routing\Panel\PreferencesRouter;
+use Raven\Core\Routing\Panel\RedirectRouter;
+use Raven\Core\Routing\Panel\RoutingRouter;
 use Raven\Core\Routing\Panel\PanelRuntimeBuilder;
-use Raven\Core\Routing\Panel\PanelSystemRouteRegistrar;
-use Raven\Core\Routing\Panel\PanelTagRouteRegistrar;
-use Raven\Core\Routing\Panel\PanelThemeAssetResponder;
-use Raven\Core\Routing\Panel\PanelUpdateRouteRegistrar;
-use Raven\Core\Routing\Panel\PanelUserRouteRegistrar;
+use Raven\Core\Routing\Panel\SystemRouter;
+use Raven\Core\Routing\Panel\TagRouter;
+use Raven\Core\Routing\Panel\ThemeAssetResponder;
+use Raven\Core\Routing\Panel\UpdateRouter;
+use Raven\Core\Routing\Panel\UserRouter;
 use Raven\Lib\Auth\Panel\PanelAccess;
 use Raven\Lib\Parser\ConfigParser;
 use Raven\Lib\Extension\Layout;
@@ -225,7 +225,7 @@ final class PanelController
 
         // Serve theme assets before panel route dispatch when front-controller rewrite is enabled.
         $requestMethod = strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET'));
-        if (PanelThemeAssetResponder::serveIfMatched($rvn, $internalPath, $requestMethod)) {
+        if (ThemeAssetResponder::serveIfMatched($rvn, $internalPath, $requestMethod)) {
             return;
         }
 
@@ -407,23 +407,23 @@ final class PanelController
         };
 
         $router = new Router();
-        PanelAuthRouteRegistrar::register($router, $authController);
-        PanelDashboardRouteRegistrar::register($router, $panelDashboardController);
-        PanelContentRouteRegistrar::register($router, $panelPageController, $rvn['input'], $renderNotFound);
-        PanelChannelRouteRegistrar::register($router, $panelChannelController, $rvn['input'], $renderNotFound);
-        PanelCategoryRouteRegistrar::register($router, $panelCategoryController, $rvn['input'], $categoryEnabled, $renderNotFound);
-        PanelTagRouteRegistrar::register($router, $panelTagController, $rvn['input'], $tagEnabled, $renderNotFound);
-        PanelRedirectRouteRegistrar::register($router, $panelRedirectController, $rvn['input'], $renderNotFound);
-        PanelUserRouteRegistrar::register($router, $panelUserController, $rvn['input'], $renderNotFound);
-        PanelGroupRouteRegistrar::register($router, $panelGroupController, $rvn['input'], $renderNotFound);
-        PanelLogRouteRegistrar::register($router, $panelLogsController);
-        PanelRoutingRouteRegistrar::register($router, $panelRoutingController);
-        PanelUpdateRouteRegistrar::register($router, $panelUpdateController);
-        PanelPreferencesRouteRegistrar::register($router, $panelPreferencesController);
-        PanelConfigRouteRegistrar::register($router, $panelConfigController);
-        PanelSystemRouteRegistrar::register($router, $panelSystemController);
+        AuthRouter::register($router, $authController);
+        DashboardRouter::register($router, $panelDashboardController);
+        ContentRouter::register($router, $panelPageController, $rvn['input'], $renderNotFound);
+        ChannelRouter::register($router, $panelChannelController, $rvn['input'], $renderNotFound);
+        CategoryRouter::register($router, $panelCategoryController, $rvn['input'], $categoryEnabled, $renderNotFound);
+        TagRouter::register($router, $panelTagController, $rvn['input'], $tagEnabled, $renderNotFound);
+        RedirectRouter::register($router, $panelRedirectController, $rvn['input'], $renderNotFound);
+        UserRouter::register($router, $panelUserController, $rvn['input'], $renderNotFound);
+        GroupRouter::register($router, $panelGroupController, $rvn['input'], $renderNotFound);
+        LogRouter::register($router, $panelLogsController);
+        RoutingRouter::register($router, $panelRoutingController);
+        UpdateRouter::register($router, $panelUpdateController);
+        PreferencesRouter::register($router, $panelPreferencesController);
+        ConfigRouter::register($router, $panelConfigController);
+        SystemRouter::register($router, $panelSystemController);
 
-        PanelExtensionRouteRegistrar::register(
+        ExtensionRouter::register(
             $router,
             $rvn,
             $enabledExtensions,

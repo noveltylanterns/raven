@@ -12,7 +12,7 @@ declare(strict_types=1);
 namespace Raven\Core\Controller\Public;
 
 use Raven\Core\Repository\PageRead;
-use Raven\Core\Routing\Public\PublicChannelPageRouteService;
+use Raven\Core\Routing\Public\ChannelPageRouter;
 use Raven\Lib\Parser\ChannelRouteParser;
 use Raven\Lib\Parser\PageDataParser;
 use Raven\Lib\Parser\TaxonomyRepoParser;
@@ -29,7 +29,7 @@ final class TagController
     private PageDataParser $pageParser;
     private TaxonomyRepoParser $taxonomyLookupRepo;
     private TemplateDecorator $templateDecorator;
-    private PublicChannelPageRouteService $publicChannelPageRouteService;
+    private ChannelPageRouter $publicChannelPageRouteService;
     private ThemeCatalog $themeCatalogService;
     private ?ThemeTemplate $themeTemplate = null;
 
@@ -54,7 +54,7 @@ final class TagController
             $context->input(),
             dirname(__DIR__, 4)
         );
-        $this->publicChannelPageRouteService = new PublicChannelPageRouteService($context->input());
+        $this->publicChannelPageRouteService = new ChannelPageRouter($context->input());
         $this->themeCatalogService = $themeCatalogService;
     }
 

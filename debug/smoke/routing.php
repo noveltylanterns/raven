@@ -40,7 +40,7 @@ spl_autoload_register(static function (string $class) use ($root): void {
 use Raven\Core\Config;
 use Raven\Core\Repository\ChannelRead;
 use Raven\Core\Repository\PageRead;
-use Raven\Core\Routing\Public\PublicChannelPageRouteService;
+use Raven\Core\Routing\Public\ChannelPageRouter;
 use Raven\Lib\Parser\ChannelRouteParser;
 use Raven\Lib\Scribe\ConfigScribe;
 use Raven\Lib\Security\InputSanitizer;
@@ -85,7 +85,7 @@ final class RoutingSmokeRunner
 
         $config = new Config($configPath);
         $input = new InputSanitizer();
-        $routeService = new PublicChannelPageRouteService($input);
+        $routeService = new ChannelPageRouter($input);
         $channels = new ChannelRead($db, 'sqlite', '', $channelDirectory);
         $pages = new PageRead($db, 'sqlite', '', $channels, false, false);
 
@@ -235,7 +235,7 @@ PHP;
      */
     private function resolvePublicPath(
         Config $config,
-        PublicChannelPageRouteService $routeService,
+        ChannelPageRouter $routeService,
         ChannelRead $channels,
         PageRead $pages,
         string $requestedSegment,

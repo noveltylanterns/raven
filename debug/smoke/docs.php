@@ -177,6 +177,7 @@ final class ConfigurationDocsSmokeRunner
     {
         require_once $this->root . '/private/Raven.php';
         $rvn = \Raven\Raven::boot();
+        if (is_callable($rvn['auth_db'] ?? null)) { $rvn['auth_db'] = ($rvn['auth_db'])(); }
         $groupRepo = new GroupRead($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix']);
         $userRepo = new UserWrite($rvn['auth_db'], $rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix']);
 
@@ -214,6 +215,7 @@ final class ConfigurationDocsSmokeRunner
 
         require_once $this->root . '/private/Raven.php';
         $rvn = \Raven\Raven::boot();
+        if (is_callable($rvn['auth_db'] ?? null)) { $rvn['auth_db'] = ($rvn['auth_db'])(); }
         $userRepo = new UserWrite($rvn['auth_db'], $rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix']);
         $userRepo->deleteById($this->tempUserId);
         $this->events[] = 'deleted_temp_user=' . $this->tempUserId;
@@ -444,6 +446,8 @@ final class ConfigurationDocsSmokeRunner
                 }
 
                 $token = trim(strip_tags(html_entity_decode($rawToken, ENT_QUOTES | ENT_HTML5)));
+                // Strip empty parentheses left when PHP expressions are removed (e.g. "Label ()" → "Label").
+                $token = preg_replace('/\s*\(\s*\)\s*$/', '', $token);
                 $token = preg_replace('/\\s+/', ' ', $token);
                 if (!is_string($token)) {
                     continue;

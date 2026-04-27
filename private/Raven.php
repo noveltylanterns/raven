@@ -13,8 +13,8 @@ namespace Raven;
 
 use PDO;
 use Raven\Core\Config;
-use Raven\Core\Database\ConnectionFactory;
-use Raven\Core\Database\Schema\SchemaManager;
+use Raven\Core\Controller\DatabaseController;
+use Raven\Lib\Database\Schema\SchemaManager;
 use Raven\Core\Logger;
 use Raven\Lib\Parser\PageRepoParser;
 use Raven\Lib\Auth\AuthService;
@@ -37,8 +37,13 @@ final class Raven
      */
     public static function boot(): array
     {
+        // IIFE creates an isolated local scope so bootstrap variables do not
+        // pollute the calling script's scope when Raven::boot() is called at
+        // the top of panel/index.php or public/index.php.
         return (static function (): array {
     $root = dirname(__DIR__);
+    // These three files are required before the spl_autoload_register below
+    // because enabledDirectories() needs them immediately at call time.
     require_once $root . '/private/lib/Extension/ExtensionRegistry.php';
     require_once $root . '/private/lib/Extension/Layout.php';
     // ExtensionStateStore instantiates ExtensionStateScribe in its constructor,
@@ -115,7 +120,7 @@ final class Raven
     $sessionCookie->startIfNeeded($config, $root, $_SERVER);
 
     $databaseConfig = (array) $config->get('database', []);
-    $connectionFactory = new ConnectionFactory($databaseConfig);
+    $connectionFactory = new DatabaseController($databaseConfig);
 
     $driver = $connectionFactory->getDriver();
     $prefix = $connectionFactory->getPrefix();
@@ -127,8 +132,14 @@ final class Raven
     $schema = new SchemaManager();
     $schema->ensureApp($rvnDb, $driver, $prefix);
 
+    // Auth DB and AuthService are lazy: many public routes (anonymous pages, feed,
+    // category listings) never touch auth at all. Deferring the auth connection and
+    // schema-ensure avoids a full DB open + migration check on every request that
+    // has nothing to do with login or sessions.
     $authDb = null;
     $authDbResolver = static function () use (&$authDb, $connectionFactory, $schema, $driver, $prefix): PDO {
+        // Singleton guard: reuse the already-opened connection within one request
+        // rather than opening a second PDO handle.
         if ($authDb instanceof PDO) {
             return $authDb;
         }
@@ -140,6 +151,8 @@ final class Raven
 
     $auth = null;
     $authResolver = static function () use (&$auth, $authDbResolver, $rvnDb, $driver, $prefix): AuthService {
+        // Same singleton guard: the auth service wraps the delight-im Auth object
+        // which itself keeps session state, so only one instance per request is safe.
         if ($auth instanceof AuthService) {
             return $auth;
         }
@@ -193,6 +206,13 @@ final class Raven
     $extensionStorage = $extensionRegistry->storageMap();
     $schedulerExtensions = $extensionRegistry->schedulerDirectories();
 
+    // The $rvn container is the shared service bag threaded through controllers,
+    // builders, and extension boot functions.
+    // Keys: root/config/driver/prefix/db are plain values resolved at boot time.
+    // auth_db/auth are Closures — callers must check is_callable() before use;
+    //   calling them opens the auth DB and runs schema-ensure on first access.
+    // extension_services starts empty; boot_extension/extension_services_for/
+    //   extension_services_all populate it lazily per extension.
     $rvn = [
         'root' => $root,
         'config' => $config,
@@ -206,9 +226,16 @@ final class Raven
         'enabled_extension_directories' => array_keys($extensionManifests),
         'enabled_extension_manifests' => $extensionManifests,
         'extension_storage' => $extensionStorage,
+        // Populated on first access per extension via the closures below.
         'extension_services' => [],
     ];
 
+    /**
+     * Boots one extension by directory slug and returns the updated $rvn container.
+     *
+     * @param string $directory Extension directory slug to boot.
+     * @return array<string, mixed> Updated service container after extension boot.
+     */
     $rvn['boot_extension'] = static function (string $directory) use (&$rvn, $extensionRegistry): array {
         return $extensionRegistry->bootExtension($rvn, $directory);
     };
@@ -232,6 +259,14 @@ final class Raven
     };
 
     $extensionsBooted = false;
+    /**
+     * Boots all enabled extensions in one pass and returns the updated $rvn container.
+     *
+     * Idempotent: subsequent calls return the already-booted container without
+     * re-running extension boot functions.
+     *
+     * @return array<string, mixed> Updated service container after all extensions boot.
+     */
     $rvn['boot_extensions'] = static function () use (&$extensionsBooted, &$rvn, $extensionRegistry): array {
         if ($extensionsBooted) {
             return $rvn;

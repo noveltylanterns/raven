@@ -11,8 +11,8 @@
 
 declare(strict_types=1);
 
-use Raven\Core\Database\ConnectionFactory;
-use Raven\Core\Database\SchemaManager;
+use Raven\Core\Controller\DatabaseController;
+use Raven\Lib\Database\Schema\SchemaManager;
 use Raven\Core\Repository\GroupRead;
 use Raven\Core\Repository\UserRead;
 use Raven\Core\Repository\UserWrite;
@@ -195,6 +195,16 @@ function installer_database_driver_support(): array
     ];
 }
 
+/**
+ * Returns the best available database driver given the support map.
+ *
+ * Prefers SQLite → MySQL → PostgreSQL. Falls back to the caller-supplied
+ * $fallback when none is available, or 'sqlite' as the last resort.
+ *
+ * @param array<string, bool> $driverSupport Map of driver key → availability flag.
+ * @param string $fallback Driver key to use when nothing in the preference order is available.
+ * @return string The selected driver key (sqlite, mysql, or pgsql).
+ */
 function installer_default_database_driver(array $driverSupport, string $fallback = 'sqlite'): string
 {
     foreach (['sqlite', 'mysql', 'pgsql'] as $driverKey) {
@@ -395,6 +405,7 @@ $sqliteDefaultBasePath = rtrim($root, '/') . '/private/dat/db.sqlite';
 $installerPath = installer_path();
 $installerRootPath = installer_root_path();
 
+// HTTP_HOST can arrive as "host,proxy-appended-host" from misconfigured proxies — take only the first entry.
 $detectedDomain = strtolower(trim((string) ($_SERVER['HTTP_HOST'] ?? $_SERVER['SERVER_NAME'] ?? '')));
 if ($detectedDomain !== '') {
     if (str_contains($detectedDomain, ',')) {
@@ -402,11 +413,15 @@ if ($detectedDomain !== '') {
     }
 
     if (str_starts_with($detectedDomain, '[')) {
+        // IPv6 literal address like [::1] or [::1]:8080 — extract just the address inside the brackets.
         $closingBracketPos = strpos($detectedDomain, ']');
         if ($closingBracketPos !== false) {
             $detectedDomain = substr($detectedDomain, 1, $closingBracketPos - 1);
         }
     } else {
+        // Strip a trailing ":port" suffix from plain hostnames like "example.com:8080".
+        // Only strip when there is exactly one colon so IPv6 addresses (multiple colons)
+        // are not accidentally truncated here (they are handled by the bracket branch above).
         $lastColonPos = strrpos($detectedDomain, ':');
         if ($lastColonPos !== false && substr_count($detectedDomain, ':') === 1) {
             $maybePort = substr($detectedDomain, $lastColonPos + 1);
@@ -416,6 +431,7 @@ if ($detectedDomain !== '') {
         }
     }
 
+    // Trailing dots are legal DNS syntax but should not appear in stored site.domain values.
     $detectedDomain = rtrim($detectedDomain, '.');
 }
 
@@ -450,16 +466,30 @@ if (is_file($composerAutoload)) {
     require_once $composerAutoload;
 }
 
+// Two-prefix PSR-4 fallback matching how Raven::boot() resolves classes:
+//   Raven\Lib\* → private/lib/   (strips 'Raven\Lib\')
+//   Raven\Core\* → private/sys/  (strips 'Raven\Core\')
+// Both prefixes must be handled explicitly; the composer.json mapping covers
+// the same paths but the Composer autoloader is absent on a clean server before
+// `composer install` has been run — the preflight gates the install form on
+// Composer being present, but this fallback is registered early so the preflight
+// check itself can load any pre-install helper classes.
 spl_autoload_register(static function (string $class) use ($root): void {
-    $prefix = 'Raven\\';
-    if (!str_starts_with($class, $prefix)) {
+    $libPrefix = 'Raven\\Lib\\';
+    if (str_starts_with($class, $libPrefix)) {
+        $file = $root . '/private/lib/' . str_replace('\\', '/', substr($class, strlen($libPrefix))) . '.php';
+        if (is_file($file)) {
+            require_once $file;
+        }
         return;
     }
 
-    $relative = str_replace('\\', '/', substr($class, strlen($prefix)));
-    $path = $root . '/private/sys/' . $relative . '.php';
-    if (is_file($path)) {
-        require_once $path;
+    $corePrefix = 'Raven\\Core\\';
+    if (str_starts_with($class, $corePrefix)) {
+        $file = $root . '/private/sys/' . str_replace('\\', '/', substr($class, strlen($corePrefix))) . '.php';
+        if (is_file($file)) {
+            require_once $file;
+        }
     }
 });
 
@@ -612,11 +642,11 @@ if ($isPost) {
 
     $tablePrefixSource = $form['db_table_prefix'] !== '' ? $form['db_table_prefix'] : $formPlaceholders['db_table_prefix'];
     $tablePrefix = preg_replace('/[^a-zA-Z0-9_]/', '', $tablePrefixSource) ?? '';
-    if ($driver === 'sqlite') {
-        $sqliteBasePath = $sqliteDefaultBasePath;
-    } else {
-        $sqliteBasePath = $sqliteDefaultBasePath;
-    }
+    // SQLite path is always set unconditionally so the database config block below
+    // can write a complete sqlite sub-tree regardless of which driver was chosen.
+    // Operators can switch to SQLite later through the config editor without
+    // needing to re-run the installer.
+    $sqliteBasePath = $sqliteDefaultBasePath;
 
     $mysqlHost = $form['mysql_host'] !== '' ? $form['mysql_host'] : $formPlaceholders['mysql_host'];
     $mysqlPortRaw = $form['mysql_port'] !== '' ? $form['mysql_port'] : $formPlaceholders['mysql_port'];
@@ -702,12 +732,16 @@ if ($isPost) {
         if (!array_key_exists('brand_logo', $nextConfig['panel'])) {
             $nextConfig['panel']['brand_logo'] = '';
         }
+        // 'public' was a config key in very early pre-release builds; remove it
+        // so stale dist files do not leave a dead key in fresh installs.
         unset($nextConfig['public']);
         $nextConfig['user'] = is_array($nextConfig['user'] ?? null) ? $nextConfig['user'] : [];
         $nextConfig['user']['auth'] = is_array($nextConfig['user']['auth'] ?? null) ? $nextConfig['user']['auth'] : [];
         $nextConfig['user']['auth']['method'] = $enableUsernames ? 'username' : 'email';
         $nextConfig['user']['auth']['registration'] = 'closed';
 
+        // All three driver sub-trees are always written so switching drivers later
+        // through the config editor does not require re-entering connection info.
         $nextConfig['database'] = [
             'driver' => $driver,
             'sqlite' => [
@@ -743,7 +777,7 @@ if ($isPost) {
                 }
             }
 
-            $connectionFactory = new ConnectionFactory((array) ($nextConfig['database'] ?? []));
+            $connectionFactory = new DatabaseController((array) ($nextConfig['database'] ?? []));
             $driverName = $connectionFactory->getDriver();
             $prefix = $connectionFactory->getPrefix();
 
@@ -756,6 +790,9 @@ if ($isPost) {
             $userRead = new UserRead($authDb, $rvnDb, $driverName, $prefix);
             $users = new UserWrite($authDb, $rvnDb, $driverName, $prefix);
             $userParser = new UserDataParser(new InputSanitizer(), $userRead);
+            // Guard against re-running the installer on a populated database.
+            // Without this check the installer could overwrite the existing admin
+            // or add a duplicate that breaks login uniqueness constraints.
             if ($userParser->listAll() !== []) {
                 throw new RuntimeException('Installer can only create the initial admin on an empty user database.');
             }

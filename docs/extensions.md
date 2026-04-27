@@ -158,7 +158,7 @@ Create modal (`Create New Extension`):
 Installed list actions:
 
 - Table columns: `Name`, `Type`, `Author`, `Description`, `Actions`
-- Per extension: `Settings` (when extension is enabled and has a panel route), `Enable/Disable`, `Export` as a button-opened archive-format dropdown menu, and `Uninstall` (when allowed).
+- Per extension: `Read Documentation` (links to the extension's `docs` URL from `ext.json` when present), `Settings` (when extension is enabled and has a panel route), `Enable/Disable`, `Export` as a button-opened archive-format dropdown menu, and `Uninstall` (when allowed).
 
 ## 8) Manifest Basics
 

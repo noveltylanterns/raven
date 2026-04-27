@@ -47,6 +47,8 @@ Tab behavior notes:
 - `Site` section:
   - core `site.*` fields
   - `site.protocol` controls whether Raven emits generated absolute URLs as `http://` or `https://`
+  - `site.scheduler` controls when the built-in page-schedule and event-log jobs run: `always` (on every public and panel request), `panel` (panel requests only), or `off` (disabled; use a server crontab with `rvn-cron` instead)
+  - `site.timezone` sets the PHP timezone used for scheduled publish/expire operations; must be a valid PHP timezone identifier or empty (defaults to UTC)
   - `site.theme` remains stored in `private/dat/config.php` but is managed via Theme Manager / `rvn-theme` (not editable in Configuration)
 - `Panel` section:
   - `panel.path`
@@ -109,6 +111,14 @@ Behavior notes:
 - Both scopes default to disabled (`opt-in`).
 - Even when enabled in config, output is hard-gated to logged-in users with `Manage System Configuration`.
 - Non-HTML responses are not injected.
+
+Event Logging section:
+
+- `logging.errors` — enables logging of PHP errors and uncaught exceptions to the Raven event log.
+- `logging.warnings` — enables logging of PHP warnings to the event log.
+- `logging.info` — enables logging of informational events (logins, config saves, etc.) to the event log.
+- `logging.retention_days` — number of days to retain event log entries before the pruner removes them; minimum 1.
+- `logging.syslog` — when enabled, event log entries are also mirrored to the system syslog via `syslog()`.
 
 #### Media Tab
 
@@ -255,6 +265,8 @@ The following config keys are expected to appear in this document and in runtime
 - `site.visibility`
 - `site.protocol`
 - `site.name`
+- `site.scheduler`
+- `site.timezone`
 - `panel.path`
 - `panel.theme`
 - `panel.brand_name`
@@ -306,6 +318,11 @@ The following config keys are expected to appear in this document and in runtime
 - `debug.show_trace`
 - `debug.show_request`
 - `debug.show_environment`
+- `logging.errors`
+- `logging.warnings`
+- `logging.info`
+- `logging.retention_days`
+- `logging.syslog`
 - `media.upload_target`
 - `media.max_filesize_kb`
 - `media.max_files_per_upload`

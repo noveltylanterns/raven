@@ -12,14 +12,16 @@ declare(strict_types=1);
 error_reporting(E_ALL & ~E_WARNING & ~E_NOTICE & ~E_DEPRECATED);
 ini_set('display_errors', '0');
 
-require_once __DIR__ . '/../../private/sys/Core/Auth/PanelAccess.php';
-require_once __DIR__ . '/../../private/lib/Config/ConfigFileStore.php';
-require_once __DIR__ . '/../../private/sys/Core/Config.php';
-require_once __DIR__ . '/../../private/sys/Core/Extension/ExtensionRegistry.php';
-require_once __DIR__ . '/../../private/lib/Extension/ExtensionScaffoldService.php';
+require_once __DIR__ . '/../../private/lib/Auth/Panel/PanelAccess.php';
+require_once __DIR__ . '/../../private/sys/Config.php';
+require_once __DIR__ . '/../../private/lib/Extension/ExtensionRegistry.php';
+require_once __DIR__ . '/../../private/lib/Extension/Panel/ExtensionScaffoldService.php';
+require_once __DIR__ . '/../../private/lib/Database/Schema/SchemaEnsureStateStore.php';
+require_once __DIR__ . '/../../private/lib/Scribe/ExtensionStateScribe.php';
 require_once __DIR__ . '/../../private/lib/Extension/ExtensionStateStore.php';
-require_once __DIR__ . '/../../private/lib/Extension/ExtensionPermissionCatalogService.php';
-require_once __DIR__ . '/../../private/lib/Extension/ExtensionCatalogService.php';
+require_once __DIR__ . '/../../private/lib/Extension/Panel/ExtensionPermissionCatalogService.php';
+require_once __DIR__ . '/../../private/lib/Extension/Layout.php';
+require_once __DIR__ . '/../../private/lib/Extension/Panel/ExtensionCatalogService.php';
 require_once __DIR__ . '/../../private/lib/Extension/ManifestContractValidator.php';
 require_once __DIR__ . '/../../private/lib/Extension/ExtensionBootstrapContractResolver.php';
 require_once __DIR__ . '/../../private/lib/Security/InputSanitizer.php';
@@ -28,10 +30,10 @@ use Raven\Core\Config;
 use Raven\Core\Repository\GroupRead;
 use Raven\Core\Repository\GroupWrite;
 use Raven\Core\Repository\UserWrite;
-use Raven\Lib\Auth\PanelAccess;
-use Raven\Lib\Extension\ExtensionCatalogService;
-use Raven\Lib\Extension\ExtensionPermissionCatalogService;
-use Raven\Lib\Extension\ExtensionScaffoldService;
+use Raven\Lib\Auth\Panel\PanelAccess;
+use Raven\Lib\Extension\Panel\ExtensionCatalogService;
+use Raven\Lib\Extension\Panel\ExtensionPermissionCatalogService;
+use Raven\Lib\Extension\Panel\ExtensionScaffoldService;
 use Raven\Lib\Extension\ExtensionStateStore;
 use Raven\Lib\Security\InputSanitizer;
 
@@ -265,7 +267,7 @@ return [
             \$rawPluginServices = [];
         }
 
-        \$rawPluginServices['marker'] = static fn (): string => '{$serviceValue}';
+        \$rawPluginServices['marker'] = '{$serviceValue}';
         \$rawExtensionServices['{$slug}'] = \$rawPluginServices;
         \$rvn['extension_services'] = \$rawExtensionServices;
         \$rvn['{$aliasKey}'] = '{$aliasValue}';
@@ -274,7 +276,7 @@ return [
 PHP;
         file_put_contents($extPath, $extContent . "\n", LOCK_EX);
 
-        $routesPath = $path . '/lib/routes_panel.php';
+        $routesPath = $path . '/routes_panel.php';
         $routesContent = <<<PHP
 <?php
 
@@ -287,7 +289,7 @@ PHP;
 
 declare(strict_types=1);
 
-use Raven\Lib\Routing\Router;
+use Raven\Core\Routing\Router;
 
 /**
  * Registers the debug plugin route only when legacy bootstrap aliases are visible.
@@ -308,16 +310,15 @@ return static function (Router \$router, array \$context): void {
     /** @var callable(): string \$currentUserTheme */
     \$currentUserTheme = \$context['currentUserTheme'] ?? static fn (): string => 'default';
 
-    /** @var mixed \$rawExtensionServices */
-    \$rawExtensionServices = \$rvn['extension_services'] ?? [];
-    \$extensionServices = is_array(\$rawExtensionServices) ? \$rawExtensionServices : [];
-    \$pluginServices = is_array(\$extensionServices['{$slug}'] ?? null)
-        ? \$extensionServices['{$slug}']
-        : [];
-    \$serviceMarker = \$pluginServices['marker'] ?? null;
-    \$legacyAlias = \$rvn['{$aliasKey}'] ?? null;
+    /** @var callable(string): array<string, mixed> \$extensionServicesFor */
+    \$extensionServicesFor = is_callable(\$context['extensionServices'] ?? null)
+        ? \$context['extensionServices']
+        : static fn (string \$dir): array => [];
 
-    if (\$serviceMarker !== '{$serviceValue}' || \$legacyAlias !== '{$aliasValue}') {
+    \$pluginServices = \$extensionServicesFor('{$slug}');
+    \$serviceMarker = \$pluginServices['marker'] ?? null;
+
+    if (\$serviceMarker !== '{$serviceValue}') {
         return;
     }
 
@@ -445,6 +446,7 @@ PHP;
     {
         require_once $this->root . '/private/Raven.php';
         $rvn = \Raven\Raven::boot();
+        if (is_callable($rvn['auth_db'] ?? null)) { $rvn['auth_db'] = ($rvn['auth_db'])(); }
         $groupRepo = new GroupWrite($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix'], new GroupRead($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix']));
         $userRepo = new UserWrite($rvn['auth_db'], $rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix']);
         $groupSlug = 'nav-smoke-' . $suffix . '-' . $this->runId;
@@ -945,6 +947,7 @@ PHP;
 
         require_once $this->root . '/private/Raven.php';
         $rvn = \Raven\Raven::boot();
+        if (is_callable($rvn['auth_db'] ?? null)) { $rvn['auth_db'] = ($rvn['auth_db'])(); }
         $userRepo = new UserWrite($rvn['auth_db'], $rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix']);
         foreach (array_reverse($this->createdUsers) as $userId) {
             try {

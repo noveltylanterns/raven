@@ -414,7 +414,7 @@ return static function (Router $router, array $context): void {
         return;
     }
 
-    $extensionRoot = dirname(__DIR__);
+    $extensionRoot = __DIR__;
     $viewFile = $extensionRoot . '/tpl/panel_index.php';
     $routePath = __ROUTE_PATH_LITERAL__;
     $section = __SECTION_LITERAL__;

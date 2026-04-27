@@ -12,7 +12,7 @@ declare(strict_types=1);
 namespace Raven\Core\Controller\Public;
 
 use Raven\Core\Repository\PageRead;
-use Raven\Core\Routing\Public\PublicChannelPageRouteService;
+use Raven\Core\Routing\Public\ChannelPageRouter;
 use Raven\Lib\Parser\CategoryRouteParser;
 use Raven\Lib\Parser\ChannelDataParser;
 use Raven\Lib\Parser\ChannelRouteParser;
@@ -29,7 +29,7 @@ final class FeedController
     private ChannelDataParser $channelParser;
     private PageDataParser $pageParser;
     private TaxonomyRepoParser $taxonomyLookupRepo;
-    private PublicChannelPageRouteService $publicChannelPageRouteService;
+    private ChannelPageRouter $publicChannelPageRouteService;
 
     /**
      * @param SharedController $context Shared public request context.
@@ -48,7 +48,7 @@ final class FeedController
         $this->channelParser = $channelParser;
         $this->pageParser = new PageDataParser($context->input(), $pageRepo);
         $this->taxonomyLookupRepo = $taxonomyLookupRepo;
-        $this->publicChannelPageRouteService = new PublicChannelPageRouteService($context->input());
+        $this->publicChannelPageRouteService = new ChannelPageRouter($context->input());
     }
 
     /**

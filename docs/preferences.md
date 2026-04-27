@@ -28,6 +28,7 @@ Fields/options:
 - `New Password` (optional, leave blank to keep current)
 - `Enter new password again to confirm:` helper text under the confirmation field
 - `Panel Theme` (`<Default>`, `Corporate`, `Ice`, `Midnight`)
+- `Timezone` (timezone offset for scheduled content; `— Use Site Default —` uses the value from `site.timezone` in site configuration)
 - `Avatar` file upload (`gif/jpg/jpeg/png`)
 - `Remove current avatar` checkbox (shown only when avatar exists)
 - `Cover Image` local file upload (`gif/jpg/jpeg/png`)

@@ -13,7 +13,7 @@ namespace Raven\Core\Controller\Panel;
 
 use Closure;
 use Raven\Core\Config;
-use Raven\Core\Database\ConnectionFactory;
+use Raven\Core\Controller\DatabaseController;
 use Raven\Lib\Archive\Folder as ArchiveDelete;
 use Raven\Lib\Archive\Install as ArchiveInstall;
 use Raven\Lib\Archive\Package as ArchivePackage;
@@ -1218,7 +1218,7 @@ final class SystemController
         }
 
         $databaseConfig = (array) $this->config->get('database', []);
-        $connectionFactory = new ConnectionFactory($databaseConfig);
+        $connectionFactory = new DatabaseController($databaseConfig);
         $cleaner = new ExtensionStorageCleaner(
             $this->root,
             $connectionFactory->createAppConnection(),
