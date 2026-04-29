@@ -135,7 +135,7 @@ final class GroupDataParser
             return null;
         }
 
-        return $this->groupRepo()->findPublicRouteDataBySlug($normalizedSlug);
+        return $this->groupRepo()->findRoutedBySlugWithMembers($normalizedSlug);
     }
 
     /**

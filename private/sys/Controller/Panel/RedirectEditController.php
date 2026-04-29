@@ -11,12 +11,11 @@ declare(strict_types=1);
 
 namespace Raven\Core\Controller\Panel;
 
+use Raven\Core\Repository\ChannelRead;
+use Raven\Core\Repository\RedirectRead;
 use Raven\Core\Repository\RedirectWrite;
-use Raven\Lib\Parser\ChannelDataParser;
-use Raven\Lib\Parser\RedirectDataParser;
 use Raven\Lib\Transport\Redirect;
 use Raven\Lib\Security\InputSanitizer;
-use Raven\Lib\View\Panel\Editor;
 
 /**
  * Handles redirect create/edit/save/delete routes for the panel.
@@ -28,34 +27,30 @@ final class RedirectEditController
 {
     private SharedController $context;
     private InputSanitizer $input;
-    private ChannelDataParser $channelParser;
+    private ChannelRead $channelRead;
+    private RedirectRead $redirectRead;
     private RedirectWrite $redirectRepo;
-    private RedirectDataParser $redirectParser;
-    private Editor $editor;
 
     /**
      * @param SharedController $context Shared panel request context.
      * @param InputSanitizer $input Shared request input sanitizer.
-     * @param ChannelDataParser $channelParser Channel data parser for redirect scope validation.
+     * @param ChannelRead $channelRead Channel repository read side for redirect scope validation and option lists.
+     * @param RedirectRead $redirectRead Redirect repository read side for edit-form lookups.
      * @param RedirectWrite $redirectRepo Redirect repository write side for redirect saves and deletes.
-     * @param RedirectDataParser $redirectParser Canonical parser for read-only edit-form reads.
-     * @param Editor $editor Shared panel editor utility methods.
      * @return void
      */
     public function __construct(
         SharedController $context,
         InputSanitizer $input,
-        ChannelDataParser $channelParser,
+        ChannelRead $channelRead,
+        RedirectRead $redirectRead,
         RedirectWrite $redirectRepo,
-        RedirectDataParser $redirectParser,
-        Editor $editor
     ) {
         $this->context = $context;
         $this->input = $input;
-        $this->channelParser = $channelParser;
+        $this->channelRead = $channelRead;
+        $this->redirectRead = $redirectRead;
         $this->redirectRepo = $redirectRepo;
-        $this->redirectParser = $redirectParser;
-        $this->editor = $editor;
     }
 
     /**
@@ -72,8 +67,8 @@ final class RedirectEditController
             return;
         }
 
-        $redirectRow = $id !== null ? $this->redirectParser->findById($id) : null;
-        $channelOptions = $this->channelParser->listOptions();
+        $redirectRow = $id !== null ? $this->redirectRead->findById($id) : null;
+        $channelOptions = $this->channelRead->listOptions();
 
         if ($id !== null && $redirectRow === null) {
             $this->context->flash('error', 'Redirect not found.');
@@ -134,7 +129,7 @@ final class RedirectEditController
         }
 
         // Channel dropdown should only post known channel slugs.
-        if ($channelSlug !== null && !$this->channelParser->slugExists($channelSlug)) {
+        if ($channelSlug !== null && !$this->channelRead->slugExists($channelSlug)) {
             $this->context->flash('error', 'Selected channel does not exist.');
             Redirect::redirect($this->editUrl($id));
         }

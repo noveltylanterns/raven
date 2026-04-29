@@ -246,15 +246,15 @@ class MediaRead
     }
 
     /**
-     * Returns public-ready gallery images for one page.
+     * Returns gallery-display-ready images for one page.
      *
      * Filters to status=ready and include_in_gallery=true, then places the cover image first
      * while preserving explicit manual order for the rest.
      *
-     * @param int $pageId Page whose public gallery images to load.
+     * @param int $pageId Page whose gallery images to load.
      * @return array<int, array<string, mixed>> Filtered and sorted image rows.
      */
-    public function listReadyForPublicPage(int $pageId): array
+    public function listDisplayReadyForPage(int $pageId): array
     {
         $images = $this->listForPage($pageId);
         $ready = [];
@@ -292,16 +292,16 @@ class MediaRead
     }
 
     /**
-     * Returns one best-fit public image URL for page-level meta tags.
+     * Returns the large cover-image variant URL for one page.
      *
      * Only an explicit ready cover image can override site-level meta image config.
      * When present, the public wrapper uses that image's large variant for both
      * OpenGraph and X/Twitter tags via the shared `meta:image` template value.
      *
-     * @param int $pageId Page whose cover image URL to resolve.
-     * @return string|null Public URL of the large cover image variant, or null when absent.
+     * @param int $pageId Page whose cover image variant URL to resolve.
+     * @return string|null URL of the large cover image variant, or null when absent.
      */
-    public function coverImageUrlForPage(int $pageId): ?string
+    public function coverLargeVariantUrlForPage(int $pageId): ?string
     {
         $images = $this->listForPage($pageId);
         if ($images === []) {

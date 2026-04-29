@@ -29,6 +29,7 @@ Targets (generator owns these files — do not hand-edit them):
 - [ ] `docs/appendix/core.md` — reflect on all sys/* classes & functions; pull `@param`/`@return`/first docline per function; group by service key in `context['rvn']` if applicable.
 - [ ] `docs/appendix/config.md` — parse `private/dat/config.php.dist` key tree + reflect on `Controller/Panel/ConfigController` for descriptions and defaults
 - [ ] `docs/appendix/database.md` — reflect on `SchemaBuilder`/`AuthSchemaBuilder` method names + annotations to enumerate tables and columns; include column purposes and the full chain of variables/routes/forms that map to each column
+- [ ] `docs/appendix/bootstrap.md` - reflect on where bootstrap is injected into the templates, how to manually generate compiled css from bootstrap sass files, and a quick rundown of all the basic bootstrap css variables & how to declare them in a custom sass file so the end user can work cleanly with the stock variables instead of creating new css classes.
 - [ ] `docs/cli.md` — shell each `private/bin/rvn-*` with `--help` and format output as markdown; replaces current hand-written content
 - [ ] `docs/extensions/` folder — per-extension docs for bundled stock extensions (contact, signups, database, etc.)
 - [ ] Wire `docgen` into maintenance checklist once generator is built

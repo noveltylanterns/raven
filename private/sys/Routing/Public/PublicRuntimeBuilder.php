@@ -37,7 +37,6 @@ use Raven\Lib\Extension\ExtensionEditorCatalogService;
 use Raven\Lib\Parser\CategoryRepoParser;
 use Raven\Lib\Parser\ChannelDataParser;
 use Raven\Lib\Parser\ConfigParser;
-use Raven\Lib\Parser\GroupDataParser;
 use Raven\Lib\Parser\MediaParser;
 use Raven\Lib\Parser\RedirectDataParser;
 use Raven\Lib\Parser\TagRepoParser;
@@ -389,13 +388,6 @@ final class PublicRuntimeBuilder
         });
 
         /**
-         * Wraps the group read side in the parser seam for public auth/group routes.
-         */
-        $groupDataParserFactory = $memoize(static function () use ($groupReadFactory, $rvn): GroupDataParser {
-            return new GroupDataParser($rvn['input'], $groupReadFactory());
-        });
-
-        /**
          * Reuses one shared public-theme catalog across public controllers.
          */
         $themeCatalogFactory = $memoize(static function () use (&$themeCatalogService, $rvn): ThemeCatalog {
@@ -434,6 +426,7 @@ final class PublicRuntimeBuilder
             $categoryLookupRepository,
             $mediaParserFactory,
             $pageReadFactory,
+            $redirectReadFactory,
             $redirectDataParserFactory,
             $tagLookupRepository,
             $taxonomyLookupRepository
@@ -444,6 +437,7 @@ final class PublicRuntimeBuilder
                 'channel_parser' => $channelDataParserFactory(),
                 'media' => $mediaParserFactory(),
                 'page' => $pageReadFactory(),
+                'redirect_read' => $redirectReadFactory(),
                 'redirect' => $redirectDataParserFactory(),
                 'tag_lookup' => $tagLookupRepository,
                 'taxonomy_lookup' => $taxonomyLookupRepository,
@@ -457,14 +451,14 @@ final class PublicRuntimeBuilder
          * @return array<string, mixed>
          */
         $publicAuthDomain = $memoize(static function () use (
-            $groupDataParserFactory,
+            $groupReadFactory,
             $userReadFactory,
             $userWriteFactory,
             $inviteReadFactory,
             $inviteWriteFactory
         ): array {
             return [
-                'group' => $groupDataParserFactory(),
+                'group' => $groupReadFactory(),
                 'user_read' => $userReadFactory(),
                 'user_write' => $userWriteFactory(),
                 'invite_read' => $inviteReadFactory,
@@ -553,7 +547,7 @@ final class PublicRuntimeBuilder
                 $requestContextFactory(),
                 $contentDomain['media'],
                 $contentDomain['page'],
-                $contentDomain['redirect'],
+                $contentDomain['redirect_read'],
                 $authDomain['user_read'],
                 $themeCatalogFactory(),
                 $extensionEditorCatalogFactory(),
@@ -597,7 +591,7 @@ final class PublicRuntimeBuilder
             $authDomain = $publicAuthDomain();
             $publicGroupController = new PublicGroupController(
                 $requestContextFactory(),
-                $authDomain['group']
+                $groupReadFactory()
             );
 
             return $publicGroupController;
@@ -635,7 +629,7 @@ final class PublicRuntimeBuilder
             $contentDomain = $publicContentDomain();
             $publicFeedController = new PublicFeedController(
                 $requestContextFactory(),
-                $contentDomain['channel_parser'],
+                $contentDomain['channel'],
                 $contentDomain['page'],
                 $contentDomain['category_lookup'](),
                 $contentDomain['tag_lookup']()
@@ -680,10 +674,10 @@ final class PublicRuntimeBuilder
             $formDomain = $publicFormDomain();
             $publicPageController = new PublicPageController(
                 $requestContextFactory(),
-                $contentDomain['channel_parser'],
+                $contentDomain['channel'],
                 $contentDomain['media'],
                 $contentDomain['page'],
-                $contentDomain['redirect'],
+                $contentDomain['redirect_read'],
                 $authDomain['user_read'],
                 $themeCatalogFactory(),
                 $extensionEditorCatalogFactory(),

@@ -12,10 +12,10 @@ declare(strict_types=1);
 namespace Raven\Core\Controller\Public;
 
 use Closure;
+use Raven\Core\Repository\GroupRead;
 use Raven\Core\Repository\InviteRead;
 use Raven\Core\Repository\InviteWrite;
 use Raven\Core\Repository\UserWrite;
-use Raven\Lib\Parser\GroupDataParser;
 use Raven\Lib\Auth\LoginAttemptPolicy;
 use Raven\Lib\Auth\LoginAttemptWorkflowService;
 use Raven\Lib\Auth\LoginChallengeFlow;
@@ -31,7 +31,7 @@ use Raven\Lib\Transport\Redirect;
 final class AuthController
 {
     private SharedController $context;
-    private GroupDataParser $groupDataParser;
+    private GroupRead $groupRead;
     private UserWrite $userRepo;
     private Closure $inviteReadResolver;
     private Closure $inviteWriteResolver;
@@ -45,7 +45,7 @@ final class AuthController
 
     /**
      * @param SharedController $context Shared public request context.
-     * @param GroupDataParser $groupDataParser Group data parser for registration target-group resolution.
+     * @param GroupRead $groupRead Group repository read side for registration target-group resolution.
      * @param UserWrite $userRepo User repository write side for registration persistence.
      * @param callable(): InviteRead $inviteReadResolver Lazy invite-token read resolver for token validation.
      * @param callable(): InviteWrite $inviteWriteResolver Lazy invite-token write resolver for token consumption.
@@ -53,13 +53,13 @@ final class AuthController
      */
     public function __construct(
         SharedController $context,
-        GroupDataParser $groupDataParser,
+        GroupRead $groupRead,
         UserWrite $userRepo,
         callable $inviteReadResolver,
         callable $inviteWriteResolver
     ) {
         $this->context = $context;
-        $this->groupDataParser = $groupDataParser;
+        $this->groupRead = $groupRead;
         $this->userRepo = $userRepo;
         $this->inviteReadResolver = Closure::fromCallable($inviteReadResolver);
         $this->inviteWriteResolver = Closure::fromCallable($inviteWriteResolver);
@@ -510,7 +510,7 @@ final class AuthController
     private function registrationGroupIds(): array
     {
         foreach (['user', 'guest', 'validating'] as $slug) {
-            $groupId = $this->groupDataParser->idBySlug($slug);
+            $groupId = $this->groupRead->idBySlug($slug);
             if (is_int($groupId) && $groupId > 0) {
                 return [$groupId];
             }

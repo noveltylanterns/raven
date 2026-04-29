@@ -110,7 +110,7 @@ final class UserDataParser
             return null;
         }
 
-        return $this->userRepo()->findPublicProfileByUsername($normalizedUsername);
+        return $this->userRepo()->findProfileSummaryByUsername($normalizedUsername);
     }
 
     /**
@@ -125,7 +125,7 @@ final class UserDataParser
             return null;
         }
 
-        return $this->userRepo()->findPublicProfileById($userId);
+        return $this->userRepo()->findProfileSummaryById($userId);
     }
 
     /**
@@ -141,7 +141,7 @@ final class UserDataParser
             return null;
         }
 
-        return $this->userRepo()->findPublicProfileByString($normalizedString);
+        return $this->userRepo()->findProfileSummaryByString($normalizedString);
     }
 
     /**
@@ -156,7 +156,7 @@ final class UserDataParser
             return [];
         }
 
-        return $this->userRepo()->listPublicProfilesByGroupId($groupId);
+        return $this->userRepo()->listProfileSummariesByGroupId($groupId);
     }
 
     /**

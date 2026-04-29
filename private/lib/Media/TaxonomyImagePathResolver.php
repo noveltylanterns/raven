@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Raven\Lib\Media\Panel;
+namespace Raven\Lib\Media;
 
 /**
  * Resolves taxonomy image storage payloads into deterministic public paths.

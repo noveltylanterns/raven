@@ -12,11 +12,11 @@ declare(strict_types=1);
 namespace Raven\Core\Controller\Panel;
 
 use Closure;
+use Raven\Core\Repository\GroupRead;
 use Raven\Core\Repository\GroupWrite;
 use Raven\Lib\Auth\Panel\PanelAccess;
 use Raven\Lib\Auth\Panel\PanelPermissionDefinitionCatalog;
 use Raven\Lib\Media\Panel\TaxonomyImageService;
-use Raven\Lib\Parser\GroupDataParser;
 use Raven\Lib\Parser\GroupRouteParser;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\Scribe\MediaScribe;
@@ -36,7 +36,7 @@ final class GroupEditController
     private SharedController $context;
     private InputSanitizer $input;
     private GroupWrite $groupRepo;
-    private GroupDataParser $groupDataParser;
+    private GroupRead $groupRead;
     private GroupRouteParser $groupRouteParser;
     private EditorTabs $editorTabs;
     private Editor $editor;
@@ -50,7 +50,7 @@ final class GroupEditController
      * @param SharedController $context Shared panel request context.
      * @param InputSanitizer $input Shared request input sanitizer.
      * @param GroupWrite $groupRepo Group repository write side for group saves and deletes.
-     * @param GroupDataParser $groupDataParser Group data parser for repo-backed group reads.
+     * @param GroupRead $groupRead Group repository read side for repo-backed group reads.
      * @param GroupRouteParser $groupRouteParser Group route parser for routing-policy reads.
      * @param EditorTabs $editorTabs Panel editor tab normalization and tab-preserving URL builder.
      * @param Editor $editor Shared panel editor utility methods.
@@ -65,7 +65,7 @@ final class GroupEditController
         SharedController $context,
         InputSanitizer $input,
         GroupWrite $groupRepo,
-        GroupDataParser $groupDataParser,
+        GroupRead $groupRead,
         GroupRouteParser $groupRouteParser,
         EditorTabs $editorTabs,
         Editor $editor,
@@ -78,7 +78,7 @@ final class GroupEditController
         $this->context = $context;
         $this->input = $input;
         $this->groupRepo = $groupRepo;
-        $this->groupDataParser = $groupDataParser;
+        $this->groupRead = $groupRead;
         $this->groupRouteParser = $groupRouteParser;
         $this->editorTabs = $editorTabs;
         $this->editor = $editor;
@@ -105,7 +105,7 @@ final class GroupEditController
 
         $group = null;
         if ($id !== null) {
-            $group = $this->groupDataParser->findById($id);
+            $group = $this->groupRead->findById($id);
             if ($group === null) {
                 $this->context->flash('error', 'Group not found.');
                 Redirect::redirect($this->context->panelUrl('/group'));
@@ -162,7 +162,7 @@ final class GroupEditController
             'basic'
         );
         $actorIsAdmin = $this->context->auth()->isAdmin();
-        $existingGroup = $id !== null ? $this->groupDataParser->findById($id) : null;
+        $existingGroup = $id !== null ? $this->groupRead->findById($id) : null;
         $isExistingStockGroup = is_array($existingGroup) && (int) ($existingGroup['is_stock'] ?? 0) === 1;
         $slugRaw = trim($this->input->text($post['slug'] ?? null, 160));
         $slug = '';

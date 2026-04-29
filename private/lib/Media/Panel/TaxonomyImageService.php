@@ -12,6 +12,7 @@ declare(strict_types=1);
 namespace Raven\Lib\Media\Panel;
 
 use Raven\Core\Config;
+use Raven\Lib\Media\TaxonomyImagePathResolver;
 
 /**
  * Shared read-side helper for taxonomy image config and path resolution.

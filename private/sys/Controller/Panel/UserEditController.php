@@ -13,6 +13,7 @@ namespace Raven\Core\Controller\Panel;
 
 use Closure;
 use Raven\Core\Config;
+use Raven\Core\Repository\GroupRead;
 use Raven\Core\Repository\InviteWrite;
 use Raven\Core\Repository\UserRead;
 use Raven\Core\Repository\UserWrite;
@@ -24,7 +25,6 @@ use Raven\Lib\Auth\SessionFlash;
 use Raven\Lib\Media\Panel\AvatarValidationPolicy;
 use Raven\Lib\Media\Panel\AvatarValidator;
 use Raven\Lib\Media\Panel\UserMediaPathService;
-use Raven\Lib\Parser\GroupDataParser;
 use Raven\Lib\Parser\GroupRouteParser;
 use Raven\Lib\Parser\UserDataParser;
 use Raven\Lib\Scribe\UserMediaScribe;
@@ -48,7 +48,7 @@ final class UserEditController
     private Config $config;
     private InputSanitizer $input;
     private string $root;
-    private GroupDataParser $groupDataParser;
+    private GroupRead $groupRead;
     private UserRead $userRead;
     private UserWrite $userWrite;
     private Closure $inviteWriteResolver;
@@ -62,7 +62,6 @@ final class UserEditController
     private EditorBlocks $editorBlocks;
     private PanelMediaConfigService $panelMediaConfigService;
     private UserDataParser $profileContactService;
-    private ?UserDataParser $userParser = null;
     private PanelTwoFactorPreferencesService $panelTwoFactorPreferencesService;
     private UserMediaScribe $userMediaScribe;
     private UserMediaPathService $userMediaPathService;
@@ -72,7 +71,7 @@ final class UserEditController
      * @param Config $config Runtime configuration reader.
      * @param InputSanitizer $input Shared request input sanitizer.
      * @param string $root Project root path for user-media storage helpers.
-     * @param GroupDataParser $groupDataParser Group data parser for group option reads and slug lookups.
+     * @param GroupRead $groupRead Group repository read side for group option reads and slug lookups.
      * @param UserRead $userRead User repository read side for user find and author lookups.
      * @param UserWrite $userWrite User repository write side for panel user saves and deletes.
      * @param callable(): InviteWrite $inviteWriteResolver Lazy invite write resolver for token creation/deletion.
@@ -95,7 +94,7 @@ final class UserEditController
         Config $config,
         InputSanitizer $input,
         string $root,
-        GroupDataParser $groupDataParser,
+        GroupRead $groupRead,
         UserRead $userRead,
         UserWrite $userWrite,
         callable $inviteWriteResolver,
@@ -116,7 +115,7 @@ final class UserEditController
         $this->config = $config;
         $this->input = $input;
         $this->root = rtrim($root, '/\\');
-        $this->groupDataParser = $groupDataParser;
+        $this->groupRead = $groupRead;
         $this->userRead = $userRead;
         $this->userWrite = $userWrite;
         $this->inviteWriteResolver = Closure::fromCallable($inviteWriteResolver);
@@ -149,7 +148,7 @@ final class UserEditController
         }
 
         $activeTab = $this->editorTabs->normalizeEditorTab($_GET['tab'] ?? null, ['account', 'permissions', 'profile', 'security'], 'account');
-        $user = $id !== null ? $this->userParser()->findById($id) : null;
+        $user = $id !== null ? $this->userRead->findById($id) : null;
         if (is_array($user)) {
             $normalizedTheme = $this->editor->normalizePanelThemeChoice((string) ($user['theme'] ?? 'default'), true);
             $user['theme'] = $normalizedTheme ?? 'default';
@@ -169,7 +168,7 @@ final class UserEditController
             Redirect::redirect($this->context->panelUrl('/user'));
         }
 
-        $groupOptions = $this->groupDataParser->listOptions();
+        $groupOptions = $this->groupRead->listOptions();
         $actorIsAdmin = $this->context->auth()->isAdmin();
         $primaryGroupId = (int) ($user['primary_group_id'] ?? 0);
         $secondaryGroupIds = array_map('intval', (array) ($user['secondary_group_ids'] ?? []));
@@ -262,7 +261,7 @@ final class UserEditController
         $existingTwoFactorMethods = [];
         $canUpdateTwoFactorMethods = false;
         if ($id !== null) {
-            $existingUser = $this->userParser()->findById($id);
+            $existingUser = $this->userRead->findById($id);
             if ($existingUser === null) {
                 $this->context->flash('error', 'User not found.');
                 Redirect::redirect($this->context->panelUrl('/user'));
@@ -302,7 +301,7 @@ final class UserEditController
             ? array_values(array_unique(array_merge([$primaryGroupId], $secondaryGroupIds)))
             : array_values(array_unique($secondaryGroupIds));
 
-        $groupOptions = $this->groupDataParser->listOptions();
+        $groupOptions = $this->groupRead->listOptions();
         $validGroupIds = array_map(static fn (array $group): int => (int) $group['id'], $groupOptions);
         $groupIds = array_values(array_intersect($groupIds, $validGroupIds));
 
@@ -393,7 +392,7 @@ final class UserEditController
         }
 
         if ($primaryGroupId < 1) {
-            $fallbackGroupId = $this->groupDataParser->idBySlug('guest') ?? 0;
+            $fallbackGroupId = $this->groupRead->idBySlug('guest') ?? 0;
             if ($fallbackGroupId > 0) {
                 $primaryGroupId = $fallbackGroupId;
                 if (!in_array($primaryGroupId, $groupIds, true)) {
@@ -857,21 +856,6 @@ final class UserEditController
 
         $this->context->flash('success', 'Invite token deleted.');
         Redirect::redirect($this->context->panelUrl('/user/invites'));
-    }
-
-    /**
-     * Returns the user parser on first use so read-only panel user flows route
-     * through the canonical parser surface instead of the repository.
-     *
-     * @return UserDataParser User data parser.
-     */
-    private function userParser(): UserDataParser
-    {
-        if (!$this->userParser instanceof UserDataParser) {
-            $this->userParser = new UserDataParser($this->input, $this->userRead);
-        }
-
-        return $this->userParser;
     }
 
     /**

@@ -144,7 +144,7 @@ class PageRead
     }
 
     /**
-     * Finds one public page by slug and optional channel slug.
+     * Finds one published page by slug and optional channel slug.
      *
      * Unchanneled pages resolve at root; channeled pages require an explicit channel slug match.
      *
@@ -152,7 +152,7 @@ class PageRead
      * @param string|null $channelSlug Optional channel slug to scope the lookup.
      * @return array<string, mixed>|null Hydrated page row with channel context, or null when not found.
      */
-    public function findPublicPage(string $pageSlug, ?string $channelSlug = null): ?array
+    public function findPublishedBySlug(string $pageSlug, ?string $channelSlug = null): ?array
     {
         $pages = $this->table('pages');
         $sql = 'SELECT p.*
@@ -192,13 +192,13 @@ class PageRead
     }
 
     /**
-     * Finds one public page by id and optional channel slug.
+     * Finds one published page by id and optional channel slug.
      *
      * @param int         $pageId      Page id to resolve.
      * @param string|null $channelSlug Optional channel slug to scope the lookup.
      * @return array<string, mixed>|null Hydrated page row with channel context, or null when not found.
      */
-    public function findPublicPageById(int $pageId, ?string $channelSlug = null): ?array
+    public function findPublishedById(int $pageId, ?string $channelSlug = null): ?array
     {
         if ($pageId < 1) {
             return null;
@@ -484,8 +484,8 @@ class PageRead
      * Returns total page count with optional prefilters.
      *
      * @param int|null $channelId  Optional channel id filter resolved before repository entry.
-     * @param int|null $categoryId Optional category id filter from the panel UI.
-     * @param int|null $tagId      Optional tag id filter from the panel UI.
+     * @param int|null $categoryId Optional category id filter.
+     * @param int|null $tagId      Optional tag id filter.
      * @return int Total matching page count.
      */
     public function count(?int $channelId = null, ?int $categoryId = null, ?int $tagId = null): int
@@ -496,7 +496,7 @@ class PageRead
 
         $where = ['1 = 1'];
         $params = [];
-        $this->appendPanelFilterClauses(
+        $this->appendFilterClauses(
             $where,
             $params,
             $channelId,
@@ -525,8 +525,8 @@ class PageRead
      * @param int      $limit      Maximum number of rows to return.
      * @param int      $offset     Zero-based row offset for pagination.
      * @param int|null $channelId  Optional channel id filter resolved before repository entry.
-     * @param int|null $categoryId Optional category id filter from the panel UI.
-     * @param int|null $tagId      Optional tag id filter from the panel UI.
+     * @param int|null $categoryId Optional category id filter.
+     * @param int|null $tagId      Optional tag id filter.
      * @return array<int, array<string, mixed>> Paginated page rows with channel context.
      */
     public function listPaged(
@@ -542,7 +542,7 @@ class PageRead
 
         $where = ['1 = 1'];
         $params = [];
-        $this->appendPanelFilterClauses(
+        $this->appendFilterClauses(
             $where,
             $params,
             $channelId,
@@ -590,8 +590,8 @@ class PageRead
      * @param int      $limit      Maximum number of rows to return.
      * @param int      $offset     Zero-based row offset for pagination.
      * @param int|null $channelId  Optional channel id filter resolved before repository entry.
-     * @param int|null $categoryId Optional category id filter from the panel UI.
-     * @param int|null $tagId      Optional tag id filter from the panel UI.
+     * @param int|null $categoryId Optional category id filter.
+     * @param int|null $tagId      Optional tag id filter.
      * @return array{rows: array<int, array<string, mixed>>, total: int} Paginated rows and total count.
      */
     public function listPage(
@@ -609,7 +609,7 @@ class PageRead
 
         $pageWhere = ['1 = 1'];
         $pageParams = [];
-        $this->appendPanelFilterClauses(
+        $this->appendFilterClauses(
             $pageWhere,
             $pageParams,
             $channelId,
@@ -624,7 +624,7 @@ class PageRead
 
         $countWhere = ['1 = 1'];
         $countParams = [];
-        $this->appendPanelFilterClauses(
+        $this->appendFilterClauses(
             $countWhere,
             $countParams,
             $channelId,
@@ -806,7 +806,7 @@ class PageRead
      * @param int $id Page id to load.
      * @return array{page: array<string, mixed>, gallery_rows: array<int, array<string, mixed>>}|null Null when not found.
      */
-    public function editFormDataById(int $id): ?array
+    public function findByIdWithGalleryRows(int $id): ?array
     {
         $pages = $this->table('pages');
         $images = $this->table('media');
@@ -1330,7 +1330,7 @@ class PageRead
     }
 
     /**
-     * Appends shared panel-filter SQL clauses for page list/count queries.
+     * Appends shared SQL clauses for page list/count queries.
      *
      * @param array<int, string>        $where                 Mutable WHERE-clause fragment list.
      * @param array<string, int|string> $params                Mutable prepared-statement parameter map.
@@ -1344,7 +1344,7 @@ class PageRead
      * @param bool                      $includeTagFilters      Whether tag filter clauses should be emitted.
      * @return void
      */
-    private function appendPanelFilterClauses(
+    private function appendFilterClauses(
         array &$where,
         array &$params,
         ?int $channelId,

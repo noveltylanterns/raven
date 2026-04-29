@@ -14,7 +14,6 @@ namespace Raven\Core\Controller\Public;
 use Raven\Core\Repository\PageRead;
 use Raven\Core\Routing\Public\ChannelPageRouter;
 use Raven\Lib\Parser\ChannelRouteParser;
-use Raven\Lib\Parser\PageDataParser;
 use Raven\Lib\Parser\TagRepoParser;
 use Raven\Lib\View\Public\TemplateDecorator;
 use Raven\Lib\View\Public\ThemeCatalog;
@@ -26,7 +25,7 @@ use Raven\Lib\View\Public\ThemeTemplate;
 final class TagController
 {
     private SharedController $context;
-    private PageDataParser $pageParser;
+    private PageRead $pageRead;
     private TagRepoParser $tagLookupRepo;
     private TemplateDecorator $templateDecorator;
     private ChannelPageRouter $publicChannelPageRouteService;
@@ -47,7 +46,7 @@ final class TagController
         ThemeCatalog $themeCatalogService
     ) {
         $this->context = $context;
-        $this->pageParser = new PageDataParser($context->input(), $pageRepo);
+        $this->pageRead = $pageRepo;
         $this->tagLookupRepo = $tagLookupRepo;
         $this->templateDecorator = new TemplateDecorator(
             $context->config(),
@@ -82,7 +81,7 @@ final class TagController
         $perPage = max(1, (int) $this->context->config()->get('tag.pagination', 10));
         $pageNumber = max(1, $pageNumber);
         $offset = ($pageNumber - 1) * $perPage;
-        $pageResult = $this->pageParser->listPageByTagSlug($tagSlug, $perPage, $offset);
+        $pageResult = $this->pageRead->listPageByTagSlug($tagSlug, $perPage, $offset);
         $total = (int) ($pageResult['total'] ?? 0);
         $totalPages = max(1, (int) ceil($total / $perPage));
 

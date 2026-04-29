@@ -15,7 +15,6 @@ use Closure;
 use Raven\Core\Repository\SetRead;
 use Raven\Core\Repository\TagRead;
 use Raven\Lib\Parser\ChannelDataParser;
-use Raven\Lib\Parser\TagDataParser;
 use Raven\Lib\Security\InputSanitizer;
 
 /**
@@ -30,7 +29,6 @@ final class TagListController
     private InputSanitizer $input;
     private Closure $tagReadResolver;
     private ?TagRead $tagRead = null;
-    private ?TagDataParser $tagParser = null;
     private Closure $tagSetRepoResolver;
     private ?SetRead $tagSetRepo = null;
     private bool $tagEnabled;
@@ -77,7 +75,7 @@ final class TagListController
             return;
         }
 
-        $tagCountsBySetId = $this->tagParser()->countsBySetId();
+        $tagCountsBySetId = $this->tagRead()->countsBySetId();
         $selectedSetId = $this->input->int($_GET['set'] ?? null, 0);
         if (
             $selectedSetId !== null
@@ -91,12 +89,12 @@ final class TagListController
 
         $requestedPage = $this->input->int($_GET['page'] ?? null, 1) ?? 1;
         $perPage = 50;
-        $pageResult = $this->tagParser()->listPage($perPage, ($requestedPage - 1) * $perPage, $selectedSetId);
+        $pageResult = $this->tagRead()->listPage($perPage, ($requestedPage - 1) * $perPage, $selectedSetId);
         $totalItems = (int) ($pageResult['total'] ?? 0);
         $tagRows = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
         $pagination = $this->context->panelPaginationState($totalItems, $requestedPage, $perPage);
         if ($totalItems > 0 && $pagination['current'] !== $requestedPage) {
-            $pageResult = $this->tagParser()->listPage($perPage, $pagination['offset'], $selectedSetId);
+            $pageResult = $this->tagRead()->listPage($perPage, $pagination['offset'], $selectedSetId);
             $tagRows = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
         }
 
@@ -142,7 +140,7 @@ final class TagListController
         }
 
         // Annotate each set row with its tag and channel usage counts.
-        $countsBySetId = $this->tagParser()->countsBySetId();
+        $countsBySetId = $this->tagRead()->countsBySetId();
         $channelCountsBySetId = $this->channelParser->explicitTaxonomySetCounts('tag');
         $setRows = [];
         foreach ($this->tagSetRepo()->listAll() as $setRow) {
@@ -180,22 +178,6 @@ final class TagListController
 
         $this->tagRead = $repo;
         return $this->tagRead;
-    }
-
-    /**
-     * Returns the tag parser on first use so read-only tag flows route through
-     * the canonical parser surface instead of the repository.
-     *
-     * @return TagDataParser Tag data parser.
-     */
-    private function tagParser(): TagDataParser
-    {
-        if ($this->tagParser instanceof TagDataParser) {
-            return $this->tagParser;
-        }
-
-        $this->tagParser = new TagDataParser($this->input, $this->tagRead());
-        return $this->tagParser;
     }
 
     /**

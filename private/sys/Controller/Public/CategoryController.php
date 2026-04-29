@@ -15,7 +15,6 @@ use Raven\Core\Repository\PageRead;
 use Raven\Core\Routing\Public\ChannelPageRouter;
 use Raven\Lib\Parser\CategoryRepoParser;
 use Raven\Lib\Parser\ChannelRouteParser;
-use Raven\Lib\Parser\PageDataParser;
 use Raven\Lib\View\Public\TemplateDecorator;
 use Raven\Lib\View\Public\ThemeCatalog;
 use Raven\Lib\View\Public\ThemeTemplate;
@@ -26,7 +25,7 @@ use Raven\Lib\View\Public\ThemeTemplate;
 final class CategoryController
 {
     private SharedController $context;
-    private PageDataParser $pageParser;
+    private PageRead $pageRead;
     private CategoryRepoParser $categoryLookupRepo;
     private TemplateDecorator $templateDecorator;
     private ChannelPageRouter $publicChannelPageRouteService;
@@ -47,7 +46,7 @@ final class CategoryController
         ThemeCatalog $themeCatalogService
     ) {
         $this->context = $context;
-        $this->pageParser = new PageDataParser($context->input(), $pageRepo);
+        $this->pageRead = $pageRepo;
         $this->categoryLookupRepo = $categoryLookupRepo;
         $this->templateDecorator = new TemplateDecorator(
             $context->config(),
@@ -82,7 +81,7 @@ final class CategoryController
         $perPage = max(1, (int) $this->context->config()->get('category.pagination', 10));
         $pageNumber = max(1, $pageNumber);
         $offset = ($pageNumber - 1) * $perPage;
-        $pageResult = $this->pageParser->listPageByCategorySlug($categorySlug, $perPage, $offset);
+        $pageResult = $this->pageRead->listPageByCategorySlug($categorySlug, $perPage, $offset);
         $total = (int) ($pageResult['total'] ?? 0);
         $totalPages = max(1, (int) ceil($total / $perPage));
 

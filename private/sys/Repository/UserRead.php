@@ -13,7 +13,6 @@ namespace Raven\Core\Repository;
 use PDO;
 use Raven\Lib\Auth\AuthPayloadCodec;
 use Raven\Lib\Auth\ContactProfileNormalizer;
-use Raven\Lib\Auth\Panel\UserPanelHydrator;
 use Raven\Lib\Database\TableNameResolver;
 
 /**
@@ -29,7 +28,6 @@ class UserRead
     private string $driver;
     private string $prefix;
     private AuthPayloadCodec $authPayloadCodec;
-    private UserPanelHydrator $panelHydrator;
 
     /**
      * @param PDO    $authDb Auth-database connection (users/passwords).
@@ -45,7 +43,6 @@ class UserRead
         $this->driver = $driver;
         $this->prefix = preg_replace('/[^a-zA-Z0-9_]/', '', $prefix) ?? '';
         $this->authPayloadCodec = new AuthPayloadCodec(new ContactProfileNormalizer());
-        $this->panelHydrator = new UserPanelHydrator();
     }
 
     /**
@@ -69,7 +66,7 @@ class UserRead
         // Build group rows separately to keep the main users query simple and portable.
         $groupMap = $this->groupEntriesByUserId();
 
-        return $this->hydratePanelUsers($users, $groupMap);
+        return $this->hydrateUsersWithGroupEntries($users, $groupMap);
     }
 
     /**
@@ -146,7 +143,7 @@ class UserRead
             ];
         }
 
-        return $this->hydratePanelUsers(array_values($usersById), $groupMap);
+        return $this->hydrateUsersWithGroupEntries(array_values($usersById), $groupMap);
     }
 
     /**
@@ -315,7 +312,7 @@ class UserRead
 
         return [
             'group_rows' => $groupRows,
-            'user_rows'  => $this->hydratePanelUsers(array_values($usersById), $groupMap),
+            'user_rows'  => $this->hydrateUsersWithGroupEntries(array_values($usersById), $groupMap),
         ];
     }
 
@@ -426,7 +423,7 @@ class UserRead
         $users = $stmt->fetchAll() ?: [];
         $groupMap = $this->groupEntriesByUserId($userIds);
 
-        return $this->hydratePanelUsers($users, $groupMap);
+        return $this->hydrateUsersWithGroupEntries($users, $groupMap);
     }
 
     /**
@@ -615,7 +612,7 @@ class UserRead
         );
 
         return [
-            'rows'          => $this->hydratePanelUsers(array_values($usersById), $groupMap),
+            'rows'          => $this->hydrateUsersWithGroupEntries(array_values($usersById), $groupMap),
             'total'         => $total,
             'group_options' => $groupOptions,
         ];
@@ -683,12 +680,12 @@ class UserRead
     }
 
     /**
-     * Returns one public-safe user profile by username.
+     * Returns one profile summary row by username.
      *
      * @param string $username Exact username to look up.
      * @return array{id: int, username: string, string: string, name: string, avatar: string|null, contact: array<int, array{type: string, value: string}>}|null
      */
-    public function findPublicProfileByUsername(string $username): ?array
+    public function findProfileSummaryByUsername(string $username): ?array
     {
         $usersTable = $this->authTable('users');
 
@@ -718,12 +715,12 @@ class UserRead
     }
 
     /**
-     * Returns one public-safe user profile by numeric user id.
+     * Returns one profile summary row by numeric user id.
      *
      * @param int $userId User id to resolve.
      * @return array{id: int, username: string, string: string, name: string, avatar: string|null, contact: array<int, array{type: string, value: string}>}|null
      */
-    public function findPublicProfileById(int $userId): ?array
+    public function findProfileSummaryById(int $userId): ?array
     {
         if ($userId <= 0) {
             return null;
@@ -757,12 +754,12 @@ class UserRead
     }
 
     /**
-     * Returns one public-safe user profile by unique user string token.
+     * Returns one profile summary row by unique user string token.
      *
      * @param string $userString Unique user string token to resolve.
      * @return array{id: int, username: string, string: string, name: string, avatar: string|null, contact: array<int, array{type: string, value: string}>}|null
      */
-    public function findPublicProfileByString(string $userString): ?array
+    public function findProfileSummaryByString(string $userString): ?array
     {
         $normalized = trim($userString);
         if ($normalized === '') {
@@ -797,12 +794,12 @@ class UserRead
     }
 
     /**
-     * Returns public-safe user profiles assigned to one group id.
+     * Returns profile summary rows assigned to one group id.
      *
      * @param int $groupId Group id to look up members for.
      * @return array<int, array{id: int, username: string, string: string, name: string, avatar: string|null}>
      */
-    public function listPublicProfilesByGroupId(int $groupId): array
+    public function listProfileSummariesByGroupId(int $groupId): array
     {
         if ($groupId <= 0) {
             return [];
@@ -1006,15 +1003,41 @@ class UserRead
     }
 
     /**
-     * Hydrates panel-facing user rows with group display metadata.
+     * Hydrates user rows with attached group display metadata.
      *
      * @param array<int, array<string, mixed>> $users    Raw user rows from the auth database.
      * @param array<int, array<int, array{name: string, permissions: int}>> $groupMap User id to group entry map.
      * @return array<int, array<string, mixed>> Hydrated user rows with group display fields.
      */
-    private function hydratePanelUsers(array $users, array $groupMap): array
+    private function hydrateUsersWithGroupEntries(array $users, array $groupMap): array
     {
-        return $this->panelHydrator->hydrate($users, $groupMap);
+        $result = [];
+        foreach ($users as $row) {
+            $userId = (int) ($row['id'] ?? 0);
+            /** @var array<int, array{name: string, permissions: int}> $groupEntries */
+            $groupEntries = $groupMap[$userId] ?? [];
+            $groupNames = array_map(
+                static fn (array $entry): string => (string) ($entry['name'] ?? ''),
+                $groupEntries
+            );
+
+            $result[] = [
+                'id' => $userId,
+                'username' => (string) ($row['username'] ?? ''),
+                'string' => (string) ($row['string'] ?? ''),
+                'name' => (string) ($row['name'] ?? ''),
+                'email' => (string) ($row['email'] ?? ''),
+                'theme' => (string) (($row['theme'] ?? '') !== '' ? $row['theme'] : 'default'),
+                'avatar' => isset($row['avatar']) && $row['avatar'] !== ''
+                    ? (string) $row['avatar']
+                    : null,
+                'groups' => $groupNames,
+                'group_entries' => $groupEntries,
+                'groups_text' => implode(', ', $groupNames),
+            ];
+        }
+
+        return $result;
     }
 
     /**

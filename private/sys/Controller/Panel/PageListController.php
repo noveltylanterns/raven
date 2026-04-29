@@ -11,9 +11,8 @@ declare(strict_types=1);
 
 namespace Raven\Core\Controller\Panel;
 
+use Raven\Core\Repository\ChannelRead;
 use Raven\Core\Repository\PageRead;
-use Raven\Lib\Parser\ChannelDataParser;
-use Raven\Lib\Parser\PageDataParser;
 use Raven\Lib\Security\InputSanitizer;
 
 /**
@@ -27,26 +26,25 @@ final class PageListController
     private SharedController $context;
     private InputSanitizer $input;
     private PageRead $pageRead;
-    private ChannelDataParser $channelParser;
-    private ?PageDataParser $pageParser = null;
+    private ChannelRead $channelRead;
 
     /**
      * @param SharedController $context Shared panel request context.
      * @param InputSanitizer $input Shared request input sanitizer.
      * @param PageRead $pageRead Page repository read side for paginated page list queries.
-     * @param ChannelDataParser $channelParser Channel data parser for channel-slug prefilter resolution.
+     * @param ChannelRead $channelRead Channel repository read side for channel-slug prefilter resolution.
      * @return void
      */
     public function __construct(
         SharedController $context,
         InputSanitizer $input,
         PageRead $pageRead,
-        ChannelDataParser $channelParser
+        ChannelRead $channelRead
     ) {
         $this->context = $context;
         $this->input = $input;
         $this->pageRead = $pageRead;
-        $this->channelParser = $channelParser;
+        $this->channelRead = $channelRead;
     }
 
     /**
@@ -72,12 +70,12 @@ final class PageListController
         }
         $requestedPage = $this->input->int($_GET['page'] ?? null, 1) ?? 1;
         $perPage = 50;
-        $prefilterChannelId = $prefilterChannel !== '' ? $this->channelParser->idBySlug($prefilterChannel) : null;
+        $prefilterChannelId = $prefilterChannel !== '' ? $this->channelRead->idBySlug($prefilterChannel) : null;
         // An unknown channel slug should behave like an empty filtered result, not like "all channels".
         $hasMissingChannelPrefilter = $prefilterChannel !== '' && $prefilterChannelId === null;
         $pageResult = $hasMissingChannelPrefilter
             ? ['rows' => [], 'total' => 0]
-            : $this->pageParser()->listPage(
+            : $this->pageRead->listPage(
                 $perPage,
                 ($requestedPage - 1) * $perPage,
                 $prefilterChannelId,
@@ -88,7 +86,7 @@ final class PageListController
         $pageRows = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
         $pagination = $this->context->panelPaginationState($totalItems, $requestedPage, $perPage);
         if (!$hasMissingChannelPrefilter && $totalItems > 0 && $pagination['current'] !== $requestedPage) {
-            $pageResult = $this->pageParser()->listPage(
+            $pageResult = $this->pageRead->listPage(
                 $perPage,
                 $pagination['offset'],
                 $prefilterChannelId,
@@ -127,20 +125,5 @@ final class PageListController
             'section' => 'page',
             'pageNav' => 'list',
         ]);
-    }
-
-    /**
-     * Returns the page parser on first use so the repository is not instantiated
-     * until an actual page list query is needed.
-     *
-     * @return PageDataParser Page data parser.
-     */
-    private function pageParser(): PageDataParser
-    {
-        if (!$this->pageParser instanceof PageDataParser) {
-            $this->pageParser = new PageDataParser($this->input, $this->pageRead);
-        }
-
-        return $this->pageParser;
     }
 }

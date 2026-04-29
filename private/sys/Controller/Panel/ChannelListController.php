@@ -11,7 +11,7 @@ declare(strict_types=1);
 
 namespace Raven\Core\Controller\Panel;
 
-use Raven\Lib\Parser\ChannelDataParser;
+use Raven\Core\Repository\ChannelRead;
 use Raven\Lib\Security\InputSanitizer;
 
 /**
@@ -24,22 +24,22 @@ final class ChannelListController
 {
     private SharedController $context;
     private InputSanitizer $input;
-    private ChannelDataParser $channelParser;
+    private ChannelRead $channelRead;
 
     /**
      * @param SharedController $context Shared panel request context.
      * @param InputSanitizer $input Shared request input sanitizer.
-     * @param ChannelDataParser $channelParser Channel data parser for paginated channel listings.
+     * @param ChannelRead $channelRead Channel repository read side for paginated channel listings.
      * @return void
      */
     public function __construct(
         SharedController $context,
         InputSanitizer $input,
-        ChannelDataParser $channelParser
+        ChannelRead $channelRead
     ) {
         $this->context = $context;
         $this->input = $input;
-        $this->channelParser = $channelParser;
+        $this->channelRead = $channelRead;
     }
 
     /**
@@ -56,12 +56,12 @@ final class ChannelListController
 
         $requestedPage = $this->input->int($_GET['page'] ?? null, 1) ?? 1;
         $perPage = 50;
-        $pageResult = $this->channelParser->listPage($perPage, ($requestedPage - 1) * $perPage);
+        $pageResult = $this->channelRead->listPage($perPage, ($requestedPage - 1) * $perPage);
         $totalItems = (int) ($pageResult['total'] ?? 0);
         $channelRows = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
         $pagination = $this->context->panelPaginationState($totalItems, $requestedPage, $perPage);
         if ($totalItems > 0 && $pagination['current'] !== $requestedPage) {
-            $pageResult = $this->channelParser->listPage($perPage, $pagination['offset']);
+            $pageResult = $this->channelRead->listPage($perPage, $pagination['offset']);
             $channelRows = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
         }
 

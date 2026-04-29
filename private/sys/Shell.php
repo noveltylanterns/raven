@@ -27,11 +27,6 @@ use Raven\Lib\Extension\Registry;
 use Raven\Lib\Extension\Panel\ExtensionScaffoldService;
 use Raven\Lib\Extension\Resolver;
 use Raven\Lib\Extension\StateRead;
-use Raven\Lib\Parser\CategoryDataParser;
-use Raven\Lib\Parser\ChannelDataParser;
-use Raven\Lib\Parser\GroupDataParser;
-use Raven\Lib\Parser\RedirectDataParser;
-use Raven\Lib\Parser\TagDataParser;
 use Raven\Lib\Scheduler\Registry as SchedulerRegistry;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\Scribe\ConfigScribe;
@@ -466,6 +461,31 @@ function raven_cli_slug_from_text(array $rvn, string $raw, string $label = 'Slug
     }
 
     return $slug;
+}
+
+/**
+ * Normalizes one optional slug selector from CLI input.
+ *
+ * Returns null when the option was omitted, blank, or fails slug normalization.
+ * Callers can treat null as "no selector provided" or as a definitive miss,
+ * depending on whether a malformed slug should fail open or fail closed.
+ *
+ * @param array<string, mixed> $rvn Shared Raven runtime container with the input normalizer.
+ * @param mixed                $raw Raw CLI option value to normalize.
+ * @return string|null Normalized slug, or null when the input is blank/invalid.
+ */
+function raven_cli_optional_slug(array $rvn, mixed $raw): ?string
+{
+    if (!is_scalar($raw)) {
+        return null;
+    }
+
+    $value = trim((string) $raw);
+    if ($value === '') {
+        return null;
+    }
+
+    return $rvn['input']->slug($value);
 }
 
 /**
@@ -950,10 +970,22 @@ function raven_cli_command_category(RavenCliContext $context, array $tokens): in
         $rvn = $context->rvn();
         $repoRead = new CategoryRead($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix']);
         $repo = new CategoryWrite($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix'], $repoRead);
-        $parser = new CategoryDataParser($rvn['input'], $repoRead);
+        $resolveCategory = static function (array $selectorOptions) use ($rvn, $repoRead): ?array {
+            $idRaw = raven_cli_option($selectorOptions, 'id', null);
+            if (is_scalar($idRaw) && trim((string) $idRaw) !== '') {
+                return $repoRead->findById((int) $idRaw);
+            }
+
+            $slug = raven_cli_optional_slug($rvn, raven_cli_option($selectorOptions, 'slug', ''));
+            if ($slug === null) {
+                return null;
+            }
+
+            return $repoRead->findBySlug($slug);
+        };
 
         if ($action === 'list') {
-            $rows = $parser->listAll();
+            $rows = $repoRead->listAll();
             if ($context->json) {
                 $context->printJson(['ok' => true, 'items' => $rows]);
             } else {
@@ -967,16 +999,7 @@ function raven_cli_command_category(RavenCliContext $context, array $tokens): in
         }
 
         if ($action === 'show') {
-            $row = null;
-            $idRaw = raven_cli_option($options, 'id', null);
-            if (is_scalar($idRaw) && trim((string) $idRaw) !== '') {
-                $row = $parser->findById((int) $idRaw);
-            } else {
-                $slugRaw = (string) raven_cli_option($options, 'slug', '');
-                if ($slugRaw !== '') {
-                    $row = $parser->findBySlug($slugRaw);
-                }
-            }
+            $row = $resolveCategory($options);
 
             if (!is_array($row)) {
                 throw new RuntimeException('Category not found.');
@@ -995,15 +1018,7 @@ function raven_cli_command_category(RavenCliContext $context, array $tokens): in
         if ($action === 'create' || $action === 'update') {
             $existing = null;
             if ($action === 'update') {
-                $idRaw = raven_cli_option($options, 'id', null);
-                if (is_scalar($idRaw) && trim((string) $idRaw) !== '') {
-                    $existing = $parser->findById((int) $idRaw);
-                } else {
-                    $slugRaw = (string) raven_cli_option($options, 'slug', '');
-                    if ($slugRaw !== '') {
-                        $existing = $parser->findBySlug($slugRaw);
-                    }
-                }
+                $existing = $resolveCategory($options);
 
                 if (!is_array($existing)) {
                     throw new RuntimeException('Category to update was not found (use --id or --slug).');
@@ -1050,16 +1065,7 @@ function raven_cli_command_category(RavenCliContext $context, array $tokens): in
         }
 
         if ($action === 'delete') {
-            $idRaw = raven_cli_option($options, 'id', null);
-            $row = null;
-            if (is_scalar($idRaw) && trim((string) $idRaw) !== '') {
-                $row = $parser->findById((int) $idRaw);
-            } else {
-                $slugRaw = (string) raven_cli_option($options, 'slug', '');
-                if ($slugRaw !== '') {
-                    $row = $parser->findBySlug($slugRaw);
-                }
-            }
+            $row = $resolveCategory($options);
 
             if (!is_array($row)) {
                 throw new RuntimeException('Category not found (use --id or --slug).');
@@ -1108,10 +1114,22 @@ function raven_cli_command_tag(RavenCliContext $context, array $tokens): int
         $rvn = $context->rvn();
         $repoRead = new TagRead($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix']);
         $repo = new TagWrite($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix'], $repoRead);
-        $parser = new TagDataParser($rvn['input'], $repoRead);
+        $resolveTag = static function (array $selectorOptions) use ($rvn, $repoRead): ?array {
+            $idRaw = raven_cli_option($selectorOptions, 'id', null);
+            if (is_scalar($idRaw) && trim((string) $idRaw) !== '') {
+                return $repoRead->findById((int) $idRaw);
+            }
+
+            $slug = raven_cli_optional_slug($rvn, raven_cli_option($selectorOptions, 'slug', ''));
+            if ($slug === null) {
+                return null;
+            }
+
+            return $repoRead->findBySlug($slug);
+        };
 
         if ($action === 'list') {
-            $rows = $parser->listAll();
+            $rows = $repoRead->listAll();
             if ($context->json) {
                 $context->printJson(['ok' => true, 'items' => $rows]);
             } else {
@@ -1125,16 +1143,7 @@ function raven_cli_command_tag(RavenCliContext $context, array $tokens): int
         }
 
         if ($action === 'show') {
-            $row = null;
-            $idRaw = raven_cli_option($options, 'id', null);
-            if (is_scalar($idRaw) && trim((string) $idRaw) !== '') {
-                $row = $parser->findById((int) $idRaw);
-            } else {
-                $slugRaw = (string) raven_cli_option($options, 'slug', '');
-                if ($slugRaw !== '') {
-                    $row = $parser->findBySlug($slugRaw);
-                }
-            }
+            $row = $resolveTag($options);
 
             if (!is_array($row)) {
                 throw new RuntimeException('Tag not found.');
@@ -1153,15 +1162,7 @@ function raven_cli_command_tag(RavenCliContext $context, array $tokens): int
         if ($action === 'create' || $action === 'update') {
             $existing = null;
             if ($action === 'update') {
-                $idRaw = raven_cli_option($options, 'id', null);
-                if (is_scalar($idRaw) && trim((string) $idRaw) !== '') {
-                    $existing = $parser->findById((int) $idRaw);
-                } else {
-                    $slugRaw = (string) raven_cli_option($options, 'slug', '');
-                    if ($slugRaw !== '') {
-                        $existing = $parser->findBySlug($slugRaw);
-                    }
-                }
+                $existing = $resolveTag($options);
 
                 if (!is_array($existing)) {
                     throw new RuntimeException('Tag to update was not found (use --id or --slug).');
@@ -1208,16 +1209,7 @@ function raven_cli_command_tag(RavenCliContext $context, array $tokens): int
         }
 
         if ($action === 'delete') {
-            $idRaw = raven_cli_option($options, 'id', null);
-            $row = null;
-            if (is_scalar($idRaw) && trim((string) $idRaw) !== '') {
-                $row = $parser->findById((int) $idRaw);
-            } else {
-                $slugRaw = (string) raven_cli_option($options, 'slug', '');
-                if ($slugRaw !== '') {
-                    $row = $parser->findBySlug($slugRaw);
-                }
-            }
+            $row = $resolveTag($options);
 
             if (!is_array($row)) {
                 throw new RuntimeException('Tag not found (use --id or --slug).');
@@ -1266,10 +1258,22 @@ function raven_cli_command_channel(RavenCliContext $context, array $tokens): int
         $rvn = $context->rvn();
         $repoRead = new ChannelRead($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix'], (string) $rvn['root'] . '/private/dat/channel');
         $repo = new ChannelWrite($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix'], $repoRead, (string) $rvn['root'] . '/private/dat/channel');
-        $parser = new ChannelDataParser($rvn['config'], $rvn['input'], $repoRead);
+        $resolveChannel = static function (array $selectorOptions) use ($rvn, $repoRead): ?array {
+            $idRaw = raven_cli_option($selectorOptions, 'id', null);
+            if (is_scalar($idRaw) && trim((string) $idRaw) !== '') {
+                return $repoRead->findById((int) $idRaw);
+            }
+
+            $slug = raven_cli_optional_slug($rvn, raven_cli_option($selectorOptions, 'slug', ''));
+            if ($slug === null) {
+                return null;
+            }
+
+            return $repoRead->findBySlug($slug);
+        };
 
         if ($action === 'list') {
-            $rows = $parser->listAll();
+            $rows = $repoRead->listAll();
             if ($context->json) {
                 $context->printJson(['ok' => true, 'items' => $rows]);
             } else {
@@ -1282,16 +1286,7 @@ function raven_cli_command_channel(RavenCliContext $context, array $tokens): int
         }
 
         if ($action === 'show') {
-            $row = null;
-            $idRaw = raven_cli_option($options, 'id', null);
-            if (is_scalar($idRaw) && trim((string) $idRaw) !== '') {
-                $row = $parser->findById((int) $idRaw);
-            } else {
-                $slugRaw = (string) raven_cli_option($options, 'slug', '');
-                if ($slugRaw !== '') {
-                    $row = $parser->findBySlug($slugRaw);
-                }
-            }
+            $row = $resolveChannel($options);
 
             if (!is_array($row)) {
                 throw new RuntimeException('Channel not found.');
@@ -1310,15 +1305,7 @@ function raven_cli_command_channel(RavenCliContext $context, array $tokens): int
         if ($action === 'create' || $action === 'update') {
             $existing = null;
             if ($action === 'update') {
-                $idRaw = raven_cli_option($options, 'id', null);
-                if (is_scalar($idRaw) && trim((string) $idRaw) !== '') {
-                    $existing = $parser->findById((int) $idRaw);
-                } else {
-                    $slugRaw = (string) raven_cli_option($options, 'slug', '');
-                    if ($slugRaw !== '') {
-                        $existing = $parser->findBySlug($slugRaw);
-                    }
-                }
+                $existing = $resolveChannel($options);
 
                 if (!is_array($existing)) {
                     throw new RuntimeException('Channel to update was not found (use --id or --slug).');
@@ -1372,16 +1359,7 @@ function raven_cli_command_channel(RavenCliContext $context, array $tokens): int
         }
 
         if ($action === 'delete') {
-            $row = null;
-            $idRaw = raven_cli_option($options, 'id', null);
-            if (is_scalar($idRaw) && trim((string) $idRaw) !== '') {
-                $row = $parser->findById((int) $idRaw);
-            } else {
-                $slugRaw = (string) raven_cli_option($options, 'slug', '');
-                if ($slugRaw !== '') {
-                    $row = $parser->findBySlug($slugRaw);
-                }
-            }
+            $row = $resolveChannel($options);
 
             if (!is_array($row)) {
                 throw new RuntimeException('Channel not found (use --id or --slug).');
@@ -1431,7 +1409,6 @@ function raven_cli_command_group(RavenCliContext $context, array $tokens): int
         $rvn = $context->rvn();
         $repoRead = new GroupRead($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix']);
         $repo = new GroupWrite($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix'], $repoRead);
-        $parser = new GroupDataParser($rvn['input'], $repoRead);
 
         $orderedPermissions = [
             'view_public' => PanelAccess::VIEW_PUBLIC_SITE,
@@ -1477,18 +1454,18 @@ function raven_cli_command_group(RavenCliContext $context, array $tokens): int
             return $names;
         };
 
-        $resolveGroup = static function (array $selectorOptions) use ($parser): ?array {
+        $resolveGroup = static function (array $selectorOptions) use ($rvn, $repoRead): ?array {
             $idRaw = raven_cli_option($selectorOptions, 'id', null);
             if (is_scalar($idRaw) && trim((string) $idRaw) !== '') {
-                return $parser->findById((int) $idRaw);
+                return $repoRead->findById((int) $idRaw);
             }
 
-            $slugRaw = (string) raven_cli_option($selectorOptions, 'slug', '');
-            if ($slugRaw === '') {
+            $slug = raven_cli_optional_slug($rvn, raven_cli_option($selectorOptions, 'slug', ''));
+            if ($slug === null) {
                 return null;
             }
 
-            return $parser->findBySlug($slugRaw);
+            return $repoRead->findBySlug($slug);
         };
 
         $parsePermissionMask = static function (array $sourceOptions, int $defaultMask) use ($permissionAliases, $orderedPermissions): int {
@@ -1544,7 +1521,7 @@ function raven_cli_command_group(RavenCliContext $context, array $tokens): int
         };
 
         if ($action === 'list') {
-            $rows = $parser->listAll();
+            $rows = $repoRead->listAll();
             $items = [];
             foreach ($rows as $row) {
                 if (!is_array($row)) {
@@ -1699,25 +1676,25 @@ function raven_cli_command_redirect(RavenCliContext $context, array $tokens): in
         $channelRepo = new ChannelRead($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix'], (string) $rvn['root'] . '/private/dat/channel');
         $repoRead = new RedirectRead($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix'], $channelRepo);
         $repo = new RedirectWrite($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix'], $channelRepo);
-        $parser = new RedirectDataParser($rvn['input'], $repoRead);
 
-        $findRedirect = static function (array $options) use ($parser): ?array {
+        $findRedirect = static function (array $options) use ($rvn, $repoRead): ?array {
             $idRaw = raven_cli_option($options, 'id', null);
             if (is_scalar($idRaw) && trim((string) $idRaw) !== '') {
-                return $parser->findById((int) $idRaw);
+                return $repoRead->findById((int) $idRaw);
             }
 
-            $slug = (string) raven_cli_option($options, 'slug', '');
-            $channel = (string) raven_cli_option($options, 'channel', '');
-            if ($slug === '') {
+            $slug = raven_cli_optional_slug($rvn, raven_cli_option($options, 'slug', ''));
+            if ($slug === null) {
                 return null;
             }
 
-            return $parser->findBySlug($slug, $channel !== '' ? $channel : null);
+            $channel = raven_cli_optional_slug($rvn, raven_cli_option($options, 'channel', ''));
+
+            return $repoRead->findBySlug($slug, $channel);
         };
 
         if ($action === 'list') {
-            $rows = $parser->listAll();
+            $rows = $repoRead->listAll();
             if ($context->json) {
                 $context->printJson(['ok' => true, 'items' => $rows]);
             } else {
@@ -1729,7 +1706,7 @@ function raven_cli_command_redirect(RavenCliContext $context, array $tokens): in
                         . '/'
                         . (string) ($row['slug'] ?? '')
                         . ' -> '
-                        . (string) ($row['target_url'] ?? '')
+                        . (string) ($row['target'] ?? '')
                     );
                 }
                 $context->ok('Listed ' . count($rows) . ' redirects.');

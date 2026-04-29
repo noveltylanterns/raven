@@ -127,6 +127,7 @@ This file is the fast system map for Raven CMS. Use it to quickly understand the
   - Core content/taxonomy/auth-facing persistence split into `*Read` (SELECT/lookup) and `*Write` (INSERT/UPDATE/DELETE) classes for each domain.
   - Read classes: `PageRead`, `ChannelRead`, `UserRead`, `GroupRead`, `CategoryRead`, `TagRead`, `SetRead`, `RedirectRead`, `MediaRead`, `InviteRead`.
   - Write classes: `PageWrite`, `ChannelWrite`, `UserWrite`, `GroupWrite`, `CategoryWrite`, `TagWrite`, `SetWrite`, `RedirectWrite`, `MediaWrite`, `InviteWrite`. Each `*Write` takes the corresponding `*Read` as a constructor arg for validation lookups.
+  - Repositories are the shared storage layer only: panel/public helper services should not be loaded into repo constructors. `UserRead` and `GroupRead` now keep their same-domain row shaping inline instead of instantiating the old route-scope auth helpers `UserPanelHydrator` and `GroupPublicRouteService`, and repository method names are being moved away from panel/public wording where the underlying data access is generic.
   - Bridge shims (`*Repository` files, e.g. `PageRepository extends PageRead`) remain for extension backward-compatibility. Do not add new core dependencies on bridge classes; use `*Read`/`*Write` directly.
 - `private/sys/Routing/`
   - Raven-owned request-dispatch primitives, runtime builders, and route registrars. Not for extension use.
@@ -141,8 +142,8 @@ This file is the fast system map for Raven CMS. Use it to quickly understand the
 - `private/lib/Auth/`
   - All auth and permission machinery for both core and extensions.
   - Includes `AuthService` (delight-im wrapper + auth/session/read facade), login/2FA flow services, group role policy, and user/session helpers. Existing-account auth-user writes now route through `lib/Scribe/AuthProfileScribe.php`.
-  - `Auth/Panel/` — panel-only ACL classes: `PanelAccess` (permission bit constants), `PanelAccessCatalog`, `PanelPermissionDefinitionCatalog`, `PanelSessionGuard`, `PanelInvitePolicyService`, `PanelTwoFactorPreferencesService`, `UserPanelHydrator`.
-  - `Auth/Public/` — public-route-only auth helpers: `GroupPublicRouteService`.
+  - `Auth/Panel/` — panel-only ACL classes: `PanelAccess` (permission bit constants), `PanelAccessCatalog`, `PanelPermissionDefinitionCatalog`, `PanelSessionGuard`, `PanelInvitePolicyService`, and `PanelTwoFactorPreferencesService`.
+  - `Auth/Public/` — public-route-only auth helpers.
   - Login-time 2FA orchestration now hangs off `LoginChallengeFlow`, `LoginChallengeState`, `LoginEmailChallenge`, `LoginEmailDelivery`, and `LoginWebAuthnChallengeService` instead of the older `TwoFactor*` login helper names.
   - `SessionFlash.php` — session-backed flash message store; used by both panel and public routes.
   - `SessionCookie.php` — session cookie configuration policy; applied at bootstrap.
@@ -210,8 +211,9 @@ This file is the fast system map for Raven CMS. Use it to quickly understand the
   - HTTP-layer helpers for both panel and public routes: `Response` (JSON/common header dispatch), `Request` (request context resolution plus canonical `path()` normalization), `Redirect` (redirect dispatch plus redirect-target validation), `Upload` (upload file-set normalization plus shared HTTP-upload validation, size/error policy, and extension checks).
   - Note: session flash has moved to `lib/Auth/SessionFlash.php`; event logging has moved to `sys/Logger.php`.
 - `private/lib/Media/`
-  - Image upload, validation, variant processing, and path management. All media handling is panel-route-only.
-  - `Media/Panel/` — all media classes live here: `AvatarValidator` (avatar upload constraints), `AvatarUploadService` (low-level avatar/cover upload sanitizer), `MediaManager` (page media lifecycle orchestration), `MediaUploadPolicy`, `ImageVariantProcessor`, `TaxonomyImageService` (read-side taxonomy image config/path helper), `UserMediaPathService` (read-side avatar/cover URL/template helper), and related path/gallery helpers.
+  - Image upload, validation, variant processing, and path management.
+  - `TaxonomyImagePathResolver` lives at the `Media/` root as the neutral taxonomy/group image-path primitive shared by repositories, repo parsers, scribes, and panel helpers.
+  - `Media/Panel/` — panel-route-specific media classes: `AvatarValidator` (avatar upload constraints), `AvatarUploadService` (low-level avatar/cover upload sanitizer), `MediaManager` (page media lifecycle orchestration), `MediaUploadPolicy`, `ImageVariantProcessor`, `TaxonomyImageService` (read-side taxonomy image config/path helper), `UserMediaPathService` (read-side avatar/cover URL/template helper), and related path/gallery helpers.
 - `private/lib/Security/`
   - Security primitives available to core and extensions: CSRF (`Csrf`, `CsrfToken`, `SessionToken`), input sanitization (`InputSanitizer`), 2FA method primitives (`Totp`, `TotpCipher`, `WebAuthn`, `RecoveryPhrase`, `TwoFactorMethodKey`, `TwoFactorMethodNormalizer`, `TwoFactorMethodRules`), and captcha (`Captcha`).
 - `private/lib/Extra/`

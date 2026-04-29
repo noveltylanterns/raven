@@ -96,7 +96,7 @@ final class MediaParser
             return [];
         }
 
-        return $this->repo()->listReadyForPublicPage($pageId);
+        return $this->repo()->listDisplayReadyForPage($pageId);
     }
 
     /**
@@ -114,7 +114,7 @@ final class MediaParser
             return null;
         }
 
-        return $this->repo()->coverImageUrlForPage($pageId);
+        return $this->repo()->coverLargeVariantUrlForPage($pageId);
     }
 
     /**

@@ -209,6 +209,53 @@ class RedirectRead
     }
 
     /**
+     * Returns one redirect row by slug and optional channel scope.
+     *
+     * The repository accepts canonical selector values here: a normalized slug,
+     * plus either a channel id, a normalized channel slug, or null for root scope.
+     * Higher-level parser/controller/CLI layers are responsible for user-input
+     * normalization before calling into this shared data boundary.
+     *
+     * @param string          $slug    Redirect slug to resolve.
+     * @param int|string|null $channel Optional channel scope; null means root scope.
+     * @return array<string, mixed>|null Redirect row with channel context, or null when not found.
+     */
+    public function findBySlug(string $slug, int|string|null $channel = null): ?array
+    {
+        $redirects = $this->table('redirects');
+        $sql = 'SELECT r.id, r.title, r.description, r.slug, r.channel, r.active, r.target, r.created, r.updated
+                FROM ' . $redirects . ' r
+                WHERE r.slug = :slug';
+        $params = [':slug' => $slug];
+
+        if (is_string($channel)) {
+            $channelId = $this->channelRepo->idFromSlug($channel);
+            if ($channelId < 1) {
+                return null;
+            }
+
+            $sql .= ' AND r.channel = :channel';
+            $params[':channel'] = $channelId;
+        } elseif (is_int($channel) && $channel > 0) {
+            $sql .= ' AND r.channel = :channel';
+            $params[':channel'] = $channel;
+        } else {
+            $sql .= ' AND r.channel = 0';
+        }
+
+        $sql .= ' LIMIT 1';
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+
+        $row = $stmt->fetch();
+        if ($row === false) {
+            return null;
+        }
+
+        return $this->withChannelContext($row, $this->channelsByIdMap());
+    }
+
+    /**
      * Returns one redirect id by slug and optional channel scope, or null when not found.
      *
      * $channel accepts a channel ID (int), a channel slug (string), or null for root scope.

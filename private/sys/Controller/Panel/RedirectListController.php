@@ -11,7 +11,7 @@ declare(strict_types=1);
 
 namespace Raven\Core\Controller\Panel;
 
-use Raven\Lib\Parser\RedirectDataParser;
+use Raven\Core\Repository\RedirectRead;
 use Raven\Lib\Security\InputSanitizer;
 
 /**
@@ -24,22 +24,22 @@ final class RedirectListController
 {
     private SharedController $context;
     private InputSanitizer $input;
-    private RedirectDataParser $redirectParser;
+    private RedirectRead $redirectRead;
 
     /**
      * @param SharedController $context Shared panel request context.
      * @param InputSanitizer $input Shared request input sanitizer.
-     * @param RedirectDataParser $redirectParser Canonical parser for redirect listings.
+     * @param RedirectRead $redirectRead Redirect repository read side for panel listings.
      * @return void
      */
     public function __construct(
         SharedController $context,
         InputSanitizer $input,
-        RedirectDataParser $redirectParser
+        RedirectRead $redirectRead
     ) {
         $this->context = $context;
         $this->input = $input;
-        $this->redirectParser = $redirectParser;
+        $this->redirectRead = $redirectRead;
     }
 
     /**
@@ -56,12 +56,12 @@ final class RedirectListController
 
         $requestedPage = $this->input->int($_GET['page'] ?? null, 1) ?? 1;
         $perPage = 50;
-        $pageResult = $this->redirectParser->listPage($perPage, ($requestedPage - 1) * $perPage);
+        $pageResult = $this->redirectRead->listPage($perPage, ($requestedPage - 1) * $perPage);
         $totalItems = (int) ($pageResult['total'] ?? 0);
         $redirectRows = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
         $pagination = $this->context->panelPaginationState($totalItems, $requestedPage, $perPage);
         if ($totalItems > 0 && $pagination['current'] !== $requestedPage) {
-            $pageResult = $this->redirectParser->listPage($perPage, $pagination['offset']);
+            $pageResult = $this->redirectRead->listPage($perPage, $pagination['offset']);
             $redirectRows = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
         }
 

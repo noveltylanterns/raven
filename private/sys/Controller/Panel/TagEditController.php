@@ -19,7 +19,6 @@ use Raven\Core\Repository\TagWrite;
 use Raven\Lib\Media\Panel\TaxonomyImageService;
 use Raven\Lib\Parser\ChannelDataParser;
 use Raven\Lib\Parser\SetParser;
-use Raven\Lib\Parser\TagDataParser;
 use Raven\Lib\Parser\TagRouteParser;
 use Raven\Lib\Scribe\MediaScribe;
 use Raven\Lib\Security\InputSanitizer;
@@ -42,7 +41,6 @@ final class TagEditController
     private ?TagRead $tagRead = null;
     private Closure $tagWriteResolver;
     private ?TagWrite $tagWrite = null;
-    private ?TagDataParser $tagParser = null;
     private Closure $tagSetRepoResolver;
     private ?SetRead $tagSetRepo = null;
     private Closure $tagSetWriteResolver;
@@ -117,7 +115,7 @@ final class TagEditController
 
         $tag = null;
         if ($id !== null) {
-            $tag = $this->tagParser()->findById($id);
+            $tag = $this->tagRead()->findById($id);
 
             if ($tag === null) {
                 $this->context->flash('error', 'Tag not found.');
@@ -213,7 +211,7 @@ final class TagEditController
         );
 
         // Process optional cover/preview/icon image uploads for the tag record.
-        $currentRecord = $this->tagParser()->findById($savedId);
+        $currentRecord = $this->tagRead()->findById($savedId);
         $currentStorage = $this->taxonomyImageService->imageStoragePayloadFromRecord('tags', $currentRecord);
         $currentPaths = $this->taxonomyImageService->imagePathsFromStoragePayload('tags', $savedId, $currentStorage);
         $nextStorage = $currentStorage;
@@ -331,7 +329,7 @@ final class TagEditController
 
         $id = $this->input->int($post['id'] ?? null, 1);
         if ($id !== null) {
-            $record = $this->tagParser()->findById($id);
+            $record = $this->tagRead()->findById($id);
             // Single-row delete path (row action button).
             try {
                 $this->tagWrite()->deleteById($id);
@@ -363,7 +361,7 @@ final class TagEditController
         $failedCount = 0;
 
         foreach ($selectedIds as $selectedId) {
-            $record = $this->tagParser()->findById($selectedId);
+            $record = $this->tagRead()->findById($selectedId);
             try {
                 // Continue deleting remaining ids even if one operation throws.
                 $this->tagWrite()->deleteById($selectedId);
@@ -514,7 +512,7 @@ final class TagEditController
         }
 
         // Reassign any remaining tags in this set to the default set before deleting.
-        $tagCount = (int) ($this->tagParser()->countsBySetId()[$id] ?? 0);
+        $tagCount = (int) ($this->tagRead()->countsBySetId()[$id] ?? 0);
         if ($tagCount > 0) {
             $this->tagWrite()->reassignSetToDefault($id, SetParser::DEFAULT_SET_ID);
         }
@@ -571,22 +569,6 @@ final class TagEditController
 
         $this->tagWrite = $repo;
         return $this->tagWrite;
-    }
-
-    /**
-     * Returns the tag parser on first use so read-only tag flows route through
-     * the canonical parser surface instead of the repository.
-     *
-     * @return TagDataParser Tag data parser.
-     */
-    private function tagParser(): TagDataParser
-    {
-        if ($this->tagParser instanceof TagDataParser) {
-            return $this->tagParser;
-        }
-
-        $this->tagParser = new TagDataParser($this->input, $this->tagRead());
-        return $this->tagParser;
     }
 
     /**

@@ -13,9 +13,9 @@ namespace Raven\Core\Controller\Public;
 
 use Closure;
 use Raven\Core\Repository\PageRead;
+use Raven\Core\Repository\RedirectRead;
 use Raven\Core\Repository\UserRead;
 use Raven\Lib\Parser\MediaParser;
-use Raven\Lib\Parser\RedirectDataParser;
 use Raven\Core\Routing\Public\ChannelPageRouter;
 use Raven\Lib\Extension\ExtensionEditorCatalogService;
 use Raven\Lib\Extension\Public\EmbeddedFormRuntimeInterface;
@@ -23,7 +23,6 @@ use Raven\Lib\Extension\Public\EmbeddedFormRuntimeService;
 use Raven\Lib\Extension\Public\EmbeddedShortcodeRuntimeInterface;
 use Raven\Lib\Parser\ChannelRouteParser;
 use Raven\Lib\Parser\PageBlockParser;
-use Raven\Lib\Parser\PageDataParser;
 use Raven\Lib\Parser\UserDataParser;
 use Raven\Lib\Transport\Redirect;
 use Raven\Lib\View\Public\MetaService;
@@ -45,9 +44,9 @@ final class ChannelController
 {
     private SharedController $context;
     private MediaParser $media;
-    private PageDataParser $pageParser;
-    private RedirectDataParser $redirectParser;
-    private UserDataParser $userParser;
+    private PageRead $pageRead;
+    private RedirectRead $redirectRead;
+    private UserRead $userRead;
     private Closure $extensionServicesProvider;
     /** @var array<string, EmbeddedShortcodeRuntimeInterface|EmbeddedFormRuntimeInterface> */
     private array $embeddedFormRuntimes = [];
@@ -69,9 +68,9 @@ final class ChannelController
     /**
      * @param SharedController $context Shared public request context.
      * @param MediaParser $media Media parser for read-only gallery rendering and page meta images.
-     * @param PageRead $pageRepo Page repository read side for channel-homepage and root-page lookups.
-     * @param RedirectDataParser $redirectParser Redirect data parser for public redirect fallbacks.
-     * @param UserRead $userRepo User repository read side for author profile lookups in page meta.
+     * @param PageRead $pageRead Page repository read side for channel-homepage and root-page lookups.
+     * @param RedirectRead $redirectRead Redirect repository read side for public redirect fallbacks.
+     * @param UserRead $userRead User repository read side for author profile lookups in page meta.
      * @param ThemeCatalog $themeCatalogService Shared public-theme catalog for template resolution and meta reads.
      * @param ExtensionEditorCatalogService $extensionEditorCatalogService Shared extension editor catalog for public block definitions.
      * @param callable(?string=): array<string, mixed> $extensionServicesProvider Lazy extension-services resolver for shortcode runtimes.
@@ -80,18 +79,18 @@ final class ChannelController
     public function __construct(
         SharedController $context,
         MediaParser $media,
-        PageRead $pageRepo,
-        RedirectDataParser $redirectParser,
-        UserRead $userRepo,
+        PageRead $pageRead,
+        RedirectRead $redirectRead,
+        UserRead $userRead,
         ThemeCatalog $themeCatalogService,
         ExtensionEditorCatalogService $extensionEditorCatalogService,
         callable $extensionServicesProvider
     ) {
         $this->context = $context;
         $this->media = $media;
-        $this->pageParser = new PageDataParser($context->input(), $pageRepo);
-        $this->redirectParser = $redirectParser;
-        $this->userParser = new UserDataParser($context->input(), $userRepo);
+        $this->pageRead = $pageRead;
+        $this->redirectRead = $redirectRead;
+        $this->userRead = $userRead;
         $this->themeCatalogService = $themeCatalogService;
         $this->extensionEditorCatalogService = $extensionEditorCatalogService;
         $this->extensionServicesProvider = Closure::fromCallable($extensionServicesProvider);
@@ -117,7 +116,7 @@ final class ChannelController
 
         // findChannelHomepage() returns null when the channel does not exist, or a
         // ['channel' => ..., 'page' => ...] tuple — page is null when no homepage exists.
-        $result = $this->pageParser->findChannelHomepage($requestedSlug);
+        $result = $this->pageRead->findChannelHomepage($requestedSlug);
         if (is_array($result) && is_array($result['page'] ?? null)) {
             $channel = is_array($result['channel'] ?? null) ? $result['channel'] : [];
             $page = $this->renderPageContentBlocks($result['page']);
@@ -159,10 +158,10 @@ final class ChannelController
 
         $page = null;
         if ((string) ($lookupTarget['type'] ?? '') === 'id') {
-            $page = $this->pageParser->findPublicPageById((int) ($lookupTarget['id'] ?? 0), null);
+            $page = $this->pageRead->findPublishedById((int) ($lookupTarget['id'] ?? 0), null);
         } else {
             $lookupSlug = (string) ($lookupTarget['slug'] ?? $requestedSlug);
-            $page = $this->pageParser->findPublicPage($lookupSlug, null);
+            $page = $this->pageRead->findPublishedBySlug($lookupSlug, null);
         }
 
         if ($page === null) {
@@ -218,7 +217,7 @@ final class ChannelController
             $page,
             $this->context->siteData(),
             fn (int $pageId): ?string => $this->media->coverImageUrlForPage($pageId),
-            fn (int $authorUserId): ?array => $this->userParser->findById($authorUserId),
+            fn (int $authorUserId): ?array => $this->userRead->findById($authorUserId),
             $profileContactOptions
         );
     }
@@ -337,7 +336,7 @@ final class ChannelController
      */
     private function tryRedirect(string $pageSlug, ?string $channelSlug = null): bool
     {
-        $redirectRow = $this->redirectParser->findActiveByPath($pageSlug, $channelSlug);
+        $redirectRow = $this->redirectRead->findActiveByPath($pageSlug, $channelSlug);
         if ($redirectRow === null) {
             return false;
         }

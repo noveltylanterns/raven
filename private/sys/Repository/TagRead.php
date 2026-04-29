@@ -12,7 +12,7 @@ namespace Raven\Core\Repository;
 
 use PDO;
 use Raven\Lib\Database\TableNameResolver;
-use Raven\Lib\Media\Panel\TaxonomyImagePathResolver;
+use Raven\Lib\Media\TaxonomyImagePathResolver;
 
 /**
  * SELECT and lookup methods for page tags.

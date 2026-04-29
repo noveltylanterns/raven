@@ -12,10 +12,10 @@ declare(strict_types=1);
 namespace Raven\Core\Controller\Panel;
 
 use Closure;
+use Raven\Core\Repository\ChannelRead;
 use Raven\Core\Repository\ChannelWrite;
 use Raven\Core\Repository\SetRead;
 use Raven\Lib\Media\Panel\TaxonomyImageService;
-use Raven\Lib\Parser\ChannelDataParser;
 use Raven\Lib\Parser\ChannelRouteParser;
 use Raven\Lib\Parser\FeedRouteParser;
 use Raven\Lib\Parser\SetParser;
@@ -36,6 +36,7 @@ final class ChannelEditController
 {
     private SharedController $context;
     private InputSanitizer $input;
+    private ChannelRead $channelRead;
     private ChannelWrite $channelRepo;
     /** @var Closure(): SetRead */
     private Closure $categorySetRepoResolver;
@@ -47,7 +48,6 @@ final class ChannelEditController
     private bool $tagEnabled;
     private TaxonomyImageService $taxonomyImageService;
     private MediaScribe $mediaScribe;
-    private ChannelDataParser $channelParser;
     private FeedRouteParser $feedParser;
     private EditorTabs $editorTabs;
     private Editor $editor;
@@ -56,6 +56,7 @@ final class ChannelEditController
     /**
      * @param SharedController $context Shared panel request context.
      * @param InputSanitizer $input Shared request input sanitizer.
+     * @param ChannelRead $channelRead Channel repository read side for edit-form lookups.
      * @param ChannelWrite $channelRepo Channel repository write side for channel saves and deletes.
      * @param callable $categorySetRepoResolver Lazy category-set repository resolver for channel set selection.
      * @param callable $tagSetRepoResolver Lazy tag-set repository resolver for channel set selection.
@@ -63,7 +64,6 @@ final class ChannelEditController
      * @param bool $tagEnabled Whether tag features are enabled in runtime config.
      * @param TaxonomyImageService $taxonomyImageService Read-side taxonomy image config and path helper.
      * @param MediaScribe $mediaScribe Write-side meta-image upload and cleanup helper.
-     * @param ChannelDataParser $channelParser Channel data parser for read-only channel lookups in edit/save.
      * @param FeedRouteParser $feedParser Feed route parser for RSS/Atom route settings.
      * @param EditorTabs $editorTabs Panel editor tab normalization and tab-preserving URL builder.
      * @param Editor $editor Shared panel editor normalizers.
@@ -73,6 +73,7 @@ final class ChannelEditController
     public function __construct(
         SharedController $context,
         InputSanitizer $input,
+        ChannelRead $channelRead,
         ChannelWrite $channelRepo,
         callable $categorySetRepoResolver,
         callable $tagSetRepoResolver,
@@ -80,7 +81,6 @@ final class ChannelEditController
         bool $tagEnabled,
         TaxonomyImageService $taxonomyImageService,
         MediaScribe $mediaScribe,
-        ChannelDataParser $channelParser,
         FeedRouteParser $feedParser,
         EditorTabs $editorTabs,
         Editor $editor,
@@ -88,6 +88,7 @@ final class ChannelEditController
     ) {
         $this->context = $context;
         $this->input = $input;
+        $this->channelRead = $channelRead;
         $this->channelRepo = $channelRepo;
         $this->categorySetRepoResolver = Closure::fromCallable($categorySetRepoResolver);
         $this->tagSetRepoResolver = Closure::fromCallable($tagSetRepoResolver);
@@ -95,7 +96,6 @@ final class ChannelEditController
         $this->tagEnabled = $tagEnabled;
         $this->taxonomyImageService = $taxonomyImageService;
         $this->mediaScribe = $mediaScribe;
-        $this->channelParser = $channelParser;
         $this->feedParser = $feedParser;
         $this->editorTabs = $editorTabs;
         $this->editor = $editor;
@@ -118,7 +118,7 @@ final class ChannelEditController
 
         $channel = null;
         if ($id !== null) {
-            $channel = $this->channelParser->findById($id);
+            $channel = $this->channelRead->findById($id);
 
             if ($channel === null) {
                 $this->context->flash('error', 'Channel not found.');
@@ -185,7 +185,7 @@ final class ChannelEditController
         }
 
         $activeTab = $this->editorTabs->normalizeEditorTab($post['tab'] ?? null, ['basic', 'meta', 'media'], 'basic');
-        $existingChannel = $id !== null ? $this->channelParser->findById($id) : null;
+        $existingChannel = $id !== null ? $this->channelRead->findById($id) : null;
         $name = $this->input->text($post['name'] ?? null, 255);
         $slug = $this->input->slug($post['slug'] ?? null);
         if ($slug === null && is_array($existingChannel)) {
@@ -262,7 +262,7 @@ final class ChannelEditController
         );
 
         // Process optional cover/preview image uploads for the channel record.
-        $currentRecord = $this->channelParser->findById($savedId);
+        $currentRecord = $this->channelRead->findById($savedId);
         $currentStorage = $this->taxonomyImageService->imageStoragePayloadFromRecord('channels', $currentRecord);
         $currentPaths = $this->taxonomyImageService->imagePathsFromStoragePayload('channels', $savedId, $currentStorage);
         $nextStorage = $currentStorage;
@@ -355,7 +355,7 @@ final class ChannelEditController
 
         $id = $this->input->int($post['id'] ?? null, 1);
         if ($id !== null) {
-            $record = $this->channelParser->findById($id);
+            $record = $this->channelRead->findById($id);
             // Single-row delete path (row action button).
             try {
                 $this->channelRepo->deleteById($id);
@@ -388,7 +388,7 @@ final class ChannelEditController
         $failedCount = 0;
 
         foreach ($selectedIds as $selectedId) {
-            $record = $this->channelParser->findById($selectedId);
+            $record = $this->channelRead->findById($selectedId);
             try {
                 // Continue deleting remaining ids even if one operation throws.
                 $this->channelRepo->deleteById($selectedId);

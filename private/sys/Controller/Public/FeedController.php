@@ -11,13 +11,12 @@ declare(strict_types=1);
 
 namespace Raven\Core\Controller\Public;
 
+use Raven\Core\Repository\ChannelRead;
 use Raven\Core\Repository\PageRead;
 use Raven\Core\Routing\Public\ChannelPageRouter;
 use Raven\Lib\Parser\CategoryRepoParser;
 use Raven\Lib\Parser\CategoryRouteParser;
-use Raven\Lib\Parser\ChannelDataParser;
 use Raven\Lib\Parser\ChannelRouteParser;
-use Raven\Lib\Parser\PageDataParser;
 use Raven\Lib\Parser\TagRepoParser;
 use Raven\Lib\Parser\TagRouteParser;
 
@@ -27,30 +26,30 @@ use Raven\Lib\Parser\TagRouteParser;
 final class FeedController
 {
     private SharedController $context;
-    private ChannelDataParser $channelParser;
-    private PageDataParser $pageParser;
+    private ChannelRead $channelRead;
+    private PageRead $pageRead;
     private CategoryRepoParser $categoryLookupRepo;
     private TagRepoParser $tagLookupRepo;
     private ChannelPageRouter $publicChannelPageRouteService;
 
     /**
      * @param SharedController $context Shared public request context.
-     * @param ChannelDataParser $channelParser Channel data parser for feed/channel label lookups.
-     * @param PageRead $pageRepo Page repository read side for feed and taxonomy listing rows.
+     * @param ChannelRead $channelRead Channel repository read side for feed/channel label lookups.
+     * @param PageRead $pageRead Page repository read side for feed and taxonomy listing rows.
      * @param CategoryRepoParser $categoryLookupRepo Category lookup parser for category feed resolution.
      * @param TagRepoParser $tagLookupRepo Tag lookup parser for tag feed resolution.
      * @return void
      */
     public function __construct(
         SharedController $context,
-        ChannelDataParser $channelParser,
-        PageRead $pageRepo,
+        ChannelRead $channelRead,
+        PageRead $pageRead,
         CategoryRepoParser $categoryLookupRepo,
         TagRepoParser $tagLookupRepo
     ) {
         $this->context = $context;
-        $this->channelParser = $channelParser;
-        $this->pageParser = new PageDataParser($context->input(), $pageRepo);
+        $this->channelRead = $channelRead;
+        $this->pageRead = $pageRead;
         $this->categoryLookupRepo = $categoryLookupRepo;
         $this->tagLookupRepo = $tagLookupRepo;
         $this->publicChannelPageRouteService = new ChannelPageRouter($context->input());
@@ -158,7 +157,7 @@ final class FeedController
                 return;
             }
 
-            $channel = $this->channelParser->findBySlug($normalizedChannelSlug);
+            $channel = $this->channelRead->findBySlug($normalizedChannelSlug);
             if (!is_array($channel) || !$this->channelFeedEnabled($channel)) {
                 $this->context->notFound();
                 return;
@@ -168,10 +167,10 @@ final class FeedController
             $scopeLabel = $this->feedChannelLabel($feedChannelSlug);
             $scopeType = 'channel';
             $scopeSlug = $feedChannelSlug;
-            $pages = $this->pageParser->listRecentPublished($feedParser->feedItems(), $feedChannelSlug);
+            $pages = $this->pageRead->listRecentPublished($feedParser->feedItems(), $feedChannelSlug);
         } else {
             if (in_array('all', $configuredFeedChannels, true)) {
-                $pages = $this->pageParser->listRecentPublished($feedParser->feedItems(), null);
+                $pages = $this->pageRead->listRecentPublished($feedParser->feedItems(), null);
             } else {
                 $selectedFeedChannels = array_values(array_filter(
                     $configuredFeedChannels,
@@ -187,7 +186,7 @@ final class FeedController
                     $scopeType = 'channels';
                 }
 
-                $pages = $this->pageParser->listRecentPublishedForChannels(
+                $pages = $this->pageRead->listRecentPublishedForChannels(
                     $feedParser->feedItems(),
                     $selectedFeedChannels
                 );
@@ -265,7 +264,7 @@ final class FeedController
                 return;
             }
 
-            $pageResult = $this->pageParser->listPageByCategorySlug($normalizedSlug, $feedParser->feedItems(), 0);
+            $pageResult = $this->pageRead->listPageByCategorySlug($normalizedSlug, $feedParser->feedItems(), 0);
             $pages = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
             $scopeLabel = $this->taxonomyFeedLabel($category, $normalizedSlug);
             $routeSuffix = [$categoryPrefix, $normalizedSlug];
@@ -282,7 +281,7 @@ final class FeedController
                 return;
             }
 
-            $pageResult = $this->pageParser->listPageByTagSlug($normalizedSlug, $feedParser->feedItems(), 0);
+            $pageResult = $this->pageRead->listPageByTagSlug($normalizedSlug, $feedParser->feedItems(), 0);
             $pages = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
             $scopeLabel = $this->taxonomyFeedLabel($tag, $normalizedSlug);
             $routeSuffix = [$tagPrefix, $normalizedSlug];
@@ -442,7 +441,7 @@ final class FeedController
             return 'Root';
         }
 
-        $channel = $this->channelParser->findBySlug($normalized);
+        $channel = $this->channelRead->findBySlug($normalized);
         if (!is_array($channel)) {
             return $normalized;
         }

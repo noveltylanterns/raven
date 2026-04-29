@@ -14,7 +14,6 @@ namespace Raven\Core\Controller\Panel;
 use Closure;
 use Raven\Core\Repository\CategoryRead;
 use Raven\Core\Repository\SetRead;
-use Raven\Lib\Parser\CategoryDataParser;
 use Raven\Lib\Parser\ChannelDataParser;
 use Raven\Lib\Security\InputSanitizer;
 
@@ -30,7 +29,6 @@ final class CategoryListController
     private InputSanitizer $input;
     private Closure $categoryReadResolver;
     private ?CategoryRead $categoryRead = null;
-    private ?CategoryDataParser $categoryParser = null;
     private Closure $categorySetRepoResolver;
     private ?SetRead $categorySetRepo = null;
     private bool $categoryEnabled;
@@ -77,7 +75,7 @@ final class CategoryListController
             return;
         }
 
-        $categoryCountsBySetId = $this->categoryParser()->countsBySetId();
+        $categoryCountsBySetId = $this->categoryRead()->countsBySetId();
         $selectedSetId = $this->input->int($_GET['set'] ?? null, 0);
         if (
             $selectedSetId !== null
@@ -91,12 +89,12 @@ final class CategoryListController
 
         $requestedPage = $this->input->int($_GET['page'] ?? null, 1) ?? 1;
         $perPage = 50;
-        $pageResult = $this->categoryParser()->listPage($perPage, ($requestedPage - 1) * $perPage, $selectedSetId);
+        $pageResult = $this->categoryRead()->listPage($perPage, ($requestedPage - 1) * $perPage, $selectedSetId);
         $totalItems = (int) ($pageResult['total'] ?? 0);
         $categoryRows = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
         $pagination = $this->context->panelPaginationState($totalItems, $requestedPage, $perPage);
         if ($totalItems > 0 && $pagination['current'] !== $requestedPage) {
-            $pageResult = $this->categoryParser()->listPage($perPage, $pagination['offset'], $selectedSetId);
+            $pageResult = $this->categoryRead()->listPage($perPage, $pagination['offset'], $selectedSetId);
             $categoryRows = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
         }
 
@@ -142,7 +140,7 @@ final class CategoryListController
         }
 
         // Annotate each set row with its category and channel usage counts.
-        $countsBySetId = $this->categoryParser()->countsBySetId();
+        $countsBySetId = $this->categoryRead()->countsBySetId();
         $channelCountsBySetId = $this->channelParser->explicitTaxonomySetCounts('category');
         $setRows = [];
         foreach ($this->categorySetRepo()->listAll() as $setRow) {
@@ -180,22 +178,6 @@ final class CategoryListController
 
         $this->categoryRead = $repo;
         return $this->categoryRead;
-    }
-
-    /**
-     * Returns the category parser on first use so read-only category flows route
-     * through the canonical parser surface instead of the repository.
-     *
-     * @return CategoryDataParser Category data parser.
-     */
-    private function categoryParser(): CategoryDataParser
-    {
-        if ($this->categoryParser instanceof CategoryDataParser) {
-            return $this->categoryParser;
-        }
-
-        $this->categoryParser = new CategoryDataParser($this->input, $this->categoryRead());
-        return $this->categoryParser;
     }
 
     /**

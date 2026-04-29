@@ -72,9 +72,7 @@ use Raven\Lib\Extension\Panel\ExtensionPermissionCatalogService;
 use Raven\Lib\Parser\ChannelDataParser;
 use Raven\Lib\Parser\ConfigParser;
 use Raven\Lib\Parser\FeedRouteParser;
-use Raven\Lib\Parser\GroupDataParser;
 use Raven\Lib\Parser\GroupRouteParser;
-use Raven\Lib\Parser\RedirectDataParser;
 use Raven\Lib\Parser\TaxonomyRepoParser;
 use Raven\Lib\Media\Panel\MediaManager;
 use Raven\Lib\Media\Panel\TaxonomyImageService;
@@ -949,7 +947,7 @@ final class PanelRuntimeBuilder
                 $requestContextFactory(),
                 $rvn['input'],
                 $contentDomain['page_read'],
-                new ChannelDataParser($rvn['config'], $rvn['input'], $contentDomain['channel_read'])
+                $contentDomain['channel_read']
             );
 
             return $pageListController;
@@ -991,7 +989,7 @@ final class PanelRuntimeBuilder
                 $taxonomyDomain['tag_set'],
                 $taxonomyDomain['taxonomy_lookup'],
                 $contentDomain['user_read'],
-                new ChannelDataParser($rvn['config'], $rvn['input'], $contentDomain['channel_read']),
+                $contentDomain['channel_read'],
                 $rvn['panel_editor_tabs'],
                 $rvn['panel_editor'],
                 $rvn['panel_editor_blocks'],
@@ -1023,7 +1021,7 @@ final class PanelRuntimeBuilder
             $channelListController = new ChannelListController(
                 $requestContextFactory(),
                 $rvn['input'],
-                new ChannelDataParser($rvn['config'], $rvn['input'], $taxonomyDomain['channel_read'])
+                $taxonomyDomain['channel_read']
             );
 
             return $channelListController;
@@ -1044,6 +1042,7 @@ final class PanelRuntimeBuilder
             $channelEditController = new ChannelEditController(
                 $requestContextFactory(),
                 $rvn['input'],
+                $taxonomyDomain['channel_read'],
                 $taxonomyDomain['channel_write'],
                 $taxonomyDomain['category_set'],
                 $taxonomyDomain['tag_set'],
@@ -1051,7 +1050,6 @@ final class PanelRuntimeBuilder
                 $taxonomyDomain['tag_enabled'],
                 new TaxonomyImageService($rvn['config']),
                 new MediaScribe($rvn['db'], $rvn['driver'], $rvn['prefix'], $rvn['config'], (string) $rvn['root']),
-                new ChannelDataParser($rvn['config'], $rvn['input'], $taxonomyDomain['channel_read']),
                 new FeedRouteParser($rvn['config'], $rvn['input']),
                 $rvn['panel_editor_tabs'],
                 $rvn['panel_editor'],
@@ -1130,7 +1128,7 @@ final class PanelRuntimeBuilder
             $redirectListController = new RedirectListController(
                 $requestContextFactory(),
                 $rvn['input'],
-                new RedirectDataParser($rvn['input'], $taxonomyDomain['redirect_read'])
+                $taxonomyDomain['redirect_read']
             );
 
             return $redirectListController;
@@ -1151,10 +1149,9 @@ final class PanelRuntimeBuilder
             $redirectEditController = new RedirectEditController(
                 $requestContextFactory(),
                 $rvn['input'],
-                new ChannelDataParser($rvn['config'], $rvn['input'], $taxonomyDomain['channel_read']),
+                $taxonomyDomain['channel_read'],
+                $taxonomyDomain['redirect_read'],
                 $taxonomyDomain['redirect_write'],
-                new RedirectDataParser($rvn['input'], $taxonomyDomain['redirect_read']),
-                $rvn['panel_editor']
             );
 
             return $redirectEditController;
@@ -1230,7 +1227,7 @@ final class PanelRuntimeBuilder
                 $requestContextFactory(),
                 $rvn['config'],
                 $rvn['input'],
-                new GroupDataParser($rvn['input'], $userDomain['group_read']),
+                $userDomain['group_read'],
                 $userDomain['user_read'],
                 $userDomain['invite_read'],
                 new SessionFlash('_raven_flash_list'),
@@ -1258,7 +1255,7 @@ final class PanelRuntimeBuilder
                 $rvn['config'],
                 $rvn['input'],
                 (string) $rvn['root'],
-                new GroupDataParser($rvn['input'], $userDomain['group_read']),
+                $userDomain['group_read'],
                 $userDomain['user_read'],
                 $userDomain['user_write'],
                 $userDomain['invite_write'],
@@ -1294,7 +1291,7 @@ final class PanelRuntimeBuilder
             $groupListController = new GroupListController(
                 $requestContextFactory(),
                 $rvn['input'],
-                new GroupDataParser($rvn['input'], $groupDomain['group_read']),
+                $groupDomain['group_read'],
                 new GroupRouteParser($rvn['config'], $rvn['input'])
             );
 
@@ -1317,7 +1314,7 @@ final class PanelRuntimeBuilder
                 $requestContextFactory(),
                 $rvn['input'],
                 $groupDomain['group_write'],
-                new GroupDataParser($rvn['input'], $groupDomain['group_read']),
+                $groupDomain['group_read'],
                 new GroupRouteParser($rvn['config'], $rvn['input']),
                 $rvn['panel_editor_tabs'],
                 $rvn['panel_editor'],

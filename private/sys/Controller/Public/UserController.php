@@ -23,6 +23,7 @@ use Raven\Lib\View\Public\TemplateDecorator;
 final class UserController
 {
     private SharedController $context;
+    private UserRead $userRead;
     private LoginIdentifierResolver $loginIdentifierResolver;
     private UserDataParser $profileContactService;
     private RouteRenderService $routeRenderService;
@@ -38,8 +39,9 @@ final class UserController
         UserRead $userRepo
     ) {
         $this->context = $context;
+        $this->userRead = $userRepo;
         $this->loginIdentifierResolver = new LoginIdentifierResolver();
-        $this->profileContactService = new UserDataParser($context->input(), $userRepo);
+        $this->profileContactService = new UserDataParser($context->input());
         $this->routeRenderService = new RouteRenderService();
         $this->templateDecorator = new TemplateDecorator(
             $context->config(),
@@ -143,7 +145,7 @@ final class UserController
                 return null;
             }
 
-            return $this->profileContactService->findPublicProfileById($userId);
+            return $this->userRead->findProfileSummaryById($userId);
         }
 
         if ($selector === 'string') {
@@ -152,7 +154,7 @@ final class UserController
                 return null;
             }
 
-            return $this->profileContactService->findPublicProfileByString($normalizedString);
+            return $this->userRead->findProfileSummaryByString($normalizedString);
         }
 
         $normalizedUsername = $this->loginIdentifierResolver->normalizeUsernameOrEmail($this->context->input(), $routeSegment);
@@ -160,6 +162,6 @@ final class UserController
             return null;
         }
 
-        return $this->profileContactService->findPublicProfileByUsername($normalizedUsername);
+        return $this->userRead->findProfileSummaryByUsername($normalizedUsername);
     }
 }

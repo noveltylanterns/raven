@@ -17,7 +17,6 @@ use Raven\Core\Repository\CategoryWrite;
 use Raven\Core\Repository\SetRead;
 use Raven\Core\Repository\SetWrite;
 use Raven\Lib\Media\Panel\TaxonomyImageService;
-use Raven\Lib\Parser\CategoryDataParser;
 use Raven\Lib\Parser\CategoryRouteParser;
 use Raven\Lib\Parser\ChannelDataParser;
 use Raven\Lib\Parser\SetParser;
@@ -42,7 +41,6 @@ final class CategoryEditController
     private ?CategoryRead $categoryRead = null;
     private Closure $categoryWriteResolver;
     private ?CategoryWrite $categoryWrite = null;
-    private ?CategoryDataParser $categoryParser = null;
     private Closure $categorySetRepoResolver;
     private ?SetRead $categorySetRepo = null;
     private Closure $categorySetWriteResolver;
@@ -117,7 +115,7 @@ final class CategoryEditController
 
         $category = null;
         if ($id !== null) {
-            $category = $this->categoryParser()->findById($id);
+            $category = $this->categoryRead()->findById($id);
 
             if ($category === null) {
                 $this->context->flash('error', 'Category not found.');
@@ -213,7 +211,7 @@ final class CategoryEditController
         );
 
         // Process optional cover/preview/icon image uploads for the category record.
-        $currentRecord = $this->categoryParser()->findById($savedId);
+        $currentRecord = $this->categoryRead()->findById($savedId);
         $currentStorage = $this->taxonomyImageService->imageStoragePayloadFromRecord('categories', $currentRecord);
         $currentPaths = $this->taxonomyImageService->imagePathsFromStoragePayload('categories', $savedId, $currentStorage);
         $nextStorage = $currentStorage;
@@ -331,7 +329,7 @@ final class CategoryEditController
 
         $id = $this->input->int($post['id'] ?? null, 1);
         if ($id !== null) {
-            $record = $this->categoryParser()->findById($id);
+            $record = $this->categoryRead()->findById($id);
             // Single-row delete path (row action button).
             try {
                 $this->categoryWrite()->deleteById($id);
@@ -363,7 +361,7 @@ final class CategoryEditController
         $failedCount = 0;
 
         foreach ($selectedIds as $selectedId) {
-            $record = $this->categoryParser()->findById($selectedId);
+            $record = $this->categoryRead()->findById($selectedId);
             try {
                 // Continue deleting remaining ids even if one operation throws.
                 $this->categoryWrite()->deleteById($selectedId);
@@ -520,7 +518,7 @@ final class CategoryEditController
         }
 
         // Reassign any remaining categories in this set to the default set before deleting.
-        $categoryCount = (int) ($this->categoryParser()->countsBySetId()[$id] ?? 0);
+        $categoryCount = (int) ($this->categoryRead()->countsBySetId()[$id] ?? 0);
         if ($categoryCount > 0) {
             $this->categoryWrite()->reassignSetToDefault($id, SetParser::DEFAULT_SET_ID);
         }
@@ -577,22 +575,6 @@ final class CategoryEditController
 
         $this->categoryWrite = $repo;
         return $this->categoryWrite;
-    }
-
-    /**
-     * Returns the category parser on first use so read-only category flows route
-     * through the canonical parser surface instead of the repository.
-     *
-     * @return CategoryDataParser Category data parser.
-     */
-    private function categoryParser(): CategoryDataParser
-    {
-        if ($this->categoryParser instanceof CategoryDataParser) {
-            return $this->categoryParser;
-        }
-
-        $this->categoryParser = new CategoryDataParser($this->input, $this->categoryRead());
-        return $this->categoryParser;
     }
 
     /**

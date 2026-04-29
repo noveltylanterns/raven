@@ -14,6 +14,7 @@ namespace Raven\Core\Controller\Panel;
 use Closure;
 use Raven\Core\Config;
 use Raven\Core\Repository\CategoryRead;
+use Raven\Core\Repository\ChannelRead;
 use Raven\Core\Repository\MediaRead;
 use Raven\Core\Repository\MediaWrite;
 use Raven\Core\Repository\PageRead;
@@ -26,15 +27,10 @@ use Raven\Lib\Extension\ExtensionEditorCatalogService;
 use Raven\Lib\Extension\Panel\ExtensionCatalogService;
 use Raven\Lib\Extension\StateRead;
 use Raven\Lib\Media\Panel\MediaManager;
-use Raven\Lib\Parser\CategoryDataParser;
-use Raven\Lib\Parser\ChannelDataParser;
 use Raven\Lib\Parser\ChannelRouteParser;
 use Raven\Lib\Parser\PageBlockParser;
-use Raven\Lib\Parser\PageDataParser;
 use Raven\Lib\Parser\SetParser;
-use Raven\Lib\Parser\TagDataParser;
 use Raven\Lib\Parser\TaxonomyRepoParser;
-use Raven\Lib\Parser\UserDataParser;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\Transport\Redirect;
 use Raven\Lib\Transport\Upload;
@@ -68,14 +64,12 @@ final class PageEditController
     /** @var Closure(): CategoryRead */
     private Closure $categoryRepoResolver;
     private ?CategoryRead $categoryRepo = null;
-    private ?CategoryDataParser $categoryParser = null;
     /** @var Closure(): SetRead */
     private Closure $categorySetRepoResolver;
     private ?SetRead $categorySetRepo = null;
     /** @var Closure(): TagRead */
     private Closure $tagRepoResolver;
     private ?TagRead $tagRepo = null;
-    private ?TagDataParser $tagParser = null;
     /** @var Closure(): SetRead */
     private Closure $tagSetRepoResolver;
     private ?SetRead $tagSetRepo = null;
@@ -84,16 +78,14 @@ final class PageEditController
     private ?TaxonomyRepoParser $taxonomyLookupRepo = null;
     /** @var Closure(string): array<string, mixed> */
     private Closure $extensionServicesFor;
-    private ?PageDataParser $pageParser = null;
     private ?PageBlockParser $pageBlockParser = null;
     private ?PageBlocks $pageBlocks = null;
     private ?Upload $uploadFileSetNormalizer = null;
     private ?PanelPost $panelPostNormalizer = null;
     private ?EditorAuthor $pageAuthorOptionBuilder = null;
     private ?LoginIdentifierResolver $identifierResolver = null;
-    private ?UserDataParser $userParser = null;
     private UserRead $userRepo;
-    private ChannelDataParser $channelParser;
+    private ChannelRead $channelRead;
     private EditorTabs $editorTabs;
     private Editor $editor;
     private EditorBlocks $editorBlocks;
@@ -120,7 +112,7 @@ final class PageEditController
      * @param callable $tagSetRepoResolver Lazy tag-set read resolver; resolved only on set-validation flows.
      * @param callable $taxonomyLookupRepoResolver Lazy taxonomy lookup resolver; resolved only on page-editor option-set queries.
      * @param UserRead $userRepo User repository read side for author validation and author select options.
-     * @param ChannelDataParser $channelParser Channel data reader for channel-scope and slug lookups.
+     * @param ChannelRead $channelRead Channel repository read side for channel-scope and slug lookups.
      * @param EditorTabs $editorTabs Panel editor tab normalization and tab-preserving URL builder.
      * @param Editor $editor Shared panel editor utility methods (body-text editor normalization).
      * @param EditorBlocks $editorBlocks Shared repeater-block view helper for modular panel rows.
@@ -147,7 +139,7 @@ final class PageEditController
         callable $tagSetRepoResolver,
         callable $taxonomyLookupRepoResolver,
         UserRead $userRepo,
-        ChannelDataParser $channelParser,
+        ChannelRead $channelRead,
         EditorTabs $editorTabs,
         Editor $editor,
         EditorBlocks $editorBlocks,
@@ -172,7 +164,7 @@ final class PageEditController
         $this->tagSetRepoResolver = Closure::fromCallable($tagSetRepoResolver);
         $this->taxonomyLookupRepoResolver = Closure::fromCallable($taxonomyLookupRepoResolver);
         $this->userRepo = $userRepo;
-        $this->channelParser = $channelParser;
+        $this->channelRead = $channelRead;
         $this->editorTabs = $editorTabs;
         $this->editor = $editor;
         $this->editorBlocks = $editorBlocks;
@@ -210,7 +202,7 @@ final class PageEditController
         $page = null;
         $galleryImages = [];
         if ($id !== null) {
-            $editData = $this->pageParser()->editFormDataById($id);
+            $editData = $this->pageRead->findByIdWithGalleryRows($id);
             if (is_array($editData)) {
                 $page = is_array($editData['page'] ?? null) ? $editData['page'] : null;
                 $galleryImages = is_array($editData['gallery_images'] ?? null) ? $editData['gallery_images'] : [];
@@ -274,7 +266,7 @@ final class PageEditController
             'page' => $page,
             'currentUserId' => $currentUserId !== null ? $currentUserId : 0,
             'authorOptions' => $this->pageAuthorOptionBuilder()->build(
-                $this->userParser()->listAll(),
+                $this->userRepo->listAll(),
                 $this->input,
                 fn (string $value): ?string => $this->identifierResolver()->normalizeUsernameOrEmail($this->input, $value)
             ),
@@ -354,7 +346,7 @@ final class PageEditController
         $galleryEnabled = $this->pageBlocks()->hasGalleryBlock($contentBlocks, $this->pageEditorBodyBlockTypeDefinitions())
             || (isset($post['gallery_enabled']) && (string) $post['gallery_enabled'] === '1');
         $authorUserId = $this->input->int($post['author_user_id'] ?? null, 1);
-        if ($authorUserId !== null && $this->userParser()->findById($authorUserId) === null) {
+        if ($authorUserId !== null && $this->userRepo->findById($authorUserId) === null) {
             $this->context->flash('error', 'Selected author account was not found.');
             Redirect::redirect($this->editorTabs->panelEditorUrlWithTab(fn (string $suffix): string => $this->context->panelUrl($suffix), '/page/edit', $id, $activeTab, 'meta'));
         }
@@ -395,16 +387,16 @@ final class PageEditController
         }
 
         // Only keep ids that currently exist, preventing stale/manual post values.
-        $categoryIds = $categoryEnabled ? $this->categoryParser()->existingIds($categoryIds) : [];
-        $tagIds = $tagEnabled ? $this->tagParser()->existingIds($tagIds) : [];
+        $categoryIds = $categoryEnabled ? $this->categoryRepo()->existingIds($categoryIds) : [];
+        $tagIds = $tagEnabled ? $this->tagRepo()->existingIds($tagIds) : [];
         $channelRecord = $channelSlug !== null && $channelSlug !== ''
-            ? $this->channelParser->findBySlug($channelSlug)
+            ? $this->channelRead->findBySlug($channelSlug)
             : null;
         $allowedCategorySets = $this->allowedTaxonomySetIdsForChannel($channelRecord, 'category');
         $allowedTagSets = $this->allowedTaxonomySetIdsForChannel($channelRecord, 'tag');
 
         if ($categoryEnabled && !$this->selectionAllowsAllSets($allowedCategorySets)) {
-            $categorySetIdsById = $this->categoryParser()->setIdsByIds($categoryIds);
+            $categorySetIdsById = $this->categoryRepo()->setIdsByIds($categoryIds);
             foreach ($categorySetIdsById as $setId) {
                 if (!in_array($setId, $allowedCategorySets, true)) {
                     $this->context->flash('error', 'One or more selected categories are outside the allowed sets for this channel.');
@@ -414,7 +406,7 @@ final class PageEditController
         }
 
         if ($tagEnabled && !$this->selectionAllowsAllSets($allowedTagSets)) {
-            $tagSetIdsById = $this->tagParser()->setIdsByIds($tagIds);
+            $tagSetIdsById = $this->tagRepo()->setIdsByIds($tagIds);
             foreach ($tagSetIdsById as $setId) {
                 if (!in_array($setId, $allowedTagSets, true)) {
                     $this->context->flash('error', 'One or more selected tags are outside the allowed sets for this channel.');
@@ -770,20 +762,6 @@ final class PageEditController
     }
 
     /**
-     * Returns the category data parser on first use.
-     *
-     * @return CategoryDataParser Category data parser.
-     */
-    private function categoryParser(): CategoryDataParser
-    {
-        if (!$this->categoryParser instanceof CategoryDataParser) {
-            $this->categoryParser = new CategoryDataParser($this->input, $this->categoryRepo());
-        }
-
-        return $this->categoryParser;
-    }
-
-    /**
      * Returns the category-set read side on first use so non-taxonomy routes
      * do not instantiate file-backed taxonomy set storage.
      *
@@ -823,20 +801,6 @@ final class PageEditController
 
         $this->tagRepo = $tagRepo;
         return $this->tagRepo;
-    }
-
-    /**
-     * Returns the tag data parser on first use.
-     *
-     * @return TagDataParser Tag data parser.
-     */
-    private function tagParser(): TagDataParser
-    {
-        if (!$this->tagParser instanceof TagDataParser) {
-            $this->tagParser = new TagDataParser($this->input, $this->tagRepo());
-        }
-
-        return $this->tagParser;
     }
 
     /**
@@ -966,34 +930,6 @@ final class PageEditController
     }
 
     /**
-     * Returns the page data parser on first use.
-     *
-     * @return PageDataParser Page data parser.
-     */
-    private function pageParser(): PageDataParser
-    {
-        if (!$this->pageParser instanceof PageDataParser) {
-            $this->pageParser = new PageDataParser($this->input, $this->pageRead);
-        }
-
-        return $this->pageParser;
-    }
-
-    /**
-     * Returns the user data parser on first use.
-     *
-     * @return UserDataParser User data parser.
-     */
-    private function userParser(): UserDataParser
-    {
-        if (!$this->userParser instanceof UserDataParser) {
-            $this->userParser = new UserDataParser($this->input, $this->userRepo);
-        }
-
-        return $this->userParser;
-    }
-
-    /**
      * Returns page-editor taxonomy option sets, skipping the taxonomy lookup
      * storage entirely when both category and tag features are disabled.
      *
@@ -1012,7 +948,7 @@ final class PageEditController
     {
         if (!$categoryEnabled && !$tagEnabled) {
             return [
-                'channel_options' => $this->channelParser->listOptions(),
+                'channel_options' => $this->channelRead->listOptions(),
                 'category_options_all' => [],
                 'tag_options_all' => [],
                 'category_options_selected' => [],

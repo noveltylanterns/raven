@@ -81,7 +81,7 @@ final class PageDataParser
             return null;
         }
 
-        return $this->pageRepo()->findPublicPage($normalizedPageSlug, $this->normalizeChannelSlug($channelSlug));
+        return $this->pageRepo()->findPublishedBySlug($normalizedPageSlug, $this->normalizeChannelSlug($channelSlug));
     }
 
     /**
@@ -97,7 +97,7 @@ final class PageDataParser
             return null;
         }
 
-        return $this->pageRepo()->findPublicPageById($pageId, $this->normalizeChannelSlug($channelSlug));
+        return $this->pageRepo()->findPublishedById($pageId, $this->normalizeChannelSlug($channelSlug));
     }
 
     /**
@@ -265,7 +265,7 @@ final class PageDataParser
             return null;
         }
 
-        $result = $this->pageRepo()->editFormDataById($id);
+        $result = $this->pageRepo()->findByIdWithGalleryRows($id);
         if ($result === null) {
             return null;
         }

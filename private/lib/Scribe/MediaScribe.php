@@ -14,8 +14,8 @@ namespace Raven\Lib\Scribe;
 use PDO;
 use Raven\Core\Config;
 use Raven\Lib\Database\TableNameResolver;
+use Raven\Lib\Media\TaxonomyImagePathResolver;
 use Raven\Lib\Media\Panel\ImageVariantProcessor;
-use Raven\Lib\Media\Panel\TaxonomyImagePathResolver;
 
 /**
  * Owns page-media mutation writes plus panel meta-image filesystem workflows.

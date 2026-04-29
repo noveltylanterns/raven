@@ -11,7 +11,7 @@ declare(strict_types=1);
 
 namespace Raven\Core\Controller\Panel;
 
-use Raven\Lib\Parser\GroupDataParser;
+use Raven\Core\Repository\GroupRead;
 use Raven\Lib\Parser\GroupRouteParser;
 use Raven\Lib\Security\InputSanitizer;
 
@@ -25,25 +25,25 @@ final class GroupListController
 {
     private SharedController $context;
     private InputSanitizer $input;
-    private GroupDataParser $groupDataParser;
+    private GroupRead $groupRead;
     private GroupRouteParser $groupRouteParser;
 
     /**
      * @param SharedController $context Shared panel request context.
      * @param InputSanitizer $input Shared request input sanitizer.
-     * @param GroupDataParser $groupDataParser Group data parser for paginated group listings.
+     * @param GroupRead $groupRead Group repository read side for paginated group listings.
      * @param GroupRouteParser $groupRouteParser Group route parser for routing-enabled flag in list view.
      * @return void
      */
     public function __construct(
         SharedController $context,
         InputSanitizer $input,
-        GroupDataParser $groupDataParser,
+        GroupRead $groupRead,
         GroupRouteParser $groupRouteParser
     ) {
         $this->context = $context;
         $this->input = $input;
-        $this->groupDataParser = $groupDataParser;
+        $this->groupRead = $groupRead;
         $this->groupRouteParser = $groupRouteParser;
     }
 
@@ -61,12 +61,12 @@ final class GroupListController
 
         $requestedPage = $this->input->int($_GET['page'] ?? null, 1) ?? 1;
         $perPage = 50;
-        $pageResult = $this->groupDataParser->listPage($perPage, ($requestedPage - 1) * $perPage);
+        $pageResult = $this->groupRead->listPage($perPage, ($requestedPage - 1) * $perPage);
         $totalItems = (int) ($pageResult['total'] ?? 0);
         $groupRows = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
         $pagination = $this->context->panelPaginationState($totalItems, $requestedPage, $perPage);
         if ($totalItems > 0 && $pagination['current'] !== $requestedPage) {
-            $pageResult = $this->groupDataParser->listPage($perPage, $pagination['offset']);
+            $pageResult = $this->groupRead->listPage($perPage, $pagination['offset']);
             $groupRows = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
         }
 

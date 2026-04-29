@@ -13,13 +13,12 @@ namespace Raven\Core\Controller\Panel;
 
 use Closure;
 use Raven\Core\Config;
+use Raven\Core\Repository\GroupRead;
 use Raven\Core\Repository\InviteRead;
 use Raven\Core\Repository\UserRead;
 use Raven\Lib\Auth\LoginIdentifierResolver;
 use Raven\Lib\Auth\SessionFlash;
-use Raven\Lib\Parser\GroupDataParser;
 use Raven\Lib\Parser\GroupRouteParser;
-use Raven\Lib\Parser\UserDataParser;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\Transport\Redirect;
 
@@ -34,20 +33,19 @@ final class UserListController
     private SharedController $context;
     private Config $config;
     private InputSanitizer $input;
-    private GroupDataParser $groupDataParser;
+    private GroupRead $groupRead;
     private UserRead $userRead;
     private Closure $inviteReadResolver;
     private ?InviteRead $inviteRead = null;
     private SessionFlash $flashList;
     private GroupRouteParser $groupParser;
     private LoginIdentifierResolver $loginIdentifierResolver;
-    private ?UserDataParser $userParser = null;
 
     /**
      * @param SharedController $context Shared panel request context.
      * @param Config $config Runtime configuration reader.
      * @param InputSanitizer $input Shared request input sanitizer.
-     * @param GroupDataParser $groupDataParser Group data parser for group filter options.
+     * @param GroupRead $groupRead Group repository read side for group filter options.
      * @param UserRead $userRead User repository read side for user list and invite creator map.
      * @param callable(): InviteRead $inviteReadResolver Lazy invite read resolver for token listings.
      * @param SessionFlash $flashList List-style flash store for pulling generated token batches.
@@ -59,7 +57,7 @@ final class UserListController
         SharedController $context,
         Config $config,
         InputSanitizer $input,
-        GroupDataParser $groupDataParser,
+        GroupRead $groupRead,
         UserRead $userRead,
         callable $inviteReadResolver,
         SessionFlash $flashList,
@@ -69,7 +67,7 @@ final class UserListController
         $this->context = $context;
         $this->config = $config;
         $this->input = $input;
-        $this->groupDataParser = $groupDataParser;
+        $this->groupRead = $groupRead;
         $this->userRead = $userRead;
         $this->inviteReadResolver = Closure::fromCallable($inviteReadResolver);
         $this->flashList = $flashList;
@@ -92,7 +90,7 @@ final class UserListController
         $prefilterGroup = strtolower(trim((string) ($this->input->text($_GET['group'] ?? null, 120) ?? '')));
         $requestedPage = $this->input->int($_GET['page'] ?? null, 1) ?? 1;
         $perPage = 50;
-        $pageResult = $this->userParser()->listPage(
+        $pageResult = $this->userRead->listPage(
             $perPage,
             ($requestedPage - 1) * $perPage,
             $prefilterGroup !== '' ? $prefilterGroup : null
@@ -101,7 +99,7 @@ final class UserListController
         $userRows = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
         $pagination = $this->context->panelPaginationState($totalItems, $requestedPage, $perPage);
         if ($totalItems > 0 && $pagination['current'] !== $requestedPage) {
-            $pageResult = $this->userParser()->listPage(
+            $pageResult = $this->userRead->listPage(
                 $perPage,
                 $pagination['offset'],
                 $prefilterGroup !== '' ? $prefilterGroup : null
@@ -111,7 +109,7 @@ final class UserListController
 
         $groupOptions = is_array($pageResult['group_options'] ?? null)
             ? $pageResult['group_options']
-            : $this->groupDataParser->listOptions();
+            : $this->groupRead->listOptions();
 
         $this->context->renderPanel('panel/user/list', [
             'users' => $userRows,
@@ -156,21 +154,6 @@ final class UserListController
     }
 
     /**
-     * Returns the user parser on first use so read-only panel user flows route
-     * through the canonical parser surface instead of the repository.
-     *
-     * @return UserDataParser User data parser.
-     */
-    private function userParser(): UserDataParser
-    {
-        if (!$this->userParser instanceof UserDataParser) {
-            $this->userParser = new UserDataParser($this->input, $this->userRead);
-        }
-
-        return $this->userParser;
-    }
-
-    /**
      * Resolves the invite read side only when invite list routes are hit.
      *
      * @return InviteRead Invite-token read side for token listings.
@@ -197,7 +180,7 @@ final class UserListController
      */
     private function inviteCreatorMap(): array
     {
-        $rows = $this->userParser()->listAll();
+        $rows = $this->userRead->listAll();
         $map = [];
         foreach ($rows as $row) {
             $userId = (int) ($row['id'] ?? 0);

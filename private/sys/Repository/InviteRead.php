@@ -70,7 +70,7 @@ class InviteRead
         $rows = $stmt->fetchAll() ?: [];
         $result = [];
         foreach ($rows as $row) {
-            $result[] = $this->hydratePanelRow($row);
+            $result[] = $this->hydrateListRow($row);
         }
 
         return $result;
@@ -199,7 +199,7 @@ class InviteRead
     }
 
     /**
-     * Normalizes one panel-facing invite row from the auth_invites table.
+     * Normalizes one invite row from the auth_invites table.
      *
      * @param array<string, mixed> $row Raw PDO row from auth_invites.
      * @return array{
@@ -214,7 +214,7 @@ class InviteRead
      *   creator: int|null
      * }
      */
-    private function hydratePanelRow(array $row): array
+    private function hydrateListRow(array $row): array
     {
         return [
             'id' => (int) ($row['id'] ?? 0),

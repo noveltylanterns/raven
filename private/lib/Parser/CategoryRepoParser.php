@@ -13,7 +13,7 @@ namespace Raven\Lib\Parser;
 
 use PDO;
 use Raven\Lib\Database\TableNameResolver;
-use Raven\Lib\Media\Panel\TaxonomyImagePathResolver;
+use Raven\Lib\Media\TaxonomyImagePathResolver;
 
 /**
  * Repository-backed parser for category lookup rows and routing option payloads.
