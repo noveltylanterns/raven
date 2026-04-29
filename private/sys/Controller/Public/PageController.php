@@ -13,10 +13,10 @@ namespace Raven\Core\Controller\Public;
 
 use Closure;
 use Raven\Core\Repository\ChannelRead;
+use Raven\Core\Repository\MediaRead;
 use Raven\Core\Repository\PageRead;
 use Raven\Core\Repository\RedirectRead;
 use Raven\Core\Repository\UserRead;
-use Raven\Lib\Parser\MediaParser;
 use Raven\Lib\Extension\Public\EmbeddedFormRuntimeInterface;
 use Raven\Lib\Extension\Public\EmbeddedFormRuntimeService;
 use Raven\Lib\Extension\Public\EmbeddedShortcodeRuntimeInterface;
@@ -40,7 +40,7 @@ final class PageController
 {
     private SharedController $context;
     private ChannelRead $channelRead;
-    private MediaParser $media;
+    private MediaRead $media;
     private PageRead $pageRead;
     private RedirectRead $redirectRead;
     private UserRead $userRead;
@@ -65,7 +65,7 @@ final class PageController
     /**
      * @param SharedController $context Shared public request context.
      * @param ChannelRead $channelRead Channel repository read side for public channel-route lookups.
-     * @param MediaParser $media Media parser for read-only gallery rendering and page meta images.
+     * @param MediaRead $media Media repository read side for gallery rendering and page meta images.
      * @param PageRead $pageRead Page repository read side for homepage, channel, and page lookups.
      * @param RedirectRead $redirectRead Redirect repository read side for public redirect fallbacks.
      * @param UserRead $userRead User repository read side for author profile lookups in page meta.
@@ -77,7 +77,7 @@ final class PageController
     public function __construct(
         SharedController $context,
         ChannelRead $channelRead,
-        MediaParser $media,
+        MediaRead $media,
         PageRead $pageRead,
         RedirectRead $redirectRead,
         UserRead $userRead,
@@ -304,7 +304,7 @@ final class PageController
         return $this->metaService()->siteDataWithPageMeta(
             $page,
             $this->context->siteData(),
-            fn (int $pageId): ?string => $this->media->coverImageUrlForPage($pageId),
+            fn (int $pageId): ?string => $this->media->coverLargeVariantUrlForPage($pageId),
             fn (int $authorUserId): ?array => $this->userRead->findById($authorUserId),
             $profileContactOptions
         );
@@ -340,7 +340,7 @@ final class PageController
         }
 
         $galleryImages = $this->templateDecorator()->decorateGalleryImagesForTemplate(
-            $this->media->listReadyForPublicPage($pageId)
+            $this->media->listDisplayReadyForPage($pageId)
         );
         if ($galleryImages === []) {
             return '';

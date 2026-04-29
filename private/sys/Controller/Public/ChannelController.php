@@ -12,10 +12,10 @@ declare(strict_types=1);
 namespace Raven\Core\Controller\Public;
 
 use Closure;
+use Raven\Core\Repository\MediaRead;
 use Raven\Core\Repository\PageRead;
 use Raven\Core\Repository\RedirectRead;
 use Raven\Core\Repository\UserRead;
-use Raven\Lib\Parser\MediaParser;
 use Raven\Core\Routing\Public\ChannelPageRouter;
 use Raven\Lib\Extension\ExtensionEditorCatalogService;
 use Raven\Lib\Extension\Public\EmbeddedFormRuntimeInterface;
@@ -43,7 +43,7 @@ use Raven\Lib\View\Public\ThemeTemplate;
 final class ChannelController
 {
     private SharedController $context;
-    private MediaParser $media;
+    private MediaRead $media;
     private PageRead $pageRead;
     private RedirectRead $redirectRead;
     private UserRead $userRead;
@@ -67,7 +67,7 @@ final class ChannelController
 
     /**
      * @param SharedController $context Shared public request context.
-     * @param MediaParser $media Media parser for read-only gallery rendering and page meta images.
+     * @param MediaRead $media Media repository read side for gallery rendering and page meta images.
      * @param PageRead $pageRead Page repository read side for channel-homepage and root-page lookups.
      * @param RedirectRead $redirectRead Redirect repository read side for public redirect fallbacks.
      * @param UserRead $userRead User repository read side for author profile lookups in page meta.
@@ -78,7 +78,7 @@ final class ChannelController
      */
     public function __construct(
         SharedController $context,
-        MediaParser $media,
+        MediaRead $media,
         PageRead $pageRead,
         RedirectRead $redirectRead,
         UserRead $userRead,
@@ -216,7 +216,7 @@ final class ChannelController
         return $this->metaService()->siteDataWithPageMeta(
             $page,
             $this->context->siteData(),
-            fn (int $pageId): ?string => $this->media->coverImageUrlForPage($pageId),
+            fn (int $pageId): ?string => $this->media->coverLargeVariantUrlForPage($pageId),
             fn (int $authorUserId): ?array => $this->userRead->findById($authorUserId),
             $profileContactOptions
         );
@@ -252,7 +252,7 @@ final class ChannelController
         }
 
         $galleryImages = $this->templateDecorator()->decorateGalleryImagesForTemplate(
-            $this->media->listReadyForPublicPage($pageId)
+            $this->media->listDisplayReadyForPage($pageId)
         );
         if ($galleryImages === []) {
             return '';

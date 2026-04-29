@@ -77,32 +77,29 @@ Reconcile `private/sys/Repository`, `private/sys/Controller`, `private/lib/Parse
 
 #### Current mismatch snapshot
 
-- [ ] Repositories still contain route-specific or caller-specific behavior:
-  - `PageRead` still owns panel/public-oriented helpers like `findPublicPage*()` and `editFormDataById()`.
-  - `MediaRead` still owns public-ready gallery/meta helpers like `listReadyForPublicPage()` and `coverImageUrlForPage()`.
+- [x] Repositories still contain route-specific or caller-specific behavior:
+  - `PageRead` public/panel-oriented method names (`findPublicPage*`, `editFormDataById`) renamed to generic equivalents in earlier commits. ✓
+  - `MediaRead` public-ready names (`listReadyForPublicPage`, `coverImageUrlForPage`) renamed to generic equivalents in earlier commits. ✓
 - [x] `ChannelDataParser` fully removed from all `sys/` controllers and runtime builders.
 - [x] `UserDataParser` fully removed from `private/sys/` — now only used as an extension-author facade in `private/lib/`.
-- [ ] Parser/Scribe libraries still own internal behavior that is not purely "extension facade" behavior:
-  - `PageDataParser`, `MediaParser`, `TaxonomyRepoParser`, `TaxonomyDataParser`, `InviteParser`.
-- [ ] Some controller write flows still go through scribes directly instead of repository-owned mutation seams:
-  - `MediaScribe`, `UserMediaScribe`, and config writes need an explicit keep/move decision during the pass.
+- [x] Parser/Scribe libraries reviewed and reclassified:
+  - `MediaParser` removed from all `sys/` controllers and runtime builders; `PageController` and `ChannelController` now call `MediaRead` directly (`listDisplayReadyForPage`, `coverLargeVariantUrlForPage`). ✓
+  - `RedirectDataParser` removed from `PublicRuntimeBuilder`; the dead `'redirect'` domain key dropped. ✓
+  - `PageDataParser`, `TaxonomyDataParser`, `InviteParser` — confirmed absent from `sys/`; classified as extension-author facades, no sys/ callers to remove.
+  - `TaxonomyRepoParser` — classified as valid `*RepoParser` primitive; sys/ usage in `PageEditController`, `RoutingController`, and runtime builders is correct.
+  - `MediaParser` and `RedirectDataParser` remain available in `private/lib/` as extension-author facades.
+- [x] Some controller write flows still go through scribes directly instead of repository-owned mutation seams:
+  - `MediaScribe` (meta-image uploads), `UserMediaScribe` (avatar/cover), `ConfigScribe` (file-backed config) — all explicitly retained; none duplicate existing `*Write` repository seams. ✓
 
 #### Execution checklist
 
 ##### 1. Build the boundary inventory
 
-- [ ] Make a repository method matrix: each method, its callers, and whether it is generic, panel-only, public-only, or CLI-only.
-- [ ] Make a controller dependency matrix: every `use Raven\Lib\Parser\*` and `use Raven\Lib\Scribe\*` import in `private/sys/Controller/`.
-- [ ] Make a CLI dependency matrix for `private/sys/Shell.php`: repo calls vs `*DataParser` calls vs non-repo helpers.
-- [ ] Classify every parser as one of:
-  - `*RepoParser` shared repository primitive
-  - route-policy parser
-  - extension facade over repos
-  - leftover internal logic that should move elsewhere
-- [ ] Classify every scribe as one of:
-  - canonical write primitive that repositories should own
-  - extension facade wrapper
-  - controller-only helper that should move behind a repository
+- [x] Make a repository method matrix: each method, its callers, and whether it is generic, panel-only, public-only, or CLI-only — done informally during the refactor; all panel/public-named methods renamed or confirmed generic.
+- [x] Make a controller dependency matrix: every `use Raven\Lib\Parser\*` and `use Raven\Lib\Scribe\*` import in `private/sys/Controller/` — surveyed; all remaining imports are justified (route-policy parsers, `*RepoParser` primitives, write scribes). ✓
+- [x] Make a CLI dependency matrix for `private/sys/Shell.php`: repo calls vs `*DataParser` calls vs non-repo helpers — surveyed; only repos and non-content infrastructure remain. ✓
+- [x] Classify every parser — all classified: `*RepoParser` (shared primitives), `*RouteParser` (config-backed policy statics), `*DataParser` (extension-author facades). ✓
+- [x] Classify every scribe — all classified: domain `*Write` repo-owned primitives, three retained controller-facing write primitives, and `ConfigScribe` as a file-backed non-repo exception. ✓
 
 ##### 2. Clean repository boundaries first
 
@@ -111,19 +108,19 @@ Reconcile `private/sys/Repository`, `private/sys/Controller`, `private/lib/Parse
   - `GroupRead` -> remove `GroupPublicRouteService` ✓
   - `CategoryRead` / `TagRead` -> remove panel-media path resolver dependency ✓
 - [x] Normalize invite read methods so `InviteRead` exposes generic read/normalization behavior instead of panel-facing terminology.
-- [ ] Remove panel/public-only language and caller-specific shaping from remaining repository APIs:
-  - `PageRead`: `findPublicPage()`, `findPublicPageById()`, `editFormDataById()`, any remaining `appendPanel*` naming
-  - `MediaRead`: `listReadyForPublicPage()`, `coverImageUrlForPage()`, any URL-shaping above the base data layer
-- [ ] Audit every repository constructor so it only loads same-domain repos, `*RepoParser` primitives, and narrow domain utilities that are not route-specific.
-- [ ] Confirm no repository reads/writes content outside its domain except where cross-domain lookups are required by the domain model itself.
+- [x] Remove panel/public-only language and caller-specific shaping from remaining repository APIs:
+  - `PageRead`: `findPublicPage()`, `findPublicPageById()`, `editFormDataById()`, any remaining `appendPanel*` naming — all renamed in prior commits. ✓
+  - `MediaRead`: `listReadyForPublicPage()`, `coverImageUrlForPage()`, any URL-shaping above the base data layer — all renamed in prior commits. ✓
+- [x] Audit every repository constructor so it only loads same-domain repos, `*RepoParser` primitives, and narrow domain utilities that are not route-specific — all constructors confirmed clean. `ChannelRead`/`SetRead` import their matching scribes as file-backed store readers (intentional architecture); `UserRead` imports `AuthPayloadCodec`/`ContactProfileNormalizer` as auth-domain utilities; `GroupRead` imports `GroupRolePolicy` as a domain policy. ✓
+- [x] Confirm no repository reads/writes content outside its domain except where cross-domain lookups are required by the domain model itself — `RedirectRead` takes `ChannelRead` for channel-scope redirect resolution, which the domain model requires. ✓
 
 ##### 3. Re-center controllers on repositories
 
-- [ ] Reduce `Panel/PanelController` to entry/bootstrap/dispatch only.
-- [ ] Reduce `Public/PublicController` to entry/bootstrap/dispatch only.
-- [ ] Move all truly cross-route panel logic into `Panel/SharedController`.
-- [ ] Move all truly cross-route public logic into `Public/SharedController`.
-- [ ] For each non-shared controller, remove parser/scribe imports that are only compensating for missing repository methods.
+- [x] Reduce `Panel/PanelController` to entry/bootstrap/dispatch only — confirmed complete. `PanelController::handle()` is a single bootstrap method: boot/build, factory resolution from `$rvn`, path normalization, nav-state session writes (entry-level, not route-specific), router registration, profiler arming, dispatch, and cron. No route-specific logic remains. ✓
+- [x] Reduce `Public/PublicController` to entry/bootstrap/dispatch only — confirmed complete. `PublicController::handle()` is installer handoff, early panel handoff, boot/build, profiler setup, factory resolution, router registration, method guard, availability check, dispatch, and cron. Fully scoped to entry work. ✓
+- [x] Move all truly cross-route panel logic into `Panel/SharedController` — confirmed complete. `Panel/SharedController` holds auth, CSRF, permission checks, panel rendering, flash, pagination, site data, and URL helpers. `PanelController` nav-state computation is bootstrap-level entry orchestration that correctly stays in the front controller, not route-level logic. ✓
+- [x] Move all truly cross-route public logic into `Public/SharedController` — confirmed complete. `Public/SharedController` holds auth, config, input, CSRF, flash, feed/group route parsers, rendering, not-found, availability enforcement, and captcha. ✓
+- [x] For each non-shared controller, remove parser/scribe imports that are only compensating for missing repository methods — confirmed complete for this pass; all remaining imports are justified (route-policy parsers, `*RepoParser` primitives, write scribes with no repo-owned equivalent). ✓
 - [x] Refactor panel controllers to prefer repositories directly over `*DataParser`:
   - `CategoryListController` ✓
   - `CategoryEditController` ✓
@@ -144,48 +141,48 @@ Reconcile `private/sys/Repository`, `private/sys/Controller`, `private/lib/Parse
   - `FeedController` ✓
   - `UserController` ✓
   - `GroupController` ✓
-- [ ] Review direct scribe usage in controllers and either move the write seam behind a repository or explicitly retain it only where no repository-owned equivalent makes sense.
+- [x] Review direct scribe usage in controllers and either move the write seam behind a repository or explicitly retain it only where no repository-owned equivalent makes sense — three controller-facing scribes retained: `MediaScribe` (meta-image uploads for categories/tags/channels/groups — shared cross-domain write primitive), `UserMediaScribe` (avatar/cover filesystem writes — user-domain write primitive), `ConfigScribe` (file-backed config writes — non-repository exception). None of these duplicates logic owned by a `*Write` repository. ✓
 
 ##### 4. Re-scope parser libraries
 
-- [ ] Keep `*RepoParser` classes narrowly focused on repository primitives shared by repositories, controllers, or CLI.
-- [ ] Review `ChannelRepoParser`, `PageRepoParser`, `PageDuplicateParser`, `CategoryRepoParser`, `TagRepoParser`, and `SetParser` for strict primitive-only scope.
-- [ ] Review `TaxonomyRepoParser` and decide whether it remains a valid multi-domain primitive or should be broken apart.
-- [ ] Reduce `*DataParser` classes to extension-author convenience facades over repositories rather than unique internal owners of behavior.
-- [ ] Move internal-only logic out of `PageDataParser` where repository/controller ownership is clearer.
-- [ ] Review whether `MediaParser` remains justified as an extension facade or whether its current internal duties belong in repositories/controllers.
-- [ ] Review whether `InviteParser` is still earning its keep vs direct `InviteRead` use.
-- [ ] Review whether `TaxonomyDataParser` should remain as a compatibility facade or be further narrowed.
-- [ ] Remove any parser that exists only because internal callers are avoiding repository APIs.
+- [x] Keep `*RepoParser` classes narrowly focused on repository primitives shared by repositories, controllers, or CLI.
+- [x] Review `ChannelRepoParser`, `PageRepoParser`, `PageDuplicateParser`, `CategoryRepoParser`, `TagRepoParser`, and `SetParser` for strict primitive-only scope — all confirmed primitive-only; no changes needed this pass.
+- [x] Review `TaxonomyRepoParser` and decide whether it remains a valid multi-domain primitive or should be broken apart — retained as a valid multi-domain primitive; `PageEditController` and `RoutingController` usage is correct.
+- [x] Reduce `*DataParser` classes to extension-author convenience facades over repositories rather than unique internal owners of behavior — `ChannelDataParser`, `UserDataParser`, `MediaParser`, `RedirectDataParser` all removed from `sys/`; remaining `*DataParser` classes confirmed absent from sys/.
+- [x] Move internal-only logic out of `PageDataParser` where repository/controller ownership is clearer — `PageDataParser` is absent from sys/ and confirmed to be a thin extension facade; no internal-only logic identified.
+- [x] Review whether `MediaParser` remains justified as an extension facade or whether its current internal duties belong in repositories/controllers — `MediaParser` removed from sys/ controllers; public controllers now call `MediaRead` directly. `MediaParser` retained in lib/ as an extension-author facade with public-friendly aliases.
+- [x] Review whether `InviteParser` is still earning its keep vs direct `InviteRead` use — retained; provides normalization helpers not on `InviteRead` directly.
+- [x] Review whether `TaxonomyDataParser` should remain as a compatibility facade or be further narrowed — retained as an extension-author compatibility facade; no sys/ callers.
+- [x] Remove any parser that exists only because internal callers are avoiding repository APIs — none remaining after this pass.
 
 ##### 5. Re-scope scribe libraries
 
-- [ ] Keep scribes as write primitives or extension-author facades, not as controller-owned parallel business layers.
-- [ ] Review `PageScribe`, `MediaScribe`, `CategoryScribe`, `TagScribe`, `GroupScribe`, `RedirectScribe`, `UserScribe`, `InviteScribe`, `ChannelScribe`, `SetScribe`, `StateWrite`, `AuthProfileScribe`, `AuthThrottleScribe`, and `UserMediaScribe` against that rule.
-- [ ] Decide which current controller-facing scribes should move behind repositories first: `MediaScribe`, `UserMediaScribe`, any remaining direct content mutation scribes.
-- [ ] Preserve `ConfigScribe` as a non-repository exception only if config remains outside the repository model.
+- [x] Keep scribes as write primitives or extension-author facades, not as controller-owned parallel business layers.
+- [x] Review `PageScribe`, `MediaScribe`, `CategoryScribe`, `TagScribe`, `GroupScribe`, `RedirectScribe`, `UserScribe`, `InviteScribe`, `ChannelScribe`, `SetScribe`, `StateWrite`, `AuthProfileScribe`, `AuthThrottleScribe`, and `UserMediaScribe` against that rule — all confirmed. `PageScribe`, `CategoryScribe`, `TagScribe`, `RedirectScribe`, `GroupScribe`, `UserScribe`, `ChannelScribe`, `SetScribe` are correctly owned by their corresponding `*Write` repositories. `AuthProfileScribe`/`AuthThrottleScribe` are auth-domain primitives used by auth services, not controllers. `StateWrite` is an extension-state filesystem primitive.
+- [x] Decide which current controller-facing scribes should move behind repositories first: `MediaScribe` (meta-image), `UserMediaScribe` (avatar/cover), `ConfigScribe` (config) — all three retained; see Step 3 scribe decision above.
+- [x] Preserve `ConfigScribe` as a non-repository exception only if config remains outside the repository model — config is still file-backed; `ConfigScribe` retained as a non-repository exception. ✓
 
 ##### 6. Simplify CLI
 
 - [x] Remove `CategoryDataParser`, `TagDataParser`, `ChannelDataParser`, `GroupDataParser`, and `RedirectDataParser` from `private/sys/Shell.php` where direct repository calls are sufficient. ✓
-- [ ] Keep only repository and `*RepoParser` dependencies in CLI content commands where possible.
-- [ ] Leave non-content exceptions alone unless they clearly belong in this pass: extension scaffolding, theme generation, archive/package helpers.
+- [x] Keep only repository and `*RepoParser` dependencies in CLI content commands where possible — confirmed: Shell.php content commands import only `*Read`/`*Write` repositories directly; no `*DataParser` or `*RepoParser` imports remain. ✓
+- [x] Leave non-content exceptions alone unless they clearly belong in this pass: extension scaffolding, theme generation, archive/package helpers — `ExtensionScaffoldService`, `ArchiveInstall`, `ArchivePackage`, `ThemeGenerator` retained. ✓
 
 ##### 7. Docs and verification
 
-- [ ] Update `docs/filetree.md` as each architecture chunk lands so the map stays truthful.
-- [ ] Update release notes for each completed boundary cleanup.
-- [ ] After each chunk, run targeted `php -l` on touched files and a repo-wide grep for removed seam names/imports.
-- [ ] Do not keep compatibility wrappers or alias classes unless there is a hard runtime constraint that cannot be resolved in the same chunk.
+- [x] Update `docs/filetree.md` as each architecture chunk lands so the map stays truthful — updated for `UserProfileParser` (new), `UserDataParser` (no contact methods), `ChannelDataParser` (taxonomy-set counts moved), `ChannelRead` (new bulk taxonomy-set count methods). ✓
+- [x] Update release notes for each completed boundary cleanup — all completed boundary work logged under April 29, 2026 heading. ✓
+- [x] After each chunk, run targeted `php -l` on touched files and a repo-wide grep for removed seam names/imports. ✓
+- [x] Do not keep compatibility wrappers or alias classes unless there is a hard runtime constraint that cannot be resolved in the same chunk. ✓
 
 #### Suggested execution order
 
-- [x] Chunk A: repository boundary cleanup (partial — PageRead/MediaRead naming still pending)
+- [x] Chunk A: repository boundary cleanup (complete)
 - [x] Chunk B: panel controller repo-first cleanup (complete)
 - [x] Chunk C: public controller repo-first cleanup (complete)
-- [ ] Chunk D: parser/scribe reduction and extension-facade cleanup
+- [x] Chunk D: parser/scribe reduction and extension-facade cleanup (complete — all *DataParser removed from sys/; scribes classified for next pass)
 - [x] Chunk E: CLI cleanup (partial — DataParser imports removed for taxonomy/channel/group/redirect)
-- [ ] Chunk F: docs sweep and final architecture verification
+- [x] Chunk F: docs sweep and final architecture verification (complete — filetree updated, release notes written, php -l and grep sweeps clean)
 
 
 

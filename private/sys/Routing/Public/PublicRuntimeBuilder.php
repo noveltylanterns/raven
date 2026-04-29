@@ -36,8 +36,6 @@ use Raven\Lib\Auth\AuthService;
 use Raven\Lib\Extension\ExtensionEditorCatalogService;
 use Raven\Lib\Parser\CategoryRepoParser;
 use Raven\Lib\Parser\ConfigParser;
-use Raven\Lib\Parser\MediaParser;
-use Raven\Lib\Parser\RedirectDataParser;
 use Raven\Lib\Parser\TagRepoParser;
 use Raven\Lib\Parser\TaxonomyRepoParser;
 use Raven\Lib\View\Public\ThemeCatalog;
@@ -359,20 +357,6 @@ final class PublicRuntimeBuilder
         };
 
         /**
-         * Wraps the redirect read side in the parser seam for public controllers.
-         */
-        $redirectDataParserFactory = $memoize(static function () use ($redirectReadFactory, $rvn): RedirectDataParser {
-            return new RedirectDataParser($rvn['input'], $redirectReadFactory());
-        });
-
-        /**
-         * Wraps the media read side in the parser seam for public rendering.
-         */
-        $mediaParserFactory = $memoize(static function () use ($mediaReadFactory): MediaParser {
-            return new MediaParser($mediaReadFactory());
-        });
-
-        /**
          * Reuses one shared public-theme catalog across public controllers.
          */
         $themeCatalogFactory = $memoize(static function () use (&$themeCatalogService, $rvn): ThemeCatalog {
@@ -408,20 +392,18 @@ final class PublicRuntimeBuilder
         $publicContentDomain = $memoize(static function () use (
             $channelReadFactory,
             $categoryLookupRepository,
-            $mediaParserFactory,
+            $mediaReadFactory,
             $pageReadFactory,
             $redirectReadFactory,
-            $redirectDataParserFactory,
             $tagLookupRepository,
             $taxonomyLookupRepository
         ): array {
             return [
                 'category_lookup' => $categoryLookupRepository,
                 'channel' => $channelReadFactory(),
-                'media' => $mediaParserFactory(),
+                'media' => $mediaReadFactory(),
                 'page' => $pageReadFactory(),
                 'redirect_read' => $redirectReadFactory(),
-                'redirect' => $redirectDataParserFactory(),
                 'tag_lookup' => $tagLookupRepository,
                 'taxonomy_lookup' => $taxonomyLookupRepository,
             ];
