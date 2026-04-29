@@ -18,7 +18,7 @@ use Raven\Core\Config;
  *
  * The Config-taking methods (globalPageRouteMode, effectiveChannelRouteMode, resolveChannelSeparator) are the
  * canonical entry point for any code that needs to resolve URL policy without loading the full ChannelDataParser stack.
- * Shared by ChannelDataParser, ChannelContextParser, PageRouteParser, and panel/public controllers.
+ * Shared by ChannelDataParser, ChannelRead, PageRouteParser, and panel/public controllers.
  */
 final class ChannelRouteParser
 {

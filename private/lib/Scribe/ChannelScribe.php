@@ -17,7 +17,7 @@ use RuntimeException;
 /**
  * Owns on-disk writes for the PHP-file-backed channel store.
  *
- * `ChannelContextParser` stays focused on filesystem reads; `ChannelRepoParser`
+ * `Repository\ChannelRead` owns the file-backed channel-store reads while `ChannelRepoParser`
  * holds the stateless normalization primitives used here. This class owns directory
  * creation, atomic writes, stale-file cleanup, and filename/data repair for channel
  * metadata files.

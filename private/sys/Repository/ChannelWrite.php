@@ -13,7 +13,6 @@ namespace Raven\Core\Repository;
 use PDO;
 use Raven\Lib\Scribe\ChannelRecordScribe;
 use Raven\Lib\Scribe\ChannelScribe;
-use Raven\Lib\Parser\ChannelContextParser;
 
 /**
  * INSERT, UPDATE, and DELETE methods for channel records.
@@ -38,13 +37,12 @@ final class ChannelWrite
     {
         $this->read = $read;
         $resolvedDir = $channelDirectory ?? (dirname(__DIR__, 3) . '/dat/channel');
-        $channelFileParser = new ChannelContextParser($resolvedDir);
         $channelFileScribe = new ChannelScribe($resolvedDir);
         $this->channelRecordScribe = new ChannelRecordScribe(
             $db,
             $driver,
             $prefix,
-            $channelFileParser,
+            fn (string $slug): array => $this->read->loadRawBySlug($slug),
             $channelFileScribe
         );
     }

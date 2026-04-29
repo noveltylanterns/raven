@@ -17,12 +17,10 @@ use RuntimeException;
  * Stateless channel normalization primitives and context-hydration helpers.
  *
  * This class exists as a shared constant and static-method primitive layer so that
- * `sys/Repository/` classes can import channel normalization logic without pulling in
- * `ChannelContextParser`'s filesystem instance methods. `ChannelContextParser` extends
- * this class, so all callers that already reference `ChannelContextParser::*` statics
- * continue to work via inheritance without any changes.
+ * `sys/Repository/` classes can import channel normalization logic without mixing in
+ * the filesystem-backed channel-store reads that live on `Repository\ChannelRead`.
  *
- * Do not add instance methods or filesystem I/O here; those belong on `ChannelContextParser`.
+ * Do not add instance methods or filesystem I/O here; those belong on the repository seam.
  */
 class ChannelRepoParser
 {

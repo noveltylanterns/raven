@@ -11,9 +11,10 @@ declare(strict_types=1);
 
 namespace Raven\Lib\Scribe;
 
+use Closure;
 use PDO;
 use Raven\Lib\Database\TableNameResolver;
-use Raven\Lib\Parser\ChannelContextParser;
+use Raven\Lib\Parser\ChannelRepoParser;
 use RuntimeException;
 
 /**
@@ -29,29 +30,30 @@ final class ChannelRecordScribe
     private PDO $db;
     private string $driver;
     private string $prefix;
-    private ChannelContextParser $channelFileParser;
+    /** @var Closure(string): array<string, mixed> */
+    private Closure $loadRawChannelBySlug;
     private ChannelScribe $channelFileScribe;
 
     /**
      * Prepares the channel write orchestrator.
      *
-     * @param PDO                  $db                App database connection used for channel delete cleanup.
-     * @param string               $driver            Active PDO driver name for table resolution.
-     * @param string               $prefix            Application table prefix before sanitization.
-     * @param ChannelContextParser $channelFileParser Read-side parser used to load existing raw channel payloads.
-     * @param ChannelScribe        $channelFileScribe Low-level file scribe used to persist canonical channel files.
+     * @param PDO                                   $db                   App database connection used for channel delete cleanup.
+     * @param string                                $driver               Active PDO driver name for table resolution.
+     * @param string                                $prefix               Application table prefix before sanitization.
+     * @param callable(string): array<string, mixed> $loadRawChannelBySlug Read-side loader used to fetch existing raw channel payloads.
+     * @param ChannelScribe                         $channelFileScribe    Low-level file scribe used to persist canonical channel files.
      */
     public function __construct(
         PDO $db,
         string $driver,
         string $prefix,
-        ChannelContextParser $channelFileParser,
+        callable $loadRawChannelBySlug,
         ChannelScribe $channelFileScribe
     ) {
         $this->db = $db;
         $this->driver = $driver;
         $this->prefix = preg_replace('/[^a-zA-Z0-9_]/', '', $prefix) ?? '';
-        $this->channelFileParser = $channelFileParser;
+        $this->loadRawChannelBySlug = Closure::fromCallable($loadRawChannelBySlug);
         $this->channelFileScribe = $channelFileScribe;
     }
 
@@ -87,15 +89,15 @@ final class ChannelRecordScribe
         $name = trim((string) ($data['name'] ?? ''));
         $slug = strtolower(trim((string) ($data['slug'] ?? '')));
         $description = trim((string) ($data['description'] ?? ''));
-        $editorOverride = ChannelContextParser::normalizeEditorOverride((string) ($data['editor_override'] ?? 'inherit'));
-        $routeMode = ChannelContextParser::normalizeRouteMode((string) ($data['route_mode'] ?? 'inherit'));
-        $routeSeparator = ChannelContextParser::normalizeRouteSeparator((string) ($data['route_separator'] ?? 'inherit'));
+        $editorOverride = ChannelRepoParser::normalizeEditorOverride((string) ($data['editor_override'] ?? 'inherit'));
+        $routeMode = ChannelRepoParser::normalizeRouteMode((string) ($data['route_mode'] ?? 'inherit'));
+        $routeSeparator = ChannelRepoParser::normalizeRouteSeparator((string) ($data['route_separator'] ?? 'inherit'));
 
-        if ($name === '' || !ChannelContextParser::isValidSlug($slug)) {
+        if ($name === '' || !ChannelRepoParser::isValidSlug($slug)) {
             throw new RuntimeException('Channel name and slug are required.');
         }
 
-        if (ChannelContextParser::isRootChannelSlug($slug) || ($idProvided && ChannelContextParser::isRootChannelId($id))) {
+        if (ChannelRepoParser::isRootChannelSlug($slug) || ($idProvided && ChannelRepoParser::isRootChannelId($id))) {
             throw new RuntimeException('The stock <root> channel is reserved and cannot be edited.');
         }
 
@@ -110,18 +112,18 @@ final class ChannelRecordScribe
             ? (int) ($existingRecord['id'] ?? 0)
             : (int) $nextChannelId();
 
-        $currentRaw = $oldSlug !== '' ? $this->channelFileParser->loadRawBySlug($oldSlug) : [];
+        $currentRaw = $oldSlug !== '' ? $this->loadRawBySlug($oldSlug) : [];
         $customFields = is_array($currentRaw['custom_fields'] ?? null) ? $currentRaw['custom_fields'] : [];
         $overrides = is_array($currentRaw['overrides'] ?? null) ? $currentRaw['overrides'] : [];
         $feedEnabled = array_key_exists('feed_enabled', $data)
-            ? ChannelContextParser::normalizeFeedEnabled($data['feed_enabled'])
-            : ChannelContextParser::normalizeFeedEnabled($currentRaw['feed_enabled'] ?? false);
+            ? ChannelRepoParser::normalizeFeedEnabled($data['feed_enabled'])
+            : ChannelRepoParser::normalizeFeedEnabled($currentRaw['feed_enabled'] ?? false);
         $categorySets = array_key_exists('category_sets', $data)
-            ? ChannelContextParser::normalizeTaxonomySetSelection($data['category_sets'], false)
-            : ChannelContextParser::normalizeTaxonomySetSelection($currentRaw['category_sets'] ?? [], false);
+            ? ChannelRepoParser::normalizeTaxonomySetSelection($data['category_sets'], false)
+            : ChannelRepoParser::normalizeTaxonomySetSelection($currentRaw['category_sets'] ?? [], false);
         $tagSets = array_key_exists('tag_sets', $data)
-            ? ChannelContextParser::normalizeTaxonomySetSelection($data['tag_sets'], false)
-            : ChannelContextParser::normalizeTaxonomySetSelection($currentRaw['tag_sets'] ?? [], false);
+            ? ChannelRepoParser::normalizeTaxonomySetSelection($data['tag_sets'], false)
+            : ChannelRepoParser::normalizeTaxonomySetSelection($currentRaw['tag_sets'] ?? [], false);
         $createdAt = trim((string) ($currentRaw['created_at'] ?? ''));
         if ($createdAt === '') {
             $createdAt = gmdate('Y-m-d H:i:s');
@@ -138,14 +140,14 @@ final class ChannelRecordScribe
             'editor_override' => $editorOverride,
             'route_mode' => $routeMode,
             'route_separator' => $routeSeparator,
-            'cover_image_path' => ChannelContextParser::normalizeNullablePath($currentRaw['cover_image_path'] ?? null),
-            'cover_image_sm_path' => ChannelContextParser::normalizeNullablePath($currentRaw['cover_image_sm_path'] ?? null),
-            'cover_image_md_path' => ChannelContextParser::normalizeNullablePath($currentRaw['cover_image_md_path'] ?? null),
-            'cover_image_lg_path' => ChannelContextParser::normalizeNullablePath($currentRaw['cover_image_lg_path'] ?? null),
-            'preview_image_path' => ChannelContextParser::normalizeNullablePath($currentRaw['preview_image_path'] ?? null),
-            'preview_image_sm_path' => ChannelContextParser::normalizeNullablePath($currentRaw['preview_image_sm_path'] ?? null),
-            'preview_image_md_path' => ChannelContextParser::normalizeNullablePath($currentRaw['preview_image_md_path'] ?? null),
-            'preview_image_lg_path' => ChannelContextParser::normalizeNullablePath($currentRaw['preview_image_lg_path'] ?? null),
+            'cover_image_path' => ChannelRepoParser::normalizeNullablePath($currentRaw['cover_image_path'] ?? null),
+            'cover_image_sm_path' => ChannelRepoParser::normalizeNullablePath($currentRaw['cover_image_sm_path'] ?? null),
+            'cover_image_md_path' => ChannelRepoParser::normalizeNullablePath($currentRaw['cover_image_md_path'] ?? null),
+            'cover_image_lg_path' => ChannelRepoParser::normalizeNullablePath($currentRaw['cover_image_lg_path'] ?? null),
+            'preview_image_path' => ChannelRepoParser::normalizeNullablePath($currentRaw['preview_image_path'] ?? null),
+            'preview_image_sm_path' => ChannelRepoParser::normalizeNullablePath($currentRaw['preview_image_sm_path'] ?? null),
+            'preview_image_md_path' => ChannelRepoParser::normalizeNullablePath($currentRaw['preview_image_md_path'] ?? null),
+            'preview_image_lg_path' => ChannelRepoParser::normalizeNullablePath($currentRaw['preview_image_lg_path'] ?? null),
             'custom_fields' => $customFields,
             'overrides' => $overrides,
             'created_at' => $createdAt,
@@ -169,8 +171,8 @@ final class ChannelRecordScribe
      *   preview_image_sm_path: string|null,
      *   preview_image_md_path: string|null,
      *   preview_image_lg_path: string|null
-     * }                                           $paths     Image-path payload to persist.
-     * @param callable(int): ?array<string, mixed> $findById  Callback for resolving the current channel row by id.
+     * }                                                   $paths     Image-path payload to persist.
+     * @param callable(int): ?array<string, mixed>         $findById  Callback for resolving the current channel row by id.
      * @throws RuntimeException When the channel does not exist or has an invalid slug.
      * @return void
      */
@@ -186,34 +188,34 @@ final class ChannelRecordScribe
             throw new RuntimeException('Channel slug is invalid.');
         }
 
-        $currentRaw = $this->channelFileParser->loadRawBySlug($slug);
+        $currentRaw = $this->loadRawBySlug($slug);
         $raw = [
             'id' => (int) ($record['id'] ?? $id),
             'name' => (string) ($record['name'] ?? ''),
             'slug' => $slug,
             'description' => (string) ($record['description'] ?? ''),
-            'feed_enabled' => ChannelContextParser::normalizeFeedEnabled(
+            'feed_enabled' => ChannelRepoParser::normalizeFeedEnabled(
                 $currentRaw['feed_enabled'] ?? ($record['feed_enabled'] ?? false)
             ),
-            'category_sets' => ChannelContextParser::normalizeTaxonomySetSelection(
+            'category_sets' => ChannelRepoParser::normalizeTaxonomySetSelection(
                 $currentRaw['category_sets'] ?? ($record['category_sets'] ?? []),
                 false
             ),
-            'tag_sets' => ChannelContextParser::normalizeTaxonomySetSelection(
+            'tag_sets' => ChannelRepoParser::normalizeTaxonomySetSelection(
                 $currentRaw['tag_sets'] ?? ($record['tag_sets'] ?? []),
                 false
             ),
             'editor_override' => (string) ($record['editor_override'] ?? 'inherit'),
             'route_mode' => (string) ($record['route_mode'] ?? 'inherit'),
             'route_separator' => (string) ($record['route_separator'] ?? 'inherit'),
-            'cover_image_path' => ChannelContextParser::normalizeNullablePath($paths['cover_image_path'] ?? null),
-            'cover_image_sm_path' => ChannelContextParser::normalizeNullablePath($paths['cover_image_sm_path'] ?? null),
-            'cover_image_md_path' => ChannelContextParser::normalizeNullablePath($paths['cover_image_md_path'] ?? null),
-            'cover_image_lg_path' => ChannelContextParser::normalizeNullablePath($paths['cover_image_lg_path'] ?? null),
-            'preview_image_path' => ChannelContextParser::normalizeNullablePath($paths['preview_image_path'] ?? null),
-            'preview_image_sm_path' => ChannelContextParser::normalizeNullablePath($paths['preview_image_sm_path'] ?? null),
-            'preview_image_md_path' => ChannelContextParser::normalizeNullablePath($paths['preview_image_md_path'] ?? null),
-            'preview_image_lg_path' => ChannelContextParser::normalizeNullablePath($paths['preview_image_lg_path'] ?? null),
+            'cover_image_path' => ChannelRepoParser::normalizeNullablePath($paths['cover_image_path'] ?? null),
+            'cover_image_sm_path' => ChannelRepoParser::normalizeNullablePath($paths['cover_image_sm_path'] ?? null),
+            'cover_image_md_path' => ChannelRepoParser::normalizeNullablePath($paths['cover_image_md_path'] ?? null),
+            'cover_image_lg_path' => ChannelRepoParser::normalizeNullablePath($paths['cover_image_lg_path'] ?? null),
+            'preview_image_path' => ChannelRepoParser::normalizeNullablePath($paths['preview_image_path'] ?? null),
+            'preview_image_sm_path' => ChannelRepoParser::normalizeNullablePath($paths['preview_image_sm_path'] ?? null),
+            'preview_image_md_path' => ChannelRepoParser::normalizeNullablePath($paths['preview_image_md_path'] ?? null),
+            'preview_image_lg_path' => ChannelRepoParser::normalizeNullablePath($paths['preview_image_lg_path'] ?? null),
             'custom_fields' => is_array($currentRaw['custom_fields'] ?? null) ? $currentRaw['custom_fields'] : [],
             'overrides' => is_array($currentRaw['overrides'] ?? null) ? $currentRaw['overrides'] : [],
             'created_at' => trim((string) ($currentRaw['created_at'] ?? '')) !== ''
@@ -227,15 +229,15 @@ final class ChannelRecordScribe
     /**
      * Deletes one channel after reassigning any lingering page/redirect rows to the root channel.
      *
-     * @param int                                          $id                   Channel id to delete.
-     * @param callable(int): ?array<string, mixed>         $findById             Callback for resolving the current channel row by id.
-     * @param callable(): array<int, int>                  $pageCountsByChannelId Callback for resolving current page counts by channel id.
+     * @param int                                  $id                    Channel id to delete.
+     * @param callable(int): ?array<string, mixed> $findById              Callback for resolving the current channel row by id.
+     * @param callable(): array<int, int>          $pageCountsByChannelId Callback for resolving current page counts by channel id.
      * @throws RuntimeException When the root channel is targeted or pages are still assigned to the channel.
      * @return void
      */
     public function deleteById(int $id, callable $findById, callable $pageCountsByChannelId): void
     {
-        if (ChannelContextParser::isRootChannelId($id)) {
+        if (ChannelRepoParser::isRootChannelId($id)) {
             throw new RuntimeException('The stock <root> channel cannot be deleted.');
         }
 
@@ -259,7 +261,7 @@ final class ChannelRecordScribe
                 'UPDATE ' . $pages . ' SET channel = :root_channel WHERE channel = :channel_id'
             );
             $detachPages->execute([
-                ':root_channel' => ChannelContextParser::ROOT_CHANNEL_ID,
+                ':root_channel' => ChannelRepoParser::ROOT_CHANNEL_ID,
                 ':channel_id' => $id,
             ]);
 
@@ -267,7 +269,7 @@ final class ChannelRecordScribe
                 'UPDATE ' . $redirects . ' SET channel = :root_channel WHERE channel = :channel_id'
             );
             $detachRedirects->execute([
-                ':root_channel' => ChannelContextParser::ROOT_CHANNEL_ID,
+                ':root_channel' => ChannelRepoParser::ROOT_CHANNEL_ID,
                 ':channel_id' => $id,
             ]);
 
@@ -291,33 +293,33 @@ final class ChannelRecordScribe
      */
     public function ensureRootChannelRecord(): void
     {
-        $raw = $this->channelFileParser->loadRawBySlug(ChannelContextParser::ROOT_CHANNEL_SLUG);
+        $raw = $this->loadRawBySlug(ChannelRepoParser::ROOT_CHANNEL_SLUG);
         $createdAt = trim((string) ($raw['created_at'] ?? ''));
         if ($createdAt === '') {
             $createdAt = gmdate('Y-m-d H:i:s');
         }
 
         $record = [
-            'id' => ChannelContextParser::ROOT_CHANNEL_ID,
-            'name' => ChannelContextParser::ROOT_CHANNEL_NAME,
-            'slug' => ChannelContextParser::ROOT_CHANNEL_SLUG,
+            'id' => ChannelRepoParser::ROOT_CHANNEL_ID,
+            'name' => ChannelRepoParser::ROOT_CHANNEL_NAME,
+            'slug' => ChannelRepoParser::ROOT_CHANNEL_SLUG,
             'description' => trim((string) ($raw['description'] ?? '')),
             'feed_enabled' => false,
-            'editor_override' => ChannelContextParser::normalizeEditorOverride(
+            'editor_override' => ChannelRepoParser::normalizeEditorOverride(
                 (string) ($raw['editor_override'] ?? 'inherit')
             ),
-            'route_mode' => ChannelContextParser::normalizeRouteMode((string) ($raw['route_mode'] ?? 'inherit')),
-            'route_separator' => ChannelContextParser::normalizeRouteSeparator(
+            'route_mode' => ChannelRepoParser::normalizeRouteMode((string) ($raw['route_mode'] ?? 'inherit')),
+            'route_separator' => ChannelRepoParser::normalizeRouteSeparator(
                 (string) ($raw['route_separator'] ?? 'inherit')
             ),
-            'cover_image_path' => ChannelContextParser::normalizeNullablePath($raw['cover_image_path'] ?? null),
-            'cover_image_sm_path' => ChannelContextParser::normalizeNullablePath($raw['cover_image_sm_path'] ?? null),
-            'cover_image_md_path' => ChannelContextParser::normalizeNullablePath($raw['cover_image_md_path'] ?? null),
-            'cover_image_lg_path' => ChannelContextParser::normalizeNullablePath($raw['cover_image_lg_path'] ?? null),
-            'preview_image_path' => ChannelContextParser::normalizeNullablePath($raw['preview_image_path'] ?? null),
-            'preview_image_sm_path' => ChannelContextParser::normalizeNullablePath($raw['preview_image_sm_path'] ?? null),
-            'preview_image_md_path' => ChannelContextParser::normalizeNullablePath($raw['preview_image_md_path'] ?? null),
-            'preview_image_lg_path' => ChannelContextParser::normalizeNullablePath($raw['preview_image_lg_path'] ?? null),
+            'cover_image_path' => ChannelRepoParser::normalizeNullablePath($raw['cover_image_path'] ?? null),
+            'cover_image_sm_path' => ChannelRepoParser::normalizeNullablePath($raw['cover_image_sm_path'] ?? null),
+            'cover_image_md_path' => ChannelRepoParser::normalizeNullablePath($raw['cover_image_md_path'] ?? null),
+            'cover_image_lg_path' => ChannelRepoParser::normalizeNullablePath($raw['cover_image_lg_path'] ?? null),
+            'preview_image_path' => ChannelRepoParser::normalizeNullablePath($raw['preview_image_path'] ?? null),
+            'preview_image_sm_path' => ChannelRepoParser::normalizeNullablePath($raw['preview_image_sm_path'] ?? null),
+            'preview_image_md_path' => ChannelRepoParser::normalizeNullablePath($raw['preview_image_md_path'] ?? null),
+            'preview_image_lg_path' => ChannelRepoParser::normalizeNullablePath($raw['preview_image_lg_path'] ?? null),
             'custom_fields' => is_array($raw['custom_fields'] ?? null) ? $raw['custom_fields'] : [],
             'overrides' => is_array($raw['overrides'] ?? null) ? $raw['overrides'] : [],
             'created_at' => $createdAt,
@@ -325,8 +327,8 @@ final class ChannelRecordScribe
 
         if ($raw === [] || $this->rootRecordNeedsRewrite($raw)) {
             $this->channelFileScribe->writeRecordById(
-                ChannelContextParser::ROOT_CHANNEL_ID,
-                ChannelContextParser::ROOT_CHANNEL_SLUG,
+                ChannelRepoParser::ROOT_CHANNEL_ID,
+                ChannelRepoParser::ROOT_CHANNEL_SLUG,
                 $record
             );
         }
@@ -356,22 +358,35 @@ final class ChannelRecordScribe
      */
     private function rootRecordNeedsRewrite(array $raw): bool
     {
-        if (ChannelContextParser::normalizeChannelId($raw['id'] ?? null) !== ChannelContextParser::ROOT_CHANNEL_ID) {
+        if (ChannelRepoParser::normalizeChannelId($raw['id'] ?? null) !== ChannelRepoParser::ROOT_CHANNEL_ID) {
             return true;
         }
 
-        if (!ChannelContextParser::isRootChannelSlug((string) ($raw['slug'] ?? ''))) {
+        if (!ChannelRepoParser::isRootChannelSlug((string) ($raw['slug'] ?? ''))) {
             return true;
         }
 
-        return trim((string) ($raw['name'] ?? '')) !== ChannelContextParser::ROOT_CHANNEL_NAME;
+        return trim((string) ($raw['name'] ?? '')) !== ChannelRepoParser::ROOT_CHANNEL_NAME;
+    }
+
+    /**
+     * Loads the current raw file-backed channel payload by slug.
+     *
+     * @param string $slug Channel slug to read.
+     * @return array<string, mixed> Raw persisted channel payload, or [] when not found.
+     */
+    private function loadRawBySlug(string $slug): array
+    {
+        $load = $this->loadRawChannelBySlug;
+        $raw = $load($slug);
+        return is_array($raw) ? $raw : [];
     }
 
     /**
      * Maps logical table names into backend-specific physical names.
      *
      * @param string $table Logical unprefixed table name.
-     * @return string       Physical table name for the active backend.
+     * @return string Physical table name for the active backend.
      */
     private function table(string $table): string
     {
