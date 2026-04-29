@@ -14,11 +14,11 @@ namespace Raven\Core\Controller\Panel;
 use Closure;
 use Raven\Core\Repository\CategoryRead;
 use Raven\Core\Repository\CategoryWrite;
+use Raven\Core\Repository\ChannelRead;
 use Raven\Core\Repository\SetRead;
 use Raven\Core\Repository\SetWrite;
 use Raven\Lib\Media\Panel\TaxonomyImageService;
 use Raven\Lib\Parser\CategoryRouteParser;
-use Raven\Lib\Parser\ChannelDataParser;
 use Raven\Lib\Parser\SetParser;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\Scribe\MediaScribe;
@@ -48,7 +48,7 @@ final class CategoryEditController
     private bool $categoryEnabled;
     private TaxonomyImageService $taxonomyImageService;
     private MediaScribe $mediaScribe;
-    private ChannelDataParser $channelParser;
+    private ChannelRead $channelRead;
     private EditorTabs $editorTabs;
     private Upload $uploadFileSetNormalizer;
 
@@ -62,7 +62,7 @@ final class CategoryEditController
      * @param bool $categoryEnabled Whether category features are enabled in runtime config.
      * @param TaxonomyImageService $taxonomyImageService Read-side taxonomy image config and path helper.
      * @param MediaScribe $mediaScribe Write-side meta-image upload and cleanup helper.
-     * @param ChannelDataParser $channelParser Channel data parser for category-set channel-assignment counts on delete.
+     * @param ChannelRead $channelRead Channel repository for category-set channel-assignment counts on delete.
      * @param EditorTabs $editorTabs Panel editor tab normalization and tab-preserving URL builder.
      * @param Upload $uploadFileSetNormalizer Normalizer for $_FILES upload groups.
      * @return void
@@ -77,7 +77,7 @@ final class CategoryEditController
         bool $categoryEnabled,
         TaxonomyImageService $taxonomyImageService,
         MediaScribe $mediaScribe,
-        ChannelDataParser $channelParser,
+        ChannelRead $channelRead,
         EditorTabs $editorTabs,
         Upload $uploadFileSetNormalizer
     ) {
@@ -90,7 +90,7 @@ final class CategoryEditController
         $this->categoryEnabled = $categoryEnabled;
         $this->taxonomyImageService = $taxonomyImageService;
         $this->mediaScribe = $mediaScribe;
-        $this->channelParser = $channelParser;
+        $this->channelRead = $channelRead;
         $this->editorTabs = $editorTabs;
         $this->uploadFileSetNormalizer = $uploadFileSetNormalizer;
     }
@@ -512,7 +512,7 @@ final class CategoryEditController
             Redirect::redirect($this->context->panelUrl('/category/set'));
         }
 
-        if ($this->channelParser->countExplicitTaxonomySetAssignments('category', $id) > 0) {
+        if ($this->channelRead->countExplicitTaxonomySetAssignments('category', $id) > 0) {
             $this->context->flash('error', 'Cannot delete a category set that is still assigned to one or more channels.');
             Redirect::redirect($this->context->panelUrl('/category/set'));
         }

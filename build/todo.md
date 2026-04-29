@@ -53,10 +53,16 @@ Last updated: 2026-04-29
 - [x] CLI pass has started with low-risk taxonomy/channel/group/redirect reductions:
   - `private/sys/Shell.php` category, tag, channel, group, and redirect commands now read directly from repositories instead of constructing `*DataParser` wrappers for simple list/show/update/delete selectors.
   - `RedirectRead` now owns the generic `findBySlug()` lookup the redirect parser/CLI already expected, so the canonical redirect slug+channel read lives on the repository boundary itself.
-- [ ] Larger controller reductions are still pending:
-  - `PageEditController` still has mixed editor/extension/taxonomy lookup helpers that need a narrower keep-or-move decision.
-  - Some controllers still use `ChannelDataParser` only for explicit taxonomy-set assignment counts, and `UserDataParser` only for contact/profile option normalization.
-  - Public runtime/container exports still expose parser factories that may now be dead internal weight even if the route controllers no longer need them.
+- [x] Remaining controller `ChannelDataParser` usages eliminated:
+  - `CategoryListController`, `CategoryEditController`, `TagListController`, and `TagEditController` now receive `ChannelRead` directly; `ChannelRead::explicitTaxonomySetCounts()` added as first-class repository method.
+  - `ConfigController` now calls `$this->channelRepo->listRoutingOptions()` directly; `ChannelDataParser` lazy wrapper removed.
+  - `PublicRuntimeBuilder` no longer builds a `channel_parser` / `public_channel_parser` factory; dead key removed from the public content domain.
+  - `ChannelDataParser` is now entirely absent from `private/sys/` — it remains available only as an extension-author facade in `private/lib/`.
+- [x] `UserProfileParser` extracted from `UserDataParser`:
+  - All profile-contact normalization and social metadata helpers moved to `private/lib/Parser/UserProfileParser.php`.
+  - `UserDataParser` retains only repository-backed user/profile read methods; `InputSanitizer` dependency removed.
+  - All sys/ controllers and runtime builders now use `UserProfileParser` directly for contact normalization.
+  - `UserDataParser` is now absent from `private/sys/` — both `*DataParser` classes live only in `private/lib/` as extension-author facades.
 
 #### Goal
 
@@ -74,9 +80,8 @@ Reconcile `private/sys/Repository`, `private/sys/Controller`, `private/lib/Parse
 - [ ] Repositories still contain route-specific or caller-specific behavior:
   - `PageRead` still owns panel/public-oriented helpers like `findPublicPage*()` and `editFormDataById()`.
   - `MediaRead` still owns public-ready gallery/meta helpers like `listReadyForPublicPage()` and `coverImageUrlForPage()`.
-- [ ] Controllers still rely heavily on `*DataParser` classes instead of repository methods:
-  - Biggest hotspots are now reduced to specialized helper-only cases rather than broad read-path ownership.
-  - Primary remaining review targets: `Panel/PageEditController`, `Panel/ConfigController`, `Public/SharedController`, and any controller still holding `ChannelDataParser` or `UserDataParser` only for helper behavior.
+- [x] `ChannelDataParser` fully removed from all `sys/` controllers and runtime builders.
+- [x] `UserDataParser` fully removed from `private/sys/` — now only used as an extension-author facade in `private/lib/`.
 - [ ] Parser/Scribe libraries still own internal behavior that is not purely "extension facade" behavior:
   - `PageDataParser`, `MediaParser`, `TaxonomyRepoParser`, `TaxonomyDataParser`, `InviteParser`.
 - [ ] Some controller write flows still go through scribes directly instead of repository-owned mutation seams:

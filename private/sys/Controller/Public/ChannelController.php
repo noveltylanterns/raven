@@ -23,7 +23,7 @@ use Raven\Lib\Extension\Public\EmbeddedFormRuntimeService;
 use Raven\Lib\Extension\Public\EmbeddedShortcodeRuntimeInterface;
 use Raven\Lib\Parser\ChannelRouteParser;
 use Raven\Lib\Parser\PageBlockParser;
-use Raven\Lib\Parser\UserDataParser;
+use Raven\Lib\Parser\UserProfileParser;
 use Raven\Lib\Transport\Redirect;
 use Raven\Lib\View\Public\MetaService;
 use Raven\Lib\View\Public\PageBlocks;
@@ -62,7 +62,7 @@ final class ChannelController
     private ?PageBlocks $pageBlocks = null;
     private ExtensionEditorCatalogService $extensionEditorCatalogService;
     private ?EmbeddedFormRuntimeService $embeddedFormRuntimeService = null;
-    private ?UserDataParser $profileContactService = null;
+    private ?UserProfileParser $profileContactService = null;
     private ?ChannelPageRouter $publicChannelPageRouteService = null;
 
     /**
@@ -482,12 +482,12 @@ final class ChannelController
     /**
      * Returns the shared profile-contact helper.
      *
-     * @return UserDataParser Shared profile-contact helper.
+     * @return UserProfileParser Shared profile-contact helper.
      */
-    private function profileContactService(): UserDataParser
+    private function profileContactService(): UserProfileParser
     {
-        if (!$this->profileContactService instanceof UserDataParser) {
-            $this->profileContactService = new UserDataParser($this->context->input());
+        if (!$this->profileContactService instanceof UserProfileParser) {
+            $this->profileContactService = new UserProfileParser($this->context->input());
         }
 
         return $this->profileContactService;

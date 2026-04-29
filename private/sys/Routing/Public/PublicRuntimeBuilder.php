@@ -35,7 +35,6 @@ use Raven\Core\Renderer;
 use Raven\Lib\Auth\AuthService;
 use Raven\Lib\Extension\ExtensionEditorCatalogService;
 use Raven\Lib\Parser\CategoryRepoParser;
-use Raven\Lib\Parser\ChannelDataParser;
 use Raven\Lib\Parser\ConfigParser;
 use Raven\Lib\Parser\MediaParser;
 use Raven\Lib\Parser\RedirectDataParser;
@@ -81,7 +80,6 @@ final class PublicRuntimeBuilder
         $taxonomyLookup = null;
         $tagLookup = null;
         $channelRead = null;
-        $channelDataParser = null;
         $extensionEditorCatalogService = null;
         $groupRead = null;
         $mediaRead = null;
@@ -173,19 +171,6 @@ final class PublicRuntimeBuilder
             );
 
             return $channelRead;
-        });
-
-        /**
-         * Builds one shared channel parser for public read-side channel lookups.
-         */
-        $channelDataParserFactory = $memoize(static function () use (&$channelDataParser, $rvn, $channelReadFactory): ChannelDataParser {
-            $channelDataParser = new ChannelDataParser(
-                $rvn['config'],
-                $rvn['input'],
-                $channelReadFactory()
-            );
-
-            return $channelDataParser;
         });
 
         /**
@@ -421,7 +406,6 @@ final class PublicRuntimeBuilder
          * @return array<string, mixed>
          */
         $publicContentDomain = $memoize(static function () use (
-            $channelDataParserFactory,
             $channelReadFactory,
             $categoryLookupRepository,
             $mediaParserFactory,
@@ -434,7 +418,6 @@ final class PublicRuntimeBuilder
             return [
                 'category_lookup' => $categoryLookupRepository,
                 'channel' => $channelReadFactory(),
-                'channel_parser' => $channelDataParserFactory(),
                 'media' => $mediaParserFactory(),
                 'page' => $pageReadFactory(),
                 'redirect_read' => $redirectReadFactory(),
@@ -482,7 +465,6 @@ final class PublicRuntimeBuilder
         $rvn['public_domain_channel'] = $publicContentDomain;
         $rvn['public_domain_feed'] = $publicContentDomain;
         $rvn['public_domain_category'] = $publicContentDomain;
-        $rvn['public_channel_parser'] = $channelDataParserFactory;
         $rvn['public_domain_auth'] = $publicAuthDomain;
         $rvn['public_domain_profile'] = $publicAuthDomain;
         $rvn['public_domain_group'] = $publicAuthDomain;

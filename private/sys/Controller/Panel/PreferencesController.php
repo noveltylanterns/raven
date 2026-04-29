@@ -26,7 +26,7 @@ use Raven\Lib\View\Panel\Editor;
 use Raven\Lib\View\Panel\EditorBlocks;
 use Raven\Lib\View\Panel\EditorTabs;
 use Raven\Lib\View\Panel\PanelMediaConfigService;
-use Raven\Lib\Parser\UserDataParser;
+use Raven\Lib\Parser\UserProfileParser;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\Security\WebAuthn;
 use Raven\Lib\Transport\Response;
@@ -49,7 +49,7 @@ final class PreferencesController
     private Editor $editor;
     private EditorBlocks $editorBlocks;
     private PanelMediaConfigService $panelMediaConfigService;
-    private UserDataParser $profileContactService;
+    private UserProfileParser $profileContactService;
     private PanelTwoFactorPreferencesService $panelTwoFactorPreferencesService;
     private UserMediaScribe $userMediaScribe;
     private UserMediaPathService $userMediaPathService;
@@ -65,7 +65,7 @@ final class PreferencesController
      * @param Editor $editor Shared panel editor utility methods (theme normalization).
      * @param EditorBlocks $editorBlocks Shared repeater-block view helper for modular panel rows.
      * @param PanelMediaConfigService $panelMediaConfigService Shared media-limit helper.
-     * @param UserDataParser $profileContactService Shared profile-contact normalizer.
+     * @param UserProfileParser $profileContactService Shared profile-contact normalizer.
      * @param PanelTwoFactorPreferencesService $panelTwoFactorPreferencesService Shared 2FA helper set.
      * @param UserMediaScribe $userMediaScribe Shared user-media write helper.
      * @param UserMediaPathService $userMediaPathService Shared user-media path resolver.
@@ -82,7 +82,7 @@ final class PreferencesController
         Editor $editor,
         EditorBlocks $editorBlocks,
         PanelMediaConfigService $panelMediaConfigService,
-        UserDataParser $profileContactService,
+        UserProfileParser $profileContactService,
         PanelTwoFactorPreferencesService $panelTwoFactorPreferencesService,
         UserMediaScribe $userMediaScribe,
         UserMediaPathService $userMediaPathService,

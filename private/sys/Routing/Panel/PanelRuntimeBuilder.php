@@ -69,7 +69,6 @@ use Raven\Lib\Extension\ExtensionEditorCatalogService;
 use Raven\Lib\Extension\StateRead;
 use Raven\Lib\Extension\Panel\ExtensionCatalogService;
 use Raven\Lib\Extension\Panel\ExtensionPermissionCatalogService;
-use Raven\Lib\Parser\ChannelDataParser;
 use Raven\Lib\Parser\ConfigParser;
 use Raven\Lib\Parser\FeedRouteParser;
 use Raven\Lib\Parser\GroupRouteParser;
@@ -77,7 +76,7 @@ use Raven\Lib\Parser\TaxonomyRepoParser;
 use Raven\Lib\Media\Panel\MediaManager;
 use Raven\Lib\Media\Panel\TaxonomyImageService;
 use Raven\Lib\Media\Panel\UserMediaPathService;
-use Raven\Lib\Parser\UserDataParser;
+use Raven\Lib\Parser\UserProfileParser;
 use Raven\Lib\Scribe\MediaScribe;
 use Raven\Lib\Scribe\UserMediaScribe;
 use Raven\Lib\View\Panel\Editor;
@@ -1077,7 +1076,7 @@ final class PanelRuntimeBuilder
                 $taxonomyDomain['category'],
                 $taxonomyDomain['category_set'],
                 $taxonomyDomain['category_enabled'],
-                new ChannelDataParser($rvn['config'], $rvn['input'], $taxonomyDomain['channel_read'])
+                $taxonomyDomain['channel_read']
             );
 
             return $categoryListController;
@@ -1105,7 +1104,7 @@ final class PanelRuntimeBuilder
                 $taxonomyDomain['category_enabled'],
                 new TaxonomyImageService($rvn['config']),
                 new MediaScribe($rvn['db'], $rvn['driver'], $rvn['prefix'], $rvn['config'], (string) $rvn['root']),
-                new ChannelDataParser($rvn['config'], $rvn['input'], $taxonomyDomain['channel_read']),
+                $taxonomyDomain['channel_read'],
                 $rvn['panel_editor_tabs'],
                 new Upload()
             );
@@ -1175,7 +1174,7 @@ final class PanelRuntimeBuilder
                 $taxonomyDomain['tag'],
                 $taxonomyDomain['tag_set'],
                 $taxonomyDomain['tag_enabled'],
-                new ChannelDataParser($rvn['config'], $rvn['input'], $taxonomyDomain['channel_read'])
+                $taxonomyDomain['channel_read']
             );
 
             return $tagListController;
@@ -1203,7 +1202,7 @@ final class PanelRuntimeBuilder
                 $taxonomyDomain['tag_enabled'],
                 new TaxonomyImageService($rvn['config']),
                 new MediaScribe($rvn['db'], $rvn['driver'], $rvn['prefix'], $rvn['config'], (string) $rvn['root']),
-                new ChannelDataParser($rvn['config'], $rvn['input'], $taxonomyDomain['channel_read']),
+                $taxonomyDomain['channel_read'],
                 $rvn['panel_editor_tabs'],
                 new Upload()
             );
@@ -1267,7 +1266,7 @@ final class PanelRuntimeBuilder
                 $rvn['panel_editor'],
                 $rvn['panel_editor_blocks'],
                 new PanelMediaConfigService($rvn['config']),
-                new UserDataParser($rvn['input']),
+                new UserProfileParser($rvn['input']),
                 new PanelTwoFactorPreferencesService($rvn['input']),
                 new UserMediaScribe((string) $rvn['root']),
                 new UserMediaPathService()
@@ -1356,7 +1355,7 @@ final class PanelRuntimeBuilder
                 $rvn['panel_editor'],
                 $rvn['panel_editor_blocks'],
                 new PanelMediaConfigService($rvn['config']),
-                new UserDataParser($rvn['input']),
+                new UserProfileParser($rvn['input']),
                 new PanelTwoFactorPreferencesService($rvn['input']),
                 new UserMediaScribe((string) $rvn['root']),
                 new UserMediaPathService(),

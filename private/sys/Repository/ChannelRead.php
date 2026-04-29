@@ -420,6 +420,31 @@ class ChannelRead
     }
 
     /**
+     * Returns channel assignment counts keyed by taxonomy set id.
+     *
+     * Iterates all channel records once and builds a map of set-id → channel count for the
+     * given taxonomy kind. Used by panel list views to annotate each taxonomy set with how
+     * many channels reference it, without a per-set round-trip.
+     *
+     * @param string $kind Taxonomy kind key: 'category' or 'tag'.
+     * @return array<int, int> Map of set id to number of channels that explicitly select it.
+     */
+    public function explicitTaxonomySetCounts(string $kind): array
+    {
+        $field = strtolower(trim($kind)) === 'tag' ? 'tag_sets' : 'category_sets';
+        $counts = [];
+
+        foreach ($this->listRecords() as $record) {
+            $selection = ChannelRepoParser::normalizeTaxonomySetSelection($record[$field] ?? [], false);
+            foreach ($selection as $setId) {
+                $counts[$setId] = (int) ($counts[$setId] ?? 0) + 1;
+            }
+        }
+
+        return $counts;
+    }
+
+    /**
      * Counts channels that explicitly include a given taxonomy set id in their configuration.
      *
      * Used before deleting a set to confirm no channels still reference it.
@@ -430,17 +455,11 @@ class ChannelRead
      */
     public function countExplicitTaxonomySetAssignments(string $kind, int $setId): int
     {
-        $field = strtolower(trim($kind)) === 'tag' ? 'tag_sets' : 'category_sets';
-        $count = 0;
-
-        foreach ($this->listRecords() as $record) {
-            $selection = ChannelRepoParser::normalizeTaxonomySetSelection($record[$field] ?? [], false);
-            if (in_array($setId, $selection, true)) {
-                $count++;
-            }
+        if ($setId < 1) {
+            return 0;
         }
 
-        return $count;
+        return (int) ($this->explicitTaxonomySetCounts($kind)[$setId] ?? 0);
     }
 
     /**

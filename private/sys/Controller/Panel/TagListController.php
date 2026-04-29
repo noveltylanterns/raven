@@ -12,9 +12,9 @@ declare(strict_types=1);
 namespace Raven\Core\Controller\Panel;
 
 use Closure;
+use Raven\Core\Repository\ChannelRead;
 use Raven\Core\Repository\SetRead;
 use Raven\Core\Repository\TagRead;
-use Raven\Lib\Parser\ChannelDataParser;
 use Raven\Lib\Security\InputSanitizer;
 
 /**
@@ -32,7 +32,7 @@ final class TagListController
     private Closure $tagSetRepoResolver;
     private ?SetRead $tagSetRepo = null;
     private bool $tagEnabled;
-    private ChannelDataParser $channelParser;
+    private ChannelRead $channelRead;
 
     /**
      * @param SharedController $context Shared panel request context.
@@ -40,7 +40,7 @@ final class TagListController
      * @param callable $tagReadResolver Lazy tag read resolver; resolved on tag list routes.
      * @param callable $tagSetRepoResolver Lazy tag-set read resolver; resolved for set filter tabs.
      * @param bool $tagEnabled Whether tag features are enabled in runtime config.
-     * @param ChannelDataParser $channelParser Channel data parser for tag-set channel usage counts.
+     * @param ChannelRead $channelRead Channel repository for tag-set channel usage counts.
      * @return void
      */
     public function __construct(
@@ -49,14 +49,14 @@ final class TagListController
         callable $tagReadResolver,
         callable $tagSetRepoResolver,
         bool $tagEnabled,
-        ChannelDataParser $channelParser
+        ChannelRead $channelRead
     ) {
         $this->context = $context;
         $this->input = $input;
         $this->tagReadResolver = Closure::fromCallable($tagReadResolver);
         $this->tagSetRepoResolver = Closure::fromCallable($tagSetRepoResolver);
         $this->tagEnabled = $tagEnabled;
-        $this->channelParser = $channelParser;
+        $this->channelRead = $channelRead;
     }
 
     /**
@@ -141,7 +141,7 @@ final class TagListController
 
         // Annotate each set row with its tag and channel usage counts.
         $countsBySetId = $this->tagRead()->countsBySetId();
-        $channelCountsBySetId = $this->channelParser->explicitTaxonomySetCounts('tag');
+        $channelCountsBySetId = $this->channelRead->explicitTaxonomySetCounts('tag');
         $setRows = [];
         foreach ($this->tagSetRepo()->listAll() as $setRow) {
             $setId = (int) ($setRow['id'] ?? 0);

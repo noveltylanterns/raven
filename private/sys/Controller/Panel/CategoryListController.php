@@ -13,8 +13,8 @@ namespace Raven\Core\Controller\Panel;
 
 use Closure;
 use Raven\Core\Repository\CategoryRead;
+use Raven\Core\Repository\ChannelRead;
 use Raven\Core\Repository\SetRead;
-use Raven\Lib\Parser\ChannelDataParser;
 use Raven\Lib\Security\InputSanitizer;
 
 /**
@@ -32,7 +32,7 @@ final class CategoryListController
     private Closure $categorySetRepoResolver;
     private ?SetRead $categorySetRepo = null;
     private bool $categoryEnabled;
-    private ChannelDataParser $channelParser;
+    private ChannelRead $channelRead;
 
     /**
      * @param SharedController $context Shared panel request context.
@@ -40,7 +40,7 @@ final class CategoryListController
      * @param callable $categoryReadResolver Lazy category read resolver; resolved on category list routes.
      * @param callable $categorySetRepoResolver Lazy category-set read resolver; resolved for set filter tabs.
      * @param bool $categoryEnabled Whether category features are enabled in runtime config.
-     * @param ChannelDataParser $channelParser Channel data parser for category-set channel usage counts.
+     * @param ChannelRead $channelRead Channel repository for category-set channel usage counts.
      * @return void
      */
     public function __construct(
@@ -49,14 +49,14 @@ final class CategoryListController
         callable $categoryReadResolver,
         callable $categorySetRepoResolver,
         bool $categoryEnabled,
-        ChannelDataParser $channelParser
+        ChannelRead $channelRead
     ) {
         $this->context = $context;
         $this->input = $input;
         $this->categoryReadResolver = Closure::fromCallable($categoryReadResolver);
         $this->categorySetRepoResolver = Closure::fromCallable($categorySetRepoResolver);
         $this->categoryEnabled = $categoryEnabled;
-        $this->channelParser = $channelParser;
+        $this->channelRead = $channelRead;
     }
 
     /**
@@ -141,7 +141,7 @@ final class CategoryListController
 
         // Annotate each set row with its category and channel usage counts.
         $countsBySetId = $this->categoryRead()->countsBySetId();
-        $channelCountsBySetId = $this->channelParser->explicitTaxonomySetCounts('category');
+        $channelCountsBySetId = $this->channelRead->explicitTaxonomySetCounts('category');
         $setRows = [];
         foreach ($this->categorySetRepo()->listAll() as $setRow) {
             $setId = (int) ($setRow['id'] ?? 0);

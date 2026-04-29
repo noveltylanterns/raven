@@ -15,10 +15,9 @@ use Closure;
 use Raven\Core\Config;
 use Raven\Core\Repository\ChannelRead;
 use Raven\Core\Repository\SetRead;
-use Raven\Lib\Parser\ChannelDataParser;
 use Raven\Lib\Parser\ChannelRouteParser;
 use Raven\Lib\Parser\ConfigParser;
-use Raven\Lib\Parser\UserDataParser;
+use Raven\Lib\Parser\UserProfileParser;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\Scribe\ConfigScribe;
 use Raven\Lib\View\Panel\Editor;
@@ -133,14 +132,13 @@ final class ConfigController
     private Config $config;
     private InputSanitizer $input;
     private ChannelRead $channelRepo;
-    private ?ChannelDataParser $channelParser = null;
     /** @var Closure(): SetRead */
     private Closure $categorySetRepoResolver;
     private ?SetRead $categorySetRepo = null;
     /** @var Closure(): SetRead */
     private Closure $tagSetRepoResolver;
     private ?SetRead $tagSetRepo = null;
-    private UserDataParser $profileContacts;
+    private UserProfileParser $profileContacts;
     private EditorTabs $editorTabs;
     private Editor $editor;
     private EditorBlocks $editorBlocks;
@@ -185,7 +183,7 @@ final class ConfigController
         $this->channelRepo = $channelRepo;
         $this->categorySetRepoResolver = Closure::fromCallable($categorySetRepoResolver);
         $this->tagSetRepoResolver = Closure::fromCallable($tagSetRepoResolver);
-        $this->profileContacts = new UserDataParser($input);
+        $this->profileContacts = new UserProfileParser($input);
         $this->editorTabs = $editorTabs;
         $this->editor = $editor;
         $this->editorBlocks = $editorBlocks;
@@ -449,22 +447,8 @@ final class ConfigController
             return $this->channelRoutingOptionsCache;
         }
 
-        $this->channelRoutingOptionsCache = $this->channelParser()->listRoutingOptions();
+        $this->channelRoutingOptionsCache = $this->channelRepo->listRoutingOptions();
         return $this->channelRoutingOptionsCache;
-    }
-
-    /**
-     * Returns the cached channel data parser for channel routing-option lookups.
-     *
-     * @return ChannelDataParser Shared channel data parser.
-     */
-    private function channelParser(): ChannelDataParser
-    {
-        if (!$this->channelParser instanceof ChannelDataParser) {
-            $this->channelParser = new ChannelDataParser($this->config, $this->input, $this->channelRepo);
-        }
-
-        return $this->channelParser;
     }
 
     /**

@@ -19,7 +19,7 @@ use Raven\Lib\Auth\SessionFlash;
 use Raven\Lib\Parser\FeedRouteParser;
 use Raven\Lib\Parser\GroupRouteParser;
 use Raven\Lib\Parser\PanelParser;
-use Raven\Lib\Parser\UserDataParser;
+use Raven\Lib\Parser\UserProfileParser;
 use Raven\Lib\Security\Captcha;
 use Raven\Lib\Security\Csrf;
 use Raven\Lib\Security\InputSanitizer;
@@ -45,7 +45,7 @@ final class SharedController
     private ?Request $requestContextResolver = null;
     private ?FeedRouteParser $feedParser = null;
     private ?GroupRouteParser $groupParser = null;
-    private ?UserDataParser $profileContactService = null;
+    private ?UserProfileParser $profileContactService = null;
     private ?Captcha $captchaService = null;
     private ThemeCatalog $themeCatalogService;
     private ?MetaService $metaService = null;
@@ -444,12 +444,12 @@ final class SharedController
     /**
      * Returns the cached profile-contact service.
      *
-     * @return UserDataParser Shared profile-contact helper.
+     * @return UserProfileParser Shared profile-contact helper.
      */
-    private function profileContactService(): UserDataParser
+    private function profileContactService(): UserProfileParser
     {
-        if (!$this->profileContactService instanceof UserDataParser) {
-            $this->profileContactService = new UserDataParser($this->input);
+        if (!$this->profileContactService instanceof UserProfileParser) {
+            $this->profileContactService = new UserProfileParser($this->input);
         }
 
         return $this->profileContactService;

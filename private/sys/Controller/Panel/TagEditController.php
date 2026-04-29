@@ -12,12 +12,12 @@ declare(strict_types=1);
 namespace Raven\Core\Controller\Panel;
 
 use Closure;
+use Raven\Core\Repository\ChannelRead;
 use Raven\Core\Repository\SetRead;
 use Raven\Core\Repository\SetWrite;
 use Raven\Core\Repository\TagRead;
 use Raven\Core\Repository\TagWrite;
 use Raven\Lib\Media\Panel\TaxonomyImageService;
-use Raven\Lib\Parser\ChannelDataParser;
 use Raven\Lib\Parser\SetParser;
 use Raven\Lib\Parser\TagRouteParser;
 use Raven\Lib\Scribe\MediaScribe;
@@ -48,7 +48,7 @@ final class TagEditController
     private bool $tagEnabled;
     private TaxonomyImageService $taxonomyImageService;
     private MediaScribe $mediaScribe;
-    private ChannelDataParser $channelParser;
+    private ChannelRead $channelRead;
     private EditorTabs $editorTabs;
     private Upload $uploadFileSetNormalizer;
 
@@ -62,7 +62,7 @@ final class TagEditController
      * @param bool $tagEnabled Whether tag features are enabled in runtime config.
      * @param TaxonomyImageService $taxonomyImageService Read-side taxonomy image config and path helper.
      * @param MediaScribe $mediaScribe Write-side meta-image upload and cleanup helper.
-     * @param ChannelDataParser $channelParser Channel data parser for tag-set channel-assignment counts on delete.
+     * @param ChannelRead $channelRead Channel repository for tag-set channel-assignment counts on delete.
      * @param EditorTabs $editorTabs Panel editor tab normalization and tab-preserving URL builder.
      * @param Upload $uploadFileSetNormalizer Normalizer for $_FILES upload groups.
      * @return void
@@ -77,7 +77,7 @@ final class TagEditController
         bool $tagEnabled,
         TaxonomyImageService $taxonomyImageService,
         MediaScribe $mediaScribe,
-        ChannelDataParser $channelParser,
+        ChannelRead $channelRead,
         EditorTabs $editorTabs,
         Upload $uploadFileSetNormalizer
     ) {
@@ -90,7 +90,7 @@ final class TagEditController
         $this->tagEnabled = $tagEnabled;
         $this->taxonomyImageService = $taxonomyImageService;
         $this->mediaScribe = $mediaScribe;
-        $this->channelParser = $channelParser;
+        $this->channelRead = $channelRead;
         $this->editorTabs = $editorTabs;
         $this->uploadFileSetNormalizer = $uploadFileSetNormalizer;
     }
@@ -506,7 +506,7 @@ final class TagEditController
             Redirect::redirect($this->context->panelUrl('/tag/set'));
         }
 
-        if ($this->channelParser->countExplicitTaxonomySetAssignments('tag', $id) > 0) {
+        if ($this->channelRead->countExplicitTaxonomySetAssignments('tag', $id) > 0) {
             $this->context->flash('error', 'Cannot delete a tag set that is still assigned to one or more channels.');
             Redirect::redirect($this->context->panelUrl('/tag/set'));
         }
