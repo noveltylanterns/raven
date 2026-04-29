@@ -7,7 +7,7 @@ namespace Raven\Lib\Extension;
 /**
  * Validates extension manifest metadata and type/file capability contracts.
  */
-final class ManifestContractValidator
+final class ValidateManifest
 {
     public function isSafeDirectoryName(string $directoryName): bool
     {

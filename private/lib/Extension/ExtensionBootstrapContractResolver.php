@@ -9,11 +9,11 @@ namespace Raven\Lib\Extension;
  */
 final class ExtensionBootstrapContractResolver
 {
-    private ManifestContractValidator $manifestValidator;
+    private ValidateManifest $manifestValidator;
 
-    public function __construct(?ManifestContractValidator $manifestValidator = null)
+    public function __construct(?ValidateManifest $manifestValidator = null)
     {
-        $this->manifestValidator = $manifestValidator ?? new ManifestContractValidator();
+        $this->manifestValidator = $manifestValidator ?? new ValidateManifest();
     }
 
     /**

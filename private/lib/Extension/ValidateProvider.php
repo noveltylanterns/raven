@@ -7,13 +7,13 @@ namespace Raven\Lib\Extension;
 /**
  * Validates extension provider files (`shortcodes.php`, `fields.php`).
  */
-final class ExtensionProviderValidator
+final class ValidateProvider
 {
-    private ManifestContractValidator $manifestValidator;
+    private ValidateManifest $manifestValidator;
 
-    public function __construct(?ManifestContractValidator $manifestValidator = null)
+    public function __construct(?ValidateManifest $manifestValidator = null)
     {
-        $this->manifestValidator = $manifestValidator ?? new ManifestContractValidator();
+        $this->manifestValidator = $manifestValidator ?? new ValidateManifest();
     }
 
     /**

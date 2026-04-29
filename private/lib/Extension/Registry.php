@@ -13,8 +13,8 @@ namespace Raven\Lib\Extension;
 
 // Loaded via require_once so this file can be included before the PSR-4 autoloader
 // is registered (raven.php bootstrap calls enabledDirectories() to build the autoloader).
-require_once __DIR__ . '/ManifestContractValidator.php';
-require_once __DIR__ . '/ExtensionProviderValidator.php';
+require_once __DIR__ . '/ValidateManifest.php';
+require_once __DIR__ . '/ValidateProvider.php';
 require_once __DIR__ . '/StateRead.php';
 
 /**
@@ -38,8 +38,8 @@ final class Registry
     // Static singletons (metadata surface)
     // -------------------------------------------------------------------------
 
-    private static ?ManifestContractValidator $manifestContractValidator = null;
-    private static ?ExtensionProviderValidator $providerValidator = null;
+    private static ?ValidateManifest $validateManifest = null;
+    private static ?ValidateProvider $validateProvider = null;
     /**
      * Per-process extension-state store cache keyed by project root.
      *
@@ -257,7 +257,7 @@ final class Registry
             return self::$manifestCache[$cacheKey];
         }
 
-        $manifest = self::manifestContractValidator()->readManifest($root, $directoryName);
+        $manifest = self::validateManifest()->readManifest($root, $directoryName);
         if ($manifest === null) {
             self::$manifestCache[$cacheKey] = null;
             return null;
@@ -633,7 +633,7 @@ final class Registry
      */
     private static function validateShortcodesProvider(string $root, string $directoryName, array $context): array
     {
-        return self::providerValidator()->validateShortcodesProvider($root, $directoryName, $context);
+        return self::validateProvider()->validateShortcodesProvider($root, $directoryName, $context);
     }
 
     /**
@@ -648,35 +648,35 @@ final class Registry
      */
     private static function validateFieldsProvider(string $root, string $directoryName, array $context): array
     {
-        return self::providerValidator()->validateFieldsProvider($root, $directoryName, $context);
+        return self::validateProvider()->validateFieldsProvider($root, $directoryName, $context);
     }
 
     /**
-     * Returns the singleton ManifestContractValidator instance.
+     * Returns the singleton ValidateManifest instance.
      *
-     * @return ManifestContractValidator
+     * @return ValidateManifest
      */
-    private static function manifestContractValidator(): ManifestContractValidator
+    private static function validateManifest(): ValidateManifest
     {
-        if (!self::$manifestContractValidator instanceof ManifestContractValidator) {
-            self::$manifestContractValidator = new ManifestContractValidator();
+        if (!self::$validateManifest instanceof ValidateManifest) {
+            self::$validateManifest = new ValidateManifest();
         }
 
-        return self::$manifestContractValidator;
+        return self::$validateManifest;
     }
 
     /**
-     * Returns the singleton ExtensionProviderValidator instance.
+     * Returns the singleton ValidateProvider instance.
      *
-     * @return ExtensionProviderValidator
+     * @return ValidateProvider
      */
-    private static function providerValidator(): ExtensionProviderValidator
+    private static function validateProvider(): ValidateProvider
     {
-        if (!self::$providerValidator instanceof ExtensionProviderValidator) {
-            self::$providerValidator = new ExtensionProviderValidator(self::manifestContractValidator());
+        if (!self::$validateProvider instanceof ValidateProvider) {
+            self::$validateProvider = new ValidateProvider(self::validateManifest());
         }
 
-        return self::$providerValidator;
+        return self::$validateProvider;
     }
 
     /**

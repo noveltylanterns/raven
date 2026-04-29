@@ -9,7 +9,7 @@ use Raven\Lib\Extension\ExtensionBootstrapContractResolver;
 use Raven\Lib\Extension\Registry;
 use Raven\Lib\Extension\Resolver;
 use Raven\Lib\Extension\StateRead;
-use Raven\Lib\Extension\ManifestContractValidator;
+use Raven\Lib\Extension\ValidateManifest;
 use Raven\Lib\Security\InputSanitizer;
 
 /**
@@ -22,7 +22,7 @@ final class ExtensionCatalogService
     private ExtensionPermissionCatalogService $permissionCatalog;
     private Config $config;
     private InputSanitizer $input;
-    private ManifestContractValidator $manifestValidator;
+    private ValidateManifest $manifestValidator;
     private ExtensionBootstrapContractResolver $bootstrapContractResolver;
 
     public function __construct(
@@ -31,7 +31,7 @@ final class ExtensionCatalogService
         ExtensionPermissionCatalogService $permissionCatalog,
         Config $config,
         InputSanitizer $input,
-        ?ManifestContractValidator $manifestValidator = null,
+        ?ValidateManifest $manifestValidator = null,
         ?ExtensionBootstrapContractResolver $bootstrapContractResolver = null
     ) {
         $this->projectRoot = rtrim($projectRoot, '/\\');
@@ -39,7 +39,7 @@ final class ExtensionCatalogService
         $this->permissionCatalog = $permissionCatalog;
         $this->config = $config;
         $this->input = $input;
-        $this->manifestValidator = $manifestValidator ?? new ManifestContractValidator();
+        $this->manifestValidator = $manifestValidator ?? new ValidateManifest();
         $this->bootstrapContractResolver = $bootstrapContractResolver ?? new ExtensionBootstrapContractResolver($this->manifestValidator);
     }
 

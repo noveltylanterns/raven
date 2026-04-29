@@ -24,7 +24,7 @@ final class ExtensionStorageCleaner
     private PDO $db;
     private string $driver;
     private string $prefix;
-    private ManifestContractValidator $manifestValidator;
+    private ValidateManifest $manifestValidator;
     private ArchiveDelete $directoryTreeService;
 
     public function __construct(
@@ -32,14 +32,14 @@ final class ExtensionStorageCleaner
         PDO $db,
         string $driver,
         string $prefix,
-        ?ManifestContractValidator $manifestValidator = null,
+        ?ValidateManifest $manifestValidator = null,
         ?ArchiveDelete $directoryTreeService = null
     ) {
         $this->projectRoot = rtrim($projectRoot, '/\\');
         $this->db = $db;
         $this->driver = strtolower(trim($driver));
         $this->prefix = preg_replace('/[^a-zA-Z0-9_]/', '', $prefix) ?? '';
-        $this->manifestValidator = $manifestValidator ?? new ManifestContractValidator();
+        $this->manifestValidator = $manifestValidator ?? new ValidateManifest();
         $this->directoryTreeService = $directoryTreeService ?? new ArchiveDelete();
     }
 

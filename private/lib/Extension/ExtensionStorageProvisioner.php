@@ -12,12 +12,12 @@ use RuntimeException;
 final class ExtensionStorageProvisioner
 {
     private string $projectRoot;
-    private ManifestContractValidator $manifestValidator;
+    private ValidateManifest $manifestValidator;
 
-    public function __construct(string $projectRoot, ?ManifestContractValidator $manifestValidator = null)
+    public function __construct(string $projectRoot, ?ValidateManifest $manifestValidator = null)
     {
         $this->projectRoot = rtrim($projectRoot, '/\\');
-        $this->manifestValidator = $manifestValidator ?? new ManifestContractValidator();
+        $this->manifestValidator = $manifestValidator ?? new ValidateManifest();
     }
 
     public function ensureLocalStorageDirectory(string $directoryName): string
