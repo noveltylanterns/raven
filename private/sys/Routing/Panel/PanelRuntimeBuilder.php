@@ -14,21 +14,28 @@ namespace Raven\Core\Routing\Panel;
 use Closure;
 use PDO;
 use Raven\Core\Controller\Panel\AuthController;
-use Raven\Core\Controller\Panel\CategoryController;
-use Raven\Core\Controller\Panel\ChannelController;
+use Raven\Core\Controller\Panel\CategoryEditController;
+use Raven\Core\Controller\Panel\CategoryListController;
+use Raven\Core\Controller\Panel\ChannelEditController;
+use Raven\Core\Controller\Panel\ChannelListController;
 use Raven\Core\Controller\Panel\ConfigController;
 use Raven\Core\Controller\Panel\DashboardController;
-use Raven\Core\Controller\Panel\GroupController;
+use Raven\Core\Controller\Panel\GroupEditController;
+use Raven\Core\Controller\Panel\GroupListController;
 use Raven\Core\Controller\Panel\LogsController;
-use Raven\Core\Controller\Panel\PageController;
+use Raven\Core\Controller\Panel\PageEditController;
+use Raven\Core\Controller\Panel\PageListController;
 use Raven\Core\Controller\Panel\PreferencesController;
-use Raven\Core\Controller\Panel\RedirectController;
+use Raven\Core\Controller\Panel\RedirectEditController;
+use Raven\Core\Controller\Panel\RedirectListController;
 use Raven\Core\Controller\Panel\RoutingController;
 use Raven\Core\Controller\Panel\SharedController;
 use Raven\Core\Controller\Panel\SystemController;
-use Raven\Core\Controller\Panel\TagController;
+use Raven\Core\Controller\Panel\TagEditController;
+use Raven\Core\Controller\Panel\TagListController;
 use Raven\Core\Controller\Panel\UpdateController;
-use Raven\Core\Controller\Panel\UserController;
+use Raven\Core\Controller\Panel\UserEditController;
+use Raven\Core\Controller\Panel\UserListController;
 use Raven\Core\Repository\CategoryRead;
 use Raven\Core\Repository\CategoryWrite;
 use Raven\Core\Repository\ChannelRead;
@@ -119,22 +126,29 @@ final class PanelRuntimeBuilder
         }
 
         $authController = null;
-        $categoryController = null;
-        $channelController = null;
+        $categoryListController = null;
+        $categoryEditController = null;
+        $channelListController = null;
+        $channelEditController = null;
         $configController = null;
-        $pageController = null;
+        $pageListController = null;
+        $pageEditController = null;
         $dashboardController = null;
-        $groupController = null;
+        $groupListController = null;
+        $groupEditController = null;
         $preferencesController = null;
         $panelSharedController = null;
         $panelRuntime = null;
-        $redirectController = null;
+        $redirectListController = null;
+        $redirectEditController = null;
         $logsController = null;
         $routingController = null;
         $systemController = null;
-        $tagController = null;
+        $tagListController = null;
+        $tagEditController = null;
         $updateController = null;
-        $userController = null;
+        $userListController = null;
+        $userEditController = null;
         $categoryRead = null;
         $categoryWrite = null;
         $categorySetRead = null;
@@ -176,7 +190,7 @@ final class PanelRuntimeBuilder
         $rvn['panel_editor'] = new Editor();
         $rvn['panel_editor_blocks'] = new EditorBlocks();
         // TinyMCE and EasyMDE helpers are registered here for extension access but
-        // only injected into PageController, which is the sole controller that
+        // only injected into PageEditController, which is the sole controller that
         // serves the rich page body editor.
         $rvn['panel_editor_mce'] = new EditorMCE();
         $rvn['panel_editor_mde'] = new EditorMDE();
@@ -918,27 +932,53 @@ final class PanelRuntimeBuilder
         };
 
         /**
-         * Builds the split page controller on first use.
-         * Owns page list, create/edit, save, gallery upload/delete, and page delete.
+         * Builds the page list controller on first use.
+         * Owns GET /page only.
          */
-        $rvn['panel_page_controller'] = static function () use (
-            &$pageController,
+        $rvn['panel_page_list_controller'] = static function () use (
+            &$pageListController,
+            &$rvn,
+            $panelContentDomain
+        ): PageListController {
+            if ($pageListController instanceof PageListController) {
+                return $pageListController;
+            }
+
+            /** @var callable(): SharedController $requestContextFactory */
+            $requestContextFactory = $rvn['panel_request_context'];
+            $contentDomain = $panelContentDomain();
+            $pageListController = new PageListController(
+                $requestContextFactory(),
+                $rvn['input'],
+                $contentDomain['page_read'],
+                new ChannelDataParser($rvn['config'], $rvn['input'], $contentDomain['channel_read'])
+            );
+
+            return $pageListController;
+        };
+
+        /**
+         * Builds the page edit controller on first use.
+         * Owns page create/edit, save, gallery upload/delete, and page delete.
+         */
+        $rvn['panel_page_edit_controller'] = static function () use (
+            &$pageEditController,
             &$rvn,
             $panelContentDomain,
             $panelTaxonomyDomain,
             $extensionStateStoreFactory,
             $extensionCatalogFactory,
             $extensionEditorCatalogFactory
-        ): PageController {
-            if ($pageController instanceof PageController) {
-                return $pageController;
+        ): PageEditController {
+            if ($pageEditController instanceof PageEditController) {
+                return $pageEditController;
             }
 
             /** @var callable(): SharedController $requestContextFactory */
             $requestContextFactory = $rvn['panel_request_context'];
             $contentDomain = $panelContentDomain();
             $taxonomyDomain = $panelTaxonomyDomain();
-            $pageController = new PageController(
+            $pageEditController = new PageEditController(
                 $requestContextFactory(),
                 $rvn['config'],
                 $rvn['input'],
@@ -967,22 +1007,43 @@ final class PanelRuntimeBuilder
                     : static fn (?string $extensionDirectory = null): array => []
             );
 
-            return $pageController;
+            return $pageEditController;
         };
 
         /**
-         * Builds the split channel controller on first use.
-         * Owns channel list, create/edit, save, and delete routes.
+         * Builds the channel list controller on first use.
+         * Owns GET /channel only.
          */
-        $rvn['panel_channel_controller'] = static function () use (&$channelController, &$rvn, $panelTaxonomyDomain): ChannelController {
-            if ($channelController instanceof ChannelController) {
-                return $channelController;
+        $rvn['panel_channel_list_controller'] = static function () use (&$channelListController, &$rvn, $panelTaxonomyDomain): ChannelListController {
+            if ($channelListController instanceof ChannelListController) {
+                return $channelListController;
             }
 
             /** @var callable(): SharedController $requestContextFactory */
             $requestContextFactory = $rvn['panel_request_context'];
             $taxonomyDomain = $panelTaxonomyDomain();
-            $channelController = new ChannelController(
+            $channelListController = new ChannelListController(
+                $requestContextFactory(),
+                $rvn['input'],
+                new ChannelDataParser($rvn['config'], $rvn['input'], $taxonomyDomain['channel_read'])
+            );
+
+            return $channelListController;
+        };
+
+        /**
+         * Builds the channel edit controller on first use.
+         * Owns channel create/edit, save, and delete routes.
+         */
+        $rvn['panel_channel_edit_controller'] = static function () use (&$channelEditController, &$rvn, $panelTaxonomyDomain): ChannelEditController {
+            if ($channelEditController instanceof ChannelEditController) {
+                return $channelEditController;
+            }
+
+            /** @var callable(): SharedController $requestContextFactory */
+            $requestContextFactory = $rvn['panel_request_context'];
+            $taxonomyDomain = $panelTaxonomyDomain();
+            $channelEditController = new ChannelEditController(
                 $requestContextFactory(),
                 $rvn['input'],
                 $taxonomyDomain['channel_write'],
@@ -999,22 +1060,46 @@ final class PanelRuntimeBuilder
                 new Upload()
             );
 
-            return $channelController;
+            return $channelEditController;
         };
 
         /**
-         * Builds the split category controller on first use.
-         * Owns category list, create/edit, save, delete, and category-set routes.
+         * Builds the category list controller on first use.
+         * Owns GET /category and GET /category/set only.
          */
-        $rvn['panel_category_controller'] = static function () use (&$categoryController, &$rvn, $panelTaxonomyDomain): CategoryController {
-            if ($categoryController instanceof CategoryController) {
-                return $categoryController;
+        $rvn['panel_category_list_controller'] = static function () use (&$categoryListController, &$rvn, $panelTaxonomyDomain): CategoryListController {
+            if ($categoryListController instanceof CategoryListController) {
+                return $categoryListController;
             }
 
             /** @var callable(): SharedController $requestContextFactory */
             $requestContextFactory = $rvn['panel_request_context'];
             $taxonomyDomain = $panelTaxonomyDomain();
-            $categoryController = new CategoryController(
+            $categoryListController = new CategoryListController(
+                $requestContextFactory(),
+                $rvn['input'],
+                $taxonomyDomain['category'],
+                $taxonomyDomain['category_set'],
+                $taxonomyDomain['category_enabled'],
+                new ChannelDataParser($rvn['config'], $rvn['input'], $taxonomyDomain['channel_read'])
+            );
+
+            return $categoryListController;
+        };
+
+        /**
+         * Builds the category edit controller on first use.
+         * Owns category create/edit, save, delete, and category-set CRUD routes.
+         */
+        $rvn['panel_category_edit_controller'] = static function () use (&$categoryEditController, &$rvn, $panelTaxonomyDomain): CategoryEditController {
+            if ($categoryEditController instanceof CategoryEditController) {
+                return $categoryEditController;
+            }
+
+            /** @var callable(): SharedController $requestContextFactory */
+            $requestContextFactory = $rvn['panel_request_context'];
+            $taxonomyDomain = $panelTaxonomyDomain();
+            $categoryEditController = new CategoryEditController(
                 $requestContextFactory(),
                 $rvn['input'],
                 $taxonomyDomain['category'],
@@ -1029,22 +1114,43 @@ final class PanelRuntimeBuilder
                 new Upload()
             );
 
-            return $categoryController;
+            return $categoryEditController;
         };
 
         /**
-         * Builds the split redirect controller on first use.
-         * Redirect CRUD only needs channel validation and redirect storage.
+         * Builds the redirect list controller on first use.
+         * Owns GET /redirect only.
          */
-        $rvn['panel_redirect_controller'] = static function () use (&$redirectController, &$rvn, $panelTaxonomyDomain): RedirectController {
-            if ($redirectController instanceof RedirectController) {
-                return $redirectController;
+        $rvn['panel_redirect_list_controller'] = static function () use (&$redirectListController, &$rvn, $panelTaxonomyDomain): RedirectListController {
+            if ($redirectListController instanceof RedirectListController) {
+                return $redirectListController;
             }
 
             /** @var callable(): SharedController $requestContextFactory */
             $requestContextFactory = $rvn['panel_request_context'];
             $taxonomyDomain = $panelTaxonomyDomain();
-            $redirectController = new RedirectController(
+            $redirectListController = new RedirectListController(
+                $requestContextFactory(),
+                $rvn['input'],
+                new RedirectDataParser($rvn['input'], $taxonomyDomain['redirect_read'])
+            );
+
+            return $redirectListController;
+        };
+
+        /**
+         * Builds the redirect edit controller on first use.
+         * Owns redirect create/edit, save, and delete routes.
+         */
+        $rvn['panel_redirect_edit_controller'] = static function () use (&$redirectEditController, &$rvn, $panelTaxonomyDomain): RedirectEditController {
+            if ($redirectEditController instanceof RedirectEditController) {
+                return $redirectEditController;
+            }
+
+            /** @var callable(): SharedController $requestContextFactory */
+            $requestContextFactory = $rvn['panel_request_context'];
+            $taxonomyDomain = $panelTaxonomyDomain();
+            $redirectEditController = new RedirectEditController(
                 $requestContextFactory(),
                 $rvn['input'],
                 new ChannelDataParser($rvn['config'], $rvn['input'], $taxonomyDomain['channel_read']),
@@ -1053,22 +1159,46 @@ final class PanelRuntimeBuilder
                 $rvn['panel_editor']
             );
 
-            return $redirectController;
+            return $redirectEditController;
         };
 
         /**
-         * Builds the split tag controller on first use.
-         * Owns tag list, create/edit, save, delete, and tag-set routes.
+         * Builds the tag list controller on first use.
+         * Owns GET /tag and GET /tag/set only.
          */
-        $rvn['panel_tag_controller'] = static function () use (&$tagController, &$rvn, $panelTaxonomyDomain): TagController {
-            if ($tagController instanceof TagController) {
-                return $tagController;
+        $rvn['panel_tag_list_controller'] = static function () use (&$tagListController, &$rvn, $panelTaxonomyDomain): TagListController {
+            if ($tagListController instanceof TagListController) {
+                return $tagListController;
             }
 
             /** @var callable(): SharedController $requestContextFactory */
             $requestContextFactory = $rvn['panel_request_context'];
             $taxonomyDomain = $panelTaxonomyDomain();
-            $tagController = new TagController(
+            $tagListController = new TagListController(
+                $requestContextFactory(),
+                $rvn['input'],
+                $taxonomyDomain['tag'],
+                $taxonomyDomain['tag_set'],
+                $taxonomyDomain['tag_enabled'],
+                new ChannelDataParser($rvn['config'], $rvn['input'], $taxonomyDomain['channel_read'])
+            );
+
+            return $tagListController;
+        };
+
+        /**
+         * Builds the tag edit controller on first use.
+         * Owns tag create/edit, save, delete, and tag-set CRUD routes.
+         */
+        $rvn['panel_tag_edit_controller'] = static function () use (&$tagEditController, &$rvn, $panelTaxonomyDomain): TagEditController {
+            if ($tagEditController instanceof TagEditController) {
+                return $tagEditController;
+            }
+
+            /** @var callable(): SharedController $requestContextFactory */
+            $requestContextFactory = $rvn['panel_request_context'];
+            $taxonomyDomain = $panelTaxonomyDomain();
+            $tagEditController = new TagEditController(
                 $requestContextFactory(),
                 $rvn['input'],
                 $taxonomyDomain['tag'],
@@ -1083,21 +1213,49 @@ final class PanelRuntimeBuilder
                 new Upload()
             );
 
-            return $tagController;
+            return $tagEditController;
         };
 
         /**
-         * Builds the split user controller on first use.
+         * Builds the user list controller on first use.
+         * Owns GET /user and GET /user/invites.
          */
-        $rvn['panel_user_controller'] = static function () use (&$userController, &$rvn, $panelUserDomain): UserController {
-            if ($userController instanceof UserController) {
-                return $userController;
+        $rvn['panel_user_list_controller'] = static function () use (&$userListController, &$rvn, $panelUserDomain): UserListController {
+            if ($userListController instanceof UserListController) {
+                return $userListController;
             }
 
             /** @var callable(): SharedController $requestContextFactory */
             $requestContextFactory = $rvn['panel_request_context'];
             $userDomain = $panelUserDomain();
-            $userController = new UserController(
+            $userListController = new UserListController(
+                $requestContextFactory(),
+                $rvn['config'],
+                $rvn['input'],
+                new GroupDataParser($rvn['input'], $userDomain['group_read']),
+                $userDomain['user_read'],
+                $userDomain['invite_read'],
+                new SessionFlash('_raven_flash_list'),
+                new GroupRouteParser($rvn['config'], $rvn['input']),
+                new LoginIdentifierResolver()
+            );
+
+            return $userListController;
+        };
+
+        /**
+         * Builds the user edit controller on first use.
+         * Owns user create/edit, save, delete, and invite token create/generate/delete routes.
+         */
+        $rvn['panel_user_edit_controller'] = static function () use (&$userEditController, &$rvn, $panelUserDomain): UserEditController {
+            if ($userEditController instanceof UserEditController) {
+                return $userEditController;
+            }
+
+            /** @var callable(): SharedController $requestContextFactory */
+            $requestContextFactory = $rvn['panel_request_context'];
+            $userDomain = $panelUserDomain();
+            $userEditController = new UserEditController(
                 $requestContextFactory(),
                 $rvn['config'],
                 $rvn['input'],
@@ -1105,7 +1263,6 @@ final class PanelRuntimeBuilder
                 new GroupDataParser($rvn['input'], $userDomain['group_read']),
                 $userDomain['user_read'],
                 $userDomain['user_write'],
-                $userDomain['invite_read'],
                 $userDomain['invite_write'],
                 new SessionFlash('_raven_flash_list'),
                 new GroupRouteParser($rvn['config'], $rvn['input']),
@@ -1121,21 +1278,44 @@ final class PanelRuntimeBuilder
                 new UserMediaPathService()
             );
 
-            return $userController;
+            return $userEditController;
         };
 
         /**
-         * Builds the split group controller on first use.
+         * Builds the group list controller on first use.
+         * Owns GET /group only.
          */
-        $rvn['panel_group_controller'] = static function () use (&$groupController, &$rvn, $panelUserDomain): GroupController {
-            if ($groupController instanceof GroupController) {
-                return $groupController;
+        $rvn['panel_group_list_controller'] = static function () use (&$groupListController, &$rvn, $panelUserDomain): GroupListController {
+            if ($groupListController instanceof GroupListController) {
+                return $groupListController;
             }
 
             /** @var callable(): SharedController $requestContextFactory */
             $requestContextFactory = $rvn['panel_request_context'];
             $groupDomain = $panelUserDomain();
-            $groupController = new GroupController(
+            $groupListController = new GroupListController(
+                $requestContextFactory(),
+                $rvn['input'],
+                new GroupDataParser($rvn['input'], $groupDomain['group_read']),
+                new GroupRouteParser($rvn['config'], $rvn['input'])
+            );
+
+            return $groupListController;
+        };
+
+        /**
+         * Builds the group edit controller on first use.
+         * Owns group create/edit, save, and delete routes.
+         */
+        $rvn['panel_group_edit_controller'] = static function () use (&$groupEditController, &$rvn, $panelUserDomain): GroupEditController {
+            if ($groupEditController instanceof GroupEditController) {
+                return $groupEditController;
+            }
+
+            /** @var callable(): SharedController $requestContextFactory */
+            $requestContextFactory = $rvn['panel_request_context'];
+            $groupDomain = $panelUserDomain();
+            $groupEditController = new GroupEditController(
                 $requestContextFactory(),
                 $rvn['input'],
                 $groupDomain['group_write'],
@@ -1158,7 +1338,7 @@ final class PanelRuntimeBuilder
                 }
             );
 
-            return $groupController;
+            return $groupEditController;
         };
 
         /**

@@ -33,7 +33,7 @@ final class InviteParser
     }
 
     /**
-     * Returns invite-token rows for panel management.
+     * Returns all invite-token rows.
      *
      * @return array<int, array{
      *   id: int,
@@ -47,9 +47,9 @@ final class InviteParser
      *   creator: int|null
      * }>
      */
-    public function listForPanel(): array
+    public function listAll(): array
     {
-        return $this->inviteRepo->listForPanel();
+        return $this->inviteRepo->listAll();
     }
 
     /**

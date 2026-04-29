@@ -34,11 +34,13 @@ use Raven\Core\Repository\UserWrite;
 use Raven\Core\Renderer;
 use Raven\Lib\Auth\AuthService;
 use Raven\Lib\Extension\ExtensionEditorCatalogService;
+use Raven\Lib\Parser\CategoryRepoParser;
 use Raven\Lib\Parser\ChannelDataParser;
 use Raven\Lib\Parser\ConfigParser;
 use Raven\Lib\Parser\GroupDataParser;
 use Raven\Lib\Parser\PageImageParser;
 use Raven\Lib\Parser\RedirectDataParser;
+use Raven\Lib\Parser\TagRepoParser;
 use Raven\Lib\Parser\TaxonomyRepoParser;
 use Raven\Lib\View\Public\ThemeCatalog;
 use RuntimeException;
@@ -76,7 +78,9 @@ final class PublicRuntimeBuilder
         $extensionServices = null;
         $inviteRead = null;
         $inviteWrite = null;
+        $categoryLookup = null;
         $taxonomyLookup = null;
+        $tagLookup = null;
         $channelRead = null;
         $channelDataParser = null;
         $extensionEditorCatalogService = null;
@@ -312,6 +316,32 @@ final class PublicRuntimeBuilder
         });
 
         /**
+         * Builds category lookup parsing only for public category-route and taxonomy-feed reads.
+         */
+        $categoryLookupRepository = $memoize(static function () use (&$categoryLookup, $rvn): CategoryRepoParser {
+            $categoryLookup = new CategoryRepoParser(
+                $rvn['db'],
+                (string) $rvn['driver'],
+                (string) $rvn['prefix']
+            );
+
+            return $categoryLookup;
+        });
+
+        /**
+         * Builds tag lookup parsing only for public tag-route and taxonomy-feed reads.
+         */
+        $tagLookupRepository = $memoize(static function () use (&$tagLookup, $rvn): TagRepoParser {
+            $tagLookup = new TagRepoParser(
+                $rvn['db'],
+                (string) $rvn['driver'],
+                (string) $rvn['prefix']
+            );
+
+            return $tagLookup;
+        });
+
+        /**
          * Boots extension providers only when public runtime code needs extension services.
          *
          * @return array<string, mixed>
@@ -401,17 +431,21 @@ final class PublicRuntimeBuilder
         $publicContentDomain = $memoize(static function () use (
             $channelDataParserFactory,
             $channelReadFactory,
+            $categoryLookupRepository,
             $pageImageParserFactory,
             $pageReadFactory,
             $redirectDataParserFactory,
+            $tagLookupRepository,
             $taxonomyLookupRepository
         ): array {
             return [
+                'category_lookup' => $categoryLookupRepository,
                 'channel' => $channelReadFactory(),
                 'channel_parser' => $channelDataParserFactory(),
                 'page_images' => $pageImageParserFactory(),
                 'page' => $pageReadFactory(),
                 'redirect' => $redirectDataParserFactory(),
+                'tag_lookup' => $tagLookupRepository,
                 'taxonomy_lookup' => $taxonomyLookupRepository,
             ];
         });
@@ -543,7 +577,7 @@ final class PublicRuntimeBuilder
             $publicCategoryController = new PublicCategoryController(
                 $requestContextFactory(),
                 $contentDomain['page'],
-                $contentDomain['taxonomy_lookup'](),
+                $contentDomain['category_lookup'](),
                 $themeCatalogFactory()
             );
 
@@ -603,7 +637,8 @@ final class PublicRuntimeBuilder
                 $requestContextFactory(),
                 $contentDomain['channel_parser'],
                 $contentDomain['page'],
-                $contentDomain['taxonomy_lookup']()
+                $contentDomain['category_lookup'](),
+                $contentDomain['tag_lookup']()
             );
 
             return $publicFeedController;
@@ -623,7 +658,7 @@ final class PublicRuntimeBuilder
             $publicTagController = new PublicTagController(
                 $requestContextFactory(),
                 $contentDomain['page'],
-                $contentDomain['taxonomy_lookup'](),
+                $contentDomain['tag_lookup'](),
                 $themeCatalogFactory()
             );
 

@@ -86,8 +86,8 @@ final class Raven
             return;
         }
 
-        // Extension classes now resolve from each extension's canonical `lib/`
-        // namespace root, with `src/` retained as a legacy migration fallback.
+        // Extension classes resolve only from each extension's canonical `lib/`
+        // namespace root so scaffolded and third-party packages target one layout.
         $extPrefix = 'Raven\\Ext\\';
         if (!str_starts_with($class, $extPrefix)) {
             return;

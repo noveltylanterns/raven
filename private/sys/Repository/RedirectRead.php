@@ -76,7 +76,7 @@ class RedirectRead
      *
      * @return int Total redirect row count.
      */
-    public function countForPanel(): int
+    public function count(): int
     {
         $redirects = $this->table('redirects');
         $stmt = $this->db->prepare('SELECT COUNT(*) FROM ' . $redirects);
@@ -92,7 +92,7 @@ class RedirectRead
      * @param int $offset Zero-based row offset for pagination.
      * @return array<int, array<string, mixed>>
      */
-    public function listForPanel(int $limit = 50, int $offset = 0): array
+    public function listPaged(int $limit = 50, int $offset = 0): array
     {
         $redirects = $this->table('redirects');
 
@@ -126,7 +126,7 @@ class RedirectRead
      * @param int $offset Zero-based row offset for pagination.
      * @return array{rows: array<int, array<string, mixed>>, total: int} Paginated rows and total count.
      */
-    public function listPageForPanel(int $limit = 50, int $offset = 0): array
+    public function listPage(int $limit = 50, int $offset = 0): array
     {
         $redirects = $this->table('redirects');
         $safeLimit = max(1, $limit);
@@ -173,7 +173,7 @@ class RedirectRead
 
         // Offset can target an empty page while rows still exist; recover accurate total.
         if ($resultRows === [] && $safeOffset > 0) {
-            $total = $this->countForPanel();
+            $total = $this->count();
         }
 
         return [

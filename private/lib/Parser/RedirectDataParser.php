@@ -46,15 +46,15 @@ final class RedirectDataParser
     }
 
     /**
-     * Returns one panel redirect page plus total row count.
+     * Returns one paginated redirect page plus total row count.
      *
      * @param int $limit  Maximum number of rows to return.
      * @param int $offset Zero-based row offset for pagination.
      * @return array{rows: array<int, array<string, mixed>>, total: int} Paginated redirect rows and total count.
      */
-    public function listPageForPanel(int $limit = 50, int $offset = 0): array
+    public function listPage(int $limit = 50, int $offset = 0): array
     {
-        return $this->redirectRepo()->listPageForPanel(max(1, $limit), max(0, $offset));
+        return $this->redirectRepo()->listPage(max(1, $limit), max(0, $offset));
     }
 
     /**

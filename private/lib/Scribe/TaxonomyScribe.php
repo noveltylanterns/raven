@@ -3,7 +3,7 @@
 /**
  * RAVEN CMS
  * ~/private/lib/Scribe/TaxonomyScribe.php
- * Shared write-side persistence helper for category/tag taxonomy records.
+ * Shared base class for category/tag taxonomy record persistence.
  * Docs: https://raven.lanterns.io
  */
 
@@ -13,41 +13,31 @@ namespace Raven\Lib\Scribe;
 
 use PDO;
 use Raven\Lib\Database\TableNameResolver;
-use RuntimeException;
 
 /**
- * Owns write-side SQL for category/tag taxonomy records.
+ * Shared write-side SQL base for category/tag taxonomy records.
  *
- * CategoryRead and TagRead own the read-heavy listing and lookup queries while
- * this class centralizes the mutation paths that touch the shared taxonomy
- * table shape and page-link cleanup rules.
+ * CategoryScribe and TagScribe narrow the concrete table/link-table selection
+ * while this base keeps the shared mutation rules in one canonical place.
  */
-final class TaxonomyScribe
+abstract class TaxonomyScribe
 {
     private PDO $db;
     private string $driver;
     private string $prefix;
-    private string $taxonomyType;
 
     /**
-     * Prepares the scribe for one taxonomy record family.
+     * Prepares the shared taxonomy write helper.
      *
-     * @param PDO    $db           App database connection used for taxonomy writes.
-     * @param string $driver       Active PDO driver name used when quoting reserved columns.
-     * @param string $prefix       Application table prefix before resolver sanitization.
-     * @param string $taxonomyType Taxonomy type label: `category` or `tag`.
+     * @param PDO    $db     App database connection used for taxonomy writes.
+     * @param string $driver Active PDO driver name used when quoting reserved columns.
+     * @param string $prefix Application table prefix before resolver sanitization.
      */
-    public function __construct(PDO $db, string $driver, string $prefix, string $taxonomyType)
+    public function __construct(PDO $db, string $driver, string $prefix)
     {
-        $normalizedType = strtolower(trim($taxonomyType));
-        if (!in_array($normalizedType, ['category', 'tag'], true)) {
-            throw new RuntimeException('TaxonomyScribe only supports category and tag writes.');
-        }
-
         $this->db = $db;
         $this->driver = $driver;
         $this->prefix = preg_replace('/[^a-zA-Z0-9_]/', '', $prefix) ?? '';
-        $this->taxonomyType = $normalizedType;
     }
 
     /**
@@ -198,7 +188,7 @@ final class TaxonomyScribe
      */
     private function taxonomyTable(): string
     {
-        return $this->table($this->taxonomyType === 'category' ? 'categories' : 'tags');
+        return $this->table($this->taxonomyTableKey());
     }
 
     /**
@@ -208,17 +198,7 @@ final class TaxonomyScribe
      */
     private function relationTable(): string
     {
-        return $this->table($this->taxonomyType === 'category' ? 'page_categories' : 'page_tags');
-    }
-
-    /**
-     * Returns the join-table column that points back to the taxonomy id.
-     *
-     * @return string Plain SQL column name used inside the link table.
-     */
-    private function relationColumn(): string
-    {
-        return $this->taxonomyType;
+        return $this->table($this->relationTableKey());
     }
 
     /**
@@ -259,4 +239,25 @@ final class TaxonomyScribe
         $column = $this->driver === 'mysql' ? '`set`' : '"set"';
         return $alias !== null && $alias !== '' ? ($alias . '.' . $column) : $column;
     }
+
+    /**
+     * Returns the logical taxonomy table name for the concrete scribe.
+     *
+     * @return string Unprefixed taxonomy table name.
+     */
+    abstract protected function taxonomyTableKey(): string;
+
+    /**
+     * Returns the logical page-link table name for the concrete scribe.
+     *
+     * @return string Unprefixed page-link table name.
+     */
+    abstract protected function relationTableKey(): string;
+
+    /**
+     * Returns the join-table column that points back to the taxonomy id.
+     *
+     * @return string Plain SQL column name used inside the link table.
+     */
+    abstract protected function relationColumn(): string;
 }

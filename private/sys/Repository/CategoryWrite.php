@@ -11,7 +11,7 @@ declare(strict_types=1);
 namespace Raven\Core\Repository;
 
 use PDO;
-use Raven\Lib\Scribe\TaxonomyScribe;
+use Raven\Lib\Scribe\CategoryScribe;
 
 /**
  * INSERT, UPDATE, and DELETE methods for page categories.
@@ -22,7 +22,7 @@ use Raven\Lib\Scribe\TaxonomyScribe;
 final class CategoryWrite
 {
     private CategoryRead $read;
-    private TaxonomyScribe $categoryScribe;
+    private CategoryScribe $categoryScribe;
 
     /**
      * @param PDO          $db     Active database connection.
@@ -33,7 +33,7 @@ final class CategoryWrite
     public function __construct(PDO $db, string $driver, string $prefix, CategoryRead $read)
     {
         $this->read = $read;
-        $this->categoryScribe = new TaxonomyScribe($db, $driver, $prefix, 'category');
+        $this->categoryScribe = new CategoryScribe($db, $driver, $prefix);
     }
 
     /**

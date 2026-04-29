@@ -11,7 +11,7 @@ declare(strict_types=1);
 namespace Raven\Core\Repository;
 
 use PDO;
-use Raven\Lib\Scribe\TaxonomyScribe;
+use Raven\Lib\Scribe\TagScribe;
 
 /**
  * INSERT, UPDATE, and DELETE methods for page tags.
@@ -22,7 +22,7 @@ use Raven\Lib\Scribe\TaxonomyScribe;
 final class TagWrite
 {
     private TagRead $read;
-    private TaxonomyScribe $tagScribe;
+    private TagScribe $tagScribe;
 
     /**
      * @param PDO     $db     Active database connection.
@@ -33,7 +33,7 @@ final class TagWrite
     public function __construct(PDO $db, string $driver, string $prefix, TagRead $read)
     {
         $this->read = $read;
-        $this->tagScribe = new TaxonomyScribe($db, $driver, $prefix, 'tag');
+        $this->tagScribe = new TagScribe($db, $driver, $prefix);
     }
 
     /**

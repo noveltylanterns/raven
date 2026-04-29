@@ -2,8 +2,8 @@
 
 /**
  * RAVEN CMS
- * ~/private/sys/Controller/Panel/RedirectController.php
- * Split panel redirect controller for redirect management routes.
+ * ~/private/sys/Controller/Panel/RedirectEditController.php
+ * Panel redirect edit controller for redirect create/edit/save/delete routes.
  * Docs: https://raven.lanterns.io
  */
 
@@ -19,12 +19,12 @@ use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\View\Panel\Editor;
 
 /**
- * Handles redirect management routes for the panel.
+ * Handles redirect create/edit/save/delete routes for the panel.
  *
- * Redirect CRUD is the narrowest taxonomy seam and stands well on its own
- * because it has no category/tag coupling.
+ * Owns the write side of the redirect seam. The redirect list route lives in
+ * RedirectListController, keeping read-only and write concerns in separate classes.
  */
-final class RedirectController
+final class RedirectEditController
 {
     private SharedController $context;
     private InputSanitizer $input;
@@ -38,7 +38,7 @@ final class RedirectController
      * @param InputSanitizer $input Shared request input sanitizer.
      * @param ChannelDataParser $channelParser Channel data parser for redirect scope validation.
      * @param RedirectWrite $redirectRepo Redirect repository write side for redirect saves and deletes.
-     * @param RedirectDataParser $redirectParser Canonical parser for read-only redirect listings and edit-form reads.
+     * @param RedirectDataParser $redirectParser Canonical parser for read-only edit-form reads.
      * @param Editor $editor Shared panel editor utility methods.
      * @return void
      */
@@ -56,39 +56,6 @@ final class RedirectController
         $this->redirectRepo = $redirectRepo;
         $this->redirectParser = $redirectParser;
         $this->editor = $editor;
-    }
-
-    /**
-     * Lists redirects for Redirect management section.
-     *
-     * @return void
-     */
-    public function redirectList(): void
-    {
-        $this->context->requirePanelLogin();
-        if (!$this->context->requireRoutePermissionOrForbidden('redirect', 'view')) {
-            return;
-        }
-
-        $requestedPage = $this->input->int($_GET['page'] ?? null, 1) ?? 1;
-        $perPage = 50;
-        $pageResult = $this->redirectParser->listPageForPanel($perPage, ($requestedPage - 1) * $perPage);
-        $totalItems = (int) ($pageResult['total'] ?? 0);
-        $redirectRows = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
-        $pagination = $this->context->panelPaginationState($totalItems, $requestedPage, $perPage);
-        if ($totalItems > 0 && $pagination['current'] !== $requestedPage) {
-            $pageResult = $this->redirectParser->listPageForPanel($perPage, $pagination['offset']);
-            $redirectRows = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
-        }
-
-        $this->context->renderPanel('panel/redirect/list', [
-            'redirectRows' => $redirectRows,
-            'pagination' => $this->context->panelPaginationViewData('/redirect', $pagination),
-            'csrfField' => $this->context->csrfField(),
-            'flashSuccess' => $this->context->pullFlash('success'),
-            'flashError' => $this->context->pullFlash('error'),
-            'section' => 'redirect',
-        ]);
     }
 
     /**

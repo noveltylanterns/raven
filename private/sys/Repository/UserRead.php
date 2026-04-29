@@ -320,12 +320,12 @@ class UserRead
     }
 
     /**
-     * Returns one total-count for panel user index with optional group-name filter.
+     * Returns total user count with optional group-name filter.
      *
      * @param string|null $groupNameFilter Optional group name to filter results by membership.
      * @return int Total matching user count.
      */
-    public function countForPanel(?string $groupNameFilter = null): int
+    public function count(?string $groupNameFilter = null): int
     {
         $normalizedGroupFilter = strtolower(trim((string) ($groupNameFilter ?? '')));
         if ($normalizedGroupFilter === '') {
@@ -350,14 +350,14 @@ class UserRead
     }
 
     /**
-     * Returns paginated users with group summaries for panel listing.
+     * Returns paginated users with group summaries.
      *
      * @param int         $limit           Maximum number of rows to return.
      * @param int         $offset          Zero-based row offset for pagination.
      * @param string|null $groupNameFilter Optional group name to filter results by membership.
-     * @return array<int, array<string, mixed>> Hydrated panel user rows.
+     * @return array<int, array<string, mixed>> Hydrated user rows.
      */
-    public function listForPanel(int $limit = 50, int $offset = 0, ?string $groupNameFilter = null): array
+    public function listPaged(int $limit = 50, int $offset = 0, ?string $groupNameFilter = null): array
     {
         $usersTable  = $this->authTable('users');
         $groupsTable = $this->groupTable('groups');
@@ -430,7 +430,7 @@ class UserRead
     }
 
     /**
-     * Returns one paginated panel-user page plus total row count and full group catalog.
+     * Returns one paginated user page plus total row count and full group catalog.
      *
      * @param int         $limit           Maximum number of rows to return.
      * @param int         $offset          Zero-based row offset for pagination.
@@ -441,7 +441,7 @@ class UserRead
      *   group_options: array<int, array{id: int, name: string, slug: string, permissions: int, is_stock: int}>
      * } Paginated user rows, total count, and group options for the filter picker.
      */
-    public function listPageForPanel(int $limit = 50, int $offset = 0, ?string $groupNameFilter = null): array
+    public function listPage(int $limit = 50, int $offset = 0, ?string $groupNameFilter = null): array
     {
         $usersTable  = $this->authTable('users');
         $groupsTable = $this->groupTable('groups');
@@ -591,7 +591,7 @@ class UserRead
         // Window COUNT() returns 0 for the empty page when offset is beyond the result set;
         // fall back to a direct count query so pagination metadata stays accurate.
         if ($usersById === [] && $safeOffset > 0) {
-            $total = $this->countForPanel($normalizedGroupFilter !== '' ? $normalizedGroupFilter : null);
+            $total = $this->count($normalizedGroupFilter !== '' ? $normalizedGroupFilter : null);
         }
 
         $groupOptions = array_values($groupOptionsById);

@@ -39,7 +39,7 @@ class InviteRead
     }
 
     /**
-     * Returns invite-token rows for panel management.
+     * Returns all invite-token rows.
      *
      * Keys match the physical auth_invites column names: id, token (display value), hint
      * (first 8 chars of normalized token), reusable (0|1), uses (integer use count),
@@ -58,7 +58,7 @@ class InviteRead
      *   creator: int|null
      * }>
      */
-    public function listForPanel(): array
+    public function listAll(): array
     {
         $stmt = $this->authDb->prepare(
             'SELECT id, value, hint, reusable, uses, expires, last_used, created, creator

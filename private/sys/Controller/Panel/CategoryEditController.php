@@ -2,8 +2,8 @@
 
 /**
  * RAVEN CMS
- * ~/private/sys/Controller/Panel/CategoryController.php
- * Split panel category controller for category management routes.
+ * ~/private/sys/Controller/Panel/CategoryEditController.php
+ * Panel category edit controller for category and category-set CRUD routes.
  * Docs: https://raven.lanterns.io
  */
 
@@ -28,30 +28,25 @@ use Raven\Lib\Transport\Upload;
 use Raven\Lib\View\Panel\EditorTabs;
 
 /**
- * Handles panel category and category-set management routes.
+ * Handles category and category-set CRUD routes for the panel.
  *
- * Owns category list, create/edit, save, delete, and category-set CRUD.
- * Channel and tag routes now live in their own controllers, so category
- * dependencies are only constructed on `/category*` requests.
+ * Owns category create/edit, save, delete, and category-set create/edit, save,
+ * delete. Category and category-set list routes live in CategoryListController
+ * to keep read-only and write concerns separate.
  */
-final class CategoryController
+final class CategoryEditController
 {
     private SharedController $context;
     private InputSanitizer $input;
-    /** @var ?CategoryRead */
-    private ?CategoryRead $categoryRead = null;
-    /** @var ?CategoryWrite */
-    private ?CategoryWrite $categoryWrite = null;
-    /** @var ?CategoryDataParser */
-    private ?CategoryDataParser $categoryParser = null;
     private Closure $categoryReadResolver;
+    private ?CategoryRead $categoryRead = null;
     private Closure $categoryWriteResolver;
-    /** @var ?SetRead */
-    private ?SetRead $categorySetRepo = null;
+    private ?CategoryWrite $categoryWrite = null;
+    private ?CategoryDataParser $categoryParser = null;
     private Closure $categorySetRepoResolver;
-    /** @var ?SetWrite */
-    private ?SetWrite $categorySetWrite = null;
+    private ?SetRead $categorySetRepo = null;
     private Closure $categorySetWriteResolver;
+    private ?SetWrite $categorySetWrite = null;
     private bool $categoryEnabled;
     private TaxonomyImageService $taxonomyImageService;
     private TaxonomyImageScribe $taxonomyImageScribe;
@@ -62,14 +57,14 @@ final class CategoryController
     /**
      * @param SharedController $context Shared panel request context.
      * @param InputSanitizer $input Shared request input sanitizer.
-     * @param callable $categoryReadResolver Lazy category read resolver; only resolved on category routes.
-     * @param callable $categoryWriteResolver Lazy category write resolver; only resolved on category save/delete routes.
-     * @param callable $categorySetRepoResolver Lazy category-set read resolver; resolved for category set listing and validation.
-     * @param callable $categorySetWriteResolver Lazy category-set write resolver; resolved for category set save and delete routes.
+     * @param callable $categoryReadResolver Lazy category read resolver; resolved on category edit and save routes.
+     * @param callable $categoryWriteResolver Lazy category write resolver; resolved on category save and delete routes.
+     * @param callable $categorySetRepoResolver Lazy category-set read resolver; resolved for set validation on category save.
+     * @param callable $categorySetWriteResolver Lazy category-set write resolver; resolved on category-set save and delete routes.
      * @param bool $categoryEnabled Whether category features are enabled in runtime config.
      * @param TaxonomyImageService $taxonomyImageService Read-side taxonomy image config and path helper.
      * @param TaxonomyImageScribe $taxonomyImageScribe Write-side taxonomy image upload and cleanup helper.
-     * @param ChannelDataParser $channelParser Channel data parser for category-set assignment counts.
+     * @param ChannelDataParser $channelParser Channel data parser for category-set channel-assignment counts on delete.
      * @param EditorTabs $editorTabs Panel editor tab normalization and tab-preserving URL builder.
      * @param Upload $uploadFileSetNormalizer Normalizer for $_FILES upload groups.
      * @return void
@@ -100,70 +95,6 @@ final class CategoryController
         $this->channelParser = $channelParser;
         $this->editorTabs = $editorTabs;
         $this->uploadFileSetNormalizer = $uploadFileSetNormalizer;
-    }
-
-    /**
-     * Lists categories for Category management section.
-     *
-     * @return void
-     */
-    public function categoryList(): void
-    {
-        $this->context->requirePanelLogin();
-        if (!$this->categoryEnabled) {
-            $this->context->renderPanelNotFound();
-            return;
-        }
-        if (!$this->context->requireRoutePermissionOrForbidden('category', 'view')) {
-            return;
-        }
-
-        $categoryCountsBySetId = $this->categoryParser()->countsBySetId();
-        $selectedSetId = $this->input->int($_GET['set'] ?? null, 0);
-        if (
-            $selectedSetId !== null
-            && (
-                !$this->categorySetRepo()->existsId($selectedSetId)
-                || (int) ($categoryCountsBySetId[$selectedSetId] ?? 0) < 1
-            )
-        ) {
-            $selectedSetId = null;
-        }
-
-        $requestedPage = $this->input->int($_GET['page'] ?? null, 1) ?? 1;
-        $perPage = 50;
-        $pageResult = $this->categoryParser()->listPageForPanel($perPage, ($requestedPage - 1) * $perPage, $selectedSetId);
-        $totalItems = (int) ($pageResult['total'] ?? 0);
-        $categoryRows = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
-        $pagination = $this->context->panelPaginationState($totalItems, $requestedPage, $perPage);
-        if ($totalItems > 0 && $pagination['current'] !== $requestedPage) {
-            $pageResult = $this->categoryParser()->listPageForPanel($perPage, $pagination['offset'], $selectedSetId);
-            $categoryRows = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
-        }
-
-        // Only show set filter tabs for sets that actually have categories.
-        $setOptions = [];
-        foreach ($this->categorySetRepo()->listOptions() as $setOption) {
-            $setId = (int) ($setOption['id'] ?? 0);
-            if ((int) ($categoryCountsBySetId[$setId] ?? 0) < 1) {
-                continue;
-            }
-
-            $setOptions[] = $setOption;
-        }
-
-        $this->context->renderPanel('panel/category/list', [
-            'categoryRows' => $categoryRows,
-            'setOptions' => $setOptions,
-            'selectedSetId' => $selectedSetId,
-            'pagination' => $this->context->panelPaginationViewData('/category', $pagination, [
-                'set' => $selectedSetId !== null ? (string) $selectedSetId : '',
-            ]),
-            'csrfField' => $this->context->csrfField(),
-            'flashSuccess' => $this->context->pullFlash('success'),
-            'flashError' => $this->context->pullFlash('error'),
-            'section' => 'category',
-        ]);
     }
 
     /**
@@ -460,42 +391,6 @@ final class CategoryController
         }
 
         Redirect::redirect($this->context->panelUrl('/category'));
-    }
-
-    /**
-     * Lists category-set records for channel-assignment management.
-     *
-     * @return void
-     */
-    public function categorySetList(): void
-    {
-        $this->context->requirePanelLogin();
-        if (!$this->categoryEnabled) {
-            $this->context->renderPanelNotFound();
-            return;
-        }
-        if (!$this->context->requireRoutePermissionOrForbidden('category', 'view')) {
-            return;
-        }
-
-        // Annotate each set row with its category and channel usage counts.
-        $countsBySetId = $this->categoryParser()->countsBySetId();
-        $channelCountsBySetId = $this->channelParser->explicitTaxonomySetCounts('category');
-        $setRows = [];
-        foreach ($this->categorySetRepo()->listAll() as $setRow) {
-            $setId = (int) ($setRow['id'] ?? 0);
-            $setRow['category_count'] = (int) ($countsBySetId[$setId] ?? 0);
-            $setRow['channel_count'] = (int) ($channelCountsBySetId[$setId] ?? 0);
-            $setRows[] = $setRow;
-        }
-
-        $this->context->renderPanel('panel/category/set_list', [
-            'setRows' => $setRows,
-            'csrfField' => $this->context->csrfField(),
-            'flashSuccess' => $this->context->pullFlash('success'),
-            'flashError' => $this->context->pullFlash('error'),
-            'section' => 'category',
-        ]);
     }
 
     /**

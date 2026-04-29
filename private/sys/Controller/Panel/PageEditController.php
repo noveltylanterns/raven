@@ -2,8 +2,8 @@
 
 /**
  * RAVEN CMS
- * ~/private/sys/Controller/Panel/PageController.php
- * Panel sub-controller for page management routes.
+ * ~/private/sys/Controller/Panel/PageEditController.php
+ * Panel page edit controller for page CRUD and gallery routes.
  * Docs: https://raven.lanterns.io
  */
 
@@ -18,13 +18,13 @@ use Raven\Core\Repository\PageImageRead;
 use Raven\Core\Repository\PageImageWrite;
 use Raven\Core\Repository\PageRead;
 use Raven\Core\Repository\PageWrite;
-use Raven\Core\Repository\TagRead;
 use Raven\Core\Repository\SetRead;
+use Raven\Core\Repository\TagRead;
 use Raven\Core\Repository\UserRead;
 use Raven\Lib\Auth\LoginIdentifierResolver;
-use Raven\Lib\Extension\Panel\ExtensionCatalogService;
 use Raven\Lib\Extension\ExtensionEditorCatalogService;
 use Raven\Lib\Extension\ExtensionStateStore;
+use Raven\Lib\Extension\Panel\ExtensionCatalogService;
 use Raven\Lib\Media\Panel\PageImageManager;
 use Raven\Lib\Parser\CategoryDataParser;
 use Raven\Lib\Parser\ChannelDataParser;
@@ -36,26 +36,24 @@ use Raven\Lib\Parser\TagDataParser;
 use Raven\Lib\Parser\TaxonomyRepoParser;
 use Raven\Lib\Parser\UserDataParser;
 use Raven\Lib\Security\InputSanitizer;
+use Raven\Lib\Transport\Redirect;
+use Raven\Lib\Transport\Upload;
 use Raven\Lib\View\Panel\Editor;
 use Raven\Lib\View\Panel\EditorAuthor;
 use Raven\Lib\View\Panel\EditorBlocks;
 use Raven\Lib\View\Panel\EditorMCE;
 use Raven\Lib\View\Panel\EditorMDE;
 use Raven\Lib\View\Panel\EditorTabs;
-use Raven\Lib\Transport\Redirect;
-use Raven\Lib\Transport\Upload;
 use Raven\Lib\View\Panel\PageBlocks;
 use Raven\Lib\View\Panel\PanelPost;
 
 /**
- * Handles panel page content management routes.
+ * Handles page create/edit, save, gallery upload/delete, and page delete routes.
  *
- * Owns: page list, page create/edit, page save, gallery image upload/delete,
- * and page delete. Extracted from the legacy monolithic PanelController as the
- * page seam — all routes that operate on Page records and their associated
- * gallery media live here.
+ * Owns all write-path page routes. The page list route lives in PageListController
+ * to keep read-only and write concerns separate.
  */
-final class PageController
+final class PageEditController
 {
     private SharedController $context;
     private Config $config;
@@ -64,17 +62,9 @@ final class PageController
     private PageWrite $pageWrite;
     private PageImageRead $pageImages;
     private PageImageWrite $pageImagesWrite;
-    private UserRead $userRepo;
-    private ChannelDataParser $channelParser;
-    private EditorTabs $editorTabs;
-    private Editor $editor;
-    private EditorBlocks $editorBlocks;
-    private EditorMCE $editorMce;
-    private EditorMDE $editorMde;
     /** @var Closure(): PageImageManager */
     private Closure $pageImageManagerResolver;
     private ?PageImageManager $pageImageManager = null;
-    private ?PageDataParser $pageParser = null;
     /** @var Closure(): CategoryRead */
     private Closure $categoryRepoResolver;
     private ?CategoryRead $categoryRepo = null;
@@ -94,6 +84,7 @@ final class PageController
     private ?TaxonomyRepoParser $taxonomyLookupRepo = null;
     /** @var Closure(string): array<string, mixed> */
     private Closure $extensionServicesFor;
+    private ?PageDataParser $pageParser = null;
     private ?PageBlockParser $pageBlockParser = null;
     private ?PageBlocks $pageBlocks = null;
     private ?Upload $uploadFileSetNormalizer = null;
@@ -101,6 +92,13 @@ final class PageController
     private ?EditorAuthor $pageAuthorOptionBuilder = null;
     private ?LoginIdentifierResolver $identifierResolver = null;
     private ?UserDataParser $userParser = null;
+    private UserRead $userRepo;
+    private ChannelDataParser $channelParser;
+    private EditorTabs $editorTabs;
+    private Editor $editor;
+    private EditorBlocks $editorBlocks;
+    private EditorMCE $editorMce;
+    private EditorMDE $editorMde;
     private ExtensionStateStore $extensionStateStore;
     private ExtensionCatalogService $extensionCatalogService;
     private ExtensionEditorCatalogService $extensionEditorCatalogService;
@@ -111,7 +109,7 @@ final class PageController
      * @param SharedController $context Shared panel request context for auth, CSRF, flash, and rendering.
      * @param Config $config Runtime configuration reader for media and content settings.
      * @param InputSanitizer $input Shared input sanitizer for panel request values.
-     * @param PageRead $pageRead Page repository read side for content list and edit-form reads.
+     * @param PageRead $pageRead Page repository read side for edit-form reads.
      * @param PageWrite $pageWrite Page repository write side for page saves and deletes.
      * @param PageImageRead $pageImages Page-image repository read side for gallery renders and page-existence checks.
      * @param PageImageWrite $pageImagesWrite Page-image repository write side for gallery persistence.
@@ -184,90 +182,6 @@ final class PageController
         $this->extensionCatalogService = $extensionCatalogService;
         $this->extensionEditorCatalogService = $extensionEditorCatalogService;
         $this->extensionServicesFor = Closure::fromCallable($extensionServicesFor);
-    }
-
-    // -------------------------------------------------------------------------
-    // Page routes
-    // -------------------------------------------------------------------------
-
-    /**
-     * Renders the page list with optional channel, category, and tag prefilters.
-     *
-     * @return void
-     */
-    public function pageList(): void
-    {
-        $this->context->requirePanelLogin();
-        if (!$this->context->requireRoutePermissionOrForbidden('page', 'view')) {
-            return;
-        }
-
-        $prefilterChannel = $this->input->slug($_GET['channel'] ?? null) ?? '';
-        $prefilterCategoryId = $this->input->int($_GET['category'] ?? null, 1) ?? 0;
-        $prefilterTagId = $this->input->int($_GET['tag'] ?? null, 1) ?? 0;
-        if (!$this->context->categoryEnabled()) {
-            $prefilterCategoryId = 0;
-        }
-        if (!$this->context->tagEnabled()) {
-            $prefilterTagId = 0;
-        }
-        $requestedPage = $this->input->int($_GET['page'] ?? null, 1) ?? 1;
-        $perPage = 50;
-        $prefilterChannelId = $prefilterChannel !== '' ? $this->channelParser->idBySlug($prefilterChannel) : null;
-        // An unknown channel slug should behave like an empty filtered result, not like "all channels".
-        $hasMissingChannelPrefilter = $prefilterChannel !== '' && $prefilterChannelId === null;
-        $pageResult = $hasMissingChannelPrefilter
-            ? ['rows' => [], 'total' => 0]
-            : $this->pageParser()->listPageForPanel(
-                $perPage,
-                ($requestedPage - 1) * $perPage,
-                $prefilterChannelId,
-                $prefilterCategoryId > 0 ? $prefilterCategoryId : null,
-                $prefilterTagId > 0 ? $prefilterTagId : null
-            );
-        $totalItems = (int) ($pageResult['total'] ?? 0);
-        $pageRows = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
-        $pagination = $this->context->panelPaginationState($totalItems, $requestedPage, $perPage);
-        if (!$hasMissingChannelPrefilter && $totalItems > 0 && $pagination['current'] !== $requestedPage) {
-            $pageResult = $this->pageParser()->listPageForPanel(
-                $perPage,
-                $pagination['offset'],
-                $prefilterChannelId,
-                $prefilterCategoryId > 0 ? $prefilterCategoryId : null,
-                $prefilterTagId > 0 ? $prefilterTagId : null
-            );
-            $pageRows = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
-        }
-        $prefilterCategoryIds = $prefilterCategoryId > 0 ? [$prefilterCategoryId] : [];
-        $prefilterTagIds = $prefilterTagId > 0 ? [$prefilterTagId] : [];
-        foreach ($pageRows as &$pageRow) {
-            // Server-side page prefilters already constrain result rows, so list rows only
-            // need the active prefilter ids for client-side in-page filter persistence.
-            $pageRow['category_ids'] = $prefilterCategoryIds;
-            $pageRow['tag_ids'] = $prefilterTagIds;
-        }
-        unset($pageRow);
-
-        $this->context->renderPanel('panel/page/list', [
-            'pages' => $pageRows,
-            'prefilterChannel' => strtolower($prefilterChannel),
-            'prefilterCategoryId' => $prefilterCategoryId,
-            'prefilterTagId' => $prefilterTagId,
-            'pagination' => $this->context->panelPaginationViewData(
-                '/page',
-                $pagination,
-                [
-                    'channel' => $prefilterChannel,
-                    'category' => $prefilterCategoryId > 0 ? (string) $prefilterCategoryId : '',
-                    'tag' => $prefilterTagId > 0 ? (string) $prefilterTagId : '',
-                ]
-            ),
-            'csrfField' => $this->context->csrfField(),
-            'flashSuccess' => $this->context->pullFlash('success'),
-            'flashError' => $this->context->pullFlash('error'),
-            'section' => 'page',
-            'pageNav' => 'list',
-        ]);
     }
 
     /**
@@ -635,13 +549,13 @@ final class PageController
         }
 
         Redirect::redirect($this->editorTabs->panelEditorUrlWithTab(
-                fn (string $suffix): string => $this->context->panelUrl($suffix),
-                '/page/edit',
-                $pageId,
-                'media',
-                'content',
-                'rvnp-editor-pane-media'
-            ));
+            fn (string $suffix): string => $this->context->panelUrl($suffix),
+            '/page/edit',
+            $pageId,
+            'media',
+            'content',
+            'rvnp-editor-pane-media'
+        ));
     }
 
     /**
@@ -679,13 +593,13 @@ final class PageController
             if (!$this->pageImageManager()->deleteImageForPage($pageId, $imageId)) {
                 $this->context->flash('error', 'Image not found or already deleted.');
                 Redirect::redirect($this->editorTabs->panelEditorUrlWithTab(
-                fn (string $suffix): string => $this->context->panelUrl($suffix),
-                '/page/edit',
-                $pageId,
-                'media',
-                'content',
-                'rvnp-editor-pane-media'
-            ));
+                    fn (string $suffix): string => $this->context->panelUrl($suffix),
+                    '/page/edit',
+                    $pageId,
+                    'media',
+                    'content',
+                    'rvnp-editor-pane-media'
+                ));
             }
 
             $this->context->flash('success', 'Image deleted.');
@@ -734,13 +648,13 @@ final class PageController
         }
 
         Redirect::redirect($this->editorTabs->panelEditorUrlWithTab(
-                fn (string $suffix): string => $this->context->panelUrl($suffix),
-                '/page/edit',
-                $pageId,
-                'media',
-                'content',
-                'rvnp-editor-pane-media'
-            ));
+            fn (string $suffix): string => $this->context->panelUrl($suffix),
+            '/page/edit',
+            $pageId,
+            'media',
+            'content',
+            'rvnp-editor-pane-media'
+        ));
     }
 
     /**
@@ -813,10 +727,6 @@ final class PageController
         Redirect::redirect($this->context->panelUrl('/page'));
     }
 
-    // -------------------------------------------------------------------------
-    // Lazy repository resolvers
-    // -------------------------------------------------------------------------
-
     /**
      * Returns the page-image manager on first use so non-media routes do not
      * instantiate upload/storage helpers.
@@ -860,7 +770,9 @@ final class PageController
     }
 
     /**
-     * @return CategoryDataParser
+     * Returns the category data parser on first use.
+     *
+     * @return CategoryDataParser Category data parser.
      */
     private function categoryParser(): CategoryDataParser
     {
@@ -914,7 +826,9 @@ final class PageController
     }
 
     /**
-     * @return TagDataParser
+     * Returns the tag data parser on first use.
+     *
+     * @return TagDataParser Tag data parser.
      */
     private function tagParser(): TagDataParser
     {
@@ -966,10 +880,6 @@ final class PageController
         $this->taxonomyLookupRepo = $taxonomyLookupRepo;
         return $this->taxonomyLookupRepo;
     }
-
-    // -------------------------------------------------------------------------
-    // Self-constructed lazy services
-    // -------------------------------------------------------------------------
 
     /**
      * Returns the shared page-block parser on first use.
@@ -1055,9 +965,33 @@ final class PageController
         return $this->identifierResolver;
     }
 
-    // -------------------------------------------------------------------------
-    // Taxonomy / route helpers
-    // -------------------------------------------------------------------------
+    /**
+     * Returns the page data parser on first use.
+     *
+     * @return PageDataParser Page data parser.
+     */
+    private function pageParser(): PageDataParser
+    {
+        if (!$this->pageParser instanceof PageDataParser) {
+            $this->pageParser = new PageDataParser($this->input, $this->pageRead);
+        }
+
+        return $this->pageParser;
+    }
+
+    /**
+     * Returns the user data parser on first use.
+     *
+     * @return UserDataParser User data parser.
+     */
+    private function userParser(): UserDataParser
+    {
+        if (!$this->userParser instanceof UserDataParser) {
+            $this->userParser = new UserDataParser($this->input, $this->userRepo);
+        }
+
+        return $this->userParser;
+    }
 
     /**
      * Returns page-editor taxonomy option sets, skipping the taxonomy lookup
@@ -1151,10 +1085,6 @@ final class PageController
         return $selection;
     }
 
-    // -------------------------------------------------------------------------
-    // Body-block / editor helpers
-    // -------------------------------------------------------------------------
-
     /**
      * Returns the page-editor body-block type definitions, including any
      * additional types contributed by enabled extensions.
@@ -1176,10 +1106,6 @@ final class PageController
 
         return $this->pageBodyBlockTypeDefinitionsCache;
     }
-
-    // -------------------------------------------------------------------------
-    // Extension editor contributions
-    // -------------------------------------------------------------------------
 
     /**
      * Returns body-block type definitions provided by enabled extensions.
@@ -1272,37 +1198,4 @@ final class PageController
 
         return $items;
     }
-
-    // -------------------------------------------------------------------------
-    // Author and user helpers
-    // -------------------------------------------------------------------------
-
-    /**
-     * @return PageDataParser
-     */
-    private function pageParser(): PageDataParser
-    {
-        if (!$this->pageParser instanceof PageDataParser) {
-            $this->pageParser = new PageDataParser($this->input, $this->pageRead);
-        }
-
-        return $this->pageParser;
-    }
-
-    /**
-     * @return UserDataParser
-     */
-    private function userParser(): UserDataParser
-    {
-        if (!$this->userParser instanceof UserDataParser) {
-            $this->userParser = new UserDataParser($this->input, $this->userRepo);
-        }
-
-        return $this->userParser;
-    }
-
-    // -------------------------------------------------------------------------
-    // POST and file normalization helpers
-    // -------------------------------------------------------------------------
-
 }

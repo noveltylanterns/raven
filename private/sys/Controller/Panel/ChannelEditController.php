@@ -2,8 +2,8 @@
 
 /**
  * RAVEN CMS
- * ~/private/sys/Controller/Panel/ChannelController.php
- * Split panel channel controller for channel management routes.
+ * ~/private/sys/Controller/Panel/ChannelEditController.php
+ * Panel channel edit controller for channel create/edit/save/delete routes.
  * Docs: https://raven.lanterns.io
  */
 
@@ -27,13 +27,12 @@ use Raven\Lib\View\Panel\Editor;
 use Raven\Lib\View\Panel\EditorTabs;
 
 /**
- * Handles panel channel management routes.
+ * Handles channel create/edit/save/delete routes for the panel.
  *
- * Owns channel list, channel create/edit, channel save, and channel delete.
- * Channel taxonomy-set selection remains here because it is channel-specific
- * edit-state; category/tag set CRUD lives in CategoryController and TagController.
+ * Owns the write side of the channel seam. The channel list route lives in
+ * ChannelListController to keep read-only and write concerns separate.
  */
-final class ChannelController
+final class ChannelEditController
 {
     private SharedController $context;
     private InputSanitizer $input;
@@ -64,7 +63,7 @@ final class ChannelController
      * @param bool $tagEnabled Whether tag features are enabled in runtime config.
      * @param TaxonomyImageService $taxonomyImageService Read-side taxonomy image config and path helper.
      * @param TaxonomyImageScribe $taxonomyImageScribe Write-side taxonomy image upload and cleanup helper.
-     * @param ChannelDataParser $channelParser Channel data parser for read-only channel lookups.
+     * @param ChannelDataParser $channelParser Channel data parser for read-only channel lookups in edit/save.
      * @param FeedRouteParser $feedParser Feed route parser for RSS/Atom route settings.
      * @param EditorTabs $editorTabs Panel editor tab normalization and tab-preserving URL builder.
      * @param Editor $editor Shared panel editor normalizers.
@@ -101,39 +100,6 @@ final class ChannelController
         $this->editorTabs = $editorTabs;
         $this->editor = $editor;
         $this->uploadFileSetNormalizer = $uploadFileSetNormalizer;
-    }
-
-    /**
-     * Lists channels for Channel management section.
-     *
-     * @return void
-     */
-    public function channelList(): void
-    {
-        $this->context->requirePanelLogin();
-        if (!$this->context->requireRoutePermissionOrForbidden('channel', 'view')) {
-            return;
-        }
-
-        $requestedPage = $this->input->int($_GET['page'] ?? null, 1) ?? 1;
-        $perPage = 50;
-        $pageResult = $this->channelParser->listPageForPanel($perPage, ($requestedPage - 1) * $perPage);
-        $totalItems = (int) ($pageResult['total'] ?? 0);
-        $channelRows = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
-        $pagination = $this->context->panelPaginationState($totalItems, $requestedPage, $perPage);
-        if ($totalItems > 0 && $pagination['current'] !== $requestedPage) {
-            $pageResult = $this->channelParser->listPageForPanel($perPage, $pagination['offset']);
-            $channelRows = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
-        }
-
-        $this->context->renderPanel('panel/channel/list', [
-            'channelRows' => $channelRows,
-            'pagination' => $this->context->panelPaginationViewData('/channel', $pagination),
-            'csrfField' => $this->context->csrfField(),
-            'flashSuccess' => $this->context->pullFlash('success'),
-            'flashError' => $this->context->pullFlash('error'),
-            'section' => 'channel',
-        ]);
     }
 
     /**

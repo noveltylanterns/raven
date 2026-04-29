@@ -3,12 +3,12 @@
 /**
  * RAVEN CMS
  * ~/private/lib/Parser/TaxonomyRepoParser.php
- * Repository-backed taxonomy lookup parser for category/tag read-side option data.
+ * Mixed taxonomy lookup parser for category/tag routing inventory and page-editor payloads.
  * Docs: https://raven.lanterns.io
  */
 
-// Inline note: This parser owns read-only taxonomy lookup queries that assemble
-// controller-facing option sets from multiple tables without exposing SQL details.
+// Inline note: This parser keeps the category+tag aggregate queries that still
+// intentionally assemble both taxonomies into one controller-facing payload.
 
 declare(strict_types=1);
 
@@ -17,10 +17,14 @@ namespace Raven\Lib\Parser;
 use PDO;
 use Raven\Core\Repository\ChannelRead;
 use Raven\Lib\Database\TableNameResolver;
-use Raven\Lib\Media\Panel\TaxonomyImagePathResolver;
 
 /**
- * Repository-backed parser for channel/category/tag rows and taxonomy option sets.
+ * Repository-backed parser for mixed channel/category/tag option sets.
+ *
+ * CategoryRepoParser and TagRepoParser own single-taxonomy slug lookups. This
+ * class remains the aggregate seam for controller flows that intentionally
+ * assemble both taxonomies into one payload, such as routing inventory and the
+ * page editor taxonomy pickers.
  */
 final class TaxonomyRepoParser
 {
@@ -28,71 +32,29 @@ final class TaxonomyRepoParser
     private string $driver;
     private string $prefix;
     private ChannelRead $channelRepo;
+    private CategoryRepoParser $categoryRepoParser;
+    private TagRepoParser $tagRepoParser;
 
+    /**
+     * Initializes the mixed taxonomy lookup parser.
+     *
+     * @param PDO         $db          App database connection used for mixed option-set reads.
+     * @param string      $driver      Active PDO driver name used for table-name resolution.
+     * @param string      $prefix      Application table prefix before resolver sanitization.
+     * @param ChannelRead $channelRepo Channel read side used to contribute channel routing options.
+     */
     public function __construct(PDO $db, string $driver, string $prefix, ChannelRead $channelRepo)
     {
         $this->db = $db;
         $this->driver = $driver;
         $this->prefix = preg_replace('/[^a-zA-Z0-9_]/', '', $prefix) ?? '';
         $this->channelRepo = $channelRepo;
+        $this->categoryRepoParser = new CategoryRepoParser($db, $driver, $prefix);
+        $this->tagRepoParser = new TagRepoParser($db, $driver, $prefix);
     }
 
     /**
-     * Finds category row by slug.
-     *
-     * @return array<string, mixed>|null
-     */
-    public function findCategoryBySlug(string $slug): ?array
-    {
-        $table = $this->table('categories');
-
-        $stmt = $this->db->prepare(
-            'SELECT
-                id,
-                name,
-                slug,
-                description,
-                cover_image,
-                preview_image
-             FROM ' . $table . '
-             WHERE slug = :slug
-             LIMIT 1'
-        );
-        $stmt->execute([':slug' => $slug]);
-
-        $row = $stmt->fetch();
-        return $row === false ? null : $this->hydrateTaxonomyRow('categories', $row);
-    }
-
-    /**
-     * Finds tag row by slug.
-     *
-     * @return array<string, mixed>|null
-     */
-    public function findTagBySlug(string $slug): ?array
-    {
-        $table = $this->table('tags');
-
-        $stmt = $this->db->prepare(
-            'SELECT
-                id,
-                name,
-                slug,
-                description,
-                cover_image,
-                preview_image
-             FROM ' . $table . '
-             WHERE slug = :slug
-             LIMIT 1'
-        );
-        $stmt->execute([':slug' => $slug]);
-
-        $row = $stmt->fetch();
-        return $row === false ? null : $this->hydrateTaxonomyRow('tags', $row);
-    }
-
-    /**
-     * Returns routing-option sets for channel/category/tag routes in one query.
+     * Returns routing-option sets for channel/category/tag routes in one payload.
      *
      * @return array{
      *   channel_options: array<int, array{id: int, name: string, slug: string, editor_override: string, route_mode: string, route_separator: string}>,
@@ -102,63 +64,19 @@ final class TaxonomyRepoParser
      */
     public function listRoutingOptions(): array
     {
-        $categories = $this->table('categories');
-        $tags = $this->table('tags');
-
-        $stmt = $this->db->prepare(
-            'SELECT option_type, id, name, slug
-             FROM (
-                 SELECT \'category\' AS option_type, id, name, slug
-                 FROM ' . $categories . '
-                 UNION ALL
-                 SELECT \'tag\' AS option_type, id, name, slug
-                 FROM ' . $tags . '
-             ) options
-             ORDER BY option_type ASC, name ASC, id ASC'
-        );
-        $stmt->execute();
-
-        $rows = $stmt->fetchAll() ?: [];
-        $result = [
+        return [
             'channel_options' => $this->channelRepo->listRoutingOptions(),
-            'category_options_all' => [],
-            'tag_options_all' => [],
+            'category_options_all' => $this->categoryRepoParser->listRoutingOptions(),
+            'tag_options_all' => $this->tagRepoParser->listRoutingOptions(),
         ];
-
-        foreach ($rows as $row) {
-            $optionType = strtolower(trim((string) ($row['option_type'] ?? '')));
-
-            $id = (int) ($row['id'] ?? 0);
-            $name = (string) ($row['name'] ?? '');
-            $slug = (string) ($row['slug'] ?? '');
-            if ($id <= 0 || $slug === '') {
-                continue;
-            }
-
-            $optionType = strtolower(trim((string) ($row['option_type'] ?? '')));
-            if ($optionType === 'category') {
-                $result['category_options_all'][] = [
-                    'id' => $id,
-                    'name' => $name,
-                    'slug' => $slug,
-                ];
-                continue;
-            }
-            if ($optionType === 'tag') {
-                $result['tag_options_all'][] = [
-                    'id' => $id,
-                    'name' => $name,
-                    'slug' => $slug,
-                ];
-            }
-        }
-
-        return $result;
     }
 
     /**
-     * Returns routing inventory taxonomy data in one query.
+     * Returns routing inventory taxonomy data in one payload.
      *
+     * @param bool $includeCategories Whether category route rows should be included.
+     * @param bool $includeTags       Whether tag route rows should be included.
+     * @param bool $includeRedirects  Whether redirect inventory rows should be included.
      * @return array{
      *   channel_options: array<int, array{id: int, name: string, slug: string, feed_enabled: bool, editor_override: string, route_mode: string, route_separator: string}>,
      *   category_options_all: array<int, array{id: int, name: string, slug: string}>,
@@ -171,89 +89,43 @@ final class TaxonomyRepoParser
         bool $includeTags = true,
         bool $includeRedirects = true
     ): array {
-        $categories = $this->table('categories');
-        $tags = $this->table('tags');
-        $redirects = $this->table('redirects');
-
         $result = [
             'channel_options' => $this->channelRepo->listRoutingOptions(),
-            'category_options_all' => [],
-            'tag_options_all' => [],
+            'category_options_all' => $includeCategories ? $this->categoryRepoParser->listRoutingOptions() : [],
+            'tag_options_all' => $includeTags ? $this->tagRepoParser->listRoutingOptions() : [],
             'redirect_rows' => [],
         ];
 
-        if ($includeCategories) {
-            $stmt = $this->db->prepare(
-                'SELECT id, name, slug
-                 FROM ' . $categories . '
-                 ORDER BY name ASC, id ASC'
-            );
-            $stmt->execute();
-            foreach ($stmt->fetchAll() ?: [] as $row) {
-                $id = (int) ($row['id'] ?? 0);
-                $slug = trim((string) ($row['slug'] ?? ''));
-                if ($id < 1 || $slug === '') {
-                    continue;
-                }
-
-                $result['category_options_all'][] = [
-                    'id' => $id,
-                    'name' => (string) ($row['name'] ?? ''),
-                    'slug' => $slug,
-                ];
-            }
+        if (!$includeRedirects) {
+            return $result;
         }
 
-        if ($includeTags) {
-            $stmt = $this->db->prepare(
-                'SELECT id, name, slug
-                 FROM ' . $tags . '
-                 ORDER BY name ASC, id ASC'
-            );
-            $stmt->execute();
-            foreach ($stmt->fetchAll() ?: [] as $row) {
-                $id = (int) ($row['id'] ?? 0);
-                $slug = trim((string) ($row['slug'] ?? ''));
-                if ($id < 1 || $slug === '') {
-                    continue;
-                }
-
-                $result['tag_options_all'][] = [
-                    'id' => $id,
-                    'name' => (string) ($row['name'] ?? ''),
-                    'slug' => $slug,
-                ];
+        $channelsById = $this->channelsByIdMap();
+        $stmt = $this->db->prepare(
+            'SELECT id, title, description, slug, channel, active, target
+             FROM ' . $this->table('redirects') . '
+             ORDER BY id ASC'
+        );
+        $stmt->execute();
+        foreach ($stmt->fetchAll() ?: [] as $row) {
+            $redirectId = (int) ($row['id'] ?? 0);
+            $redirectSlug = trim((string) ($row['slug'] ?? ''));
+            if ($redirectId < 1 || $redirectSlug === '') {
+                continue;
             }
-        }
 
-        if ($includeRedirects) {
-            $channelsById = $this->channelsByIdMap();
-            $stmt = $this->db->prepare(
-                'SELECT id, title, description, slug, channel, active, target
-                 FROM ' . $redirects . '
-                 ORDER BY id ASC'
-            );
-            $stmt->execute();
-            foreach ($stmt->fetchAll() ?: [] as $row) {
-                $redirectId = (int) ($row['id'] ?? 0);
-                $redirectSlug = trim((string) ($row['slug'] ?? ''));
-                if ($redirectId < 1 || $redirectSlug === '') {
-                    continue;
-                }
-
-                $channelId = $row['channel'] !== null ? (int) $row['channel'] : null;
-                $channel = $channelId !== null ? ($channelsById[$channelId] ?? null) : null;
-                $redirectRow = [
-                    'id' => $redirectId,
-                    'title' => (string) ($row['title'] ?? ''),
-                    'description' => (string) ($row['description'] ?? ''),
-                    'slug' => $redirectSlug,
-                    'channel' => $channelId,
-                    'active' => (int) ($row['active'] ?? 0),
-                    'target' => (string) ($row['target'] ?? ''),
-                ];
-                $result['redirect_rows'][] = ChannelRepoParser::applyBasicChannelContext($redirectRow, $channel);
-            }
+            $channelId = $row['channel'] !== null ? (int) $row['channel'] : null;
+            $channel = $channelId !== null ? ($channelsById[$channelId] ?? null) : null;
+            $redirectRow = [
+                'id' => $redirectId,
+                'title' => (string) ($row['title'] ?? ''),
+                'description' => (string) ($row['description'] ?? ''),
+                'slug' => $redirectSlug,
+                'channel' => $channelId,
+                'active' => (int) ($row['active'] ?? 0),
+                'target' => (string) ($row['target'] ?? ''),
+            ];
+            $result['redirect_rows'][] = ChannelRepoParser::applyBasicChannelContext($redirectRow, $channel);
         }
 
         return $result;
@@ -262,6 +134,9 @@ final class TaxonomyRepoParser
     /**
      * Returns page-editor taxonomy options and assigned category/tag rows in one query.
      *
+     * @param int  $pageId            Page id whose taxonomy assignments should be loaded.
+     * @param bool $includeCategories Whether category option rows should be included.
+     * @param bool $includeTags       Whether tag option rows should be included.
      * @return array{
      *   channel_options: array<int, array{id: int, name: string, slug: string}>,
      *   category_options_all: array<int, array{id: int, name: string, slug: string, set: int}>,
@@ -290,8 +165,6 @@ final class TaxonomyRepoParser
         $unionSelects = [];
         $params = [];
         if ($includeCategories) {
-            $categories = $this->table('categories');
-            $pageCategories = $this->table('page_categories');
             $unionSelects[] =
                 'SELECT
                     \'category\' AS option_type,
@@ -300,16 +173,14 @@ final class TaxonomyRepoParser
                     c.slug,
                     ' . $this->setColumn('c') . ' AS set_value,
                     CASE WHEN pc.page IS NULL THEN 0 ELSE 1 END AS is_assigned
-                 FROM ' . $categories . ' c
-                 LEFT JOIN ' . $pageCategories . ' pc
+                 FROM ' . $this->table('categories') . ' c
+                 LEFT JOIN ' . $this->table('page_categories') . ' pc
                     ON pc.category = c.id
                    AND pc.page = ?';
             $params[] = $normalizedPageId;
         }
 
         if ($includeTags) {
-            $tags = $this->table('tags');
-            $pageTags = $this->table('page_tags');
             $unionSelects[] =
                 'SELECT
                     \'tag\' AS option_type,
@@ -318,8 +189,8 @@ final class TaxonomyRepoParser
                     t.slug,
                     ' . $this->setColumn('t') . ' AS set_value,
                     CASE WHEN pt.page IS NULL THEN 0 ELSE 1 END AS is_assigned
-                 FROM ' . $tags . ' t
-                 LEFT JOIN ' . $pageTags . ' pt
+                 FROM ' . $this->table('tags') . ' t
+                 LEFT JOIN ' . $this->table('page_tags') . ' pt
                     ON pt.tag = t.id
                    AND pt.page = ?';
             $params[] = $normalizedPageId;
@@ -334,13 +205,9 @@ final class TaxonomyRepoParser
         );
         $stmt->execute($params);
 
-        $rows = $stmt->fetchAll() ?: [];
-
-        foreach ($rows as $row) {
+        foreach ($stmt->fetchAll() ?: [] as $row) {
             $optionType = strtolower(trim((string) ($row['option_type'] ?? '')));
-
             $id = (int) ($row['id'] ?? 0);
-            $name = (string) ($row['name'] ?? '');
             $slug = (string) ($row['slug'] ?? '');
             if ($id <= 0 || $slug === '') {
                 continue;
@@ -348,7 +215,7 @@ final class TaxonomyRepoParser
 
             $entry = [
                 'id' => $id,
-                'name' => $name,
+                'name' => (string) ($row['name'] ?? ''),
                 'slug' => $slug,
                 'set' => (int) ($row['set_value'] ?? 0),
             ];
@@ -361,6 +228,7 @@ final class TaxonomyRepoParser
                 }
                 continue;
             }
+
             if ($optionType === 'tag') {
                 $result['tag_options_all'][] = $entry;
                 if ($isAssigned) {
@@ -373,7 +241,9 @@ final class TaxonomyRepoParser
     }
 
     /**
-     * @return array<int, array<string, mixed>>
+     * Returns channels indexed by id for redirect-row decoration.
+     *
+     * @return array<int, array<string, mixed>> Channel map keyed by numeric id.
      */
     private function channelsByIdMap(): array
     {
@@ -382,6 +252,9 @@ final class TaxonomyRepoParser
 
     /**
      * Maps logical taxonomy table names into backend-specific names.
+     *
+     * @param string $table Logical unprefixed table name.
+     * @return string       Physical table name for the active database backend.
      */
     private function table(string $table): string
     {
@@ -389,21 +262,11 @@ final class TaxonomyRepoParser
     }
 
     /**
-     * @param array<string, mixed> $row
-     * @return array<string, mixed>
+     * Returns the correctly quoted taxonomy-set column name.
+     *
+     * @param string|null $alias Optional SQL table alias prefix.
+     * @return string            Quoted `set` column reference.
      */
-    private function hydrateTaxonomyRow(string $taxonomyType, array $row): array
-    {
-        $id = (int) ($row['id'] ?? 0);
-        $storage = TaxonomyImagePathResolver::storagePayloadFromRecord($taxonomyType, $row);
-        if (TaxonomyImagePathResolver::supportsFilenameStorage($taxonomyType)) {
-            $row['cover_image'] = $storage['cover_image'] ?? null;
-            $row['preview_image'] = $storage['preview_image'] ?? null;
-        }
-
-        return array_merge($row, TaxonomyImagePathResolver::pathsFromStoragePayload($taxonomyType, $id, $storage));
-    }
-
     private function setColumn(?string $alias = null): string
     {
         $column = $this->driver === 'mysql' ? '`set`' : '"set"';

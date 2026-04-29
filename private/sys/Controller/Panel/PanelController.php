@@ -76,53 +76,102 @@ final class PanelController
                 throw new RuntimeException('Panel dashboard controller factory is unavailable.');
             };
 
-        /** @var callable(): object $panelChannelController */
-        $panelChannelController = is_callable($rvn['panel_channel_controller'] ?? null)
-            ? $rvn['panel_channel_controller']
+        /** @var callable(): object $panelChannelListController */
+        $panelChannelListController = is_callable($rvn['panel_channel_list_controller'] ?? null)
+            ? $rvn['panel_channel_list_controller']
             : static function (): object {
-                throw new RuntimeException('Panel channel controller factory is unavailable.');
+                throw new RuntimeException('Panel channel list controller factory is unavailable.');
             };
 
-        /** @var callable(): object $panelCategoryController */
-        $panelCategoryController = is_callable($rvn['panel_category_controller'] ?? null)
-            ? $rvn['panel_category_controller']
+        /** @var callable(): object $panelChannelEditController */
+        $panelChannelEditController = is_callable($rvn['panel_channel_edit_controller'] ?? null)
+            ? $rvn['panel_channel_edit_controller']
             : static function (): object {
-                throw new RuntimeException('Panel category controller factory is unavailable.');
+                throw new RuntimeException('Panel channel edit controller factory is unavailable.');
             };
 
-        /** @var callable(): object $panelTagController */
-        $panelTagController = is_callable($rvn['panel_tag_controller'] ?? null)
-            ? $rvn['panel_tag_controller']
+        /** @var callable(): object $panelCategoryListController */
+        $panelCategoryListController = is_callable($rvn['panel_category_list_controller'] ?? null)
+            ? $rvn['panel_category_list_controller']
             : static function (): object {
-                throw new RuntimeException('Panel tag controller factory is unavailable.');
+                throw new RuntimeException('Panel category list controller factory is unavailable.');
             };
 
-        /** @var callable(): object $panelRedirectController */
-        $panelRedirectController = is_callable($rvn['panel_redirect_controller'] ?? null)
-            ? $rvn['panel_redirect_controller']
+        /** @var callable(): object $panelCategoryEditController */
+        $panelCategoryEditController = is_callable($rvn['panel_category_edit_controller'] ?? null)
+            ? $rvn['panel_category_edit_controller']
             : static function (): object {
-                throw new RuntimeException('Panel redirect controller factory is unavailable.');
+                throw new RuntimeException('Panel category edit controller factory is unavailable.');
             };
 
-        /** @var callable(): object $panelUserController */
-        $panelUserController = is_callable($rvn['panel_user_controller'] ?? null)
-            ? $rvn['panel_user_controller']
+        /** @var callable(): object $panelTagListController */
+        $panelTagListController = is_callable($rvn['panel_tag_list_controller'] ?? null)
+            ? $rvn['panel_tag_list_controller']
             : static function (): object {
-                throw new RuntimeException('Panel user controller factory is unavailable.');
+                throw new RuntimeException('Panel tag list controller factory is unavailable.');
             };
 
-        /** @var callable(): object $panelGroupController */
-        $panelGroupController = is_callable($rvn['panel_group_controller'] ?? null)
-            ? $rvn['panel_group_controller']
+        /** @var callable(): object $panelTagEditController */
+        $panelTagEditController = is_callable($rvn['panel_tag_edit_controller'] ?? null)
+            ? $rvn['panel_tag_edit_controller']
             : static function (): object {
-                throw new RuntimeException('Panel group controller factory is unavailable.');
+                throw new RuntimeException('Panel tag edit controller factory is unavailable.');
             };
 
-        /** @var callable(): object $panelPageController */
-        $panelPageController = is_callable($rvn['panel_page_controller'] ?? null)
-            ? $rvn['panel_page_controller']
+        /** @var callable(): object $panelRedirectListController */
+        $panelRedirectListController = is_callable($rvn['panel_redirect_list_controller'] ?? null)
+            ? $rvn['panel_redirect_list_controller']
             : static function (): object {
-                throw new RuntimeException('Panel page controller factory is unavailable.');
+                throw new RuntimeException('Panel redirect list controller factory is unavailable.');
+            };
+
+        /** @var callable(): object $panelRedirectEditController */
+        $panelRedirectEditController = is_callable($rvn['panel_redirect_edit_controller'] ?? null)
+            ? $rvn['panel_redirect_edit_controller']
+            : static function (): object {
+                throw new RuntimeException('Panel redirect edit controller factory is unavailable.');
+            };
+
+        /** @var callable(): object $panelUserListController */
+        $panelUserListController = is_callable($rvn['panel_user_list_controller'] ?? null)
+            ? $rvn['panel_user_list_controller']
+            : static function (): object {
+                throw new RuntimeException('Panel user list controller factory is unavailable.');
+            };
+
+        /** @var callable(): object $panelUserEditController */
+        $panelUserEditController = is_callable($rvn['panel_user_edit_controller'] ?? null)
+            ? $rvn['panel_user_edit_controller']
+            : static function (): object {
+                throw new RuntimeException('Panel user edit controller factory is unavailable.');
+            };
+
+        /** @var callable(): object $panelGroupListController */
+        $panelGroupListController = is_callable($rvn['panel_group_list_controller'] ?? null)
+            ? $rvn['panel_group_list_controller']
+            : static function (): object {
+                throw new RuntimeException('Panel group list controller factory is unavailable.');
+            };
+
+        /** @var callable(): object $panelGroupEditController */
+        $panelGroupEditController = is_callable($rvn['panel_group_edit_controller'] ?? null)
+            ? $rvn['panel_group_edit_controller']
+            : static function (): object {
+                throw new RuntimeException('Panel group edit controller factory is unavailable.');
+            };
+
+        /** @var callable(): object $panelPageListController */
+        $panelPageListController = is_callable($rvn['panel_page_list_controller'] ?? null)
+            ? $rvn['panel_page_list_controller']
+            : static function (): object {
+                throw new RuntimeException('Panel page list controller factory is unavailable.');
+            };
+
+        /** @var callable(): object $panelPageEditController */
+        $panelPageEditController = is_callable($rvn['panel_page_edit_controller'] ?? null)
+            ? $rvn['panel_page_edit_controller']
+            : static function (): object {
+                throw new RuntimeException('Panel page edit controller factory is unavailable.');
             };
 
         /** @var callable(): object $panelPreferencesController */
@@ -409,13 +458,13 @@ final class PanelController
         $router = new Router();
         AuthRouter::register($router, $authController);
         DashboardRouter::register($router, $panelDashboardController);
-        ContentRouter::register($router, $panelPageController, $rvn['input'], $renderNotFound);
-        ChannelRouter::register($router, $panelChannelController, $rvn['input'], $renderNotFound);
-        CategoryRouter::register($router, $panelCategoryController, $rvn['input'], $categoryEnabled, $renderNotFound);
-        TagRouter::register($router, $panelTagController, $rvn['input'], $tagEnabled, $renderNotFound);
-        RedirectRouter::register($router, $panelRedirectController, $rvn['input'], $renderNotFound);
-        UserRouter::register($router, $panelUserController, $rvn['input'], $renderNotFound);
-        GroupRouter::register($router, $panelGroupController, $rvn['input'], $renderNotFound);
+        ContentRouter::register($router, $panelPageListController, $panelPageEditController, $rvn['input'], $renderNotFound);
+        ChannelRouter::register($router, $panelChannelListController, $panelChannelEditController, $rvn['input'], $renderNotFound);
+        CategoryRouter::register($router, $panelCategoryListController, $panelCategoryEditController, $rvn['input'], $categoryEnabled, $renderNotFound);
+        TagRouter::register($router, $panelTagListController, $panelTagEditController, $rvn['input'], $tagEnabled, $renderNotFound);
+        RedirectRouter::register($router, $panelRedirectListController, $panelRedirectEditController, $rvn['input'], $renderNotFound);
+        UserRouter::register($router, $panelUserListController, $panelUserEditController, $rvn['input'], $renderNotFound);
+        GroupRouter::register($router, $panelGroupListController, $panelGroupEditController, $rvn['input'], $renderNotFound);
         LogRouter::register($router, $panelLogsController);
         RoutingRouter::register($router, $panelRoutingController);
         UpdateRouter::register($router, $panelUpdateController);

@@ -65,17 +65,17 @@ final class UserDataParser
     }
 
     /**
-     * Returns one paginated page of panel user rows plus total count and group options.
+     * Returns one paginated user page plus total count and group options.
      *
      * @param int         $limit            Maximum number of rows to return.
      * @param int         $offset           Zero-based row offset for pagination.
      * @param string|null $groupNameFilter  Optional group name substring filter.
      * @return array{rows: array<int, array<string, mixed>>, total: int, group_options: array<int, array{id: int, name: string, slug: string, permissions: int, is_stock: int}>} Paginated rows and total count.
      */
-    public function listPageForPanel(int $limit = 50, int $offset = 0, ?string $groupNameFilter = null): array
+    public function listPage(int $limit = 50, int $offset = 0, ?string $groupNameFilter = null): array
     {
         $normalizedFilter = is_string($groupNameFilter) ? strtolower(trim($groupNameFilter)) : '';
-        return $this->userRepo()->listPageForPanel(
+        return $this->userRepo()->listPage(
             max(1, $limit),
             max(0, $offset),
             $normalizedFilter !== '' ? $normalizedFilter : null

@@ -80,7 +80,7 @@ Last updated: 2026-03-25
 ## Extension Rules
 - Extensions live in `private/ext/{slug}/`.
 - Manifest required: `private/ext/{slug}/ext.json`.
-- Extension route files (if needed) live under `private/ext/{slug}/lib/` (`routes_panel.php` / `routes_public.php`).
+- Extension provider files stay at the extension root (`routes_panel.php`, `routes_public.php`, `schema.php`, `cron.php`), while extension classes autoload from `private/ext/{slug}/lib/`.
 - Extension services/bootstrap should stay self-contained under that extension directory.
 - Extension packaging/manifest/security contracts are governed by `private/ext/AGENTS.md`.
 

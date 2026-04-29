@@ -183,16 +183,16 @@ final class PageDataParser
     }
 
     /**
-     * Returns the total number of pages visible in the panel list, optionally filtered.
+     * Returns the total page count, optionally filtered.
      *
      * @param int|null $channelId Optional channel id filter.
      * @param int|null $categoryId Optional category id filter.
      * @param int|null $tagId Optional tag id filter.
      * @return int Total matching page count.
      */
-    public function countForPanel(?int $channelId = null, ?int $categoryId = null, ?int $tagId = null): int
+    public function count(?int $channelId = null, ?int $categoryId = null, ?int $tagId = null): int
     {
-        return $this->pageRepo()->countForPanel(
+        return $this->pageRepo()->count(
             $this->normalizePositiveId($channelId),
             $this->normalizePositiveId($categoryId),
             $this->normalizePositiveId($tagId)
@@ -200,7 +200,7 @@ final class PageDataParser
     }
 
     /**
-     * Returns one paginated page of panel page rows plus total count.
+     * Returns one paginated page of page rows plus total count.
      *
      * @param int $limit Maximum number of rows to return.
      * @param int $offset Zero-based row offset for pagination.
@@ -209,14 +209,14 @@ final class PageDataParser
      * @param int|null $tagId Optional tag id filter.
      * @return array{rows: array<int, array<string, mixed>>, total: int} Paginated rows and total count.
      */
-    public function listPageForPanel(
+    public function listPage(
         int $limit = 50,
         int $offset = 0,
         ?int $channelId = null,
         ?int $categoryId = null,
         ?int $tagId = null
     ): array {
-        return $this->pageRepo()->listPageForPanel(
+        return $this->pageRepo()->listPage(
             max(1, $limit),
             max(0, $offset),
             $this->normalizePositiveId($channelId),

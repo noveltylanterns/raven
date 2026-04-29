@@ -20,6 +20,7 @@ At minimum, each extension needs:
 - optional `routes_panel.php` (panel route registrar)
 - optional `routes_public.php` (public route registrar)
 - optional `shortcodes.php` (page editor shortcode provider)
+- optional `lib/` (autoloaded extension PHP classes under the `Raven\Ext\...` namespace)
 - optional `tpl/` (extension-owned panel templates; panel-routable types only)
 - optional extension-local state files when needed by your extension
 
@@ -33,6 +34,10 @@ Core panel bootstrap (`panel/index.php`) does this:
 4. Loads optional extension providers (`ext.php`, `schema.php`, route registrars) for enabled, valid extensions.
    `schema.php` runs when the extension requests storage in `ext.php`.
 5. Injects a context object (`app`, `panelUrl`, `requirePanelLogin`, etc.) for route registration.
+
+Provider files are loaded only from the extension root. Raven no longer falls back to legacy `lib/*.php` provider locations.
+
+Enabled extension classes autoload only from `private/ext/{slug}/lib/`. Raven no longer scans a legacy `src/` class root.
 
 ## 3) Enablement And Permission Model
 
@@ -112,14 +117,16 @@ Also:
 
 1. Create `private/ext/{slug}/`.
 2. Add `ext.json` first.
-3. Add `ext.php` and `schema.php` for service/storage behavior.
-4. Add `routes_panel.php` + `tpl/` only when panel pages are needed.
-5. Add `routes_public.php` only for `module` extensions that need public endpoints.
+3. Add `ext.php` and root-level `schema.php` for service/storage behavior.
+4. Add root-level `routes_panel.php` + `tpl/` only when panel pages are needed.
+5. Add root-level `routes_public.php` only for `module` extensions that need public endpoints.
 6. Add `shortcodes.php` only when editor shortcode insertion is needed.
    It may accept a context array so shortcode options can react to config without manually bootstrapping `ext.php`.
 7. Add extension-local state files only when necessary.
 8. Enable extension in Extension Manager.
 9. Verify permission masks, nav placement, CSRF-protected actions, and failure behavior.
+
+Autoloaded extension classes belong under `private/ext/{slug}/lib/` only.
 
 Alternative bootstrap path:
 

@@ -2,8 +2,8 @@
 
 /**
  * RAVEN CMS
- * ~/private/sys/Controller/Panel/UserController.php
- * Split panel user controller for user-management routes.
+ * ~/private/sys/Controller/Panel/UserEditController.php
+ * Panel user edit controller for user and invite CRUD routes.
  * Docs: https://raven.lanterns.io
  */
 
@@ -13,9 +13,7 @@ namespace Raven\Core\Controller\Panel;
 
 use Closure;
 use Raven\Core\Config;
-use Raven\Core\Repository\InviteRead;
 use Raven\Core\Repository\InviteWrite;
-use Raven\Lib\Parser\GroupDataParser;
 use Raven\Core\Repository\UserRead;
 use Raven\Core\Repository\UserWrite;
 use Raven\Lib\Auth\LoginIdentifierResolver;
@@ -26,24 +24,25 @@ use Raven\Lib\Auth\SessionFlash;
 use Raven\Lib\Media\Panel\AvatarValidationPolicy;
 use Raven\Lib\Media\Panel\AvatarValidator;
 use Raven\Lib\Media\Panel\UserMediaPathService;
+use Raven\Lib\Parser\GroupDataParser;
+use Raven\Lib\Parser\GroupRouteParser;
+use Raven\Lib\Parser\UserDataParser;
+use Raven\Lib\Scribe\UserMediaScribe;
+use Raven\Lib\Security\InputSanitizer;
+use Raven\Lib\Transport\Redirect;
 use Raven\Lib\View\Panel\Editor;
 use Raven\Lib\View\Panel\EditorBlocks;
 use Raven\Lib\View\Panel\EditorTabs;
 use Raven\Lib\View\Panel\PanelMediaConfigService;
-use Raven\Lib\Parser\GroupRouteParser;
-use Raven\Lib\Parser\UserDataParser;
-use Raven\Lib\Security\InputSanitizer;
-use Raven\Lib\Scribe\UserMediaScribe;
-
-use Raven\Lib\Transport\Redirect;
 
 /**
- * Handles split user-management routes.
+ * Handles user and invite CRUD routes for the panel.
  *
- * The whole panel user seam lives here: list/edit/save/delete plus invite
- * management. Session/auth state still stays in SharedController/bootstrap.
+ * Owns user create/edit, save, delete, and invite token create, generate, delete.
+ * User list and invite list routes live in UserListController to keep read-only
+ * and write concerns separate.
  */
-final class UserController
+final class UserEditController
 {
     private SharedController $context;
     private Config $config;
@@ -52,9 +51,7 @@ final class UserController
     private GroupDataParser $groupDataParser;
     private UserRead $userRead;
     private UserWrite $userWrite;
-    private Closure $inviteReadResolver;
     private Closure $inviteWriteResolver;
-    private ?InviteRead $inviteRead = null;
     private ?InviteWrite $inviteWrite = null;
     private SessionFlash $flashList;
     private GroupRouteParser $groupParser;
@@ -76,9 +73,8 @@ final class UserController
      * @param InputSanitizer $input Shared request input sanitizer.
      * @param string $root Project root path for user-media storage helpers.
      * @param GroupDataParser $groupDataParser Group data parser for group option reads and slug lookups.
-     * @param UserRead $userRead User repository read side for panel user list/find and author lookups.
+     * @param UserRead $userRead User repository read side for user find and author lookups.
      * @param UserWrite $userWrite User repository write side for panel user saves and deletes.
-     * @param callable(): InviteRead $inviteReadResolver Lazy invite read resolver for token listings.
      * @param callable(): InviteWrite $inviteWriteResolver Lazy invite write resolver for token creation/deletion.
      * @param SessionFlash $flashList List-style flash store for generated token batches.
      * @param GroupRouteParser $groupParser Shared group/profile routing-policy parser.
@@ -102,7 +98,6 @@ final class UserController
         GroupDataParser $groupDataParser,
         UserRead $userRead,
         UserWrite $userWrite,
-        callable $inviteReadResolver,
         callable $inviteWriteResolver,
         SessionFlash $flashList,
         GroupRouteParser $groupParser,
@@ -124,7 +119,6 @@ final class UserController
         $this->groupDataParser = $groupDataParser;
         $this->userRead = $userRead;
         $this->userWrite = $userWrite;
-        $this->inviteReadResolver = Closure::fromCallable($inviteReadResolver);
         $this->inviteWriteResolver = Closure::fromCallable($inviteWriteResolver);
         $this->flashList = $flashList;
         $this->groupParser = $groupParser;
@@ -138,56 +132,6 @@ final class UserController
         $this->panelTwoFactorPreferencesService = $panelTwoFactorPreferencesService;
         $this->userMediaScribe = $userMediaScribe;
         $this->userMediaPathService = $userMediaPathService;
-    }
-
-    /**
-     * Lists users for the User management section.
-     *
-     * @return void
-     */
-    public function userList(): void
-    {
-        $this->context->requirePanelLogin();
-        if (!$this->context->requireRoutePermissionOrForbidden('user', 'view')) {
-            return;
-        }
-
-        $prefilterGroup = strtolower(trim((string) ($this->input->text($_GET['group'] ?? null, 120) ?? '')));
-        $requestedPage = $this->input->int($_GET['page'] ?? null, 1) ?? 1;
-        $perPage = 50;
-        $pageResult = $this->userParser()->listPageForPanel(
-            $perPage,
-            ($requestedPage - 1) * $perPage,
-            $prefilterGroup !== '' ? $prefilterGroup : null
-        );
-        $totalItems = (int) ($pageResult['total'] ?? 0);
-        $userRows = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
-        $pagination = $this->context->panelPaginationState($totalItems, $requestedPage, $perPage);
-        if ($totalItems > 0 && $pagination['current'] !== $requestedPage) {
-            $pageResult = $this->userParser()->listPageForPanel(
-                $perPage,
-                $pagination['offset'],
-                $prefilterGroup !== '' ? $prefilterGroup : null
-            );
-            $userRows = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
-        }
-
-        $groupOptions = is_array($pageResult['group_options'] ?? null)
-            ? $pageResult['group_options']
-            : $this->groupDataParser->listOptions();
-
-        $this->context->renderPanel('panel/user/list', [
-            'users' => $userRows,
-            'prefilterGroup' => $prefilterGroup,
-            'groupOptions' => $groupOptions,
-            'loginIdentifierMode' => $this->panelLoginIdentifierMode(),
-            'registrationMode' => $this->registrationMode(),
-            'pagination' => $this->context->panelPaginationViewData('/user', $pagination, ['group' => $prefilterGroup]),
-            'csrfField' => $this->context->csrfField(),
-            'flashSuccess' => $this->context->pullFlash('success'),
-            'flashError' => $this->context->pullFlash('error'),
-            'section' => 'user',
-        ]);
     }
 
     /**
@@ -789,34 +733,6 @@ final class UserController
     }
 
     /**
-     * Lists registration invite tokens for user onboarding.
-     *
-     * @return void
-     */
-    public function userInvites(): void
-    {
-        $this->context->requirePanelLogin();
-        if (!$this->context->requireRoutePermissionOrForbidden('user', 'view')) {
-            return;
-        }
-        if (!$this->ensureInviteRegistrationMode()) {
-            return;
-        }
-
-        $this->context->renderPanel('panel/user/invites', [
-            'inviteRows' => $this->inviteRead()->listForPanel(),
-            'inviteCreatorMap' => $this->inviteCreatorMap(),
-            'inviteGeneratedTokens' => $this->pullFlashList('generated_invites'),
-            'inviteRegistrationMode' => $this->registrationMode(),
-            'inviteNowTs' => time(),
-            'csrfField' => $this->context->csrfField(),
-            'flashSuccess' => $this->context->pullFlash('success'),
-            'flashError' => $this->context->pullFlash('error'),
-            'section' => 'user',
-        ]);
-    }
-
-    /**
      * Creates one invite token from panel form input.
      *
      * @param array<string, mixed> $post Submitted form payload.
@@ -861,7 +777,7 @@ final class UserController
         }
 
         $this->context->flash('success', $isReusable ? 'Reusable invite token created.' : 'Single-use invite token created.');
-        $this->flashList('generated_invites', [$token]);
+        $this->storeFlashList('generated_invites', [$token]);
         Redirect::redirect($this->context->panelUrl('/user/invites'));
     }
 
@@ -903,7 +819,7 @@ final class UserController
         }
 
         $this->context->flash('success', 'Generated ' . count($tokens) . ' single-use invite token' . (count($tokens) === 1 ? '' : 's') . '.');
-        $this->flashList('generated_invites', $tokens);
+        $this->storeFlashList('generated_invites', $tokens);
         Redirect::redirect($this->context->panelUrl('/user/invites'));
     }
 
@@ -944,34 +860,38 @@ final class UserController
     }
 
     /**
-     * Builds one user-id keyed label/edit-url map for invite-token creator rendering.
+     * Returns the user parser on first use so read-only panel user flows route
+     * through the canonical parser surface instead of the repository.
      *
-     * @return array<int, array{label: string, edit_url: string}>
+     * @return UserDataParser User data parser.
      */
-    private function inviteCreatorMap(): array
+    private function userParser(): UserDataParser
     {
-        $rows = $this->userParser()->listAll();
-        $map = [];
-        foreach ($rows as $row) {
-            $userId = (int) ($row['id'] ?? 0);
-            if ($userId < 1) {
-                continue;
-            }
-
-            $displayName = trim((string) ($row['name'] ?? ''));
-            $username = trim((string) ($row['username'] ?? ''));
-            $email = trim((string) ($row['email'] ?? ''));
-            $label = $displayName !== ''
-                ? $displayName
-                : ($username !== '' ? $username : ($email !== '' ? $email : ('User #' . $userId)));
-
-            $map[$userId] = [
-                'label' => $label,
-                'edit_url' => $this->context->panelUrl('/user/edit/' . $userId),
-            ];
+        if (!$this->userParser instanceof UserDataParser) {
+            $this->userParser = new UserDataParser($this->input, $this->userRead);
         }
 
-        return $map;
+        return $this->userParser;
+    }
+
+    /**
+     * Resolves the invite write side only when invite create/delete routes are hit.
+     *
+     * @return InviteWrite Invite-token write side for token creation and deletion.
+     */
+    private function inviteWrite(): InviteWrite
+    {
+        if ($this->inviteWrite instanceof InviteWrite) {
+            return $this->inviteWrite;
+        }
+
+        $repo = ($this->inviteWriteResolver)();
+        if (!$repo instanceof InviteWrite) {
+            throw new \RuntimeException('Panel invite write resolver returned an invalid value.');
+        }
+
+        $this->inviteWrite = $repo;
+        return $this->inviteWrite;
     }
 
     /**
@@ -981,7 +901,7 @@ final class UserController
      * @param array<int, string> $values Flash-list values to store.
      * @return void
      */
-    private function flashList(string $key, array $values): void
+    private function storeFlashList(string $key, array $values): void
     {
         $normalized = [];
         foreach ($values as $value) {
@@ -998,47 +918,6 @@ final class UserController
         }
 
         $this->flashList->putList($key, $normalized);
-    }
-
-    /**
-     * Pulls and removes one flash-list payload from session.
-     *
-     * @param string $key Flash-list storage key.
-     * @return array<int, string>|null Sanitized stored values, or null when none exist.
-     */
-    private function pullFlashList(string $key): ?array
-    {
-        $value = $this->flashList->pullList($key);
-        if (!is_array($value)) {
-            return null;
-        }
-
-        $normalized = [];
-        foreach ($value as $item) {
-            $stringItem = is_string($item) ? trim($item) : '';
-            if ($stringItem === '') {
-                continue;
-            }
-
-            $normalized[] = $this->input->text($stringItem, 400);
-        }
-
-        return $normalized === [] ? null : $normalized;
-    }
-
-    /**
-     * Returns the user parser on first use so read-only panel user flows route
-     * through the canonical parser surface instead of the repository.
-     *
-     * @return UserDataParser User data parser.
-     */
-    private function userParser(): UserDataParser
-    {
-        if (!$this->userParser instanceof UserDataParser) {
-            $this->userParser = new UserDataParser($this->input, $this->userRead);
-        }
-
-        return $this->userParser;
     }
 
     /**
@@ -1266,45 +1145,5 @@ final class UserController
         }
 
         return array_values($selected);
-    }
-
-    /**
-     * Resolves the invite read side only when invite list routes are hit.
-     *
-     * @return InviteRead Invite-token read side for token listings.
-     */
-    private function inviteRead(): InviteRead
-    {
-        if ($this->inviteRead instanceof InviteRead) {
-            return $this->inviteRead;
-        }
-
-        $repo = ($this->inviteReadResolver)();
-        if (!$repo instanceof InviteRead) {
-            throw new \RuntimeException('Panel invite read resolver returned an invalid value.');
-        }
-
-        $this->inviteRead = $repo;
-        return $this->inviteRead;
-    }
-
-    /**
-     * Resolves the invite write side only when invite create/delete routes are hit.
-     *
-     * @return InviteWrite Invite-token write side for token creation and deletion.
-     */
-    private function inviteWrite(): InviteWrite
-    {
-        if ($this->inviteWrite instanceof InviteWrite) {
-            return $this->inviteWrite;
-        }
-
-        $repo = ($this->inviteWriteResolver)();
-        if (!$repo instanceof InviteWrite) {
-            throw new \RuntimeException('Panel invite write resolver returned an invalid value.');
-        }
-
-        $this->inviteWrite = $repo;
-        return $this->inviteWrite;
     }
 }

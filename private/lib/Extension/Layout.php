@@ -3,7 +3,7 @@
 /**
  * RAVEN CMS
  * ~/private/lib/Extension/Layout.php
- * Canonical extension filesystem layout resolver with legacy fallbacks.
+ * Canonical extension filesystem layout resolver.
  * Docs: https://raven.lanterns.io
  */
 
@@ -12,7 +12,7 @@ declare(strict_types=1);
 namespace Raven\Lib\Extension;
 
 /**
- * Resolves canonical extension file locations while tolerating legacy layouts.
+ * Resolves canonical extension file locations.
  */
 final class Layout
 {
@@ -29,23 +29,11 @@ final class Layout
     }
 
     /**
-     * Returns the legacy provider path for one extension-local provider file.
-     *
-     * @param string $extensionRoot Absolute extension directory path.
-     * @param string $filename Provider basename such as `routes_panel.php`.
-     * @return string Absolute legacy path under `lib/`.
-     */
-    public static function legacyProviderPath(string $extensionRoot, string $filename): string
-    {
-        return rtrim($extensionRoot, '/\\') . '/lib/' . ltrim($filename, '/\\');
-    }
-
-    /**
-     * Returns the best available provider path, preferring the canonical layout.
+     * Returns the canonical provider path when it exists.
      *
      * @param string $extensionRoot Absolute extension directory path.
      * @param string $filename Provider basename such as `schema.php`.
-     * @return string|null Existing provider path, or null when neither layout exists.
+     * @return string|null Existing provider path, or null when the provider is absent.
      */
     public static function providerPath(string $extensionRoot, string $filename): ?string
     {
@@ -54,16 +42,11 @@ final class Layout
             return $canonicalPath;
         }
 
-        $legacyPath = self::legacyProviderPath($extensionRoot, $filename);
-        if (is_file($legacyPath)) {
-            return $legacyPath;
-        }
-
         return null;
     }
 
     /**
-     * Returns whether one provider exists in either the canonical or legacy layout.
+     * Returns whether one provider exists in the canonical layout.
      *
      * @param string $extensionRoot Absolute extension directory path.
      * @param string $filename Provider basename such as `shortcodes.php`.
@@ -75,16 +58,15 @@ final class Layout
     }
 
     /**
-     * Returns extension class roots ordered by canonical preference.
+     * Returns the canonical extension class root.
      *
      * @param string $extensionRoot Absolute extension directory path.
-     * @return array<int, string> Ordered class roots (`lib/` first, `src/` fallback second).
+     * @return array<int, string> Ordered class roots for `Raven\Ext\*` autoloading.
      */
     public static function classRoots(string $extensionRoot): array
     {
         return [
             rtrim($extensionRoot, '/\\') . '/lib',
-            rtrim($extensionRoot, '/\\') . '/src',
         ];
     }
 }

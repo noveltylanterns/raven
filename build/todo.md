@@ -12,6 +12,13 @@ This is the default Build Mode backlog file. If the user asks about goals, unpat
 - `build/long.md` houses long-term project & roadmap goals, for optional secondary context. Do not load it on short-term build tasks.
 
 
+## Library Refactor Cleanup
+
+
+
+
+
+
 
 # Legacy Fallback Log
 
@@ -21,10 +28,6 @@ Items below are the remaining classified legacy/compatibility lanes after the cu
 
 ---
 
-- `DEFER FOR EXTENSION LAYOUT MIGRATION`
-	- `private/lib/Extension/Layout.php`
-	- Provider/path resolution still falls back from canonical root-level extension files (`routes_panel.php`, `schema.php`, `cron.php`, etc.) to the legacy `lib/*.php` layout so third-party packages keep loading during the migration window.
-- `DEFER FOR EXTENSION LAYOUT MIGRATION`
-	- `private/Raven.php`
-	- `Raven\Ext\*` autoloading now prefers `private/ext/{slug}/lib/` but still falls back to legacy `src/` roots until external extensions have been rebuilt around the new class layout.
+- None currently logged.
+
 ---

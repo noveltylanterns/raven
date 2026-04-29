@@ -2,8 +2,8 @@
 
 /**
  * RAVEN CMS
- * ~/private/sys/Controller/Panel/TagController.php
- * Panel controller for tag and tag-set management routes.
+ * ~/private/sys/Controller/Panel/TagEditController.php
+ * Panel tag edit controller for tag and tag-set CRUD routes.
  * Docs: https://raven.lanterns.io
  */
 
@@ -12,10 +12,10 @@ declare(strict_types=1);
 namespace Raven\Core\Controller\Panel;
 
 use Closure;
-use Raven\Core\Repository\TagRead;
-use Raven\Core\Repository\TagWrite;
 use Raven\Core\Repository\SetRead;
 use Raven\Core\Repository\SetWrite;
+use Raven\Core\Repository\TagRead;
+use Raven\Core\Repository\TagWrite;
 use Raven\Lib\Media\Panel\TaxonomyImageService;
 use Raven\Lib\Parser\ChannelDataParser;
 use Raven\Lib\Parser\SetParser;
@@ -28,30 +28,25 @@ use Raven\Lib\Transport\Upload;
 use Raven\Lib\View\Panel\EditorTabs;
 
 /**
- * Handles panel tag and tag-set management routes.
+ * Handles tag and tag-set CRUD routes for the panel.
  *
- * Owns the `/tag*` route family exclusively. Category, channel, and redirect
- * management each live in their own split controllers so tag dependencies are
- * only constructed on `/tag*` requests.
+ * Owns tag create/edit, save, delete, and tag-set create/edit, save, delete.
+ * Tag and tag-set list routes live in TagListController to keep read-only
+ * and write concerns separate.
  */
-final class TagController
+final class TagEditController
 {
     private SharedController $context;
     private InputSanitizer $input;
-    /** @var ?TagRead */
-    private ?TagRead $tagRead = null;
-    /** @var ?TagWrite */
-    private ?TagWrite $tagWrite = null;
-    /** @var ?TagDataParser */
-    private ?TagDataParser $tagParser = null;
     private Closure $tagReadResolver;
+    private ?TagRead $tagRead = null;
     private Closure $tagWriteResolver;
-    /** @var ?SetRead */
-    private ?SetRead $tagSetRepo = null;
+    private ?TagWrite $tagWrite = null;
+    private ?TagDataParser $tagParser = null;
     private Closure $tagSetRepoResolver;
-    /** @var ?SetWrite */
-    private ?SetWrite $tagSetWrite = null;
+    private ?SetRead $tagSetRepo = null;
     private Closure $tagSetWriteResolver;
+    private ?SetWrite $tagSetWrite = null;
     private bool $tagEnabled;
     private TaxonomyImageService $taxonomyImageService;
     private TaxonomyImageScribe $taxonomyImageScribe;
@@ -62,14 +57,14 @@ final class TagController
     /**
      * @param SharedController $context Shared panel request context.
      * @param InputSanitizer $input Shared request input sanitizer.
-     * @param callable $tagReadResolver Lazy tag read resolver; only resolved on tag routes.
-     * @param callable $tagWriteResolver Lazy tag write resolver; only resolved on tag save/delete routes.
-     * @param callable $tagSetRepoResolver Lazy tag-set read resolver; resolved for tag set listing and validation.
-     * @param callable $tagSetWriteResolver Lazy tag-set write resolver; resolved for tag set save and delete routes.
+     * @param callable $tagReadResolver Lazy tag read resolver; resolved on tag edit and save routes.
+     * @param callable $tagWriteResolver Lazy tag write resolver; resolved on tag save and delete routes.
+     * @param callable $tagSetRepoResolver Lazy tag-set read resolver; resolved for set validation on tag save.
+     * @param callable $tagSetWriteResolver Lazy tag-set write resolver; resolved on tag-set save and delete routes.
      * @param bool $tagEnabled Whether tag features are enabled in runtime config.
      * @param TaxonomyImageService $taxonomyImageService Read-side taxonomy image config and path helper.
      * @param TaxonomyImageScribe $taxonomyImageScribe Write-side taxonomy image upload and cleanup helper.
-     * @param ChannelDataParser $channelParser Channel data parser for taxonomy-set assignment counts.
+     * @param ChannelDataParser $channelParser Channel data parser for tag-set channel-assignment counts on delete.
      * @param EditorTabs $editorTabs Panel editor tab normalization and tab-preserving URL builder.
      * @param Upload $uploadFileSetNormalizer Normalizer for $_FILES upload groups.
      * @return void
@@ -100,74 +95,6 @@ final class TagController
         $this->channelParser = $channelParser;
         $this->editorTabs = $editorTabs;
         $this->uploadFileSetNormalizer = $uploadFileSetNormalizer;
-    }
-
-    // -------------------------------------------------------------------------
-    // Tag routes
-    // -------------------------------------------------------------------------
-
-    /**
-     * Lists tags for Tag management section.
-     *
-     * @return void
-     */
-    public function tagList(): void
-    {
-        $this->context->requirePanelLogin();
-        if (!$this->tagEnabled) {
-            $this->context->renderPanelNotFound();
-            return;
-        }
-        if (!$this->context->requireRoutePermissionOrForbidden('tag', 'view')) {
-            return;
-        }
-
-        $tagCountsBySetId = $this->tagParser()->countsBySetId();
-        $selectedSetId = $this->input->int($_GET['set'] ?? null, 0);
-        if (
-            $selectedSetId !== null
-            && (
-                !$this->tagSetRepo()->existsId($selectedSetId)
-                || (int) ($tagCountsBySetId[$selectedSetId] ?? 0) < 1
-            )
-        ) {
-            $selectedSetId = null;
-        }
-
-        $requestedPage = $this->input->int($_GET['page'] ?? null, 1) ?? 1;
-        $perPage = 50;
-        $pageResult = $this->tagParser()->listPageForPanel($perPage, ($requestedPage - 1) * $perPage, $selectedSetId);
-        $totalItems = (int) ($pageResult['total'] ?? 0);
-        $tagRows = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
-        $pagination = $this->context->panelPaginationState($totalItems, $requestedPage, $perPage);
-        if ($totalItems > 0 && $pagination['current'] !== $requestedPage) {
-            $pageResult = $this->tagParser()->listPageForPanel($perPage, $pagination['offset'], $selectedSetId);
-            $tagRows = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
-        }
-
-        // Only show set filter tabs for sets that actually have tags.
-        $setOptions = [];
-        foreach ($this->tagSetRepo()->listOptions() as $setOption) {
-            $setId = (int) ($setOption['id'] ?? 0);
-            if ((int) ($tagCountsBySetId[$setId] ?? 0) < 1) {
-                continue;
-            }
-
-            $setOptions[] = $setOption;
-        }
-
-        $this->context->renderPanel('panel/tag/list', [
-            'tagRows' => $tagRows,
-            'setOptions' => $setOptions,
-            'selectedSetId' => $selectedSetId,
-            'pagination' => $this->context->panelPaginationViewData('/tag', $pagination, [
-                'set' => $selectedSetId !== null ? (string) $selectedSetId : '',
-            ]),
-            'csrfField' => $this->context->csrfField(),
-            'flashSuccess' => $this->context->pullFlash('success'),
-            'flashError' => $this->context->pullFlash('error'),
-            'section' => 'tag',
-        ]);
     }
 
     /**
@@ -466,46 +393,6 @@ final class TagController
         Redirect::redirect($this->context->panelUrl('/tag'));
     }
 
-    // -------------------------------------------------------------------------
-    // Tag-set routes
-    // -------------------------------------------------------------------------
-
-    /**
-     * Lists tag-set records for channel-assignment management.
-     *
-     * @return void
-     */
-    public function tagSetList(): void
-    {
-        $this->context->requirePanelLogin();
-        if (!$this->tagEnabled) {
-            $this->context->renderPanelNotFound();
-            return;
-        }
-        if (!$this->context->requireRoutePermissionOrForbidden('tag', 'view')) {
-            return;
-        }
-
-        // Annotate each set row with its tag and channel usage counts.
-        $countsBySetId = $this->tagParser()->countsBySetId();
-        $channelCountsBySetId = $this->channelParser->explicitTaxonomySetCounts('tag');
-        $setRows = [];
-        foreach ($this->tagSetRepo()->listAll() as $setRow) {
-            $setId = (int) ($setRow['id'] ?? 0);
-            $setRow['tag_count'] = (int) ($countsBySetId[$setId] ?? 0);
-            $setRow['channel_count'] = (int) ($channelCountsBySetId[$setId] ?? 0);
-            $setRows[] = $setRow;
-        }
-
-        $this->context->renderPanel('panel/tag/set_list', [
-            'setRows' => $setRows,
-            'csrfField' => $this->context->csrfField(),
-            'flashSuccess' => $this->context->pullFlash('success'),
-            'flashError' => $this->context->pullFlash('error'),
-            'section' => 'tag',
-        ]);
-    }
-
     /**
      * Shows tag-set create/edit form.
      *
@@ -643,10 +530,6 @@ final class TagController
         $this->context->flash('success', $tagCount > 0 ? 'Tag set deleted. ' . $tagCount . ' ' . ($tagCount === 1 ? 'tag was' : 'tags were') . ' moved to the default set.' : 'Tag set deleted.');
         Redirect::redirect($this->context->panelUrl('/tag/set'));
     }
-
-    // -------------------------------------------------------------------------
-    // Private helpers
-    // -------------------------------------------------------------------------
 
     /**
      * Returns the tag read side on first use so non-tag routes do not

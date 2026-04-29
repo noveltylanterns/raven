@@ -13,9 +13,9 @@ namespace Raven\Core\Controller\Public;
 
 use Raven\Core\Repository\PageRead;
 use Raven\Core\Routing\Public\ChannelPageRouter;
+use Raven\Lib\Parser\CategoryRepoParser;
 use Raven\Lib\Parser\ChannelRouteParser;
 use Raven\Lib\Parser\PageDataParser;
-use Raven\Lib\Parser\TaxonomyRepoParser;
 use Raven\Lib\View\Public\TemplateDecorator;
 use Raven\Lib\View\Public\ThemeCatalog;
 use Raven\Lib\View\Public\ThemeTemplate;
@@ -27,7 +27,7 @@ final class CategoryController
 {
     private SharedController $context;
     private PageDataParser $pageParser;
-    private TaxonomyRepoParser $taxonomyLookupRepo;
+    private CategoryRepoParser $categoryLookupRepo;
     private TemplateDecorator $templateDecorator;
     private ChannelPageRouter $publicChannelPageRouteService;
     private ThemeCatalog $themeCatalogService;
@@ -36,19 +36,19 @@ final class CategoryController
     /**
      * @param SharedController $context Shared public request context.
      * @param PageRead $pageRepo Page repository read side for public category page lists.
-     * @param TaxonomyRepoParser $taxonomyLookupRepo Taxonomy lookup parser for category resolution.
+     * @param CategoryRepoParser $categoryLookupRepo Category lookup parser for category resolution.
      * @param ThemeCatalog $themeCatalogService Shared public-theme catalog for template resolution.
      * @return void
      */
     public function __construct(
         SharedController $context,
         PageRead $pageRepo,
-        TaxonomyRepoParser $taxonomyLookupRepo,
+        CategoryRepoParser $categoryLookupRepo,
         ThemeCatalog $themeCatalogService
     ) {
         $this->context = $context;
         $this->pageParser = new PageDataParser($context->input(), $pageRepo);
-        $this->taxonomyLookupRepo = $taxonomyLookupRepo;
+        $this->categoryLookupRepo = $categoryLookupRepo;
         $this->templateDecorator = new TemplateDecorator(
             $context->config(),
             $context->input(),
@@ -73,7 +73,7 @@ final class CategoryController
             return;
         }
 
-        $category = $this->taxonomyLookupRepo->findCategoryBySlug($categorySlug);
+        $category = $this->categoryLookupRepo->findBySlug($categorySlug);
         if ($category === null) {
             $this->context->notFound();
             return;

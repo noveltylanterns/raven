@@ -207,7 +207,7 @@ class ChannelRead
      *
      * @return int Total channel count.
      */
-    public function countForPanel(): int
+    public function count(): int
     {
         return count($this->listRecords());
     }
@@ -219,7 +219,7 @@ class ChannelRead
      * @param int $offset Zero-based row offset for pagination.
      * @return array<int, array<string, mixed>> Hydrated channel rows with page counts.
      */
-    public function listForPanel(int $limit = 50, int $offset = 0): array
+    public function listPaged(int $limit = 50, int $offset = 0): array
     {
         $rows = $this->listAll();
         $safeOffset = max(0, $offset);
@@ -235,7 +235,7 @@ class ChannelRead
      * @param int $offset Zero-based row offset for pagination.
      * @return array{rows: array<int, array<string, mixed>>, total: int} Paginated rows and total count.
      */
-    public function listPageForPanel(int $limit = 50, int $offset = 0): array
+    public function listPage(int $limit = 50, int $offset = 0): array
     {
         $rows = $this->listAll();
         $safeOffset = max(0, $offset);

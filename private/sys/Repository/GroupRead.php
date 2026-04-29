@@ -95,7 +95,7 @@ class GroupRead
      *
      * @return int Total group row count.
      */
-    public function countForPanel(): int
+    public function count(): int
     {
         $groups = $this->table('groups');
         $stmt = $this->db->prepare('SELECT COUNT(*) FROM ' . $groups);
@@ -105,13 +105,13 @@ class GroupRead
     }
 
     /**
-     * Returns paginated groups with member counts for panel listing.
+     * Returns paginated groups with member counts.
      *
      * @param int $limit  Maximum number of rows to return.
      * @param int $offset Zero-based row offset for pagination.
      * @return array<int, array<string, mixed>>
      */
-    public function listForPanel(int $limit = 50, int $offset = 0): array
+    public function listPaged(int $limit = 50, int $offset = 0): array
     {
         $groups = $this->table('groups');
         $userGroups = $this->table('user_groups');
@@ -159,7 +159,7 @@ class GroupRead
      * @param int $offset Zero-based row offset for pagination.
      * @return array{rows: array<int, array<string, mixed>>, total: int} Paginated rows and total count.
      */
-    public function listPageForPanel(int $limit = 50, int $offset = 0): array
+    public function listPage(int $limit = 50, int $offset = 0): array
     {
         $groups = $this->table('groups');
         $userGroups = $this->table('user_groups');
@@ -226,7 +226,7 @@ class GroupRead
 
         // Offset can target an empty page while rows still exist; recover accurate total.
         if ($resultRows === [] && $safeOffset > 0) {
-            $total = $this->countForPanel();
+            $total = $this->count();
         }
 
         return [

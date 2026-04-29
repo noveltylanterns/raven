@@ -13,12 +13,13 @@ namespace Raven\Core\Controller\Public;
 
 use Raven\Core\Repository\PageRead;
 use Raven\Core\Routing\Public\ChannelPageRouter;
+use Raven\Lib\Parser\CategoryRepoParser;
 use Raven\Lib\Parser\CategoryRouteParser;
 use Raven\Lib\Parser\ChannelDataParser;
 use Raven\Lib\Parser\ChannelRouteParser;
 use Raven\Lib\Parser\PageDataParser;
+use Raven\Lib\Parser\TagRepoParser;
 use Raven\Lib\Parser\TagRouteParser;
-use Raven\Lib\Parser\TaxonomyRepoParser;
 
 /**
  * Handles split public feed routes.
@@ -28,26 +29,30 @@ final class FeedController
     private SharedController $context;
     private ChannelDataParser $channelParser;
     private PageDataParser $pageParser;
-    private TaxonomyRepoParser $taxonomyLookupRepo;
+    private CategoryRepoParser $categoryLookupRepo;
+    private TagRepoParser $tagLookupRepo;
     private ChannelPageRouter $publicChannelPageRouteService;
 
     /**
      * @param SharedController $context Shared public request context.
      * @param ChannelDataParser $channelParser Channel data parser for feed/channel label lookups.
      * @param PageRead $pageRepo Page repository read side for feed and taxonomy listing rows.
-     * @param TaxonomyRepoParser $taxonomyLookupRepo Taxonomy lookup parser for category/tag resolution.
+     * @param CategoryRepoParser $categoryLookupRepo Category lookup parser for category feed resolution.
+     * @param TagRepoParser $tagLookupRepo Tag lookup parser for tag feed resolution.
      * @return void
      */
     public function __construct(
         SharedController $context,
         ChannelDataParser $channelParser,
         PageRead $pageRepo,
-        TaxonomyRepoParser $taxonomyLookupRepo
+        CategoryRepoParser $categoryLookupRepo,
+        TagRepoParser $tagLookupRepo
     ) {
         $this->context = $context;
         $this->channelParser = $channelParser;
         $this->pageParser = new PageDataParser($context->input(), $pageRepo);
-        $this->taxonomyLookupRepo = $taxonomyLookupRepo;
+        $this->categoryLookupRepo = $categoryLookupRepo;
+        $this->tagLookupRepo = $tagLookupRepo;
         $this->publicChannelPageRouteService = new ChannelPageRouter($context->input());
     }
 
@@ -254,7 +259,7 @@ final class FeedController
                 return;
             }
 
-            $category = $this->taxonomyLookupRepo->findCategoryBySlug($normalizedSlug);
+            $category = $this->categoryLookupRepo->findBySlug($normalizedSlug);
             if (!is_array($category)) {
                 $this->context->notFound();
                 return;
@@ -271,7 +276,7 @@ final class FeedController
                 return;
             }
 
-            $tag = $this->taxonomyLookupRepo->findTagBySlug($normalizedSlug);
+            $tag = $this->tagLookupRepo->findBySlug($normalizedSlug);
             if (!is_array($tag)) {
                 $this->context->notFound();
                 return;

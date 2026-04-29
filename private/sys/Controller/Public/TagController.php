@@ -15,7 +15,7 @@ use Raven\Core\Repository\PageRead;
 use Raven\Core\Routing\Public\ChannelPageRouter;
 use Raven\Lib\Parser\ChannelRouteParser;
 use Raven\Lib\Parser\PageDataParser;
-use Raven\Lib\Parser\TaxonomyRepoParser;
+use Raven\Lib\Parser\TagRepoParser;
 use Raven\Lib\View\Public\TemplateDecorator;
 use Raven\Lib\View\Public\ThemeCatalog;
 use Raven\Lib\View\Public\ThemeTemplate;
@@ -27,7 +27,7 @@ final class TagController
 {
     private SharedController $context;
     private PageDataParser $pageParser;
-    private TaxonomyRepoParser $taxonomyLookupRepo;
+    private TagRepoParser $tagLookupRepo;
     private TemplateDecorator $templateDecorator;
     private ChannelPageRouter $publicChannelPageRouteService;
     private ThemeCatalog $themeCatalogService;
@@ -36,19 +36,19 @@ final class TagController
     /**
      * @param SharedController $context Shared public request context.
      * @param PageRead $pageRepo Page repository read side for public tag page lists.
-     * @param TaxonomyRepoParser $taxonomyLookupRepo Taxonomy lookup parser for tag resolution.
+     * @param TagRepoParser $tagLookupRepo Tag lookup parser for tag resolution.
      * @param ThemeCatalog $themeCatalogService Shared public-theme catalog for template resolution.
      * @return void
      */
     public function __construct(
         SharedController $context,
         PageRead $pageRepo,
-        TaxonomyRepoParser $taxonomyLookupRepo,
+        TagRepoParser $tagLookupRepo,
         ThemeCatalog $themeCatalogService
     ) {
         $this->context = $context;
         $this->pageParser = new PageDataParser($context->input(), $pageRepo);
-        $this->taxonomyLookupRepo = $taxonomyLookupRepo;
+        $this->tagLookupRepo = $tagLookupRepo;
         $this->templateDecorator = new TemplateDecorator(
             $context->config(),
             $context->input(),
@@ -73,7 +73,7 @@ final class TagController
             return;
         }
 
-        $tag = $this->taxonomyLookupRepo->findTagBySlug($tagSlug);
+        $tag = $this->tagLookupRepo->findBySlug($tagSlug);
         if ($tag === null) {
             $this->context->notFound();
             return;

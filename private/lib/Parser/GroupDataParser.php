@@ -49,15 +49,15 @@ final class GroupDataParser
     }
 
     /**
-     * Returns one panel group page plus total row count.
+     * Returns one paginated group page plus total row count.
      *
      * @param int $limit  Maximum number of rows to return.
      * @param int $offset Zero-based row offset for pagination.
      * @return array{rows: array<int, array<string, mixed>>, total: int} Paginated group rows and total count.
      */
-    public function listPageForPanel(int $limit = 50, int $offset = 0): array
+    public function listPage(int $limit = 50, int $offset = 0): array
     {
-        return $this->groupRepo()->listPageForPanel(max(1, $limit), max(0, $offset));
+        return $this->groupRepo()->listPage(max(1, $limit), max(0, $offset));
     }
 
     /**

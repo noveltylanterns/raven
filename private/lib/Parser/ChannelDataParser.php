@@ -54,15 +54,15 @@ final class ChannelDataParser
     }
 
     /**
-     * Returns one panel channel page plus total row count.
+     * Returns one paginated channel page plus total row count.
      *
      * @param int $limit  Maximum number of rows to return.
      * @param int $offset Zero-based row offset for pagination.
      * @return array{rows: array<int, array<string, mixed>>, total: int} Paginated channel rows and total count.
      */
-    public function listPageForPanel(int $limit = 50, int $offset = 0): array
+    public function listPage(int $limit = 50, int $offset = 0): array
     {
-        return $this->channelRepo()->listPageForPanel(max(1, $limit), max(0, $offset));
+        return $this->channelRepo()->listPage(max(1, $limit), max(0, $offset));
     }
 
     /**

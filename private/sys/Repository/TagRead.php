@@ -73,7 +73,7 @@ class TagRead
      * @param int|null $setId Optional taxonomy set id filter; null returns unfiltered count.
      * @return int Total matching tag count.
      */
-    public function countForPanel(?int $setId = null): int
+    public function count(?int $setId = null): int
     {
         $tags = $this->table('tags');
         $sql = 'SELECT COUNT(*) FROM ' . $tags;
@@ -96,7 +96,7 @@ class TagRead
      * @param int|null $setId  Optional taxonomy set id filter; null returns all sets.
      * @return array<int, array<string, mixed>> Hydrated tag rows with page counts.
      */
-    public function listForPanel(int $limit = 50, int $offset = 0, ?int $setId = null): array
+    public function listPaged(int $limit = 50, int $offset = 0, ?int $setId = null): array
     {
         $tags = $this->table('tags');
         $pageTags = $this->table('page_tags');
@@ -137,7 +137,7 @@ class TagRead
      * @param int|null $setId  Optional taxonomy set id filter; null returns all sets.
      * @return array{rows: array<int, array<string, mixed>>, total: int} Paginated rows and total count.
      */
-    public function listPageForPanel(int $limit = 50, int $offset = 0, ?int $setId = null): array
+    public function listPage(int $limit = 50, int $offset = 0, ?int $setId = null): array
     {
         $tags = $this->table('tags');
         $pageTags = $this->table('page_tags');
@@ -202,7 +202,7 @@ class TagRead
 
         // Offset can target an empty page while rows still exist; recover accurate total.
         if ($resultRows === [] && $safeOffset > 0) {
-            $total = $this->countForPanel($setId);
+            $total = $this->count($setId);
         }
 
         return [
@@ -244,7 +244,7 @@ class TagRead
     /**
      * Returns only ids that currently exist in storage.
      *
-     * Used by TagWrite to filter incoming save payloads before delegating to TaxonomyScribe.
+     * Used by TagWrite to filter incoming save payloads before delegating to TagScribe.
      *
      * @param array<int> $ids Candidate id list; non-positive values are ignored.
      * @return array<int> Subset of ids that match rows in the tags table.

@@ -299,10 +299,12 @@ declare(strict_types=1);
 - Optional extension-owned panel templates: `private/ext/{directory_name}/tpl/*.php`
 - Optional extension-owned public templates: `private/ext/{directory_name}/tpl/public_*.php` (module only)
 - Optional bin directory: `private/ext/{directory_name}/bin/` (requires `bin: true` in `ext.php` storage)
+- Provider files are root-level only. Do not place `schema.php`, `routes_panel.php`, `routes_public.php`, `shortcodes.php`, `fields.php`, or `cron.php` under `lib/`.
 
 ## Extension Autoloading
 - Enabled extensions may autoload PHP classes from `private/ext/{slug}/lib/`.
 - Namespace-to-path mapping is PSR-4-like from that `lib/` root.
+- Raven no longer scans a legacy `src/` fallback. If a class should autoload, place it under `lib/`.
 - Example:
 - class `Raven\Ext\Smallweb\SmallwebService` must live at `private/ext/smallweb/lib/Smallweb/SmallwebService.php`
 - class `Raven\Ext\Acme\Admin\Controller` must live at `private/ext/acme/lib/Acme/Admin/Controller.php`

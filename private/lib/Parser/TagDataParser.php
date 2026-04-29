@@ -49,40 +49,40 @@ final class TagDataParser
     }
 
     /**
-     * Returns the total number of tags visible in the panel list, optionally filtered by set.
+     * Returns the total tag count, optionally filtered by set.
      *
      * @param int|null $setId Optional taxonomy set id filter.
      * @return int             Total matching tag count.
      */
-    public function countForPanel(?int $setId = null): int
+    public function count(?int $setId = null): int
     {
-        return $this->tagRepo()->countForPanel($this->normalizeSetId($setId));
+        return $this->tagRepo()->count($this->normalizeSetId($setId));
     }
 
     /**
-     * Returns a flat list of panel tag rows, optionally filtered by set.
+     * Returns a flat list of paginated tag rows, optionally filtered by set.
      *
      * @param int      $limit  Maximum number of rows to return.
      * @param int      $offset Zero-based row offset for pagination.
      * @param int|null $setId  Optional taxonomy set id filter.
      * @return array<int, array<string, mixed>> Tag rows.
      */
-    public function listForPanel(int $limit = 50, int $offset = 0, ?int $setId = null): array
+    public function listPaged(int $limit = 50, int $offset = 0, ?int $setId = null): array
     {
-        return $this->tagRepo()->listForPanel(max(1, $limit), max(0, $offset), $this->normalizeSetId($setId));
+        return $this->tagRepo()->listPaged(max(1, $limit), max(0, $offset), $this->normalizeSetId($setId));
     }
 
     /**
-     * Returns one paginated page of panel tag rows plus total count.
+     * Returns one paginated page of tag rows plus total count.
      *
      * @param int      $limit  Maximum number of rows to return.
      * @param int      $offset Zero-based row offset for pagination.
      * @param int|null $setId  Optional taxonomy set id filter.
      * @return array{rows: array<int, array<string, mixed>>, total: int} Paginated rows and total count.
      */
-    public function listPageForPanel(int $limit = 50, int $offset = 0, ?int $setId = null): array
+    public function listPage(int $limit = 50, int $offset = 0, ?int $setId = null): array
     {
-        return $this->tagRepo()->listPageForPanel(max(1, $limit), max(0, $offset), $this->normalizeSetId($setId));
+        return $this->tagRepo()->listPage(max(1, $limit), max(0, $offset), $this->normalizeSetId($setId));
     }
 
     /**

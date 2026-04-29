@@ -23,26 +23,28 @@ final class GroupRouter
      * Registers the panel group route family.
      *
      * @param Router $router Mutable router receiving group routes.
-     * @param callable(): object $panelGroupController Lazy group controller factory.
+     * @param callable(): object $panelGroupListController Lazy group list controller factory for GET /group.
+     * @param callable(): object $panelGroupEditController Lazy group edit controller factory for create/edit/save/delete routes.
      * @param InputSanitizer $input Shared input normalizer for route params.
      * @param callable(): void $renderNotFound Renders a 404 response when a route param is invalid.
      * @return void
      */
     public static function register(
         Router $router,
-        callable $panelGroupController,
+        callable $panelGroupListController,
+        callable $panelGroupEditController,
         InputSanitizer $input,
         callable $renderNotFound
     ): void {
-        $router->add('GET', '/group', static function () use ($panelGroupController): void {
-            $panelGroupController()->groupList();
+        $router->add('GET', '/group', static function () use ($panelGroupListController): void {
+            $panelGroupListController()->groupList();
         });
 
-        $router->add('GET', '/group/edit', static function () use ($panelGroupController): void {
-            $panelGroupController()->groupEdit(null);
+        $router->add('GET', '/group/edit', static function () use ($panelGroupEditController): void {
+            $panelGroupEditController()->groupEdit(null);
         });
 
-        $router->add('GET', '/group/edit/{id}', static function (array $params) use ($panelGroupController, $input, $renderNotFound): void {
+        $router->add('GET', '/group/edit/{id}', static function (array $params) use ($panelGroupEditController, $input, $renderNotFound): void {
             $id = $input->int($params['id'] ?? null, 1);
 
             if ($id === null) {
@@ -50,15 +52,15 @@ final class GroupRouter
                 return;
             }
 
-            $panelGroupController()->groupEdit($id);
+            $panelGroupEditController()->groupEdit($id);
         });
 
-        $router->add('POST', '/group/save', static function () use ($panelGroupController): void {
-            $panelGroupController()->groupSave($_POST, $_FILES);
+        $router->add('POST', '/group/save', static function () use ($panelGroupEditController): void {
+            $panelGroupEditController()->groupSave($_POST, $_FILES);
         });
 
-        $router->add('POST', '/group/delete', static function () use ($panelGroupController): void {
-            $panelGroupController()->groupDelete($_POST);
+        $router->add('POST', '/group/delete', static function () use ($panelGroupEditController): void {
+            $panelGroupEditController()->groupDelete($_POST);
         });
     }
 }

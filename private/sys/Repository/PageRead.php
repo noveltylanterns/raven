@@ -481,14 +481,14 @@ class PageRead
     }
 
     /**
-     * Returns one total-count for panel page index with optional prefilters.
+     * Returns total page count with optional prefilters.
      *
      * @param int|null $channelId  Optional channel id filter resolved before repository entry.
      * @param int|null $categoryId Optional category id filter from the panel UI.
      * @param int|null $tagId      Optional tag id filter from the panel UI.
      * @return int Total matching page count.
      */
-    public function countForPanel(?int $channelId = null, ?int $categoryId = null, ?int $tagId = null): int
+    public function count(?int $channelId = null, ?int $categoryId = null, ?int $tagId = null): int
     {
         $pages = $this->table('pages');
         $pageCategories = $this->table('page_categories');
@@ -520,16 +520,16 @@ class PageRead
     }
 
     /**
-     * Returns paginated page list for panel page index with optional prefilters.
+     * Returns paginated page list with optional prefilters.
      *
      * @param int      $limit      Maximum number of rows to return.
      * @param int      $offset     Zero-based row offset for pagination.
      * @param int|null $channelId  Optional channel id filter resolved before repository entry.
      * @param int|null $categoryId Optional category id filter from the panel UI.
      * @param int|null $tagId      Optional tag id filter from the panel UI.
-     * @return array<int, array<string, mixed>> Panel page rows with channel context.
+     * @return array<int, array<string, mixed>> Paginated page rows with channel context.
      */
-    public function listForPanel(
+    public function listPaged(
         int $limit = 50,
         int $offset = 0,
         ?int $channelId = null,
@@ -585,7 +585,7 @@ class PageRead
     }
 
     /**
-     * Returns one paginated panel page-list page plus total row count.
+     * Returns one paginated page-list page plus total row count.
      *
      * @param int      $limit      Maximum number of rows to return.
      * @param int      $offset     Zero-based row offset for pagination.
@@ -594,7 +594,7 @@ class PageRead
      * @param int|null $tagId      Optional tag id filter from the panel UI.
      * @return array{rows: array<int, array<string, mixed>>, total: int} Paginated rows and total count.
      */
-    public function listPageForPanel(
+    public function listPage(
         int $limit = 50,
         int $offset = 0,
         ?int $channelId = null,
@@ -684,7 +684,7 @@ class PageRead
 
         // Offset can target an empty page while rows still exist; recover accurate total.
         if ($resultRows === [] && $safeOffset > 0) {
-            $total = $this->countForPanel($channelId, $categoryId, $tagId);
+            $total = $this->count($channelId, $categoryId, $tagId);
         }
 
         return [

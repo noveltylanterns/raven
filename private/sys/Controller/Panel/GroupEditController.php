@@ -2,8 +2,8 @@
 
 /**
  * RAVEN CMS
- * ~/private/sys/Controller/Panel/GroupController.php
- * Split panel group controller for usergroup-management routes.
+ * ~/private/sys/Controller/Panel/GroupEditController.php
+ * Panel group edit controller for group create/edit/save/delete routes.
  * Docs: https://raven.lanterns.io
  */
 
@@ -26,9 +26,12 @@ use Raven\Lib\View\Panel\Editor;
 use Raven\Lib\View\Panel\EditorTabs;
 
 /**
- * Handles split group-management routes.
+ * Handles group create/edit/save/delete routes for the panel.
+ *
+ * Owns the write side of the group seam. The group list route lives in
+ * GroupListController to keep read-only and write concerns separate.
  */
-final class GroupController
+final class GroupEditController
 {
     private SharedController $context;
     private InputSanitizer $input;
@@ -87,40 +90,6 @@ final class GroupController
     }
 
     /**
-     * Lists groups for Usergroup management section.
-     *
-     * @return void
-     */
-    public function groupList(): void
-    {
-        $this->context->requirePanelLogin();
-        if (!$this->context->requireRoutePermissionOrForbidden('group', 'view')) {
-            return;
-        }
-
-        $requestedPage = $this->input->int($_GET['page'] ?? null, 1) ?? 1;
-        $perPage = 50;
-        $pageResult = $this->groupDataParser->listPageForPanel($perPage, ($requestedPage - 1) * $perPage);
-        $totalItems = (int) ($pageResult['total'] ?? 0);
-        $groupRows = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
-        $pagination = $this->context->panelPaginationState($totalItems, $requestedPage, $perPage);
-        if ($totalItems > 0 && $pagination['current'] !== $requestedPage) {
-            $pageResult = $this->groupDataParser->listPageForPanel($perPage, $pagination['offset']);
-            $groupRows = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
-        }
-
-        $this->context->renderPanel('panel/group/list', [
-            'groups' => $groupRows,
-            'pagination' => $this->context->panelPaginationViewData('/group', $pagination),
-            'groupRoutingEnabledSystemWide' => $this->groupRoutesEnabledForRoutingTable(),
-            'csrfField' => $this->context->csrfField(),
-            'flashSuccess' => $this->context->pullFlash('success'),
-            'flashError' => $this->context->pullFlash('error'),
-            'section' => 'group',
-        ]);
-    }
-
-    /**
      * Shows the group create/edit form.
      *
      * @param int|null $id Group id in edit mode, or null in create mode.
@@ -147,8 +116,8 @@ final class GroupController
 
         $this->context->renderPanel('panel/group/edit', [
             'group' => $group,
-            'groupRoutePrefix' => $this->groupRoutePrefix(),
-            'groupRoutingEnabledSystemWide' => $this->groupRoutesEnabledForRoutingTable(),
+            'groupRoutePrefix' => $this->groupRouteParser->groupRoutePrefix(),
+            'groupRoutingEnabledSystemWide' => $this->groupRouteParser->groupRoutesEnabledForRoutingTable(),
             'permissionDefinitions' => $this->permissionDefinitions(),
             'canEditConfigurationBit' => $this->context->auth()->isAdmin(),
             'imageAllowedExtensions' => $this->taxonomyImageService->allowedImageExtensionsLabel(),
@@ -205,7 +174,7 @@ final class GroupController
             }
         }
 
-        $groupRoutingEnabledSystemWide = $this->groupRoutesEnabledForRoutingTable();
+        $groupRoutingEnabledSystemWide = $this->groupRouteParser->groupRoutesEnabledForRoutingTable();
         $routeEnabled = $groupRoutingEnabledSystemWide
             && isset($post['route_enabled'])
             && (string) $post['route_enabled'] === '1';
@@ -451,26 +420,6 @@ final class GroupController
         return $this->panelPermissionDefinitionCatalog->extensionBitsMask(
             fn (): array => $this->currentPanelPermissionMap()
         );
-    }
-
-    /**
-     * Returns configured public group route prefix.
-     *
-     * @return string Public group route prefix.
-     */
-    private function groupRoutePrefix(): string
-    {
-        return $this->groupRouteParser->groupRoutePrefix();
-    }
-
-    /**
-     * Returns true when public group URLs are enabled for routing.
-     *
-     * @return bool True when group routes are enabled.
-     */
-    private function groupRoutesEnabledForRoutingTable(): bool
-    {
-        return $this->groupRouteParser->groupRoutesEnabledForRoutingTable();
     }
 
     /**

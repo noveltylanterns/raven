@@ -23,26 +23,28 @@ final class ContentRouter
      * Registers the panel page route family.
      *
      * @param Router $router Mutable router receiving page routes.
-     * @param callable(): object $panelPageController Lazy page controller factory.
+     * @param callable(): object $panelPageListController Lazy page list controller factory for GET /page.
+     * @param callable(): object $panelPageEditController Lazy page edit controller factory for create/edit/save/gallery/delete routes.
      * @param InputSanitizer $input Shared input normalizer for route params.
      * @param callable(): void $renderNotFound Renders a 404 response when a route param is invalid.
      * @return void
      */
     public static function register(
         Router $router,
-        callable $panelPageController,
+        callable $panelPageListController,
+        callable $panelPageEditController,
         InputSanitizer $input,
         callable $renderNotFound
     ): void {
-        $router->add('GET', '/page', static function () use ($panelPageController): void {
-            $panelPageController()->pageList();
+        $router->add('GET', '/page', static function () use ($panelPageListController): void {
+            $panelPageListController()->pageList();
         });
 
-        $router->add('GET', '/page/edit', static function () use ($panelPageController): void {
-            $panelPageController()->pageEdit(null);
+        $router->add('GET', '/page/edit', static function () use ($panelPageEditController): void {
+            $panelPageEditController()->pageEdit(null);
         });
 
-        $router->add('GET', '/page/edit/{id}', static function (array $params) use ($panelPageController, $input, $renderNotFound): void {
+        $router->add('GET', '/page/edit/{id}', static function (array $params) use ($panelPageEditController, $input, $renderNotFound): void {
             $id = $input->int($params['id'] ?? null, 1);
 
             if ($id === null) {
@@ -50,23 +52,23 @@ final class ContentRouter
                 return;
             }
 
-            $panelPageController()->pageEdit($id);
+            $panelPageEditController()->pageEdit($id);
         });
 
-        $router->add('POST', '/page/save', static function () use ($panelPageController): void {
-            $panelPageController()->pageSave($_POST);
+        $router->add('POST', '/page/save', static function () use ($panelPageEditController): void {
+            $panelPageEditController()->pageSave($_POST);
         });
 
-        $router->add('POST', '/page/gallery/upload', static function () use ($panelPageController): void {
-            $panelPageController()->pageGalleryUpload($_POST, $_FILES);
+        $router->add('POST', '/page/gallery/upload', static function () use ($panelPageEditController): void {
+            $panelPageEditController()->pageGalleryUpload($_POST, $_FILES);
         });
 
-        $router->add('POST', '/page/gallery/delete', static function () use ($panelPageController): void {
-            $panelPageController()->pageGalleryDelete($_POST);
+        $router->add('POST', '/page/gallery/delete', static function () use ($panelPageEditController): void {
+            $panelPageEditController()->pageGalleryDelete($_POST);
         });
 
-        $router->add('POST', '/page/delete', static function () use ($panelPageController): void {
-            $panelPageController()->pageDelete($_POST);
+        $router->add('POST', '/page/delete', static function () use ($panelPageEditController): void {
+            $panelPageEditController()->pageDelete($_POST);
         });
     }
 }
