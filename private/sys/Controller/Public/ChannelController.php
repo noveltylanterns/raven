@@ -14,7 +14,7 @@ namespace Raven\Core\Controller\Public;
 use Closure;
 use Raven\Core\Repository\PageRead;
 use Raven\Core\Repository\UserRead;
-use Raven\Lib\Parser\PageImageParser;
+use Raven\Lib\Parser\MediaParser;
 use Raven\Lib\Parser\RedirectDataParser;
 use Raven\Core\Routing\Public\ChannelPageRouter;
 use Raven\Lib\Extension\ExtensionEditorCatalogService;
@@ -44,7 +44,7 @@ use Raven\Lib\View\Public\ThemeTemplate;
 final class ChannelController
 {
     private SharedController $context;
-    private PageImageParser $pageImages;
+    private MediaParser $media;
     private PageDataParser $pageParser;
     private RedirectDataParser $redirectParser;
     private UserDataParser $userParser;
@@ -68,7 +68,7 @@ final class ChannelController
 
     /**
      * @param SharedController $context Shared public request context.
-     * @param PageImageParser $pageImages Page-image parser for read-only gallery rendering and page meta images.
+     * @param MediaParser $media Media parser for read-only gallery rendering and page meta images.
      * @param PageRead $pageRepo Page repository read side for channel-homepage and root-page lookups.
      * @param RedirectDataParser $redirectParser Redirect data parser for public redirect fallbacks.
      * @param UserRead $userRepo User repository read side for author profile lookups in page meta.
@@ -79,7 +79,7 @@ final class ChannelController
      */
     public function __construct(
         SharedController $context,
-        PageImageParser $pageImages,
+        MediaParser $media,
         PageRead $pageRepo,
         RedirectDataParser $redirectParser,
         UserRead $userRepo,
@@ -88,7 +88,7 @@ final class ChannelController
         callable $extensionServicesProvider
     ) {
         $this->context = $context;
-        $this->pageImages = $pageImages;
+        $this->media = $media;
         $this->pageParser = new PageDataParser($context->input(), $pageRepo);
         $this->redirectParser = $redirectParser;
         $this->userParser = new UserDataParser($context->input(), $userRepo);
@@ -217,7 +217,7 @@ final class ChannelController
         return $this->metaService()->siteDataWithPageMeta(
             $page,
             $this->context->siteData(),
-            fn (int $pageId): ?string => $this->pageImages->coverImageUrlForPage($pageId),
+            fn (int $pageId): ?string => $this->media->coverImageUrlForPage($pageId),
             fn (int $authorUserId): ?array => $this->userParser->findById($authorUserId),
             $profileContactOptions
         );
@@ -240,7 +240,7 @@ final class ChannelController
     }
 
     /**
-     * Renders one gallery body block from page image rows.
+     * Renders one gallery body block from page media rows.
      *
      * @param array<string, mixed> $page Public page payload.
      * @return string Gallery block HTML.
@@ -253,7 +253,7 @@ final class ChannelController
         }
 
         $galleryImages = $this->templateDecorator()->decorateGalleryImagesForTemplate(
-            $this->pageImages->listReadyForPublicPage($pageId)
+            $this->media->listReadyForPublicPage($pageId)
         );
         if ($galleryImages === []) {
             return '';

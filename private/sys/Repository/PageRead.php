@@ -809,8 +809,8 @@ class PageRead
     public function editFormDataById(int $id): ?array
     {
         $pages = $this->table('pages');
-        $images = $this->table('page_images');
-        $variants = $this->table('page_image_variants');
+        $images = $this->table('media');
+        $variants = $this->table('media_variants');
 
         $stmt = $this->db->prepare(
             'SELECT

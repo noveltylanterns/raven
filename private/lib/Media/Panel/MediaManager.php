@@ -2,8 +2,8 @@
 
 /**
  * RAVEN CMS
- * ~/private/lib/Media/PageImageManager.php
- * ImageMagick-backed service for per-entry gallery upload processing.
+ * ~/private/lib/Media/Panel/MediaManager.php
+ * ImageMagick-backed service for page-scoped media upload processing.
  * Docs: https://raven.lanterns.io
  */
 
@@ -13,34 +13,48 @@ namespace Raven\Lib\Media\Panel;
 
 use Imagick;
 use Raven\Core\Config;
-use Raven\Core\Repository\PageImageRepository;
+use Raven\Core\Repository\MediaRead;
+use Raven\Core\Repository\MediaWrite;
 use Raven\Lib\Media\Panel\ImageVariantProcessor;
-use Raven\Lib\Media\Panel\PageImagePathLayout;
-use Raven\Lib\Media\Panel\PageImageUploadPolicy;
+use Raven\Lib\Media\Panel\MediaPathLayout;
+use Raven\Lib\Media\Panel\MediaUploadPolicy;
 use Raven\Lib\Security\InputSanitizer;
 
 /**
  * Handles upload validation, variant generation, and filesystem cleanup for page galleries.
  */
-final class PageImageManager
+final class MediaManager
 {
     private Config $config;
     private InputSanitizer $input;
-    private PageImageRepository $images;
+    private MediaRead $mediaRead;
+    private MediaWrite $mediaWrite;
     private string $projectRoot;
-    private ?PageImageUploadPolicy $uploadPolicy = null;
+    private ?MediaUploadPolicy $uploadPolicy = null;
     private ?ImageVariantProcessor $variantProcessor = null;
-    private ?PageImagePathLayout $pathLayout = null;
+    private ?MediaPathLayout $pathLayout = null;
 
+    /**
+     * Prepares the panel media manager with split read/write gallery persistence seams.
+     *
+     * @param Config         $config      Runtime config used for upload-policy and variant settings.
+     * @param InputSanitizer $input       Input normalizer used for stored image metadata fields.
+     * @param MediaRead      $mediaRead   Read-side media persistence for duplicate checks and ordering.
+     * @param MediaWrite     $mediaWrite  Write-side media persistence for insert/delete workflows.
+     * @param string         $projectRoot Absolute Raven project root used for upload-path resolution.
+     * @return void
+     */
     public function __construct(
         Config $config,
         InputSanitizer $input,
-        PageImageRepository $images,
+        MediaRead $mediaRead,
+        MediaWrite $mediaWrite,
         string $projectRoot
     ) {
         $this->config = $config;
         $this->input = $input;
-        $this->images = $images;
+        $this->mediaRead = $mediaRead;
+        $this->mediaWrite = $mediaWrite;
         $this->projectRoot = rtrim($projectRoot, '/');
     }
 
@@ -156,7 +170,7 @@ final class PageImageManager
             ];
         }
 
-        if ($this->images->hasHashForPage($pageId, $hashSha256)) {
+        if ($this->mediaRead->hasHashForPage($pageId, $hashSha256)) {
             return [
                 'ok' => false,
                 'error' => 'This image already exists in the page gallery.',
@@ -166,7 +180,7 @@ final class PageImageManager
         if (!$this->pathLayout()->ensurePageDirectory($pageId)) {
             return [
                 'ok' => false,
-                'error' => 'Failed to create page image directory.',
+                'error' => 'Failed to create page media directory.',
             ];
         }
 
@@ -268,7 +282,7 @@ final class PageImageManager
                 'height' => $sourceHeight,
                 'hash' => $hashSha256,
                 'status' => 'ready',
-                'sort_order' => $this->images->nextSortOrderForPage($pageId),
+                'sort_order' => $this->mediaRead->nextSortOrderForPage($pageId),
                 'include_in_gallery' => true,
                 'alt_text' => $imageTitle,
                 'title_text' => $imageTitle,
@@ -279,7 +293,7 @@ final class PageImageManager
                 'focal_y' => null,
             ];
 
-            $imageId = $this->images->insertImageWithVariants($imageRow, $variantRows);
+            $imageId = $this->mediaWrite->insertImageWithVariants($imageRow, $variantRows);
 
             return [
                 'ok' => true,
@@ -305,7 +319,7 @@ final class PageImageManager
      */
     public function deleteImageForPage(int $pageId, int $imageId): bool
     {
-        $deleted = $this->images->deleteImageForPage($pageId, $imageId);
+        $deleted = $this->mediaWrite->deleteImageForPage($pageId, $imageId);
         if ($deleted === null) {
             return false;
         }
@@ -326,7 +340,7 @@ final class PageImageManager
      */
     public function deleteAllForPage(int $pageId): void
     {
-        $storedPaths = $this->images->deleteAllForPage($pageId);
+        $storedPaths = $this->mediaWrite->deleteAllForPage($pageId);
 
         foreach ($storedPaths as $storedPath) {
             $this->deleteStoredPath($storedPath);
@@ -414,10 +428,10 @@ final class PageImageManager
         return $this->uploadPolicy()->uploadErrorMessage($code);
     }
 
-    private function uploadPolicy(): PageImageUploadPolicy
+    private function uploadPolicy(): MediaUploadPolicy
     {
-        if (!$this->uploadPolicy instanceof PageImageUploadPolicy) {
-            $this->uploadPolicy = new PageImageUploadPolicy($this->config);
+        if (!$this->uploadPolicy instanceof MediaUploadPolicy) {
+            $this->uploadPolicy = new MediaUploadPolicy($this->config);
         }
 
         return $this->uploadPolicy;
@@ -432,10 +446,10 @@ final class PageImageManager
         return $this->variantProcessor;
     }
 
-    private function pathLayout(): PageImagePathLayout
+    private function pathLayout(): MediaPathLayout
     {
-        if (!$this->pathLayout instanceof PageImagePathLayout) {
-            $this->pathLayout = new PageImagePathLayout($this->projectRoot);
+        if (!$this->pathLayout instanceof MediaPathLayout) {
+            $this->pathLayout = new MediaPathLayout($this->projectRoot);
         }
 
         return $this->pathLayout;

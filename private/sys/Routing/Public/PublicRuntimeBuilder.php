@@ -26,7 +26,7 @@ use Raven\Core\Repository\ChannelRead;
 use Raven\Core\Repository\GroupRead;
 use Raven\Core\Repository\InviteRead;
 use Raven\Core\Repository\InviteWrite;
-use Raven\Core\Repository\PageImageRead;
+use Raven\Core\Repository\MediaRead;
 use Raven\Core\Repository\PageRead;
 use Raven\Core\Repository\RedirectRead;
 use Raven\Core\Repository\UserRead;
@@ -38,7 +38,7 @@ use Raven\Lib\Parser\CategoryRepoParser;
 use Raven\Lib\Parser\ChannelDataParser;
 use Raven\Lib\Parser\ConfigParser;
 use Raven\Lib\Parser\GroupDataParser;
-use Raven\Lib\Parser\PageImageParser;
+use Raven\Lib\Parser\MediaParser;
 use Raven\Lib\Parser\RedirectDataParser;
 use Raven\Lib\Parser\TagRepoParser;
 use Raven\Lib\Parser\TaxonomyRepoParser;
@@ -85,7 +85,7 @@ final class PublicRuntimeBuilder
         $channelDataParser = null;
         $extensionEditorCatalogService = null;
         $groupRead = null;
-        $pageImageRead = null;
+        $mediaRead = null;
         $pageRead = null;
         $redirectRead = null;
         $themeCatalogService = null;
@@ -203,16 +203,16 @@ final class PublicRuntimeBuilder
         });
 
         /**
-         * Builds page-image read side only when public rendering needs media rows.
+         * Builds media read side only when public rendering needs media rows.
          */
-        $pageImageReadFactory = $memoize(static function () use (&$pageImageRead, $rvn): PageImageRead {
-            $pageImageRead = new PageImageRead(
+        $mediaReadFactory = $memoize(static function () use (&$mediaRead, $rvn): MediaRead {
+            $mediaRead = new MediaRead(
                 $rvn['db'],
                 (string) $rvn['driver'],
                 (string) $rvn['prefix']
             );
 
-            return $pageImageRead;
+            return $mediaRead;
         });
 
         /**
@@ -382,10 +382,10 @@ final class PublicRuntimeBuilder
         });
 
         /**
-         * Wraps the page-image read side in the parser seam for public rendering.
+         * Wraps the media read side in the parser seam for public rendering.
          */
-        $pageImageParserFactory = $memoize(static function () use ($pageImageReadFactory): PageImageParser {
-            return new PageImageParser($pageImageReadFactory());
+        $mediaParserFactory = $memoize(static function () use ($mediaReadFactory): MediaParser {
+            return new MediaParser($mediaReadFactory());
         });
 
         /**
@@ -432,7 +432,7 @@ final class PublicRuntimeBuilder
             $channelDataParserFactory,
             $channelReadFactory,
             $categoryLookupRepository,
-            $pageImageParserFactory,
+            $mediaParserFactory,
             $pageReadFactory,
             $redirectDataParserFactory,
             $tagLookupRepository,
@@ -442,7 +442,7 @@ final class PublicRuntimeBuilder
                 'category_lookup' => $categoryLookupRepository,
                 'channel' => $channelReadFactory(),
                 'channel_parser' => $channelDataParserFactory(),
-                'page_images' => $pageImageParserFactory(),
+                'media' => $mediaParserFactory(),
                 'page' => $pageReadFactory(),
                 'redirect' => $redirectDataParserFactory(),
                 'tag_lookup' => $tagLookupRepository,
@@ -551,7 +551,7 @@ final class PublicRuntimeBuilder
             $formDomain = $publicFormDomain();
             $publicChannelController = new PublicChannelController(
                 $requestContextFactory(),
-                $contentDomain['page_images'],
+                $contentDomain['media'],
                 $contentDomain['page'],
                 $contentDomain['redirect'],
                 $authDomain['user_read'],
@@ -681,7 +681,7 @@ final class PublicRuntimeBuilder
             $publicPageController = new PublicPageController(
                 $requestContextFactory(),
                 $contentDomain['channel_parser'],
-                $contentDomain['page_images'],
+                $contentDomain['media'],
                 $contentDomain['page'],
                 $contentDomain['redirect'],
                 $authDomain['user_read'],

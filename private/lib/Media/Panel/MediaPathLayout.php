@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace Raven\Lib\Media\Panel;
 
 /**
- * Shared page gallery storage path layout and cleanup helpers.
+ * Shared page-media storage path layout and cleanup helpers.
  */
-final class PageImagePathLayout
+final class MediaPathLayout
 {
     private string $projectRoot;
 
@@ -85,4 +85,3 @@ final class PageImagePathLayout
         @rmdir($directory);
     }
 }
-

@@ -2,8 +2,8 @@
 
 /**
  * RAVEN CMS
- * ~/private/lib/Scribe/PageImageScribe.php
- * Write-side persistence helper for per-page gallery images and variants.
+ * ~/private/lib/Scribe/MediaScribe.php
+ * Write-side persistence helper for page-scoped media rows and variants.
  * Docs: https://raven.lanterns.io
  */
 
@@ -15,22 +15,22 @@ use PDO;
 use Raven\Lib\Database\TableNameResolver;
 
 /**
- * Owns page-image mutation writes and delete workflows.
+ * Owns page-media mutation writes and delete workflows.
  *
- * PageImageRepository keeps the read-heavy gallery listing queries, while this
- * class centralizes image insert/update/delete persistence, cover-selection
+ * MediaRead keeps the read-heavy gallery listing queries, while this class
+ * centralizes image insert/update/delete persistence, cover-selection
  * normalization, and transactional cleanup for page-gallery writes.
  */
-final class PageImageScribe
+final class MediaScribe
 {
     private PDO $db;
     private string $driver;
     private string $prefix;
 
     /**
-     * Prepares the page-image scribe for page gallery writes.
+     * Prepares the media scribe for page gallery writes.
      *
-     * @param PDO    $db     App database connection used for page-image writes.
+     * @param PDO    $db     App database connection used for page-media writes.
      * @param string $driver Active PDO driver name used for table resolution and key-return policy.
      * @param string $prefix Application table prefix before resolver sanitization.
      * @return void
@@ -52,8 +52,8 @@ final class PageImageScribe
      */
     public function insertImageWithVariants(array $image, array $variants): int
     {
-        $images = $this->table('page_images');
-        $imageVariants = $this->table('page_image_variants');
+        $images = $this->table('media');
+        $imageVariants = $this->table('media_variants');
         $now = gmdate('Y-m-d H:i:s');
 
         $this->db->beginTransaction();
@@ -152,7 +152,7 @@ final class PageImageScribe
         unset($enabled);
 
         $pages = $this->table('pages');
-        $images = $this->table('page_images');
+        $images = $this->table('media');
         $now = gmdate('Y-m-d H:i:s');
         $imageUpdates = $this->canonicalizePrimarySelections($imageUpdates);
         $coverImageId = $this->resolvedPrimaryImageId($pageId, $imageUpdates);
@@ -230,8 +230,8 @@ final class PageImageScribe
     public function deleteImageForPage(int $pageId, int $imageId): ?array
     {
         $pagesTable = $this->table('pages');
-        $imagesTable = $this->table('page_images');
-        $variantsTable = $this->table('page_image_variants');
+        $imagesTable = $this->table('media');
+        $variantsTable = $this->table('media_variants');
 
         $this->db->beginTransaction();
 
@@ -315,8 +315,8 @@ final class PageImageScribe
     public function deleteAllForPage(int $pageId): array
     {
         $pagesTable = $this->table('pages');
-        $imagesTable = $this->table('page_images');
-        $variantsTable = $this->table('page_image_variants');
+        $imagesTable = $this->table('media');
+        $variantsTable = $this->table('media_variants');
 
         $this->db->beginTransaction();
 
@@ -460,7 +460,7 @@ final class PageImageScribe
      * Resolves the primary image id that should be stored on the page row.
      *
      * @param int                                    $pageId       Owning page id.
-     * @param array<int, array<string, scalar|null>> $imageUpdates Canonicalized page-image update payload.
+     * @param array<int, array<string, scalar|null>> $imageUpdates Canonicalized page-media update payload.
      * @return int|null Selected cover image id, existing cover image id, or null when none applies.
      */
     private function resolvedPrimaryImageId(int $pageId, array $imageUpdates): ?int
@@ -472,7 +472,7 @@ final class PageImageScribe
         }
 
         $pages = $this->table('pages');
-        $images = $this->table('page_images');
+        $images = $this->table('media');
         $stmt = $this->db->prepare(
             'SELECT p.cover_image
              FROM ' . $pages . ' p

@@ -14,7 +14,7 @@ namespace Raven\Core\Controller\Public;
 use Closure;
 use Raven\Core\Repository\PageRead;
 use Raven\Core\Repository\UserRead;
-use Raven\Lib\Parser\PageImageParser;
+use Raven\Lib\Parser\MediaParser;
 use Raven\Lib\Extension\Public\EmbeddedFormRuntimeInterface;
 use Raven\Lib\Extension\Public\EmbeddedFormRuntimeService;
 use Raven\Lib\Extension\Public\EmbeddedShortcodeRuntimeInterface;
@@ -41,7 +41,7 @@ final class PageController
 {
     private SharedController $context;
     private ChannelDataParser $channelParser;
-    private PageImageParser $pageImages;
+    private MediaParser $media;
     private PageDataParser $pageParser;
     private RedirectDataParser $redirectParser;
     private UserDataParser $userParser;
@@ -66,7 +66,7 @@ final class PageController
     /**
      * @param SharedController $context Shared public request context.
      * @param ChannelDataParser $channelParser Channel data parser for public channel-route lookups.
-     * @param PageImageParser $pageImages Page-image parser for read-only gallery rendering and page meta images.
+     * @param MediaParser $media Media parser for read-only gallery rendering and page meta images.
      * @param PageRead $pageRepo Page repository read side for homepage, channel, and page lookups.
      * @param RedirectDataParser $redirectParser Redirect data parser for public redirect fallbacks.
      * @param UserRead $userRepo User repository read side for author profile lookups in page meta.
@@ -78,7 +78,7 @@ final class PageController
     public function __construct(
         SharedController $context,
         ChannelDataParser $channelParser,
-        PageImageParser $pageImages,
+        MediaParser $media,
         PageRead $pageRepo,
         RedirectDataParser $redirectParser,
         UserRead $userRepo,
@@ -88,7 +88,7 @@ final class PageController
     ) {
         $this->context = $context;
         $this->channelParser = $channelParser;
-        $this->pageImages = $pageImages;
+        $this->media = $media;
         $this->pageParser = new PageDataParser($context->input(), $pageRepo);
         $this->redirectParser = $redirectParser;
         $this->userParser = new UserDataParser($context->input(), $userRepo);
@@ -305,7 +305,7 @@ final class PageController
         return $this->metaService()->siteDataWithPageMeta(
             $page,
             $this->context->siteData(),
-            fn (int $pageId): ?string => $this->pageImages->coverImageUrlForPage($pageId),
+            fn (int $pageId): ?string => $this->media->coverImageUrlForPage($pageId),
             fn (int $authorUserId): ?array => $this->userParser->findById($authorUserId),
             $profileContactOptions
         );
@@ -328,7 +328,7 @@ final class PageController
     }
 
     /**
-     * Renders one gallery body block from page image rows.
+     * Renders one gallery body block from page media rows.
      *
      * @param array<string, mixed> $page Public page payload.
      * @return string Gallery block HTML.
@@ -341,7 +341,7 @@ final class PageController
         }
 
         $galleryImages = $this->templateDecorator()->decorateGalleryImagesForTemplate(
-            $this->pageImages->listReadyForPublicPage($pageId)
+            $this->media->listReadyForPublicPage($pageId)
         );
         if ($galleryImages === []) {
             return '';

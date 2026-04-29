@@ -121,7 +121,41 @@ final class SchemaEnsureStateStore
             return true;
         }
 
-        return $markerMtime > $stateMtime;
+        if ($markerMtime > $stateMtime) {
+            return true;
+        }
+
+        return $this->latestSchemaSourceMtime() > $stateMtime;
+    }
+
+    /**
+     * Returns the newest mtime among core schema source files that should invalidate ensures.
+     *
+     * This keeps deployed schema refactors from being skipped when local marker files are
+     * older than the last successful ensure state.
+     *
+     * @return int Latest relevant schema-source mtime, or 0 when none can be read.
+     */
+    private function latestSchemaSourceMtime(): int
+    {
+        $files = [
+            $this->root . '/private/lib/Database/Schema/SchemaBootstrap.php',
+            $this->root . '/private/lib/Database/Schema/SchemaBuilder.php',
+            $this->root . '/private/lib/Database/Schema/AuthSchemaBuilder.php',
+            $this->root . '/private/lib/Database/Schema/SchemaEnsurePipeline.php',
+            $this->root . '/private/lib/Database/Schema/ExtensionSchemaRunner.php',
+            $this->root . '/private/lib/Database/Schema/SeedInstaller.php',
+        ];
+
+        $latest = 0;
+        foreach ($files as $file) {
+            $mtime = (int) (@filemtime($file) ?: 0);
+            if ($mtime > $latest) {
+                $latest = $mtime;
+            }
+        }
+
+        return $latest;
     }
 
     /**

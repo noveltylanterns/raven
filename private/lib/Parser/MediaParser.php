@@ -2,8 +2,8 @@
 
 /**
  * RAVEN CMS
- * ~/private/lib/Parser/PageImageParser.php
- * Read-only page-image lookup helper backed by PageImageRead.
+ * ~/private/lib/Parser/MediaParser.php
+ * Read-only page media lookup helper backed by MediaRead.
  * Docs: https://raven.lanterns.io
  */
 
@@ -11,28 +11,28 @@ declare(strict_types=1);
 
 namespace Raven\Lib\Parser;
 
-use Raven\Core\Repository\PageImageRead;
+use Raven\Core\Repository\MediaRead;
 use RuntimeException;
 
 /**
- * Repository-backed page-image read helper.
+ * Repository-backed page media read helper.
  *
- * Exposes read-only page-image queries for public rendering, panel preview,
+ * Exposes read-only page-media queries for public rendering, panel preview,
  * and extension access. Write operations (insert, update gallery, delete)
- * live on PageImageScribe, which the repository already delegates to internally.
+ * live on MediaScribe, which the repository already delegates to internally.
  */
-final class PageImageParser
+final class MediaParser
 {
-    private ?PageImageRead $pageImageRepo;
+    private ?MediaRead $mediaRepo;
 
     /**
-     * Prepares the page-image parser for read-only image lookups.
+     * Prepares the media parser for read-only page-media lookups.
      *
-     * @param PageImageRead|null $pageImageRepo Optional repository for read-only page-image queries.
+     * @param MediaRead|null $mediaRepo Optional repository for read-only page-media queries.
      */
-    public function __construct(?PageImageRead $pageImageRepo = null)
+    public function __construct(?MediaRead $mediaRepo = null)
     {
-        $this->pageImageRepo = $pageImageRepo;
+        $this->mediaRepo = $mediaRepo;
     }
 
     /**
@@ -118,17 +118,17 @@ final class PageImageParser
     }
 
     /**
-     * Returns the injected page-image repository for repo-backed reads.
+     * Returns the injected media repository for repo-backed reads.
      *
-     * @return PageImageRead Repository backing canonical read methods.
+     * @return MediaRead Repository backing canonical read methods.
      * @throws RuntimeException When no repository was injected at construction time.
      */
-    private function repo(): PageImageRead
+    private function repo(): MediaRead
     {
-        if (!$this->pageImageRepo instanceof PageImageRead) {
-            throw new RuntimeException('PageImageParser requires a PageImageRead for repository-backed reads.');
+        if (!$this->mediaRepo instanceof MediaRead) {
+            throw new RuntimeException('MediaParser requires a MediaRead for repository-backed reads.');
         }
 
-        return $this->pageImageRepo;
+        return $this->mediaRepo;
     }
 }

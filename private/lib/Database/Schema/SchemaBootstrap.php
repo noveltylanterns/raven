@@ -28,6 +28,8 @@ final class SchemaBootstrap
      */
     public function ensureSchema(PDO $db, string $driver, string $prefix): void
     {
+        $this->renameLegacyMediaTables($db, $driver, $prefix);
+
         if ($driver === 'sqlite') {
             $pagesTable = $prefix . 'pages';
             $categoriesTable = $prefix . 'categories';
@@ -35,8 +37,8 @@ final class SchemaBootstrap
             $redirectsTable = $prefix . 'redirects';
             $pageCategoriesTable = $prefix . 'page_categories';
             $pageTagsTable = $prefix . 'page_tags';
-            $pageImagesTable = $prefix . 'page_images';
-            $pageImageVariantsTable = $prefix . 'page_image_variants';
+            $mediaTable = $prefix . 'media';
+            $mediaVariantsTable = $prefix . 'media_variants';
             $groupsTable = $prefix . 'groups';
             $userGroupsTable = $prefix . 'user_groups';
             $loginFailuresTable = $prefix . 'auth_failures';
@@ -109,7 +111,7 @@ final class SchemaBootstrap
                 PRIMARY KEY (page, tag)
             )');
 
-            $db->exec('CREATE TABLE IF NOT EXISTS ' . $pageImagesTable . ' (
+            $db->exec('CREATE TABLE IF NOT EXISTS ' . $mediaTable . ' (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 page INTEGER NOT NULL,
                 storage_target TEXT NOT NULL DEFAULT \'local\',
@@ -136,7 +138,7 @@ final class SchemaBootstrap
                 updated TEXT NOT NULL
             )');
 
-            $db->exec('CREATE TABLE IF NOT EXISTS ' . $pageImageVariantsTable . ' (
+            $db->exec('CREATE TABLE IF NOT EXISTS ' . $mediaVariantsTable . ' (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 image INTEGER NOT NULL,
                 variant_key TEXT NOT NULL,
@@ -270,7 +272,7 @@ final class SchemaBootstrap
                 PRIMARY KEY (page, tag)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
 
-            $db->exec('CREATE TABLE IF NOT EXISTS ' . $prefix . 'page_images (
+            $db->exec('CREATE TABLE IF NOT EXISTS ' . $prefix . 'media (
                 id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
                 page BIGINT UNSIGNED NOT NULL,
                 storage_target VARCHAR(40) NOT NULL DEFAULT \'local\',
@@ -295,11 +297,11 @@ final class SchemaBootstrap
                 focal_y DOUBLE NULL,
                 created DATETIME NOT NULL,
                 updated DATETIME NOT NULL,
-                INDEX idx_' . $prefix . 'page_images_page (page),
-                INDEX idx_' . $prefix . 'page_images_sort_order (page, sort_order)
+                INDEX idx_' . $prefix . 'media_page (page),
+                INDEX idx_' . $prefix . 'media_sort_order (page, sort_order)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
 
-            $db->exec('CREATE TABLE IF NOT EXISTS ' . $prefix . 'page_image_variants (
+            $db->exec('CREATE TABLE IF NOT EXISTS ' . $prefix . 'media_variants (
                 id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
                 image BIGINT UNSIGNED NOT NULL,
                 variant_key VARCHAR(30) NOT NULL,
@@ -311,8 +313,8 @@ final class SchemaBootstrap
                 width INT UNSIGNED NOT NULL DEFAULT 0,
                 height INT UNSIGNED NOT NULL DEFAULT 0,
                 created DATETIME NOT NULL,
-                UNIQUE KEY uniq_' . $prefix . 'page_image_variants_image_variant (image, variant_key),
-                INDEX idx_' . $prefix . 'page_image_variants_image (image)
+                UNIQUE KEY uniq_' . $prefix . 'media_variants_image_variant (image, variant_key),
+                INDEX idx_' . $prefix . 'media_variants_image (image)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
 
             $db->exec('CREATE TABLE IF NOT EXISTS ' . $prefix . 'groups (
@@ -423,7 +425,7 @@ final class SchemaBootstrap
             PRIMARY KEY (page, tag)
         )');
 
-        $db->exec('CREATE TABLE IF NOT EXISTS ' . $prefix . 'page_images (
+        $db->exec('CREATE TABLE IF NOT EXISTS ' . $prefix . 'media (
             id BIGSERIAL PRIMARY KEY,
             page BIGINT NOT NULL,
             storage_target VARCHAR(40) NOT NULL DEFAULT \'local\',
@@ -449,7 +451,7 @@ final class SchemaBootstrap
             created TIMESTAMP NOT NULL,
             updated TIMESTAMP NOT NULL
         )');
-        $db->exec('CREATE TABLE IF NOT EXISTS ' . $prefix . 'page_image_variants (
+        $db->exec('CREATE TABLE IF NOT EXISTS ' . $prefix . 'media_variants (
             id BIGSERIAL PRIMARY KEY,
             image BIGINT NOT NULL,
             variant_key VARCHAR(30) NOT NULL,
@@ -463,7 +465,7 @@ final class SchemaBootstrap
             created TIMESTAMP NOT NULL,
             UNIQUE (image, variant_key)
         )');
-        $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $prefix . 'page_image_variants_image ON ' . $prefix . 'page_image_variants (image)');
+        $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $prefix . 'media_variants_image ON ' . $prefix . 'media_variants (image)');
 
         $db->exec('CREATE TABLE IF NOT EXISTS ' . $prefix . 'groups (
             id BIGSERIAL PRIMARY KEY,
@@ -501,6 +503,106 @@ final class SchemaBootstrap
         $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $prefix . 'auth_failures_last_failed ON ' . $prefix . 'auth_failures (last_failed)');
         // Shortcode registry is extension-owned via `{slug}/shortcodes.php`; drop deprecated table when present.
         $db->exec('DROP TABLE IF EXISTS ' . $prefix . 'shortcodes');
+    }
+
+    /**
+     * Renames legacy page-image tables to the new media-table names before schema creation runs.
+     *
+     * This keeps existing installs on the live data set instead of creating new empty
+     * `media` tables beside populated legacy `page_images` tables after the namespace rename.
+     *
+     * @param PDO    $db     App database connection.
+     * @param string $driver Active PDO driver name.
+     * @param string $prefix Active Raven table prefix.
+     * @return void
+     */
+    private function renameLegacyMediaTables(PDO $db, string $driver, string $prefix): void
+    {
+        $this->renameLegacyTable($db, $driver, $prefix . 'page_images', $prefix . 'media');
+        $this->renameLegacyTable($db, $driver, $prefix . 'page_image_variants', $prefix . 'media_variants');
+    }
+
+    /**
+     * Renames one legacy table only when the old name exists and the new name does not.
+     *
+     * @param PDO    $db       App database connection.
+     * @param string $driver   Active PDO driver name.
+     * @param string $fromName Legacy physical table name.
+     * @param string $toName   Replacement physical table name.
+     * @return void
+     */
+    private function renameLegacyTable(PDO $db, string $driver, string $fromName, string $toName): void
+    {
+        if (!$this->tableExists($db, $driver, $fromName) || $this->tableExists($db, $driver, $toName)) {
+            return;
+        }
+
+        if ($driver === 'mysql') {
+            $db->exec('RENAME TABLE ' . $fromName . ' TO ' . $toName);
+            return;
+        }
+
+        if ($driver === 'pgsql') {
+            $db->exec(
+                'ALTER TABLE ' . $this->quotePgIdentifier($fromName) . '
+                 RENAME TO ' . $this->quotePgIdentifier($toName)
+            );
+            return;
+        }
+
+        $db->exec('ALTER TABLE ' . $fromName . ' RENAME TO ' . $toName);
+    }
+
+    /**
+     * Returns true when one physical table exists for the active driver.
+     *
+     * @param PDO    $db     App database connection.
+     * @param string $driver Active PDO driver name.
+     * @param string $table  Physical table name to test.
+     * @return bool True when the table exists.
+     */
+    private function tableExists(PDO $db, string $driver, string $table): bool
+    {
+        if ($driver === 'sqlite') {
+            $stmt = $db->prepare(
+                'SELECT 1 FROM sqlite_master WHERE type = :type AND name = :name LIMIT 1'
+            );
+            $stmt->execute([
+                ':type' => 'table',
+                ':name' => $table,
+            ]);
+
+            return $stmt->fetchColumn() !== false;
+        }
+
+        if ($driver === 'mysql') {
+            $stmt = $db->prepare(
+                'SELECT 1
+                 FROM information_schema.tables
+                 WHERE table_schema = DATABASE()
+                   AND table_name = :table_name
+                 LIMIT 1'
+            );
+            $stmt->execute([':table_name' => $table]);
+
+            return $stmt->fetchColumn() !== false;
+        }
+
+        $stmt = $db->prepare('SELECT to_regclass(:table_name)');
+        $stmt->execute([':table_name' => $table]);
+
+        return $stmt->fetchColumn() !== null;
+    }
+
+    /**
+     * Quotes one PostgreSQL identifier for DDL statements.
+     *
+     * @param string $identifier Physical table name to quote.
+     * @return string Double-quoted identifier.
+     */
+    private function quotePgIdentifier(string $identifier): string
+    {
+        return '"' . str_replace('"', '""', $identifier) . '"';
     }
 
 }

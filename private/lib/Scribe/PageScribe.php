@@ -191,15 +191,15 @@ final class PageScribe
             // Variants hang off image ids, so they must be removed before the
             // owning image rows to keep the transaction FK-safe across drivers.
             $detachImageVariants = $this->db->prepare(
-                'DELETE FROM ' . $this->table('page_image_variants') . '
+                'DELETE FROM ' . $this->table('media_variants') . '
                  WHERE image IN (
-                    SELECT id FROM ' . $this->table('page_images') . ' WHERE page = :page
+                    SELECT id FROM ' . $this->table('media') . ' WHERE page = :page
                  )'
             );
             $detachImageVariants->execute($pageIdParams);
 
             $detachImages = $this->db->prepare(
-                'DELETE FROM ' . $this->table('page_images') . ' WHERE page = :page'
+                'DELETE FROM ' . $this->table('media') . ' WHERE page = :page'
             );
             $detachImages->execute($pageIdParams);
 

@@ -433,8 +433,8 @@ declare(strict_types=1);
 - `categories`
 - `channels`
 - `groups`
-- `page_images`
-- `page_image_manager`
+- `media`
+- `media_manager`
 - `pages`
 - `redirects`
 - `tags`

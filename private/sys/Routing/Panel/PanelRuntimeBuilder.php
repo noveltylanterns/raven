@@ -44,9 +44,8 @@ use Raven\Core\Repository\GroupRead;
 use Raven\Core\Repository\GroupWrite;
 use Raven\Core\Repository\InviteRead;
 use Raven\Core\Repository\InviteWrite;
-use Raven\Core\Repository\PageImageRead;
-use Raven\Core\Repository\PageImageRepository;
-use Raven\Core\Repository\PageImageWrite;
+use Raven\Core\Repository\MediaRead;
+use Raven\Core\Repository\MediaWrite;
 use Raven\Core\Repository\PageRead;
 use Raven\Core\Repository\PageWrite;
 use Raven\Core\Repository\RedirectRead;
@@ -77,7 +76,7 @@ use Raven\Lib\Parser\GroupDataParser;
 use Raven\Lib\Parser\GroupRouteParser;
 use Raven\Lib\Parser\RedirectDataParser;
 use Raven\Lib\Parser\TaxonomyRepoParser;
-use Raven\Lib\Media\Panel\PageImageManager;
+use Raven\Lib\Media\Panel\MediaManager;
 use Raven\Lib\Media\Panel\TaxonomyImageService;
 use Raven\Lib\Media\Panel\UserMediaPathService;
 use Raven\Lib\Parser\UserDataParser;
@@ -159,9 +158,9 @@ final class PanelRuntimeBuilder
         $tagSetWrite = null;
         $inviteRead = null;
         $inviteWrite = null;
-        $pageImageRead = null;
-        $pageImageWrite = null;
-        $pageImageManager = null;
+        $mediaRead = null;
+        $mediaWrite = null;
+        $mediaManager = null;
         $logger = null;
         $taxonomyLookupRepository = null;
         $channelRead = null;
@@ -308,29 +307,29 @@ final class PanelRuntimeBuilder
         });
 
         /**
-         * Builds page-image read side for panel gallery renders and existence checks.
+         * Builds media read side for panel gallery renders and existence checks.
          */
-        $pageImagesReadFactory = $memoize(static function () use (&$pageImageRead, $rvn): PageImageRead {
-            $pageImageRead = new PageImageRead(
+        $mediaReadFactory = $memoize(static function () use (&$mediaRead, $rvn): MediaRead {
+            $mediaRead = new MediaRead(
                 $rvn['db'],
                 (string) $rvn['driver'],
                 (string) $rvn['prefix']
             );
 
-            return $pageImageRead;
+            return $mediaRead;
         });
 
         /**
-         * Builds page-image write side for panel gallery persistence.
+         * Builds media write side for panel gallery persistence.
          */
-        $pageImagesWriteFactory = $memoize(static function () use (&$pageImageWrite, $rvn): PageImageWrite {
-            $pageImageWrite = new PageImageWrite(
+        $mediaWriteFactory = $memoize(static function () use (&$mediaWrite, $rvn): MediaWrite {
+            $mediaWrite = new MediaWrite(
                 $rvn['db'],
                 (string) $rvn['driver'],
                 (string) $rvn['prefix']
             );
 
-            return $pageImageWrite;
+            return $mediaWrite;
         });
 
         /**
@@ -481,22 +480,21 @@ final class PanelRuntimeBuilder
         });
 
         /**
-         * Builds the panel page-image helper only when page editing enters media flows.
+         * Builds the panel media helper only when page editing enters media flows.
          *
-         * PageImageManager is a justified holdout: it needs both hasHashForPage/nextSortOrderForPage
-         * (read-side) and insertImageWithVariants/deleteImageForPage (write-side) in one object.
-         * Keep using PageImageRepository bridge until PageImageManager is refactored to accept
-         * separate read+write injections.
+         * The manager spans both gallery duplicate/order lookups and media-row mutations,
+         * so it takes the split read/write seams directly.
          */
-        $pageImageManagerFactory = $memoize(static function () use (&$pageImageManager, $rvn): PageImageManager {
-            $bridge = new PageImageRepository(
-                $rvn['db'],
-                (string) $rvn['driver'],
-                (string) $rvn['prefix']
+        $mediaManagerFactory = $memoize(static function () use (&$mediaManager, $rvn, $mediaReadFactory, $mediaWriteFactory): MediaManager {
+            $mediaManager = new MediaManager(
+                $rvn['config'],
+                $rvn['input'],
+                $mediaReadFactory(),
+                $mediaWriteFactory(),
+                (string) $rvn['root']
             );
-            $pageImageManager = new PageImageManager($rvn['config'], $rvn['input'], $bridge, (string) $rvn['root']);
 
-            return $pageImageManager;
+            return $mediaManager;
         });
 
         /**
@@ -593,18 +591,18 @@ final class PanelRuntimeBuilder
             $channelReadFactory,
             $pageReadFactory,
             $pageWriteFactory,
-            $pageImagesReadFactory,
-            $pageImagesWriteFactory,
-            $pageImageManagerFactory,
+            $mediaReadFactory,
+            $mediaWriteFactory,
+            $mediaManagerFactory,
             $userReadFactory
         ): array {
             return [
                 'channel_read' => $channelReadFactory(),
                 'page_read' => $pageReadFactory(),
                 'page_write' => $pageWriteFactory(),
-                'page_images_read' => $pageImagesReadFactory(),
-                'page_images_write' => $pageImagesWriteFactory(),
-                'page_image_manager' => $pageImageManagerFactory,
+                'media_read' => $mediaReadFactory(),
+                'media_write' => $mediaWriteFactory(),
+                'media_manager' => $mediaManagerFactory,
                 'user_read' => $userReadFactory(),
             ];
         });
@@ -984,9 +982,9 @@ final class PanelRuntimeBuilder
                 $rvn['input'],
                 $contentDomain['page_read'],
                 $contentDomain['page_write'],
-                $contentDomain['page_images_read'],
-                $contentDomain['page_images_write'],
-                $contentDomain['page_image_manager'],
+                $contentDomain['media_read'],
+                $contentDomain['media_write'],
+                $contentDomain['media_manager'],
                 $taxonomyDomain['category'],
                 $taxonomyDomain['category_set'],
                 $taxonomyDomain['tag'],

@@ -1,8 +1,8 @@
 <?php
 /**
  * RAVEN CMS
- * ~/private/sys/Repository/PageImageWrite.php
- * Write-side data access for page gallery images and their size variants.
+ * ~/private/sys/Repository/MediaWrite.php
+ * Write-side data access for page-scoped media rows and their size variants.
  * Docs: https://raven.lanterns.io
  */
 
@@ -11,17 +11,17 @@ declare(strict_types=1);
 namespace Raven\Core\Repository;
 
 use PDO;
-use Raven\Lib\Scribe\PageImageScribe;
+use Raven\Lib\Scribe\MediaScribe;
 
 /**
- * INSERT, UPDATE, and DELETE methods for per-page gallery images and size variants.
+ * INSERT, UPDATE, and DELETE methods for page-scoped media rows and size variants.
  *
- * Read operations (SELECT, lookup) live in PageImageRead.
- * All SQL mutations are delegated to PageImageScribe.
+ * Read operations (SELECT, lookup) live in MediaRead.
+ * All SQL mutations are delegated to MediaScribe.
  */
-final class PageImageWrite
+final class MediaWrite
 {
-    private PageImageScribe $pageImageScribe;
+    private MediaScribe $mediaScribe;
 
     /**
      * @param PDO    $db     Active database connection.
@@ -30,7 +30,7 @@ final class PageImageWrite
      */
     public function __construct(PDO $db, string $driver, string $prefix)
     {
-        $this->pageImageScribe = new PageImageScribe($db, $driver, $prefix);
+        $this->mediaScribe = new MediaScribe($db, $driver, $prefix);
     }
 
     /**
@@ -42,7 +42,7 @@ final class PageImageWrite
      */
     public function insertImageWithVariants(array $image, array $variants): int
     {
-        return $this->pageImageScribe->insertImageWithVariants($image, $variants);
+        return $this->mediaScribe->insertImageWithVariants($image, $variants);
     }
 
     /**
@@ -54,7 +54,7 @@ final class PageImageWrite
      */
     public function updateGalleryForPage(int $pageId, bool $enabled, array $imageUpdates): void
     {
-        $this->pageImageScribe->updateGalleryForPage($pageId, $enabled, $imageUpdates);
+        $this->mediaScribe->updateGalleryForPage($pageId, $enabled, $imageUpdates);
     }
 
     /**
@@ -66,7 +66,7 @@ final class PageImageWrite
      */
     public function deleteImageForPage(int $pageId, int $imageId): ?array
     {
-        return $this->pageImageScribe->deleteImageForPage($pageId, $imageId);
+        return $this->mediaScribe->deleteImageForPage($pageId, $imageId);
     }
 
     /**
@@ -77,6 +77,6 @@ final class PageImageWrite
      */
     public function deleteAllForPage(int $pageId): array
     {
-        return $this->pageImageScribe->deleteAllForPage($pageId);
+        return $this->mediaScribe->deleteAllForPage($pageId);
     }
 }

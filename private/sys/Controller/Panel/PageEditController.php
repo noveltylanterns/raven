@@ -14,8 +14,8 @@ namespace Raven\Core\Controller\Panel;
 use Closure;
 use Raven\Core\Config;
 use Raven\Core\Repository\CategoryRead;
-use Raven\Core\Repository\PageImageRead;
-use Raven\Core\Repository\PageImageWrite;
+use Raven\Core\Repository\MediaRead;
+use Raven\Core\Repository\MediaWrite;
 use Raven\Core\Repository\PageRead;
 use Raven\Core\Repository\PageWrite;
 use Raven\Core\Repository\SetRead;
@@ -25,7 +25,7 @@ use Raven\Lib\Auth\LoginIdentifierResolver;
 use Raven\Lib\Extension\ExtensionEditorCatalogService;
 use Raven\Lib\Extension\ExtensionStateStore;
 use Raven\Lib\Extension\Panel\ExtensionCatalogService;
-use Raven\Lib\Media\Panel\PageImageManager;
+use Raven\Lib\Media\Panel\MediaManager;
 use Raven\Lib\Parser\CategoryDataParser;
 use Raven\Lib\Parser\ChannelDataParser;
 use Raven\Lib\Parser\ChannelRouteParser;
@@ -60,11 +60,11 @@ final class PageEditController
     private InputSanitizer $input;
     private PageRead $pageRead;
     private PageWrite $pageWrite;
-    private PageImageRead $pageImages;
-    private PageImageWrite $pageImagesWrite;
-    /** @var Closure(): PageImageManager */
-    private Closure $pageImageManagerResolver;
-    private ?PageImageManager $pageImageManager = null;
+    private MediaRead $mediaRead;
+    private MediaWrite $mediaWrite;
+    /** @var Closure(): MediaManager */
+    private Closure $mediaManagerResolver;
+    private ?MediaManager $mediaManager = null;
     /** @var Closure(): CategoryRead */
     private Closure $categoryRepoResolver;
     private ?CategoryRead $categoryRepo = null;
@@ -111,9 +111,9 @@ final class PageEditController
      * @param InputSanitizer $input Shared input sanitizer for panel request values.
      * @param PageRead $pageRead Page repository read side for edit-form reads.
      * @param PageWrite $pageWrite Page repository write side for page saves and deletes.
-     * @param PageImageRead $pageImages Page-image repository read side for gallery renders and page-existence checks.
-     * @param PageImageWrite $pageImagesWrite Page-image repository write side for gallery persistence.
-     * @param callable $pageImageManagerResolver Lazy page-image manager resolver; resolved only on gallery upload/delete routes.
+     * @param MediaRead $mediaRead Media repository read side for gallery renders and page-existence checks.
+     * @param MediaWrite $mediaWrite Media repository write side for gallery persistence.
+     * @param callable $mediaManagerResolver Lazy media manager resolver; resolved only on gallery upload/delete routes.
      * @param callable $categoryRepoResolver Lazy category read resolver; resolved only on taxonomy-aware page routes.
      * @param callable $categorySetRepoResolver Lazy category-set read resolver; resolved only on set-validation flows.
      * @param callable $tagRepoResolver Lazy tag read resolver; resolved only on taxonomy-aware page routes.
@@ -138,9 +138,9 @@ final class PageEditController
         InputSanitizer $input,
         PageRead $pageRead,
         PageWrite $pageWrite,
-        PageImageRead $pageImages,
-        PageImageWrite $pageImagesWrite,
-        callable $pageImageManagerResolver,
+        MediaRead $mediaRead,
+        MediaWrite $mediaWrite,
+        callable $mediaManagerResolver,
         callable $categoryRepoResolver,
         callable $categorySetRepoResolver,
         callable $tagRepoResolver,
@@ -163,9 +163,9 @@ final class PageEditController
         $this->input = $input;
         $this->pageRead = $pageRead;
         $this->pageWrite = $pageWrite;
-        $this->pageImages = $pageImages;
-        $this->pageImagesWrite = $pageImagesWrite;
-        $this->pageImageManagerResolver = Closure::fromCallable($pageImageManagerResolver);
+        $this->mediaRead = $mediaRead;
+        $this->mediaWrite = $mediaWrite;
+        $this->mediaManagerResolver = Closure::fromCallable($mediaManagerResolver);
         $this->categoryRepoResolver = Closure::fromCallable($categoryRepoResolver);
         $this->categorySetRepoResolver = Closure::fromCallable($categorySetRepoResolver);
         $this->tagRepoResolver = Closure::fromCallable($tagRepoResolver);
@@ -453,7 +453,7 @@ final class PageEditController
             ]);
 
             // Keep Media tab metadata and page-level gallery toggle in sync with save.
-            $this->pageImagesWrite->updateGalleryForPage(
+            $this->mediaWrite->updateGalleryForPage(
                 $savedId,
                 $galleryEnabled,
                 $galleryImageUpdates
@@ -487,7 +487,7 @@ final class PageEditController
         }
 
         $pageId = $this->input->int($post['id'] ?? null, 1);
-        if ($pageId === null || !$this->pageImages->pageExists($pageId)) {
+        if ($pageId === null || !$this->mediaRead->pageExists($pageId)) {
             $this->context->flash('error', 'Save the page before uploading gallery images.');
             Redirect::redirect($this->context->panelUrl('/page'));
         }
@@ -528,7 +528,7 @@ final class PageEditController
         $errors = [];
 
         foreach ($uploads as $upload) {
-            $result = $this->pageImageManager()->uploadForPage($pageId, $upload);
+            $result = $this->mediaManager()->uploadForPage($pageId, $upload);
             if ((bool) ($result['ok'] ?? false)) {
                 $successCount++;
                 continue;
@@ -590,7 +590,7 @@ final class PageEditController
 
         // Single-row delete action has priority when explicit image id is posted.
         if ($imageId !== null) {
-            if (!$this->pageImageManager()->deleteImageForPage($pageId, $imageId)) {
+            if (!$this->mediaManager()->deleteImageForPage($pageId, $imageId)) {
                 $this->context->flash('error', 'Image not found or already deleted.');
                 Redirect::redirect($this->editorTabs->panelEditorUrlWithTab(
                     fn (string $suffix): string => $this->context->panelUrl($suffix),
@@ -630,7 +630,7 @@ final class PageEditController
         $failedCount = 0;
 
         foreach ($selectedImageIds as $selectedImageId) {
-            if ($this->pageImageManager()->deleteImageForPage($pageId, $selectedImageId)) {
+            if ($this->mediaManager()->deleteImageForPage($pageId, $selectedImageId)) {
                 $deletedCount++;
             } else {
                 $failedCount++;
@@ -682,7 +682,7 @@ final class PageEditController
         if ($id !== null) {
             // Single-row delete path (row action button).
             try {
-                $this->pageImageManager()->deleteAllForPage($id);
+                $this->mediaManager()->deleteAllForPage($id);
                 $this->pageWrite->deleteById($id);
             } catch (\Throwable) {
                 $this->context->flash('error', 'Failed to delete page.');
@@ -706,7 +706,7 @@ final class PageEditController
         foreach ($selectedIds as $selectedId) {
             try {
                 // Keep processing all selected ids even when one delete fails.
-                $this->pageImageManager()->deleteAllForPage($selectedId);
+                $this->mediaManager()->deleteAllForPage($selectedId);
                 $this->pageWrite->deleteById($selectedId);
                 $deletedCount++;
             } catch (\Throwable) {
@@ -728,24 +728,24 @@ final class PageEditController
     }
 
     /**
-     * Returns the page-image manager on first use so non-media routes do not
+     * Returns the media manager on first use so non-media routes do not
      * instantiate upload/storage helpers.
      *
-     * @return PageImageManager Shared page-image manager for gallery operations.
+     * @return MediaManager Shared media manager for gallery operations.
      */
-    private function pageImageManager(): PageImageManager
+    private function mediaManager(): MediaManager
     {
-        if ($this->pageImageManager instanceof PageImageManager) {
-            return $this->pageImageManager;
+        if ($this->mediaManager instanceof MediaManager) {
+            return $this->mediaManager;
         }
 
-        $pageImageManager = ($this->pageImageManagerResolver)();
-        if (!$pageImageManager instanceof PageImageManager) {
-            throw new \RuntimeException('Content controller page-image manager resolver returned an invalid value.');
+        $mediaManager = ($this->mediaManagerResolver)();
+        if (!$mediaManager instanceof MediaManager) {
+            throw new \RuntimeException('Content controller media manager resolver returned an invalid value.');
         }
 
-        $this->pageImageManager = $pageImageManager;
-        return $this->pageImageManager;
+        $this->mediaManager = $mediaManager;
+        return $this->mediaManager;
     }
 
     /**

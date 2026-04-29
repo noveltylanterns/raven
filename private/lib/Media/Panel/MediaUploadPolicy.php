@@ -7,9 +7,9 @@ namespace Raven\Lib\Media\Panel;
 use Raven\Core\Config;
 
 /**
- * Shared upload policy helpers for page gallery images.
+ * Shared upload policy helpers for panel media uploads.
  */
-final class PageImageUploadPolicy
+final class MediaUploadPolicy
 {
     private Config $config;
 
@@ -78,4 +78,3 @@ final class PageImageUploadPolicy
         };
     }
 }
-

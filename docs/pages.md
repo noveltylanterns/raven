@@ -149,9 +149,10 @@ Behavior notes:
 - Page persistence:
   - `private/sys/Repository/PageRepository.php`
 - Gallery persistence:
-  - `private/sys/Repository/PageImageRepository.php`
+  - `private/sys/Repository/MediaRead.php`
+  - `private/sys/Repository/MediaWrite.php`
 - Gallery processing:
-  - `private/sys/Core/Media/PageImageManager.php`
+  - `private/lib/Media/Panel/MediaManager.php`
 
 ### Panel Routes
 
@@ -182,12 +183,12 @@ Root-scope note:
 4. Normalizes category/tag ids against current valid ids.
 5. Normalizes gallery metadata payload (`normalizeGalleryImageUpdates`).
 6. Saves page row via `PageRepository::save(...)`.
-7. Saves media-tab metadata + gallery toggle via `PageImageRepository::updateGalleryForPage(...)`.
+7. Saves media-tab metadata + gallery toggle via `MediaWrite::updateGalleryForPage(...)`.
 
 Important media-flag behavior:
 
 - Cover flags are canonicalized so only one cover remains.
-- Repository performs an additional integrity pass over all page images to enforce this even when posted payload is partial or malformed.
+- Write-side persistence performs an additional integrity pass over all page images to enforce this even when posted payload is partial or malformed.
 
 ### Page Data Model
 
@@ -195,8 +196,8 @@ Core page fields live in `pages` table, with related tables:
 
 - `page_categories` (many-to-many)
 - `page_tags` (many-to-many)
-- `page_images`
-- `page_image_variants`
+- `media`
+- `media_variants`
 
 Content blocks persistence model:
 
@@ -213,7 +214,7 @@ Content blocks persistence model:
 
 ### Gallery Upload/Delete Model
 
-`PageImageManager::uploadForPage(...)`:
+`MediaManager::uploadForPage(...)`:
 
 - requires Imagick
 - validates upload, MIME, extension allowlist, filesize
@@ -221,11 +222,11 @@ Content blocks persistence model:
 - auto-orients image
 - optionally strips EXIF (`media.images.strip_exif`)
 - writes source image + `sm`/`md`/`lg` variants
-- stores rows in `page_images` + `page_image_variants`
+- stores rows in `media` + `media_variants` through `MediaWrite`
 
-`PageImageManager::deleteImageForPage(...)` and `deleteAllForPage(...)`:
+`MediaManager::deleteImageForPage(...)` and `deleteAllForPage(...)`:
 
-- remove DB rows through repository
+- remove DB rows through `MediaWrite`
 - remove files from `public/uploads/pages/{page_id}/...`
 - clean up empty page image directory
 

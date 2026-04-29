@@ -42,7 +42,7 @@ final class EditorMCE
      * excluded from gallery inclusion. Each item exposes the four variant URLs used by
      * the gallery picker (`original`, `sm`, `md`, `lg`).
      *
-     * @param array<int, array<string, mixed>> $galleryImages Gallery image records from PageImageRepository.
+     * @param array<int, array<string, mixed>> $galleryImages Gallery image records from media-read hydration.
      * @return array<int, array{id: int, label: string, alt_text: string, caption: string, variants: array{original: string, sm: string, md: string, lg: string}}> Compact gallery items for JSON encoding.
      */
     public function galleryItems(array $galleryImages): array
