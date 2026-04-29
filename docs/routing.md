@@ -6,7 +6,7 @@ This document explains Raven's Routing Table screen for both panel users and dev
 
 Maintenance note: keep this file updated whenever Routing Table routes, row-building/conflict logic, export behavior, or Routing Table panel views change (`private/tpl/panel/routing.php`, `RoutingController::routing*`, or routing inventory composition helpers).
 
-Public-routing note: public entry orchestration now lives in `private/sys/Controller/Public/PublicController.php`, where controller-aligned registrars from `private/sys/Routing/Public/` map stock public route families onto the split handlers under `private/sys/Controller/Public/`. Shared low-level routing primitives live in `private/sys/Routing/`, while scope-specific gating stays in the public/panel front controllers. Keep those files and `public/theme/AGENTS.md` in sync when public route families are added or changed.
+Public-routing note: public entry orchestration lives directly in `public/index.php`, where controller-aligned registrars from `private/sys/Routing/Public/` map stock public route families onto the split handlers under `private/sys/Controller/Public/`. Shared low-level routing primitives live in `private/sys/Routing/`, while scope-specific gating stays in the index entry files. Keep those files and `public/theme/AGENTS.md` in sync when public route families are added or changed.
 
 ## 1) Panel Guide (Routing Table)
 
@@ -80,10 +80,10 @@ Export fields include:
 - Panel controller:
   - `private/sys/Controller/Panel/RoutingController.php`
 - Public route bootstrap:
-  - `private/sys/Controller/Public/PublicController.php`
+  - `public/index.php`
   - `private/sys/Routing/Public/*Router.php`
 - Panel route bootstrap:
-  - `private/sys/Controller/Panel/PanelController.php`
+  - `panel/index.php`
   - `private/sys/Routing/Panel/*Router.php`
   - Channel/category/tag panel routes are now registered through their own `ChannelRouter.php`, `CategoryRouter.php`, and `TagRouter.php` files instead of a shared taxonomy registrar bundle.
   - Event-log routes are now registered through `LogRouter.php` instead of riding through the broader system-route registrar.
@@ -112,7 +112,7 @@ Export fields include:
 
 ### Panel Routes
 
-Declared through `private/sys/Routing/Panel/PanelRoutingRouteRegistrar.php` and wired by `private/sys/Controller/Panel/PanelController.php`:
+Declared through `private/sys/Routing/Panel/PanelRoutingRouteRegistrar.php` and wired by `panel/index.php`:
 
 - `GET /routing` -> routing inventory screen
 - `GET /routing/export` -> CSV export

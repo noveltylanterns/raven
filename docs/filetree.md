@@ -26,13 +26,11 @@ This file is the fast system map for Raven CMS. Use it to quickly understand the
 ## Runtime Entrypoints
 
 - `public/index.php`
-  - Public frontend entry shim.
-  - Should stay limited to universal public-entry delegation only.
+  - Public web entry orchestration and dispatch. Handles installer handoff, early panel handoff for single-entrypoint setups, profiler arming, controller factory resolution, router registration, availability gating, dispatch, and cron scheduling.
 - `public/install.php`
   - First-run installer.
 - `panel/index.php`
-  - Panel/dashboard entry shim.
-  - Should stay limited to universal panel-entry delegation only.
+  - Admin panel entry orchestration and dispatch. Handles boot, path normalization, auth-helper path detection, category/tag feature flags, theme asset fast path, nav-state session writes (stock nav + extension nav), router registration, profiler arming, dispatch, and cron scheduling.
 - `private/Raven.php`
   - `Raven\Raven` shared bootstrap class and container builder.
   - Owns autoloading, config/session/database/auth startup, lazy service registration, extension metadata, and scheduler wiring.
@@ -121,8 +119,8 @@ This file is the fast system map for Raven CMS. Use it to quickly understand the
 - `private/sys/Controller/`
   - Public/panel/auth controllers and request flow coordination.
   - `DatabaseController` — bootstrap-only database connection factory at the `Controller/` root level; creates app and auth PDO connections from config using the `lib/Database/Connection/` helpers. Not for extension use.
-  - `Controller/Panel/` now holds both the panel front controller (`PanelController`) and the split panel sub-controllers, all coordinated through `SharedController`; `AuthController`, `DashboardController`, `PageController`, `ChannelController`, `CategoryController`, `TaxonomyController`, `RedirectController`, `UserController`, `GroupController`, `LogsController`, `RoutingController`, `UpdateController`, `PreferencesController`, `ConfigController`, and `SystemController` own the panel route seams. `PageController` owns the `/page*` route family, `ChannelController` owns `/channel*`, `CategoryController` owns `/category*`, `TaxonomyController` is now narrowed to `/tag*`, `LogsController` owns `/logs*`, `RoutingController` owns `/routing*`, and `UpdateController` owns `/update*`.
-  - `Controller/Public/` now holds both the public front controller (`PublicController`) and the split public sub-controllers, all coordinated through `SharedController`; `AuthController`, `UserController`, `GroupController`, `CategoryController`, `ChannelController`, `TagController`, `FeedController`, and `PageController` own the public route seams. `UserController` owns public profile routes, `GroupController` owns public group routes, `CategoryController` owns `/{category.prefix}/*`, `ChannelController` owns the single-segment `/{slug}` landing/root-page seam, `TagController` owns `/{tag.prefix}/*`, `FeedController` is narrowed to feed/XML routes, and `PageController` owns homepage plus channel-qualified page routes and embedded-form submission.
+  - `Controller/Panel/` holds the split panel sub-controllers coordinated through `SharedController`; `AuthController`, `DashboardController`, `PageController`, `ChannelController`, `CategoryController`, `TaxonomyController`, `RedirectController`, `UserController`, `GroupController`, `LogsController`, `RoutingController`, `UpdateController`, `PreferencesController`, `ConfigController`, and `SystemController` own the panel route seams. `PageController` owns the `/page*` route family, `ChannelController` owns `/channel*`, `CategoryController` owns `/category*`, `TaxonomyController` is now narrowed to `/tag*`, `LogsController` owns `/logs*`, `RoutingController` owns `/routing*`, and `UpdateController` owns `/update*`.
+  - `Controller/Public/` holds the split public sub-controllers coordinated through `SharedController`; `AuthController`, `UserController`, `GroupController`, `CategoryController`, `ChannelController`, `TagController`, `FeedController`, and `PageController` own the public route seams. `UserController` owns public profile routes, `GroupController` owns public group routes, `CategoryController` owns `/{category.prefix}/*`, `ChannelController` owns the single-segment `/{slug}` landing/root-page seam, `TagController` owns `/{tag.prefix}/*`, `FeedController` is narrowed to feed/XML routes, and `PageController` owns homepage plus channel-qualified page routes and embedded-form submission.
 - `private/sys/Repository/`
   - Core content/taxonomy/auth-facing persistence split into `*Read` (SELECT/lookup) and `*Write` (INSERT/UPDATE/DELETE) classes for each domain.
   - Read classes: `PageRead`, `ChannelRead`, `UserRead`, `GroupRead`, `CategoryRead`, `TagRead`, `SetRead`, `RedirectRead`, `MediaRead`, `InviteRead`.
@@ -135,7 +133,7 @@ This file is the fast system map for Raven CMS. Use it to quickly understand the
   - `Request.php` / `Response.php` — the immutable routing request/response value objects used by the dispatcher.
   - `Routing/Public/` — `PublicRuntimeBuilder`, controller-aligned public route registrars (including extension-route loading), `RouteConfig`, and `ChannelPageRouter` (wraps `Raven\Lib\Parser\ModeParser` for public content controllers: lookup-target resolution and canonical segment building).
   - `Routing/Panel/` — `PanelRuntimeBuilder`, controller-aligned panel route routers (including dedicated `ChannelRouter`, `CategoryRouter`, `TagRouter`, `LogRouter`, `RoutingRouter`, and `UpdateRouter` files for the split panel route families), extension-route loading, panel theme-asset fast path, and `RoutingInventoryBuilder` (builds the normalized routing inventory row set for the panel routing diagnostics view).
-  - Note: the actual public/panel front controllers now live under `private/sys/Controller/Public/PublicController.php` and `private/sys/Controller/Panel/PanelController.php`; `sys/Routing/` now owns only shared routing primitives plus scope-specific builders/registrars.
+  - Note: entry orchestration now lives directly in `public/index.php` and `panel/index.php`; `sys/Routing/` owns shared routing primitives plus scope-specific builders/registrars, and `sys/Controller/` owns only the route-specific sub-controllers and shared request-context helpers.
 
 ### private/lib/
 
