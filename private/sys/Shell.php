@@ -23,9 +23,10 @@ use Raven\Core\Repository\TagWrite;
 use Raven\Lib\Archive\Install as ArchiveInstall;
 use Raven\Lib\Archive\Package as ArchivePackage;
 use Raven\Lib\Auth\Panel\PanelAccess;
-use Raven\Lib\Extension\ExtensionStateStore;
+use Raven\Lib\Extension\Registry;
 use Raven\Lib\Extension\Panel\ExtensionScaffoldService;
-use Raven\Lib\Extension\ExtensionRegistry;
+use Raven\Lib\Extension\Resolver;
+use Raven\Lib\Extension\StateRead;
 use Raven\Lib\Parser\CategoryDataParser;
 use Raven\Lib\Parser\ChannelDataParser;
 use Raven\Lib\Parser\GroupDataParser;
@@ -499,15 +500,15 @@ function raven_cli_find_row_by_slug(array $rows, string $slug): ?array
  * filesystem seam for each helper call in the same command flow.
  *
  * @param string $root Project root path.
- * @return ExtensionStateStore Shared extension-state store for that root.
+ * @return StateRead Shared extension-state store for that root.
  */
-function raven_cli_extension_state_store(string $root): ExtensionStateStore
+function raven_cli_extension_state_store(string $root): StateRead
 {
     static $stores = [];
 
     $normalizedRoot = rtrim($root, '/');
-    if (!isset($stores[$normalizedRoot]) || !$stores[$normalizedRoot] instanceof ExtensionStateStore) {
-        $stores[$normalizedRoot] = new ExtensionStateStore($normalizedRoot . '/private/ext');
+    if (!isset($stores[$normalizedRoot]) || !$stores[$normalizedRoot] instanceof StateRead) {
+        $stores[$normalizedRoot] = new StateRead($normalizedRoot . '/private/ext');
     }
 
     return $stores[$normalizedRoot];
@@ -2028,15 +2029,15 @@ function raven_cli_command_extension(RavenCliContext $context, array $tokens): i
                     continue;
                 }
 
-                $manifest = ExtensionRegistry::readManifest($root, $entry);
+                $manifest = Registry::readManifest($root, $entry);
                 $items[] = [
                     'slug' => $entry,
                     'enabled' => !empty($state['enabled'][$entry]),
                     'valid' => $manifest !== null,
                     'name' => $manifest['name'] ?? $entry,
                     'type' => $manifest['type'] ?? 'invalid',
-                    'has_panel_routes' => \Raven\Lib\Extension\Layout::hasProvider($path, 'routes_panel.php'),
-                    'has_public_routes' => \Raven\Lib\Extension\Layout::hasProvider($path, 'routes_public.php'),
+                    'has_panel_routes' => Resolver::hasProvider($path, 'routes_panel.php'),
+                    'has_public_routes' => Resolver::hasProvider($path, 'routes_public.php'),
                 ];
             }
 
@@ -2077,7 +2078,7 @@ function raven_cli_command_extension(RavenCliContext $context, array $tokens): i
                 throw new RuntimeException('Extension directory not found: ' . $slug);
             }
 
-            $manifest = ExtensionRegistry::readManifest($root, $slug);
+            $manifest = Registry::readManifest($root, $slug);
             if ($action === 'enable' && $manifest === null) {
                 throw new RuntimeException('Extension manifest is invalid; refusing to enable.');
             }
@@ -2133,7 +2134,7 @@ function raven_cli_command_extension(RavenCliContext $context, array $tokens): i
                 throw new RuntimeException('Disable extension first or pass --force.');
             }
 
-            $manifest = ExtensionRegistry::readManifest($root, $slug);
+            $manifest = Registry::readManifest($root, $slug);
             if ($manifest !== null) {
                 $resolver = new \Raven\Lib\Extension\ExtensionBootstrapContractResolver();
                 $contract = $resolver->resolve($root, $slug, $manifest);
@@ -2216,7 +2217,7 @@ function raven_cli_command_extension(RavenCliContext $context, array $tokens): i
                 throw new RuntimeException($flattenError);
             }
 
-            if (ExtensionRegistry::readManifest($root, $slug) === null) {
+            if (Registry::readManifest($root, $slug) === null) {
                 raven_cli_remove_directory_recursive($target);
                 throw new RuntimeException('Imported extension has invalid ext.json/type contract.');
             }
@@ -2311,7 +2312,7 @@ function raven_cli_command_extension(RavenCliContext $context, array $tokens): i
                 $createdFiles[] = 'composer.json';
             }
 
-            if (ExtensionRegistry::readManifest($root, $slug) === null) {
+            if (Registry::readManifest($root, $slug) === null) {
                 raven_cli_remove_directory_recursive($path);
                 throw new RuntimeException('Generated scaffold failed extension manifest/type validation.');
             }

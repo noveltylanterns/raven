@@ -19,9 +19,9 @@ use Raven\Lib\Archive\Install as ArchiveInstall;
 use Raven\Lib\Archive\Package as ArchivePackage;
 use Raven\Lib\Scribe\ConfigScribe;
 use Raven\Lib\Extension\ExtensionBootstrapContractResolver;
-use Raven\Lib\Extension\ExtensionStateStore;
 use Raven\Lib\Extension\ExtensionStorageCleaner;
 use Raven\Lib\Extension\ExtensionStorageProvisioner;
+use Raven\Lib\Extension\StateRead;
 use Raven\Lib\Extension\Panel\ExtensionCatalogService;
 use Raven\Lib\Extension\Panel\ExtensionScaffoldService;
 use Raven\Lib\Security\InputSanitizer;
@@ -48,7 +48,7 @@ final class SystemController
     /** @var Closure(string): array<string, mixed> */
     private Closure $extensionServicesFor;
     private ?ArchivePackage $archivePackages = null;
-    private ExtensionStateStore $extensionStateStore;
+    private StateRead $extensionStateStore;
     private ?ExtensionScaffoldService $extensionScaffoldService = null;
     private ?ThemeGenerator $themeGenerator = null;
     private ?ExtensionStorageProvisioner $extensionStorageProvisioner = null;
@@ -63,7 +63,7 @@ final class SystemController
      * @param Config $config Runtime configuration reader.
      * @param InputSanitizer $input Shared request input sanitizer.
      * @param string $root Project root path for filesystem-backed admin workflows.
-     * @param ExtensionStateStore $extensionStateStore Shared extension state store for panel system reads/writes.
+     * @param StateRead $extensionStateStore Shared extension state store for panel system reads/writes.
      * @param ExtensionCatalogService $extensionCatalogService Shared extension catalog for manifest and stock-extension reads.
      * @param ThemeCatalog $themeCatalogService Shared public-theme catalog for theme inventory and slug validation.
      * @param callable(string): array<string, mixed> $extensionServicesFor Lazy per-extension services resolver.
@@ -74,7 +74,7 @@ final class SystemController
         Config $config,
         InputSanitizer $input,
         string $root,
-        ExtensionStateStore $extensionStateStore,
+        StateRead $extensionStateStore,
         ExtensionCatalogService $extensionCatalogService,
         ThemeCatalog $themeCatalogService,
         callable $extensionServicesFor

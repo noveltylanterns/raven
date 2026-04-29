@@ -2,8 +2,8 @@
 
 /**
  * RAVEN CMS
- * ~/private/lib/Scribe/LoginThrottleScribe.php
- * Write-side persistence helper for login-throttle buckets.
+ * ~/private/lib/Scribe/AuthThrottleScribe.php
+ * Write-side persistence helper for auth-throttle buckets.
  * Docs: https://raven.lanterns.io
  */
 
@@ -14,20 +14,20 @@ namespace Raven\Lib\Scribe;
 use PDO;
 
 /**
- * Owns write-side persistence for identifier+IP login-throttle buckets.
+ * Owns write-side persistence for identifier+IP auth-throttle buckets.
  *
  * LoginThrottleService keeps the read-side bucket lookup and throttle policy,
  * while this class centralizes the mutation SQL for bucket upserts, deletes,
  * and stale-row pruning.
  */
-final class LoginThrottleScribe
+final class AuthThrottleScribe
 {
     private PDO $rvnDb;
     private string $driver;
     private string $prefix;
 
     /**
-     * Prepares the login-throttle scribe for bucket writes.
+     * Prepares the auth-throttle scribe for bucket writes.
      *
      * @param PDO $rvnDb App-database connection for `auth_failures` writes.
      * @param string $driver Active PDO driver name used for conflict syntax.

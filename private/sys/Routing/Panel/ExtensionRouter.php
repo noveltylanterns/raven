@@ -13,7 +13,7 @@ namespace Raven\Core\Routing\Panel;
 
 use Raven\Lib\Auth\Panel\PanelAccess;
 use Raven\Lib\Auth\Panel\PanelSessionGuard;
-use Raven\Lib\Extension\Layout;
+use Raven\Lib\Extension\Resolver;
 use Raven\Lib\Parser\PanelParser;
 use Raven\Core\Routing\Router;
 
@@ -190,7 +190,7 @@ final class ExtensionRouter
 
         foreach (array_keys($enabledExtensions) as $extensionName) {
             $extensionRoot = $rvn['root'] . '/private/ext/' . $extensionName;
-            $routesFile = Layout::providerPath($extensionRoot, 'routes_panel.php');
+            $routesFile = Resolver::providerPath($extensionRoot, 'routes_panel.php');
             if ($routesFile === null) {
                 continue;
             }

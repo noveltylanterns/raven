@@ -5,7 +5,8 @@ declare(strict_types=1);
 namespace Raven\Lib\Extension\Panel;
 
 use Raven\Lib\Auth\Panel\PanelAccess;
-use Raven\Lib\Extension\ExtensionStateStore;
+use Raven\Lib\Extension\Resolver;
+use Raven\Lib\Extension\StateRead;
 use Raven\Lib\Security\InputSanitizer;
 
 /**
@@ -13,10 +14,10 @@ use Raven\Lib\Security\InputSanitizer;
  */
 final class ExtensionPermissionCatalogService
 {
-    private ExtensionStateStore $stateStore;
+    private StateRead $stateStore;
     private InputSanitizer $input;
 
-    public function __construct(ExtensionStateStore $stateStore, InputSanitizer $input)
+    public function __construct(StateRead $stateStore, InputSanitizer $input)
     {
         $this->stateStore = $stateStore;
         $this->input = $input;
@@ -171,7 +172,7 @@ final class ExtensionPermissionCatalogService
             }
 
             $extensionPath = $this->stateStore->basePath() . '/' . $entry;
-            if (!is_dir($extensionPath) || !\Raven\Lib\Extension\Layout::hasProvider($extensionPath, 'routes_panel.php')) {
+            if (!is_dir($extensionPath) || !Resolver::hasProvider($extensionPath, 'routes_panel.php')) {
                 continue;
             }
 

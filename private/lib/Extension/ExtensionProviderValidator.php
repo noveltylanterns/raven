@@ -39,7 +39,7 @@ final class ExtensionProviderValidator
         }
 
         $extensionRoot = rtrim($root, '/') . '/private/ext/' . $directoryName;
-        $providerPath = Layout::providerPath($extensionRoot, 'shortcodes.php');
+        $providerPath = Resolver::providerPath($extensionRoot, 'shortcodes.php');
         if ($providerPath === null) {
             return [
                 'valid' => true,
@@ -155,7 +155,7 @@ final class ExtensionProviderValidator
         }
 
         $extensionRoot = rtrim($root, '/') . '/private/ext/' . $directoryName;
-        $providerPath = Layout::providerPath($extensionRoot, 'fields.php');
+        $providerPath = Resolver::providerPath($extensionRoot, 'fields.php');
         if ($providerPath === null) {
             return [
                 'valid' => true,

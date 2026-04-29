@@ -71,7 +71,7 @@ final class ExtensionEditorCatalogService
                 continue;
             }
 
-            $fields = ExtensionRegistry::fields(
+            $fields = Registry::fields(
                 $this->projectRoot,
                 (string) $extensionName,
                 [
@@ -104,8 +104,8 @@ final class ExtensionEditorCatalogService
     public function publicBodyBlockDefinitions(): array
     {
         $definitions = [];
-        foreach (ExtensionRegistry::enabledDirectories($this->projectRoot, true) as $extensionName) {
-            $manifest = ExtensionRegistry::readManifest($this->projectRoot, $extensionName);
+        foreach (Registry::enabledDirectories($this->projectRoot, true) as $extensionName) {
+            $manifest = Registry::readManifest($this->projectRoot, $extensionName);
             if (
                 !is_array($manifest)
                 || !in_array((string) ($manifest['type'] ?? ''), ['content', 'module'], true)
@@ -113,7 +113,7 @@ final class ExtensionEditorCatalogService
                 continue;
             }
 
-            $fields = ExtensionRegistry::fields(
+            $fields = Registry::fields(
                 $this->projectRoot,
                 (string) $extensionName,
                 [
@@ -173,7 +173,7 @@ final class ExtensionEditorCatalogService
                 continue;
             }
 
-            $shortcodes = ExtensionRegistry::shortcodes(
+            $shortcodes = Registry::shortcodes(
                 $this->projectRoot,
                 (string) $extensionName,
                 [

@@ -20,8 +20,8 @@ use Raven\Lib\Parser\PageRepoParser;
 use Raven\Lib\Auth\AuthService;
 use Raven\Lib\Auth\SessionCookie;
 use Raven\Lib\Parser\ConfigParser;
-use Raven\Lib\Extension\ExtensionRegistry;
-use Raven\Lib\Scheduler\Registry;
+use Raven\Lib\Extension\Registry;
+use Raven\Lib\Scheduler\Registry as SchedulerRegistry;
 use Raven\Lib\Security\Csrf;
 use Raven\Lib\Security\InputSanitizer;
 
@@ -44,13 +44,13 @@ final class Raven
     $root = dirname(__DIR__);
     // These three files are required before the spl_autoload_register below
     // because enabledDirectories() needs them immediately at call time.
-    require_once $root . '/private/lib/Extension/ExtensionRegistry.php';
-    require_once $root . '/private/lib/Extension/Layout.php';
-    // ExtensionStateStore instantiates ExtensionStateScribe in its constructor,
+    require_once $root . '/private/lib/Extension/Registry.php';
+    require_once $root . '/private/lib/Extension/Resolver.php';
+    // StateRead instantiates StateWrite in its constructor,
     // which runs inside enabledDirectories() before the spl_autoload_register below.
     // Require it directly so it is available at that point.
-    require_once $root . '/private/lib/Scribe/ExtensionStateScribe.php';
-    $enabledExtensionDirectories = ExtensionRegistry::enabledDirectories($root, true);
+    require_once $root . '/private/lib/Extension/StateWrite.php';
+    $enabledExtensionDirectories = Registry::enabledDirectories($root, true);
 
     // Load per-package handlers instead of the full Composer autoloader.
     // Each handler registers a targeted PSR-4 autoloader for its package only.
@@ -96,7 +96,7 @@ final class Raven
         $relative = str_replace('\\', '/', substr($class, strlen($extPrefix)));
         foreach ($enabledExtensionDirectories as $directory) {
             $extensionRoot = $root . '/private/ext/' . $directory;
-            foreach (\Raven\Lib\Extension\Layout::classRoots($extensionRoot) as $classRoot) {
+            foreach (\Raven\Lib\Extension\Resolver::classRoots($extensionRoot) as $classRoot) {
                 if (!is_dir($classRoot)) {
                     continue;
                 }
@@ -201,7 +201,7 @@ final class Raven
         return false;
     });
 
-    $extensionRegistry = new ExtensionRegistry($root, $enabledExtensionDirectories);
+    $extensionRegistry = new Registry($root, $enabledExtensionDirectories);
     $extensionManifests = $extensionRegistry->manifests();
     $extensionStorage = $extensionRegistry->storageMap();
     $schedulerExtensions = $extensionRegistry->schedulerDirectories();
@@ -279,7 +279,7 @@ final class Raven
     // Wire the system-wide scheduler.
     // Both core jobs and extension-declared jobs (from extension `cron.php`) run through this registry.
     // The scheduler is passive at bootstrap time — jobs only execute when rvn-cron triggers runDue().
-    $scheduler = new Registry($root);
+    $scheduler = new SchedulerRegistry($root);
 
     // Built-in core job: flip page publish/draft status based on scheduled publish/expires columns.
     // Interval of 60 s means rvn-cron running every minute covers all scheduled posts promptly.

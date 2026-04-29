@@ -35,7 +35,7 @@ use Raven\Core\Routing\Panel\UpdateRouter;
 use Raven\Core\Routing\Panel\UserRouter;
 use Raven\Lib\Auth\Panel\PanelAccess;
 use Raven\Lib\Parser\ConfigParser;
-use Raven\Lib\Extension\Layout;
+use Raven\Lib\Extension\Resolver;
 use Raven\Lib\Parser\PanelParser;
 use Raven\Lib\Scheduler\Cron;
 use Raven\Lib\View\Error as ViewError;
@@ -351,7 +351,7 @@ final class PanelController
                 }
 
                 $extensionRoot = $rvn['root'] . '/private/ext/' . $directoryName;
-                $panelRoutesFile = Layout::providerPath($extensionRoot, 'routes_panel.php');
+                $panelRoutesFile = Resolver::providerPath($extensionRoot, 'routes_panel.php');
                 if ($panelRoutesFile === null) {
                     continue;
                 }

@@ -14,8 +14,8 @@ namespace Raven\Lib\Database\Schema;
 use PDO;
 use Raven\Lib\Database\TableNameResolver;
 use Raven\Lib\Extension\ExtensionBootstrapContractResolver;
-use Raven\Lib\Extension\Layout;
-use Raven\Lib\Extension\ExtensionRegistry;
+use Raven\Lib\Extension\Registry;
+use Raven\Lib\Extension\Resolver;
 
 /**
  * Executes extension-owned schema providers during bootstrap.
@@ -37,8 +37,8 @@ final class ExtensionSchemaRunner
     public function ensureEnabledExtensionSchemas(PDO $db, string $driver, string $prefix): void
     {
         $root = dirname(__DIR__, 4);
-        foreach (ExtensionRegistry::enabledDirectories($root, true) as $directory) {
-            $manifest = ExtensionRegistry::readManifest($root, $directory);
+        foreach (Registry::enabledDirectories($root, true) as $directory) {
+            $manifest = Registry::readManifest($root, $directory);
             if (!is_array($manifest)) {
                 continue;
             }
@@ -60,7 +60,7 @@ final class ExtensionSchemaRunner
             }
 
             $extensionRoot = $root . '/private/ext/' . $directory;
-            $schemaPath = Layout::providerPath($extensionRoot, 'schema.php');
+            $schemaPath = Resolver::providerPath($extensionRoot, 'schema.php');
             if ($schemaPath === null) {
                 continue;
             }

@@ -22,7 +22,7 @@ use Raven\Lib\Parser\CategoryRouteParser;
 use Raven\Lib\Parser\ChannelDataParser;
 use Raven\Lib\Parser\SetParser;
 use Raven\Lib\Security\InputSanitizer;
-use Raven\Lib\Scribe\TaxonomyImageScribe;
+use Raven\Lib\Scribe\MediaScribe;
 use Raven\Lib\Transport\Redirect;
 use Raven\Lib\Transport\Upload;
 use Raven\Lib\View\Panel\EditorTabs;
@@ -49,7 +49,7 @@ final class CategoryEditController
     private ?SetWrite $categorySetWrite = null;
     private bool $categoryEnabled;
     private TaxonomyImageService $taxonomyImageService;
-    private TaxonomyImageScribe $taxonomyImageScribe;
+    private MediaScribe $mediaScribe;
     private ChannelDataParser $channelParser;
     private EditorTabs $editorTabs;
     private Upload $uploadFileSetNormalizer;
@@ -63,7 +63,7 @@ final class CategoryEditController
      * @param callable $categorySetWriteResolver Lazy category-set write resolver; resolved on category-set save and delete routes.
      * @param bool $categoryEnabled Whether category features are enabled in runtime config.
      * @param TaxonomyImageService $taxonomyImageService Read-side taxonomy image config and path helper.
-     * @param TaxonomyImageScribe $taxonomyImageScribe Write-side taxonomy image upload and cleanup helper.
+     * @param MediaScribe $mediaScribe Write-side meta-image upload and cleanup helper.
      * @param ChannelDataParser $channelParser Channel data parser for category-set channel-assignment counts on delete.
      * @param EditorTabs $editorTabs Panel editor tab normalization and tab-preserving URL builder.
      * @param Upload $uploadFileSetNormalizer Normalizer for $_FILES upload groups.
@@ -78,7 +78,7 @@ final class CategoryEditController
         callable $categorySetWriteResolver,
         bool $categoryEnabled,
         TaxonomyImageService $taxonomyImageService,
-        TaxonomyImageScribe $taxonomyImageScribe,
+        MediaScribe $mediaScribe,
         ChannelDataParser $channelParser,
         EditorTabs $editorTabs,
         Upload $uploadFileSetNormalizer
@@ -91,7 +91,7 @@ final class CategoryEditController
         $this->categorySetWriteResolver = Closure::fromCallable($categorySetWriteResolver);
         $this->categoryEnabled = $categoryEnabled;
         $this->taxonomyImageService = $taxonomyImageService;
-        $this->taxonomyImageScribe = $taxonomyImageScribe;
+        $this->mediaScribe = $mediaScribe;
         $this->channelParser = $channelParser;
         $this->editorTabs = $editorTabs;
         $this->uploadFileSetNormalizer = $uploadFileSetNormalizer;
@@ -249,9 +249,9 @@ final class CategoryEditController
         }
 
         if (isset($coverUploads[0])) {
-            $coverResult = $this->taxonomyImageScribe->storeUpload('categories', $savedId, 'cover', $coverUploads[0]);
+            $coverResult = $this->mediaScribe->storeMetaImageUpload('categories', $savedId, 'cover', $coverUploads[0]);
             if (!$coverResult['ok']) {
-                $this->taxonomyImageScribe->cleanupPathSets('categories', $savedId, $newPathSets);
+                $this->mediaScribe->cleanupMetaImagePathSets('categories', $savedId, $newPathSets);
                 $this->context->flash('error', (string) ($coverResult['error'] ?? 'Failed to upload cover image.'));
                 Redirect::redirect($savedEditUrl);
             }
@@ -263,9 +263,9 @@ final class CategoryEditController
         }
 
         if (isset($previewUploads[0])) {
-            $previewResult = $this->taxonomyImageScribe->storeUpload('categories', $savedId, 'preview', $previewUploads[0]);
+            $previewResult = $this->mediaScribe->storeMetaImageUpload('categories', $savedId, 'preview', $previewUploads[0]);
             if (!$previewResult['ok']) {
-                $this->taxonomyImageScribe->cleanupPathSets('categories', $savedId, $newPathSets);
+                $this->mediaScribe->cleanupMetaImagePathSets('categories', $savedId, $newPathSets);
                 $this->context->flash('error', (string) ($previewResult['error'] ?? 'Failed to upload preview image.'));
                 Redirect::redirect($savedEditUrl);
             }
@@ -277,9 +277,9 @@ final class CategoryEditController
         }
 
         if (isset($iconUploads[0])) {
-            $iconResult = $this->taxonomyImageScribe->storeUpload('categories', $savedId, 'icon', $iconUploads[0]);
+            $iconResult = $this->mediaScribe->storeMetaImageUpload('categories', $savedId, 'icon', $iconUploads[0]);
             if (!$iconResult['ok']) {
-                $this->taxonomyImageScribe->cleanupPathSets('categories', $savedId, $newPathSets);
+                $this->mediaScribe->cleanupMetaImagePathSets('categories', $savedId, $newPathSets);
                 $this->context->flash('error', (string) ($iconResult['error'] ?? 'Failed to upload icon image.'));
                 Redirect::redirect($savedEditUrl);
             }
@@ -294,14 +294,14 @@ final class CategoryEditController
             $this->categoryWrite()->updateImageFiles($savedId, $nextStorage);
         } catch (\Throwable) {
             // Keep DB and filesystem in sync when image-path persistence fails.
-            $this->taxonomyImageScribe->cleanupPathSets('categories', $savedId, $newPathSets);
+            $this->mediaScribe->cleanupMetaImagePathSets('categories', $savedId, $newPathSets);
             $this->context->flash('error', 'Failed to save category image selections.');
             Redirect::redirect($savedEditUrl);
         }
 
         $nextPaths = $this->taxonomyImageService->imagePathsFromStoragePayload('categories', $savedId, $nextStorage);
         $obsoletePaths = $this->taxonomyImageService->removedPaths($currentPaths, $nextPaths);
-        $this->taxonomyImageScribe->deleteStoredPaths('categories', $savedId, $obsoletePaths);
+        $this->mediaScribe->deleteMetaImageStoredPaths('categories', $savedId, $obsoletePaths);
 
         $this->context->flash('success', 'Changes saved.');
         Redirect::redirect($savedEditUrl);
@@ -341,7 +341,7 @@ final class CategoryEditController
             }
 
             if ($record !== null) {
-                $this->taxonomyImageScribe->deleteStoredPaths(
+                $this->mediaScribe->deleteMetaImageStoredPaths(
                     'categories',
                     $id,
                     $this->taxonomyImageService->imagePathsFromRecord('categories', $id, $record)
@@ -368,7 +368,7 @@ final class CategoryEditController
                 // Continue deleting remaining ids even if one operation throws.
                 $this->categoryWrite()->deleteById($selectedId);
                 if ($record !== null) {
-                    $this->taxonomyImageScribe->deleteStoredPaths(
+                    $this->mediaScribe->deleteMetaImageStoredPaths(
                         'categories',
                         $selectedId,
                         $this->taxonomyImageService->imagePathsFromRecord('categories', $selectedId, $record)

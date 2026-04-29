@@ -19,7 +19,7 @@ use Raven\Lib\Media\Panel\TaxonomyImageService;
 use Raven\Lib\Parser\GroupDataParser;
 use Raven\Lib\Parser\GroupRouteParser;
 use Raven\Lib\Security\InputSanitizer;
-use Raven\Lib\Scribe\TaxonomyImageScribe;
+use Raven\Lib\Scribe\MediaScribe;
 use Raven\Lib\Transport\Redirect;
 use Raven\Lib\Transport\Upload;
 use Raven\Lib\View\Panel\Editor;
@@ -41,7 +41,7 @@ final class GroupEditController
     private EditorTabs $editorTabs;
     private Editor $editor;
     private TaxonomyImageService $taxonomyImageService;
-    private TaxonomyImageScribe $taxonomyImageScribe;
+    private MediaScribe $mediaScribe;
     private PanelPermissionDefinitionCatalog $panelPermissionDefinitionCatalog;
     private Upload $uploadFileSetNormalizer;
     private Closure $panelPermissionMapProvider;
@@ -55,7 +55,7 @@ final class GroupEditController
      * @param EditorTabs $editorTabs Panel editor tab normalization and tab-preserving URL builder.
      * @param Editor $editor Shared panel editor utility methods.
      * @param TaxonomyImageService $taxonomyImageService Read-side taxonomy image config and path helper.
-     * @param TaxonomyImageScribe $taxonomyImageScribe Write-side taxonomy image upload and cleanup helper.
+     * @param MediaScribe $mediaScribe Write-side meta-image upload and cleanup helper.
      * @param PanelPermissionDefinitionCatalog $panelPermissionDefinitionCatalog Shared panel permission-definition catalog.
      * @param Upload $uploadFileSetNormalizer Shared upload payload flattener.
      * @param callable(): array<string, array<string, mixed>> $panelPermissionMapProvider Session-scoped extension permission map provider.
@@ -70,7 +70,7 @@ final class GroupEditController
         EditorTabs $editorTabs,
         Editor $editor,
         TaxonomyImageService $taxonomyImageService,
-        TaxonomyImageScribe $taxonomyImageScribe,
+        MediaScribe $mediaScribe,
         PanelPermissionDefinitionCatalog $panelPermissionDefinitionCatalog,
         Upload $uploadFileSetNormalizer,
         callable $panelPermissionMapProvider
@@ -83,7 +83,7 @@ final class GroupEditController
         $this->editorTabs = $editorTabs;
         $this->editor = $editor;
         $this->taxonomyImageService = $taxonomyImageService;
-        $this->taxonomyImageScribe = $taxonomyImageScribe;
+        $this->mediaScribe = $mediaScribe;
         $this->panelPermissionDefinitionCatalog = $panelPermissionDefinitionCatalog;
         $this->uploadFileSetNormalizer = $uploadFileSetNormalizer;
         $this->panelPermissionMapProvider = Closure::fromCallable($panelPermissionMapProvider);
@@ -289,9 +289,9 @@ final class GroupEditController
         }
 
         if (isset($coverUploads[0])) {
-            $coverResult = $this->taxonomyImageScribe->storeUpload('groups', $savedId, 'cover', $coverUploads[0]);
+            $coverResult = $this->mediaScribe->storeMetaImageUpload('groups', $savedId, 'cover', $coverUploads[0]);
             if (!(bool) ($coverResult['ok'] ?? false)) {
-                $this->taxonomyImageScribe->cleanupPathSets('groups', $savedId, $newPathSets);
+                $this->mediaScribe->cleanupMetaImagePathSets('groups', $savedId, $newPathSets);
                 $this->context->flash('error', (string) ($coverResult['error'] ?? 'Failed to upload cover image.'));
                 Redirect::redirect($savedEditUrl);
             }
@@ -302,9 +302,9 @@ final class GroupEditController
         }
 
         if (isset($iconUploads[0])) {
-            $iconResult = $this->taxonomyImageScribe->storeUpload('groups', $savedId, 'icon', $iconUploads[0]);
+            $iconResult = $this->mediaScribe->storeMetaImageUpload('groups', $savedId, 'icon', $iconUploads[0]);
             if (!(bool) ($iconResult['ok'] ?? false)) {
-                $this->taxonomyImageScribe->cleanupPathSets('groups', $savedId, $newPathSets);
+                $this->mediaScribe->cleanupMetaImagePathSets('groups', $savedId, $newPathSets);
                 $this->context->flash('error', (string) ($iconResult['error'] ?? 'Failed to upload icon image.'));
                 Redirect::redirect($savedEditUrl);
             }
@@ -317,14 +317,14 @@ final class GroupEditController
         try {
             $this->groupRepo->updateImageFiles($savedId, $nextStorage);
         } catch (\Throwable) {
-            $this->taxonomyImageScribe->cleanupPathSets('groups', $savedId, $newPathSets);
+            $this->mediaScribe->cleanupMetaImagePathSets('groups', $savedId, $newPathSets);
             $this->context->flash('error', 'Failed to save group image selections.');
             Redirect::redirect($savedEditUrl);
         }
 
         $nextPaths = $this->taxonomyImageService->imagePathsFromStoragePayload('groups', $savedId, $nextStorage);
         $obsoletePaths = $this->taxonomyImageService->removedPaths($currentPaths, $nextPaths);
-        $this->taxonomyImageScribe->deleteStoredPaths('groups', $savedId, $obsoletePaths);
+        $this->mediaScribe->deleteMetaImageStoredPaths('groups', $savedId, $obsoletePaths);
 
         $this->context->flash('success', 'Changes saved.');
         Redirect::redirect($savedEditUrl);

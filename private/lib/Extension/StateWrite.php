@@ -2,31 +2,31 @@
 
 /**
  * RAVEN CMS
- * ~/private/lib/Scribe/ExtensionStateScribe.php
+ * ~/private/lib/Extension/StateWrite.php
  * Write-side persistence helper for extension enablement and permission state.
  * Docs: https://raven.lanterns.io
  */
 
 declare(strict_types=1);
 
-namespace Raven\Lib\Scribe;
+namespace Raven\Lib\Extension;
 
 use Raven\Lib\Database\Schema\SchemaEnsureStateStore;
 
 /**
  * Owns filesystem writes for `private/dat/ext/.state.php`.
  *
- * ExtensionStateStore keeps the read-side state loading helpers, while this
+ * StateRead keeps the read-side state loading helpers, while this
  * class centralizes normalization, serialization, atomic persistence, and
  * schema-marker invalidation for extension enablement and permission writes.
  */
-final class ExtensionStateScribe
+final class StateWrite
 {
     private string $extensionsBasePath;
     private string $stateBasePath;
 
     /**
-     * Prepares the extension-state scribe for one project tree.
+     * Prepares the extension-state writer for one project tree.
      *
      * @param string $extensionsBasePath Absolute `private/ext` directory path.
      * @param string|null $stateBasePath Optional absolute `private/dat/ext` directory path override.

@@ -12,7 +12,7 @@ declare(strict_types=1);
 namespace Raven\Core\Routing\Public;
 
 use Raven\Core\Routing\Router;
-use Raven\Lib\Extension\Layout;
+use Raven\Lib\Extension\Resolver;
 use Raven\Lib\Security\InputSanitizer;
 
 /**
@@ -48,7 +48,7 @@ final class ExtensionRouter
             }
 
             $extensionRoot = $rvn['root'] . '/private/ext/' . $extensionName;
-            $routesFile = Layout::providerPath($extensionRoot, 'routes_public.php');
+            $routesFile = Resolver::providerPath($extensionRoot, 'routes_public.php');
             if ($routesFile === null) {
                 continue;
             }

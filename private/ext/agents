@@ -314,7 +314,7 @@ declare(strict_types=1);
 ## Extension Enablement State
 - Runtime enablement state file: `private/dat/ext/.state.php`
 - Commit-safe template: `private/dat/ext/.state.php.dist`
-- Shared parser: `private/lib/Extension/ExtensionRegistry.php` (`Raven\Lib\Extension\ExtensionRegistry`; used by bootstrap/panel/public runtime checks)
+- Shared parser: `private/lib/Extension/Registry.php` (`Raven\Lib\Extension\Registry`; used by bootstrap/panel/public runtime checks)
 - State structure:
 - `enabled`: `{extension_directory => true}`
 - `permissions`: `{extension_directory => panel_permission_bit}` for non-system extensions

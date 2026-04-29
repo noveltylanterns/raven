@@ -13,7 +13,6 @@ namespace Raven\Core\Repository;
 use PDO;
 use Raven\Lib\Database\TableNameResolver;
 use Raven\Lib\Parser\ChannelRepoParser;
-use Raven\Lib\Scribe\ChannelRecordScribe;
 use Raven\Lib\Scribe\ChannelScribe;
 
 /**
@@ -32,7 +31,6 @@ class ChannelRead
     private string $prefix;
     private string $channelDirectory;
     private ChannelScribe $channelFileScribe;
-    private ChannelRecordScribe $channelRecordScribe;
     /** @var array<int, array<string, mixed>>|null */
     private ?array $channelsCache = null;
 
@@ -49,13 +47,6 @@ class ChannelRead
         $this->prefix = preg_replace('/[^a-zA-Z0-9_]/', '', $prefix) ?? '';
         $this->channelDirectory = rtrim($channelDirectory ?? (dirname(__DIR__, 3) . '/dat/channel'), '/');
         $this->channelFileScribe = new ChannelScribe($this->channelDirectory);
-        $this->channelRecordScribe = new ChannelRecordScribe(
-            $db,
-            $driver,
-            $prefix,
-            fn (string $slug): array => $this->loadRawBySlug($slug),
-            $this->channelFileScribe
-        );
     }
 
     /**
@@ -105,7 +96,7 @@ class ChannelRead
             return $this->channelsCache;
         }
 
-        $this->channelRecordScribe->ensureRootChannelRecord();
+        $this->ensureRootChannelRecord();
         $this->channelFileScribe->normalizeStorageLayout();
         $paths = $this->listChannelFilePaths();
         $records = [];
@@ -148,7 +139,11 @@ class ChannelRead
             $records[] = $record;
             $slug = (string) ($record['slug'] ?? '');
             if ($slug !== '') {
-                $this->channelRecordScribe->persistChannelId($slug, $id);
+                try {
+                    $this->channelFileScribe->persistChannelId($slug, $id);
+                } catch (\Throwable) {
+                    // Read paths should stay resilient even if best-effort id repair cannot be persisted.
+                }
             }
         }
 
@@ -408,8 +403,8 @@ class ChannelRead
     /**
      * Loads the raw data array for a channel by its slug, or an empty array when not found.
      *
-     * ChannelWrite and ChannelRecordScribe use this when they need the current file-backed
-     * payload without hydrating the full normalized repository row.
+     * ChannelWrite uses this when it needs the current file-backed payload without
+     * hydrating the full normalized repository row.
      *
      * @param string $slug Channel slug to look up.
      * @return array<string, mixed> Raw record data, or [] when the record does not exist.
@@ -451,7 +446,7 @@ class ChannelRead
     /**
      * Returns a page-count map keyed by channel id.
      *
-     * Public so ChannelWrite can pass it as a closure argument to ChannelRecordScribe.
+     * Public so ChannelWrite can reuse the page-count lookup during guarded deletes.
      *
      * @return array<int, int> Map of channel id to page count.
      */
@@ -512,6 +507,77 @@ class ChannelRead
     private function normalizeChannelId(mixed $value): ?int
     {
         return ChannelRepoParser::normalizeChannelId($value);
+    }
+
+    /**
+     * Ensures the stock root channel exists with canonical immutable fields.
+     *
+     * Rewrites the file when id, slug, or reserved name drift from their canonical values.
+     *
+     * @return void
+     */
+    private function ensureRootChannelRecord(): void
+    {
+        $raw = $this->loadRawBySlug(ChannelRepoParser::ROOT_CHANNEL_SLUG);
+        $createdAt = trim((string) ($raw['created_at'] ?? ''));
+        if ($createdAt === '') {
+            $createdAt = gmdate('Y-m-d H:i:s');
+        }
+
+        $record = [
+            'id' => ChannelRepoParser::ROOT_CHANNEL_ID,
+            'name' => ChannelRepoParser::ROOT_CHANNEL_NAME,
+            'slug' => ChannelRepoParser::ROOT_CHANNEL_SLUG,
+            'description' => trim((string) ($raw['description'] ?? '')),
+            'feed_enabled' => false,
+            'editor_override' => ChannelRepoParser::normalizeEditorOverride(
+                (string) ($raw['editor_override'] ?? 'inherit')
+            ),
+            'route_mode' => ChannelRepoParser::normalizeRouteMode((string) ($raw['route_mode'] ?? 'inherit')),
+            'route_separator' => ChannelRepoParser::normalizeRouteSeparator(
+                (string) ($raw['route_separator'] ?? 'inherit')
+            ),
+            'cover_image_path' => ChannelRepoParser::normalizeNullablePath($raw['cover_image_path'] ?? null),
+            'cover_image_sm_path' => ChannelRepoParser::normalizeNullablePath($raw['cover_image_sm_path'] ?? null),
+            'cover_image_md_path' => ChannelRepoParser::normalizeNullablePath($raw['cover_image_md_path'] ?? null),
+            'cover_image_lg_path' => ChannelRepoParser::normalizeNullablePath($raw['cover_image_lg_path'] ?? null),
+            'preview_image_path' => ChannelRepoParser::normalizeNullablePath($raw['preview_image_path'] ?? null),
+            'preview_image_sm_path' => ChannelRepoParser::normalizeNullablePath($raw['preview_image_sm_path'] ?? null),
+            'preview_image_md_path' => ChannelRepoParser::normalizeNullablePath($raw['preview_image_md_path'] ?? null),
+            'preview_image_lg_path' => ChannelRepoParser::normalizeNullablePath($raw['preview_image_lg_path'] ?? null),
+            'category_sets' => ChannelRepoParser::normalizeTaxonomySetSelection($raw['category_sets'] ?? [], false),
+            'tag_sets' => ChannelRepoParser::normalizeTaxonomySetSelection($raw['tag_sets'] ?? [], false),
+            'custom_fields' => is_array($raw['custom_fields'] ?? null) ? $raw['custom_fields'] : [],
+            'overrides' => is_array($raw['overrides'] ?? null) ? $raw['overrides'] : [],
+            'created_at' => $createdAt,
+        ];
+
+        if ($raw === [] || $this->rootRecordNeedsRewrite($raw)) {
+            $this->channelFileScribe->writeRecordById(
+                ChannelRepoParser::ROOT_CHANNEL_ID,
+                ChannelRepoParser::ROOT_CHANNEL_SLUG,
+                $record
+            );
+        }
+    }
+
+    /**
+     * Returns whether the stored root-channel record needs to be rewritten.
+     *
+     * @param array<string, mixed> $raw Raw root-channel payload from disk.
+     * @return bool True when immutable root fields differ from canonical values.
+     */
+    private function rootRecordNeedsRewrite(array $raw): bool
+    {
+        if (ChannelRepoParser::normalizeChannelId($raw['id'] ?? null) !== ChannelRepoParser::ROOT_CHANNEL_ID) {
+            return true;
+        }
+
+        if (!ChannelRepoParser::isRootChannelSlug((string) ($raw['slug'] ?? ''))) {
+            return true;
+        }
+
+        return trim((string) ($raw['name'] ?? '')) !== ChannelRepoParser::ROOT_CHANNEL_NAME;
     }
 
     /**

@@ -2,7 +2,7 @@
 
 /**
  * RAVEN CMS
- * ~/private/lib/Extension/Layout.php
+ * ~/private/lib/Extension/Resolver.php
  * Canonical extension filesystem layout resolver.
  * Docs: https://raven.lanterns.io
  */
@@ -14,7 +14,7 @@ namespace Raven\Lib\Extension;
 /**
  * Resolves canonical extension file locations.
  */
-final class Layout
+final class Resolver
 {
     /**
      * Returns the canonical provider path for one extension-local root file.

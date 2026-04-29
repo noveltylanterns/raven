@@ -12,7 +12,7 @@ declare(strict_types=1);
 namespace Raven\Lib\Auth;
 
 use PDO;
-use Raven\Lib\Scribe\LoginThrottleScribe;
+use Raven\Lib\Scribe\AuthThrottleScribe;
 
 /**
  * Persistent login-throttle buckets keyed by identifier + client IP.
@@ -21,7 +21,7 @@ final class LoginThrottleService
 {
     private PDO $rvnDb;
     private string $prefix;
-    private LoginThrottleScribe $loginThrottleScribe;
+    private AuthThrottleScribe $authThrottleScribe;
 
     /**
      * Prepares the login-throttle service for read-side bucket policy checks.
@@ -35,7 +35,7 @@ final class LoginThrottleService
     {
         $this->rvnDb = $rvnDb;
         $this->prefix = preg_replace('/[^a-zA-Z0-9_]/', '', $prefix) ?? '';
-        $this->loginThrottleScribe = new LoginThrottleScribe($rvnDb, $driver, $this->prefix);
+        $this->authThrottleScribe = new AuthThrottleScribe($rvnDb, $driver, $this->prefix);
     }
 
     /**
@@ -49,7 +49,7 @@ final class LoginThrottleService
     public function isTemporarilyLocked(string $identifier, string $ipAddress, int $windowSeconds): bool
     {
         $windowSeconds = max(1, $windowSeconds);
-        $this->loginThrottleScribe->pruneExpiredRows($windowSeconds, $windowSeconds);
+        $this->authThrottleScribe->pruneExpiredRows($windowSeconds, $windowSeconds);
 
         $normalizedIdentifier = $this->normalizeIdentifier($identifier);
         $normalizedIp = $this->normalizeIp($ipAddress);
@@ -68,7 +68,7 @@ final class LoginThrottleService
 
         $firstFailedAt = (int) ($row['first_failed'] ?? 0);
         if ($firstFailedAt === 0 || ($now - $firstFailedAt) > $windowSeconds) {
-            $this->loginThrottleScribe->deleteRow($bucketHash);
+            $this->authThrottleScribe->deleteRow($bucketHash);
         }
 
         return false;
@@ -94,7 +94,7 @@ final class LoginThrottleService
         $maxAttempts = max(1, $maxAttempts);
         $windowSeconds = max(1, $windowSeconds);
         $lockSeconds = max(1, $lockSeconds);
-        $this->loginThrottleScribe->pruneExpiredRows($windowSeconds, $lockSeconds);
+        $this->authThrottleScribe->pruneExpiredRows($windowSeconds, $lockSeconds);
 
         $normalizedIdentifier = $this->normalizeIdentifier($identifier);
         $normalizedIp = $this->normalizeIp($ipAddress);
@@ -115,7 +115,7 @@ final class LoginThrottleService
             ? ($now + $lockSeconds)
             : 0;
 
-        $this->loginThrottleScribe->upsertRow(
+        $this->authThrottleScribe->upsertRow(
             $bucketHash,
             $normalizedIdentifier,
             $normalizedIp,
@@ -138,7 +138,7 @@ final class LoginThrottleService
         $normalizedIdentifier = $this->normalizeIdentifier($identifier);
         $normalizedIp = $this->normalizeIp($ipAddress);
         $bucketHash = $this->bucketHash($normalizedIdentifier, $normalizedIp);
-        $this->loginThrottleScribe->deleteRow($bucketHash);
+        $this->authThrottleScribe->deleteRow($bucketHash);
     }
 
     /**

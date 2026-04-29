@@ -2,7 +2,7 @@
 
 /**
  * RAVEN CMS
- * ~/private/lib/Extension/ExtensionRegistry.php
+ * ~/private/lib/Extension/Registry.php
  * Shared extension state, manifest parsing, and per-request runtime lifecycle.
  * Docs: https://raven.lanterns.io
  */
@@ -15,7 +15,7 @@ namespace Raven\Lib\Extension;
 // is registered (raven.php bootstrap calls enabledDirectories() to build the autoloader).
 require_once __DIR__ . '/ManifestContractValidator.php';
 require_once __DIR__ . '/ExtensionProviderValidator.php';
-require_once __DIR__ . '/ExtensionStateStore.php';
+require_once __DIR__ . '/StateRead.php';
 
 /**
  * Unified extension registry — static metadata surface plus per-request runtime lifecycle.
@@ -32,7 +32,7 @@ require_once __DIR__ . '/ExtensionStateStore.php';
  * resolveExtensionServices, extensionContext, bootAllExtensions) are called by raven.php
  * closures and the public/panel bootstrap layers on demand.
  */
-final class ExtensionRegistry
+final class Registry
 {
     // -------------------------------------------------------------------------
     // Static singletons (metadata surface)
@@ -48,9 +48,9 @@ final class ExtensionRegistry
      * process forever. This keeps long-lived tests and tooling flows from
      * accidentally reusing the wrong `private/ext` / `private/dat/ext` paths.
      *
-     * @var array<string, ExtensionStateStore>
+     * @var array<string, StateRead>
      */
-    private static array $stateStores = [];
+    private static array $stateReads = [];
 
     /**
      * Per-process manifest cache keyed by "{root}::{directory}".
@@ -147,7 +147,7 @@ final class ExtensionRegistry
      */
     public static function enabledMap(string $root): array
     {
-        $state = self::stateStore($root)->loadStateData();
+        $state = self::stateRead($root)->loadStateData();
         /** @var mixed $rawEnabled */
         $rawEnabled = $state['enabled'] ?? [];
         if (!is_array($rawEnabled)) {
@@ -180,7 +180,7 @@ final class ExtensionRegistry
      */
     public static function permissionMap(string $root, array $allowedBits = []): array
     {
-        $state = self::stateStore($root)->loadStateData();
+        $state = self::stateRead($root)->loadStateData();
         /** @var mixed $rawPermissions */
         $rawPermissions = $state['permissions'] ?? [];
         if (!is_array($rawPermissions)) {
@@ -680,19 +680,19 @@ final class ExtensionRegistry
     }
 
     /**
-     * Returns the cached ExtensionStateStore instance for the given root.
+     * Returns the cached StateRead instance for the given root.
      *
      * @param string $root Project root path.
-     * @return ExtensionStateStore
+     * @return StateRead
      */
-    private static function stateStore(string $root): ExtensionStateStore
+    private static function stateRead(string $root): StateRead
     {
         $normalizedRoot = rtrim($root, '/\\');
-        if (!isset(self::$stateStores[$normalizedRoot]) || !self::$stateStores[$normalizedRoot] instanceof ExtensionStateStore) {
+        if (!isset(self::$stateReads[$normalizedRoot]) || !self::$stateReads[$normalizedRoot] instanceof StateRead) {
             // Auto-derives stateBasePath as private/dat/ext from extensionsBasePath.
-            self::$stateStores[$normalizedRoot] = new ExtensionStateStore($normalizedRoot . '/private/ext');
+            self::$stateReads[$normalizedRoot] = new StateRead($normalizedRoot . '/private/ext');
         }
 
-        return self::$stateStores[$normalizedRoot];
+        return self::$stateReads[$normalizedRoot];
     }
 }

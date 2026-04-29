@@ -23,8 +23,8 @@ use Raven\Core\Repository\TagRead;
 use Raven\Core\Repository\UserRead;
 use Raven\Lib\Auth\LoginIdentifierResolver;
 use Raven\Lib\Extension\ExtensionEditorCatalogService;
-use Raven\Lib\Extension\ExtensionStateStore;
 use Raven\Lib\Extension\Panel\ExtensionCatalogService;
+use Raven\Lib\Extension\StateRead;
 use Raven\Lib\Media\Panel\MediaManager;
 use Raven\Lib\Parser\CategoryDataParser;
 use Raven\Lib\Parser\ChannelDataParser;
@@ -99,7 +99,7 @@ final class PageEditController
     private EditorBlocks $editorBlocks;
     private EditorMCE $editorMce;
     private EditorMDE $editorMde;
-    private ExtensionStateStore $extensionStateStore;
+    private StateRead $extensionStateStore;
     private ExtensionCatalogService $extensionCatalogService;
     private ExtensionEditorCatalogService $extensionEditorCatalogService;
     /** @var array<string, array{label: string, editor: string}>|null */
@@ -126,7 +126,7 @@ final class PageEditController
      * @param EditorBlocks $editorBlocks Shared repeater-block view helper for modular panel rows.
      * @param EditorMCE $editorMce TinyMCE-specific helpers for asset URL and gallery-item payload building.
      * @param EditorMDE $editorMde EasyMDE-specific helpers for asset URLs and JS fallback path lists.
-     * @param ExtensionStateStore $extensionStateStore Shared extension state store for enabled-extension reads.
+     * @param StateRead $extensionStateStore Shared extension state store for enabled-extension reads.
      * @param ExtensionCatalogService $extensionCatalogService Shared extension catalog for manifest validation reads.
      * @param ExtensionEditorCatalogService $extensionEditorCatalogService Shared editor catalog for extension body blocks and shortcode menus.
      * @param callable $extensionServicesFor Extension services resolver used to load per-extension shortcode and body-block contributions.
@@ -153,7 +153,7 @@ final class PageEditController
         EditorBlocks $editorBlocks,
         EditorMCE $editorMce,
         EditorMDE $editorMde,
-        ExtensionStateStore $extensionStateStore,
+        StateRead $extensionStateStore,
         ExtensionCatalogService $extensionCatalogService,
         ExtensionEditorCatalogService $extensionEditorCatalogService,
         callable $extensionServicesFor

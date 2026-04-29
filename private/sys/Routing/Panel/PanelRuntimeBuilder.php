@@ -66,7 +66,7 @@ use Raven\Lib\Auth\Panel\PanelTwoFactorPreferencesService;
 use Raven\Lib\Auth\PasswordChangePolicy;
 use Raven\Lib\Auth\SessionFlash;
 use Raven\Lib\Extension\ExtensionEditorCatalogService;
-use Raven\Lib\Extension\ExtensionStateStore;
+use Raven\Lib\Extension\StateRead;
 use Raven\Lib\Extension\Panel\ExtensionCatalogService;
 use Raven\Lib\Extension\Panel\ExtensionPermissionCatalogService;
 use Raven\Lib\Parser\ChannelDataParser;
@@ -80,7 +80,7 @@ use Raven\Lib\Media\Panel\MediaManager;
 use Raven\Lib\Media\Panel\TaxonomyImageService;
 use Raven\Lib\Media\Panel\UserMediaPathService;
 use Raven\Lib\Parser\UserDataParser;
-use Raven\Lib\Scribe\TaxonomyImageScribe;
+use Raven\Lib\Scribe\MediaScribe;
 use Raven\Lib\Scribe\UserMediaScribe;
 use Raven\Lib\View\Panel\Editor;
 use Raven\Lib\View\Panel\EditorBlocks;
@@ -776,8 +776,8 @@ final class PanelRuntimeBuilder
         /**
          * Reuses one shared extension-state store across panel bootstrap helpers.
          */
-        $extensionStateStoreFactory = $memoize(static function () use (&$extensionStateStore, $rvn): ExtensionStateStore {
-            $extensionStateStore = new ExtensionStateStore((string) $rvn['root'] . '/private/ext');
+        $extensionStateStoreFactory = $memoize(static function () use (&$extensionStateStore, $rvn): StateRead {
+            $extensionStateStore = new StateRead((string) $rvn['root'] . '/private/ext');
 
             return $extensionStateStore;
         });
@@ -1050,7 +1050,7 @@ final class PanelRuntimeBuilder
                 $taxonomyDomain['category_enabled'],
                 $taxonomyDomain['tag_enabled'],
                 new TaxonomyImageService($rvn['config']),
-                new TaxonomyImageScribe($rvn['config'], (string) $rvn['root']),
+                new MediaScribe($rvn['db'], $rvn['driver'], $rvn['prefix'], $rvn['config'], (string) $rvn['root']),
                 new ChannelDataParser($rvn['config'], $rvn['input'], $taxonomyDomain['channel_read']),
                 new FeedRouteParser($rvn['config'], $rvn['input']),
                 $rvn['panel_editor_tabs'],
@@ -1106,7 +1106,7 @@ final class PanelRuntimeBuilder
                 $taxonomyDomain['category_set_write'],
                 $taxonomyDomain['category_enabled'],
                 new TaxonomyImageService($rvn['config']),
-                new TaxonomyImageScribe($rvn['config'], (string) $rvn['root']),
+                new MediaScribe($rvn['db'], $rvn['driver'], $rvn['prefix'], $rvn['config'], (string) $rvn['root']),
                 new ChannelDataParser($rvn['config'], $rvn['input'], $taxonomyDomain['channel_read']),
                 $rvn['panel_editor_tabs'],
                 new Upload()
@@ -1205,7 +1205,7 @@ final class PanelRuntimeBuilder
                 $taxonomyDomain['tag_set_write'],
                 $taxonomyDomain['tag_enabled'],
                 new TaxonomyImageService($rvn['config']),
-                new TaxonomyImageScribe($rvn['config'], (string) $rvn['root']),
+                new MediaScribe($rvn['db'], $rvn['driver'], $rvn['prefix'], $rvn['config'], (string) $rvn['root']),
                 new ChannelDataParser($rvn['config'], $rvn['input'], $taxonomyDomain['channel_read']),
                 $rvn['panel_editor_tabs'],
                 new Upload()
@@ -1322,7 +1322,7 @@ final class PanelRuntimeBuilder
                 $rvn['panel_editor_tabs'],
                 $rvn['panel_editor'],
                 new TaxonomyImageService($rvn['config']),
-                new TaxonomyImageScribe($rvn['config'], (string) $rvn['root']),
+                new MediaScribe($rvn['db'], $rvn['driver'], $rvn['prefix'], $rvn['config'], (string) $rvn['root']),
                 new PanelPermissionDefinitionCatalog(),
                 new Upload(),
                 static function () use (&$rvn): array {

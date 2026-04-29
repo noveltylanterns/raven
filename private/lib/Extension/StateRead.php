@@ -2,8 +2,8 @@
 
 /**
  * RAVEN CMS
- * ~/private/lib/Extension/ExtensionStateStore.php
- * Read-side loader and compatibility facade for extension enablement state.
+ * ~/private/lib/Extension/StateRead.php
+ * Read-side loader for extension enablement state.
  * Docs: https://raven.lanterns.io
  */
 
@@ -11,19 +11,17 @@ declare(strict_types=1);
 
 namespace Raven\Lib\Extension;
 
-use Raven\Lib\Scribe\ExtensionStateScribe;
-
 /**
- * Shared persistence service for extension enablement/permission state maps.
+ * Shared read-side service for extension enablement and permission state maps.
  */
-final class ExtensionStateStore
+final class StateRead
 {
     private string $extensionsBasePath;
     private string $stateBasePath;
-    private ExtensionStateScribe $extensionStateScribe;
+    private StateWrite $stateWrite;
 
     /**
-     * Prepares the extension-state store for one project tree.
+     * Prepares the extension-state reader for one project tree.
      *
      * @param string $extensionsBasePath Absolute `private/ext` directory path.
      * @param string|null $stateBasePath Optional absolute `private/dat/ext` directory path override.
@@ -35,7 +33,7 @@ final class ExtensionStateStore
         $this->stateBasePath = $stateBasePath !== null
             ? rtrim($stateBasePath, '/\\')
             : dirname($this->extensionsBasePath) . '/dat/ext';
-        $this->extensionStateScribe = new ExtensionStateScribe($this->extensionsBasePath, $this->stateBasePath);
+        $this->stateWrite = new StateWrite($this->extensionsBasePath, $this->stateBasePath);
     }
 
     /**
@@ -77,14 +75,14 @@ final class ExtensionStateStore
     /**
      * Ensures the extension-state directory exists.
      *
-     * Kept as a compatibility forwarder for callers that still ask the store to
-     * provision the write-side state directory explicitly.
+     * Exposes state-directory provisioning for flows that both read and write
+     * extension state through the same service boundary.
      *
      * @return void
      */
     public function ensureStateDirectory(): void
     {
-        $this->extensionStateScribe->ensureStateDirectory();
+        $this->stateWrite->ensureStateDirectory();
     }
 
     /**
@@ -188,7 +186,7 @@ final class ExtensionStateStore
         if ($permissionBitsMap === []) {
             $permissionBitsMap = $currentState['permission_bits'];
         }
-        $this->extensionStateScribe->saveState(
+        $this->stateWrite->saveState(
             $enabledMap,
             $permissionMap,
             $permissionBitsMap,

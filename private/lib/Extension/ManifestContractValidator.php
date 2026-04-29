@@ -26,10 +26,10 @@ final class ManifestContractValidator
 
     public function typeContractError(string $extensionRoot, string $type): ?string
     {
-        $hasPanelRoutes = Layout::hasProvider($extensionRoot, 'routes_panel.php');
-        $hasPublicRoutes = Layout::hasProvider($extensionRoot, 'routes_public.php');
-        $hasShortcodes = Layout::hasProvider($extensionRoot, 'shortcodes.php');
-        $hasFields = Layout::hasProvider($extensionRoot, 'fields.php');
+        $hasPanelRoutes = Resolver::hasProvider($extensionRoot, 'routes_panel.php');
+        $hasPublicRoutes = Resolver::hasProvider($extensionRoot, 'routes_public.php');
+        $hasShortcodes = Resolver::hasProvider($extensionRoot, 'shortcodes.php');
+        $hasFields = Resolver::hasProvider($extensionRoot, 'fields.php');
 
         if ($hasPanelRoutes && $type === 'framework') {
             return 'Framework extensions may not define routes_panel.php.';

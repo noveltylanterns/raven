@@ -6,7 +6,7 @@ namespace Raven\Lib\Extension\Public;
 
 use Raven\Lib\Extension\Public\EmbeddedFormRuntimeInterface;
 use Raven\Lib\Extension\Public\EmbeddedShortcodeRuntimeInterface;
-use Raven\Lib\Extension\ExtensionRegistry;
+use Raven\Lib\Extension\Registry;
 use Raven\Lib\Security\InputSanitizer;
 
 /**
@@ -290,7 +290,7 @@ final class EmbeddedFormRuntimeService
     private function isExtensionEnabled(string $extensionName): bool
     {
         if ($this->enabledExtensionMap === null) {
-            $this->enabledExtensionMap = ExtensionRegistry::enabledMap($this->projectRoot);
+            $this->enabledExtensionMap = Registry::enabledMap($this->projectRoot);
         }
 
         return !empty($this->enabledExtensionMap[$extensionName]);

@@ -264,7 +264,7 @@ final class Registry
     private function loadExtensionCronFile(string $directoryName): void
     {
         $extensionRoot = $this->root . '/private/ext/' . $directoryName;
-        $cronPath = \Raven\Lib\Extension\Layout::providerPath($extensionRoot, 'cron.php');
+        $cronPath = \Raven\Lib\Extension\Resolver::providerPath($extensionRoot, 'cron.php');
         if ($cronPath === null) {
             return;
         }

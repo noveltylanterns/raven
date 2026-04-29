@@ -6,9 +6,9 @@ namespace Raven\Lib\Extension\Panel;
 
 use Raven\Core\Config;
 use Raven\Lib\Extension\ExtensionBootstrapContractResolver;
-use Raven\Lib\Extension\Layout;
-use Raven\Lib\Extension\ExtensionRegistry;
-use Raven\Lib\Extension\ExtensionStateStore;
+use Raven\Lib\Extension\Registry;
+use Raven\Lib\Extension\Resolver;
+use Raven\Lib\Extension\StateRead;
 use Raven\Lib\Extension\ManifestContractValidator;
 use Raven\Lib\Security\InputSanitizer;
 
@@ -18,7 +18,7 @@ use Raven\Lib\Security\InputSanitizer;
 final class ExtensionCatalogService
 {
     private string $projectRoot;
-    private ExtensionStateStore $stateStore;
+    private StateRead $stateStore;
     private ExtensionPermissionCatalogService $permissionCatalog;
     private Config $config;
     private InputSanitizer $input;
@@ -27,7 +27,7 @@ final class ExtensionCatalogService
 
     public function __construct(
         string $projectRoot,
-        ExtensionStateStore $stateStore,
+        StateRead $stateStore,
         ExtensionPermissionCatalogService $permissionCatalog,
         Config $config,
         InputSanitizer $input,
@@ -94,7 +94,7 @@ final class ExtensionCatalogService
             $manifest = $this->readManifest($extensionPath, $formsProvider);
             $isValid = (bool) ($manifest['valid'] ?? false);
             $isEnabled = $isValid && !empty($enabledMap[$entry]);
-            $hasPanelRoutes = Layout::hasProvider($extensionPath, 'routes_panel.php');
+            $hasPanelRoutes = Resolver::hasProvider($extensionPath, 'routes_panel.php');
             $isStock = $this->isStockExtensionDirectory($entry);
             $canUninstall = !$isEnabled;
             $uninstallBlockReason = '';
@@ -326,7 +326,7 @@ final class ExtensionCatalogService
         }
 
         if ($directorySlug !== '') {
-            $shortcodesError = ExtensionRegistry::shortcodesValidationError(
+            $shortcodesError = Registry::shortcodesValidationError(
                 $this->projectRoot,
                 $directorySlug,
                 [
@@ -352,7 +352,7 @@ final class ExtensionCatalogService
                 ];
             }
 
-            $fieldsError = ExtensionRegistry::fieldsValidationError(
+            $fieldsError = Registry::fieldsValidationError(
                 $this->projectRoot,
                 $directorySlug,
                 [

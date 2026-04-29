@@ -20,7 +20,7 @@ use Raven\Lib\Parser\ChannelRouteParser;
 use Raven\Lib\Parser\FeedRouteParser;
 use Raven\Lib\Parser\SetParser;
 use Raven\Lib\Security\InputSanitizer;
-use Raven\Lib\Scribe\TaxonomyImageScribe;
+use Raven\Lib\Scribe\MediaScribe;
 use Raven\Lib\Transport\Redirect;
 use Raven\Lib\Transport\Upload;
 use Raven\Lib\View\Panel\Editor;
@@ -46,7 +46,7 @@ final class ChannelEditController
     private bool $categoryEnabled;
     private bool $tagEnabled;
     private TaxonomyImageService $taxonomyImageService;
-    private TaxonomyImageScribe $taxonomyImageScribe;
+    private MediaScribe $mediaScribe;
     private ChannelDataParser $channelParser;
     private FeedRouteParser $feedParser;
     private EditorTabs $editorTabs;
@@ -62,7 +62,7 @@ final class ChannelEditController
      * @param bool $categoryEnabled Whether category features are enabled in runtime config.
      * @param bool $tagEnabled Whether tag features are enabled in runtime config.
      * @param TaxonomyImageService $taxonomyImageService Read-side taxonomy image config and path helper.
-     * @param TaxonomyImageScribe $taxonomyImageScribe Write-side taxonomy image upload and cleanup helper.
+     * @param MediaScribe $mediaScribe Write-side meta-image upload and cleanup helper.
      * @param ChannelDataParser $channelParser Channel data parser for read-only channel lookups in edit/save.
      * @param FeedRouteParser $feedParser Feed route parser for RSS/Atom route settings.
      * @param EditorTabs $editorTabs Panel editor tab normalization and tab-preserving URL builder.
@@ -79,7 +79,7 @@ final class ChannelEditController
         bool $categoryEnabled,
         bool $tagEnabled,
         TaxonomyImageService $taxonomyImageService,
-        TaxonomyImageScribe $taxonomyImageScribe,
+        MediaScribe $mediaScribe,
         ChannelDataParser $channelParser,
         FeedRouteParser $feedParser,
         EditorTabs $editorTabs,
@@ -94,7 +94,7 @@ final class ChannelEditController
         $this->categoryEnabled = $categoryEnabled;
         $this->tagEnabled = $tagEnabled;
         $this->taxonomyImageService = $taxonomyImageService;
-        $this->taxonomyImageScribe = $taxonomyImageScribe;
+        $this->mediaScribe = $mediaScribe;
         $this->channelParser = $channelParser;
         $this->feedParser = $feedParser;
         $this->editorTabs = $editorTabs;
@@ -291,9 +291,9 @@ final class ChannelEditController
         }
 
         if (isset($coverUploads[0])) {
-            $coverResult = $this->taxonomyImageScribe->storeUpload('channels', $savedId, 'cover', $coverUploads[0]);
+            $coverResult = $this->mediaScribe->storeMetaImageUpload('channels', $savedId, 'cover', $coverUploads[0]);
             if (!$coverResult['ok']) {
-                $this->taxonomyImageScribe->cleanupPathSets('channels', $savedId, $newPathSets);
+                $this->mediaScribe->cleanupMetaImagePathSets('channels', $savedId, $newPathSets);
                 $this->context->flash('error', (string) ($coverResult['error'] ?? 'Failed to upload cover image.'));
                 Redirect::redirect($savedEditUrl);
             }
@@ -305,9 +305,9 @@ final class ChannelEditController
         }
 
         if (isset($previewUploads[0])) {
-            $previewResult = $this->taxonomyImageScribe->storeUpload('channels', $savedId, 'preview', $previewUploads[0]);
+            $previewResult = $this->mediaScribe->storeMetaImageUpload('channels', $savedId, 'preview', $previewUploads[0]);
             if (!$previewResult['ok']) {
-                $this->taxonomyImageScribe->cleanupPathSets('channels', $savedId, $newPathSets);
+                $this->mediaScribe->cleanupMetaImagePathSets('channels', $savedId, $newPathSets);
                 $this->context->flash('error', (string) ($previewResult['error'] ?? 'Failed to upload preview image.'));
                 Redirect::redirect($savedEditUrl);
             }
@@ -322,14 +322,14 @@ final class ChannelEditController
             $this->channelRepo->updateImagePaths($savedId, $nextStorage);
         } catch (\Throwable) {
             // Keep DB and filesystem in sync when image-path persistence fails.
-            $this->taxonomyImageScribe->cleanupPathSets('channels', $savedId, $newPathSets);
+            $this->mediaScribe->cleanupMetaImagePathSets('channels', $savedId, $newPathSets);
             $this->context->flash('error', 'Failed to save channel image selections.');
             Redirect::redirect($savedEditUrl);
         }
 
         $nextPaths = $this->taxonomyImageService->imagePathsFromStoragePayload('channels', $savedId, $nextStorage);
         $obsoletePaths = $this->taxonomyImageService->removedPaths($currentPaths, $nextPaths);
-        $this->taxonomyImageScribe->deleteStoredPaths('channels', $savedId, $obsoletePaths);
+        $this->mediaScribe->deleteMetaImageStoredPaths('channels', $savedId, $obsoletePaths);
 
         $this->context->flash('success', 'Changes saved.');
         Redirect::redirect($savedEditUrl);
@@ -366,7 +366,7 @@ final class ChannelEditController
             }
 
             if ($record !== null) {
-                $this->taxonomyImageScribe->deleteStoredPaths(
+                $this->mediaScribe->deleteMetaImageStoredPaths(
                     'channels',
                     $id,
                     $this->taxonomyImageService->imagePathsFromRecord('channels', $id, $record)
@@ -393,7 +393,7 @@ final class ChannelEditController
                 // Continue deleting remaining ids even if one operation throws.
                 $this->channelRepo->deleteById($selectedId);
                 if ($record !== null) {
-                    $this->taxonomyImageScribe->deleteStoredPaths(
+                    $this->mediaScribe->deleteMetaImageStoredPaths(
                         'channels',
                         $selectedId,
                         $this->taxonomyImageService->imagePathsFromRecord('channels', $selectedId, $record)
