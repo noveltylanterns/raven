@@ -11,6 +11,7 @@ declare(strict_types=1);
 
 namespace Raven\Core\Routing\Public;
 
+use Raven\Core\Routing\RouteParamGuard;
 use Raven\Core\Routing\Router;
 use Raven\Lib\Security\InputSanitizer;
 
@@ -19,6 +20,24 @@ use Raven\Lib\Security\InputSanitizer;
  */
 final class GroupRouter
 {
+    /**
+     * Registers group routes from one shared dependency payload.
+     *
+     * @param Router $router Mutable router receiving group routes.
+     * @param RouteDeps $deps Shared public route dependency payload.
+     * @return void
+     */
+    public static function registerWithDeps(Router $router, RouteDeps $deps): void
+    {
+        self::register(
+            $router,
+            $deps->publicGroupController,
+            $deps->publicRequestContext,
+            $deps->input,
+            $deps->routeConfig
+        );
+    }
+
     /**
      * Registers the public group route family.
      *
@@ -43,10 +62,10 @@ final class GroupRouter
 
         $groupRouteBase = '/' . $groupPrefix;
         $router->add('GET', $groupRouteBase . '/{slug}', static function (array $params) use ($publicGroupController, $publicRequestContext, $input): void {
-            $slug = $input->slug($params['slug'] ?? null);
-
-            if ($slug === null) {
+            $slug = RouteParamGuard::slugOrNotFound($input, $params['slug'] ?? null, static function () use ($publicRequestContext): void {
                 $publicRequestContext()->notFound();
+            });
+            if ($slug === null) {
                 return;
             }
 

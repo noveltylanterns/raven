@@ -11,6 +11,7 @@ declare(strict_types=1);
 
 namespace Raven\Core\Routing\Panel;
 
+use Raven\Core\Routing\RouteParamGuard;
 use Raven\Core\Routing\Router;
 use Raven\Lib\Security\InputSanitizer;
 
@@ -19,6 +20,24 @@ use Raven\Lib\Security\InputSanitizer;
  */
 final class RedirectRouter
 {
+    /**
+     * Registers redirect routes from one shared dependency payload.
+     *
+     * @param Router $router Mutable router receiving redirect routes.
+     * @param RouteDeps $deps Shared panel route dependency payload.
+     * @return void
+     */
+    public static function registerWithDeps(Router $router, RouteDeps $deps): void
+    {
+        self::register(
+            $router,
+            $deps->panelRedirectListController,
+            $deps->panelRedirectEditController,
+            $deps->input,
+            $deps->renderNotFound
+        );
+    }
+
     /**
      * Registers the panel redirect route family.
      *
@@ -45,10 +64,8 @@ final class RedirectRouter
         });
 
         $router->add('GET', '/redirect/edit/{id}', static function (array $params) use ($panelRedirectEditController, $input, $renderNotFound): void {
-            $id = $input->int($params['id'] ?? null, 1);
-
+            $id = RouteParamGuard::intOrNotFound($input, $params['id'] ?? null, 1, $renderNotFound);
             if ($id === null) {
-                $renderNotFound();
                 return;
             }
 

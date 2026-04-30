@@ -19,6 +19,18 @@ use Raven\Core\Routing\Router;
 final class AuthRouter
 {
     /**
+     * Registers the public auth route family from one shared dependency payload.
+     *
+     * @param Router $router Mutable router receiving the auth routes.
+     * @param RouteDeps $deps Shared public route dependency payload.
+     * @return void
+     */
+    public static function registerWithDeps(Router $router, RouteDeps $deps): void
+    {
+        self::register($router, $deps->publicAuthController);
+    }
+
+    /**
      * Registers the public auth route family.
      *
      * @param Router $router Mutable router receiving the auth routes.

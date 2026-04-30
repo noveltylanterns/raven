@@ -19,6 +19,18 @@ use Raven\Core\Routing\Router;
 final class LogRouter
 {
     /**
+     * Registers log routes from one shared dependency payload.
+     *
+     * @param Router $router Mutable router receiving logs routes.
+     * @param RouteDeps $deps Shared panel route dependency payload.
+     * @return void
+     */
+    public static function registerWithDeps(Router $router, RouteDeps $deps): void
+    {
+        self::register($router, $deps->panelLogsController);
+    }
+
+    /**
      * Registers the panel logs route family.
      *
      * @param Router $router Mutable router receiving log routes.

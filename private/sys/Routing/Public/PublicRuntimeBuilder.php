@@ -22,6 +22,9 @@ use Raven\Core\Controller\Public\PageController as PublicPageController;
 use Raven\Core\Controller\Public\SharedController;
 use Raven\Core\Controller\Public\TagController as PublicTagController;
 use Raven\Core\Controller\Public\UserController as PublicUserController;
+use Raven\Core\Factory\Public\ControllerFactories;
+use Raven\Core\Factory\Public\DomainFactories;
+use Raven\Core\Factory\Public\RepoFactories;
 use Raven\Core\Repository\ChannelRead;
 use Raven\Core\Repository\GroupRead;
 use Raven\Core\Repository\InviteRead;
@@ -157,171 +160,20 @@ final class PublicRuntimeBuilder
             };
         };
 
-        /**
-         * Builds channel read side for public routing/content flows.
-         */
-        $channelReadFactory = $memoize(static function () use (&$channelRead, $rvn): ChannelRead {
-            $channelRead = new ChannelRead(
-                $rvn['db'],
-                (string) $rvn['driver'],
-                (string) $rvn['prefix'],
-                (string) $rvn['root'] . '/private/dat/channel'
-            );
-
-            return $channelRead;
-        });
-
-        /**
-         * Builds group read side for public auth/profile flows.
-         */
-        $groupReadFactory = $memoize(static function () use (&$groupRead, $rvn): GroupRead {
-            $groupRead = new GroupRead(
-                $rvn['db'],
-                (string) $rvn['driver'],
-                (string) $rvn['prefix']
-            );
-
-            return $groupRead;
-        });
-
-        /**
-         * Builds media read side only when public rendering needs media rows.
-         */
-        $mediaReadFactory = $memoize(static function () use (&$mediaRead, $rvn): MediaRead {
-            $mediaRead = new MediaRead(
-                $rvn['db'],
-                (string) $rvn['driver'],
-                (string) $rvn['prefix']
-            );
-
-            return $mediaRead;
-        });
-
-        /**
-         * Builds page read side for public content routes.
-         */
-        $pageReadFactory = $memoize(static function () use (&$pageRead, $rvn, $channelReadFactory, $categoryEnabled, $tagEnabled): PageRead {
-            $pageRead = new PageRead(
-                $rvn['db'],
-                (string) $rvn['driver'],
-                (string) $rvn['prefix'],
-                $channelReadFactory(),
-                $categoryEnabled,
-                $tagEnabled
-            );
-
-            return $pageRead;
-        });
-
-        /**
-         * Builds redirect read side for public redirect fallbacks and routing helpers.
-         */
-        $redirectReadFactory = $memoize(static function () use (&$redirectRead, $rvn, $channelReadFactory): RedirectRead {
-            $redirectRead = new RedirectRead(
-                $rvn['db'],
-                (string) $rvn['driver'],
-                (string) $rvn['prefix'],
-                $channelReadFactory()
-            );
-
-            return $redirectRead;
-        });
-
-        /**
-         * Builds user read side for public author lookups and profile flows.
-         */
-        $userReadFactory = $memoize(static function () use (&$userRead, $rvn, $resolveAuthDb): UserRead {
-            $userRead = new UserRead(
-                $resolveAuthDb(),
-                $rvn['db'],
-                (string) $rvn['driver'],
-                (string) $rvn['prefix']
-            );
-
-            return $userRead;
-        });
-
-        /**
-         * Builds user write side for public login/register flows.
-         */
-        $userWriteFactory = $memoize(static function () use (&$userWrite, $rvn, $resolveAuthDb): UserWrite {
-            $userWrite = new UserWrite(
-                $resolveAuthDb(),
-                $rvn['db'],
-                (string) $rvn['driver'],
-                (string) $rvn['prefix']
-            );
-
-            return $userWrite;
-        });
-
-        /**
-         * Builds invite-token read side only for the registration flows that validate tokens.
-         */
-        $inviteReadFactory = $memoize(static function () use (&$inviteRead, $rvn, $resolveAuthDb): InviteRead {
-            $inviteRead = new InviteRead(
-                $resolveAuthDb(),
-                (string) $rvn['driver'],
-                (string) $rvn['prefix']
-            );
-
-            return $inviteRead;
-        });
-
-        /**
-         * Builds invite-token write side only for the registration flows that consume tokens.
-         */
-        $inviteWriteFactory = $memoize(static function () use (&$inviteWrite, $rvn, $resolveAuthDb, $inviteReadFactory): InviteWrite {
-            $inviteWrite = new InviteWrite(
-                $resolveAuthDb(),
-                (string) $rvn['driver'],
-                (string) $rvn['prefix'],
-                $inviteReadFactory()
-            );
-
-            return $inviteWrite;
-        });
-
-        /**
-         * Builds taxonomy lookup parsing only for public routes that actually
-         * resolve channel/category/tag slugs.
-         */
-        $taxonomyLookupRepository = $memoize(static function () use (&$taxonomyLookup, $rvn, $channelReadFactory): TaxonomyRepoParser {
-            $taxonomyLookup = new TaxonomyRepoParser(
-                $rvn['db'],
-                (string) $rvn['driver'],
-                (string) $rvn['prefix'],
-                $channelReadFactory()
-            );
-
-            return $taxonomyLookup;
-        });
-
-        /**
-         * Builds category lookup parsing only for public category-route and taxonomy-feed reads.
-         */
-        $categoryLookupRepository = $memoize(static function () use (&$categoryLookup, $rvn): CategoryRepoParser {
-            $categoryLookup = new CategoryRepoParser(
-                $rvn['db'],
-                (string) $rvn['driver'],
-                (string) $rvn['prefix']
-            );
-
-            return $categoryLookup;
-        });
-
-        /**
-         * Builds tag lookup parsing only for public tag-route and taxonomy-feed reads.
-         */
-        $tagLookupRepository = $memoize(static function () use (&$tagLookup, $rvn): TagRepoParser {
-            $tagLookup = new TagRepoParser(
-                $rvn['db'],
-                (string) $rvn['driver'],
-                (string) $rvn['prefix']
-            );
-
-            return $tagLookup;
-        });
+        /** @var array<string, Closure> $repoFactories */
+        $repoFactories = RepoFactories::build($rvn, $memoize, $resolveAuthDb, $categoryEnabled, $tagEnabled);
+        $channelReadFactory = $repoFactories['channel_read'];
+        $groupReadFactory = $repoFactories['group_read'];
+        $mediaReadFactory = $repoFactories['media_read'];
+        $pageReadFactory = $repoFactories['page_read'];
+        $redirectReadFactory = $repoFactories['redirect_read'];
+        $userReadFactory = $repoFactories['user_read'];
+        $userWriteFactory = $repoFactories['user_write'];
+        $inviteReadFactory = $repoFactories['invite_read'];
+        $inviteWriteFactory = $repoFactories['invite_write'];
+        $taxonomyLookupRepository = $repoFactories['taxonomy_lookup'];
+        $categoryLookupRepository = $repoFactories['category_lookup'];
+        $tagLookupRepository = $repoFactories['tag_lookup'];
 
         /**
          * Boots extension providers only when public runtime code needs extension services.
@@ -382,66 +234,26 @@ final class PublicRuntimeBuilder
             return $extensionEditorCatalogService;
         });
 
-        /**
-         * Public content/feed routes share the same page/channel/redirect runtime
-         * dependencies, so expose them as one clustered factory ahead of the later
-         * sub-controller split.
-         *
-         * @return array<string, mixed>
-         */
-        $publicContentDomain = $memoize(static function () use (
+        /** @var array<string, Closure> $domainFactories */
+        $domainFactories = DomainFactories::build(
+            $memoize,
             $channelReadFactory,
             $categoryLookupRepository,
             $mediaReadFactory,
             $pageReadFactory,
             $redirectReadFactory,
             $tagLookupRepository,
-            $taxonomyLookupRepository
-        ): array {
-            return [
-                'category_lookup' => $categoryLookupRepository,
-                'channel' => $channelReadFactory(),
-                'media' => $mediaReadFactory(),
-                'page' => $pageReadFactory(),
-                'redirect_read' => $redirectReadFactory(),
-                'tag_lookup' => $tagLookupRepository,
-                'taxonomy_lookup' => $taxonomyLookupRepository,
-            ];
-        });
-
-        /**
-         * Public auth/profile routes share account-facing repositories; keep that
-         * seam visible now so login/register/profile can split cleanly later.
-         *
-         * @return array<string, mixed>
-         */
-        $publicAuthDomain = $memoize(static function () use (
+            $taxonomyLookupRepository,
             $groupReadFactory,
             $userReadFactory,
             $userWriteFactory,
             $inviteReadFactory,
-            $inviteWriteFactory
-        ): array {
-            return [
-                'group' => $groupReadFactory(),
-                'user_read' => $userReadFactory(),
-                'user_write' => $userWriteFactory(),
-                'invite_read' => $inviteReadFactory,
-                'invite_write' => $inviteWriteFactory,
-            ];
-        });
-
-        /**
-         * Embedded-form and shortcode routes depend on extension services but
-         * should stay lazy on ordinary public page requests.
-         *
-         * @return array<string, mixed>
-         */
-        $publicFormDomain = $memoize(static function () use ($extensionServicesProvider): array {
-            return [
-                'extension_services' => $extensionServicesProvider,
-            ];
-        });
+            $inviteWriteFactory,
+            $extensionServicesProvider
+        );
+        $publicContentDomain = $domainFactories['public_domain_content'];
+        $publicAuthDomain = $domainFactories['public_domain_auth'];
+        $publicFormDomain = $domainFactories['public_domain_form'];
 
         $rvn['public_domain_content'] = $publicContentDomain;
         $rvn['public_domain_channel'] = $publicContentDomain;
@@ -453,205 +265,16 @@ final class PublicRuntimeBuilder
         $rvn['public_domain_tag'] = $publicContentDomain;
         $rvn['public_domain_form'] = $publicFormDomain;
 
-        /**
-         * Builds the shared request context for split public sub-controllers.
-         */
-        $rvn['public_request_context'] = static function () use (&$publicSharedController, $rvn, $resolveAuth, $themeCatalogFactory): SharedController {
-            if ($publicSharedController instanceof SharedController) {
-                return $publicSharedController;
-            }
-
-            $publicSharedController = new SharedController(
-                $rvn['config'],
-                $resolveAuth(),
-                $rvn['input'],
-                $rvn['csrf'],
-                $themeCatalogFactory()
-            );
-
-            return $publicSharedController;
-        };
-
-        /**
-         * Builds the split public auth controller on first use.
-         */
-        $rvn['public_auth_controller'] = static function () use (&$publicAuthController, &$rvn, $publicAuthDomain): PublicAuthController {
-            if ($publicAuthController instanceof PublicAuthController) {
-                return $publicAuthController;
-            }
-
-            /** @var callable(): SharedController $requestContextFactory */
-            $requestContextFactory = $rvn['public_request_context'];
-            $authDomain = $publicAuthDomain();
-            $publicAuthController = new PublicAuthController(
-                $requestContextFactory(),
-                $authDomain['group'],
-                $authDomain['user_write'],
-                $authDomain['invite_read'],
-                $authDomain['invite_write']
-            );
-
-            return $publicAuthController;
-        };
-
-        /**
-         * Builds the split public channel controller on first use.
-         */
-        $rvn['public_channel_controller'] = static function () use (&$publicChannelController, &$rvn, $publicContentDomain, $publicAuthDomain, $publicFormDomain, $themeCatalogFactory, $extensionEditorCatalogFactory): PublicChannelController {
-            if ($publicChannelController instanceof PublicChannelController) {
-                return $publicChannelController;
-            }
-
-            /** @var callable(): SharedController $requestContextFactory */
-            $requestContextFactory = $rvn['public_request_context'];
-            $contentDomain = $publicContentDomain();
-            $authDomain = $publicAuthDomain();
-            $formDomain = $publicFormDomain();
-            $publicChannelController = new PublicChannelController(
-                $requestContextFactory(),
-                $contentDomain['media'],
-                $contentDomain['page'],
-                $contentDomain['redirect_read'],
-                $authDomain['user_read'],
-                $themeCatalogFactory(),
-                $extensionEditorCatalogFactory(),
-                $formDomain['extension_services']
-            );
-
-            return $publicChannelController;
-        };
-
-        /**
-         * Builds the split public category controller on first use.
-         */
-        $rvn['public_category_controller'] = static function () use (&$publicCategoryController, &$rvn, $publicContentDomain, $themeCatalogFactory): PublicCategoryController {
-            if ($publicCategoryController instanceof PublicCategoryController) {
-                return $publicCategoryController;
-            }
-
-            /** @var callable(): SharedController $requestContextFactory */
-            $requestContextFactory = $rvn['public_request_context'];
-            $contentDomain = $publicContentDomain();
-            $publicCategoryController = new PublicCategoryController(
-                $requestContextFactory(),
-                $contentDomain['page'],
-                $contentDomain['category_lookup'](),
-                $themeCatalogFactory()
-            );
-
-            return $publicCategoryController;
-        };
-
-        /**
-         * Builds the split public group controller on first use.
-         */
-        $rvn['public_group_controller'] = static function () use (&$publicGroupController, &$rvn, $publicAuthDomain): PublicGroupController {
-            if ($publicGroupController instanceof PublicGroupController) {
-                return $publicGroupController;
-            }
-
-            /** @var callable(): SharedController $requestContextFactory */
-            $requestContextFactory = $rvn['public_request_context'];
-            $authDomain = $publicAuthDomain();
-            $publicGroupController = new PublicGroupController(
-                $requestContextFactory(),
-                $groupReadFactory()
-            );
-
-            return $publicGroupController;
-        };
-
-        /**
-         * Builds the split public user controller on first use.
-         */
-        $rvn['public_user_controller'] = static function () use (&$publicUserController, &$rvn, $publicAuthDomain): PublicUserController {
-            if ($publicUserController instanceof PublicUserController) {
-                return $publicUserController;
-            }
-
-            /** @var callable(): SharedController $requestContextFactory */
-            $requestContextFactory = $rvn['public_request_context'];
-            $authDomain = $publicAuthDomain();
-            $publicUserController = new PublicUserController(
-                $requestContextFactory(),
-                $authDomain['user_read']
-            );
-
-            return $publicUserController;
-        };
-
-        /**
-         * Builds the split public feed controller on first use.
-         */
-        $rvn['public_feed_controller'] = static function () use (&$publicFeedController, &$rvn, $publicContentDomain): PublicFeedController {
-            if ($publicFeedController instanceof PublicFeedController) {
-                return $publicFeedController;
-            }
-
-            /** @var callable(): SharedController $requestContextFactory */
-            $requestContextFactory = $rvn['public_request_context'];
-            $contentDomain = $publicContentDomain();
-            $publicFeedController = new PublicFeedController(
-                $requestContextFactory(),
-                $contentDomain['channel'],
-                $contentDomain['page'],
-                $contentDomain['category_lookup'](),
-                $contentDomain['tag_lookup']()
-            );
-
-            return $publicFeedController;
-        };
-
-        /**
-         * Builds the split public tag controller on first use.
-         */
-        $rvn['public_tag_controller'] = static function () use (&$publicTagController, &$rvn, $publicContentDomain, $themeCatalogFactory): PublicTagController {
-            if ($publicTagController instanceof PublicTagController) {
-                return $publicTagController;
-            }
-
-            /** @var callable(): SharedController $requestContextFactory */
-            $requestContextFactory = $rvn['public_request_context'];
-            $contentDomain = $publicContentDomain();
-            $publicTagController = new PublicTagController(
-                $requestContextFactory(),
-                $contentDomain['page'],
-                $contentDomain['tag_lookup'](),
-                $themeCatalogFactory()
-            );
-
-            return $publicTagController;
-        };
-
-        /**
-         * Builds the split public page controller on first use.
-         */
-        $rvn['public_page_controller'] = static function () use (&$publicPageController, &$rvn, $publicContentDomain, $publicAuthDomain, $publicFormDomain, $themeCatalogFactory, $extensionEditorCatalogFactory): PublicPageController {
-            if ($publicPageController instanceof PublicPageController) {
-                return $publicPageController;
-            }
-
-            /** @var callable(): SharedController $requestContextFactory */
-            $requestContextFactory = $rvn['public_request_context'];
-            $contentDomain = $publicContentDomain();
-            $authDomain = $publicAuthDomain();
-            $formDomain = $publicFormDomain();
-            $publicPageController = new PublicPageController(
-                $requestContextFactory(),
-                $contentDomain['channel'],
-                $contentDomain['media'],
-                $contentDomain['page'],
-                $contentDomain['redirect_read'],
-                $authDomain['user_read'],
-                $themeCatalogFactory(),
-                $extensionEditorCatalogFactory(),
-                $formDomain['extension_services']
-            );
-
-            return $publicPageController;
-        };
-
-        $rvn['public_extension_services'] = $extensionServicesProvider;
+        ControllerFactories::register(
+            $rvn,
+            $resolveAuth,
+            $themeCatalogFactory,
+            $extensionEditorCatalogFactory,
+            $publicContentDomain,
+            $publicAuthDomain,
+            $publicFormDomain,
+            $extensionServicesProvider
+        );
 
         return $rvn;
     }

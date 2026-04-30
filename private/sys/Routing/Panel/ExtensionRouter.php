@@ -27,6 +27,26 @@ use Raven\Core\Routing\Router;
 final class ExtensionRouter
 {
     /**
+     * Registers extension routes from one shared dependency payload.
+     *
+     * @param Router $router Mutable router receiving extension routes.
+     * @param RouteDeps $deps Shared panel route dependency payload.
+     * @return void
+     */
+    public static function registerWithDeps(Router $router, RouteDeps $deps): void
+    {
+        self::register(
+            $router,
+            $deps->rvn,
+            $deps->enabledExtensions,
+            $deps->enabledExtensionManifests,
+            $deps->extensionPermissionCatalog,
+            $deps->internalPath,
+            $deps->renderPublicNotFound
+        );
+    }
+
+    /**
      * Registers enabled extension panel routes onto the shared router.
      *
      * @param Router $router Mutable router receiving extension routes.

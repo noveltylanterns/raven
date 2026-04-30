@@ -387,6 +387,103 @@ declare(strict_types=1);
   - Extension templates live at `private/ext/{slug}/tpl/{template}.php`.
 - Registration happens during `public/index.php` route bootstrap before fallback page/channel routes.
 
+## Taxonomy-Style Route Helpers (Panel & Public)
+
+Core ships two shared route-pattern builders that extension authors can call directly from their
+own `routes_panel.php` and `routes_public.php` files. Using these eliminates the need to
+hand-copy the standard category/tag route patterns.
+
+### Panel — `TaxonomyCrudRouter`
+- Class: `Raven\Core\Routing\Panel\TaxonomyCrudRouter`
+- Registers the standard 10-route panel CRUD+set pattern used by categories and tags:
+  `/{prefix}`, `/{prefix}/set`, `/{prefix}/edit/new`, `/{prefix}/edit/{id}`,
+  `POST /{prefix}/save`, `POST /{prefix}/delete`, `/{prefix}/set/edit/new`,
+  `/{prefix}/set/edit/{id}`, `POST /{prefix}/set/save`, `POST /{prefix}/set/delete`.
+- Static entry point:
+  ```php
+  TaxonomyCrudRouter::register(
+      Router $router,
+      string $prefix,           // URL prefix, e.g. 'genre'
+      Closure $onList,
+      Closure $onSetList,
+      Closure $onEditNew,
+      Closure $onEditById,      // receives int $id
+      Closure $onSave,
+      Closure $onDelete,
+      Closure $onSetEditNew,
+      Closure $onSetEditById,   // receives int $id (min=0 for sets, min=1 for items)
+      Closure $onSetSave,
+      Closure $onSetDelete,
+      InputSanitizer $input,
+      bool $enabled,
+      callable $renderNotFound
+  ): void
+  ```
+- Typical call from `routes_panel.php`:
+  ```php
+  use Raven\Core\Routing\Panel\TaxonomyCrudRouter;
+
+  return static function (Router $router, array $context): void {
+      $rvn = $context['rvn'];
+      $ctrl = $rvn['extension_services']['my-ext']['genre_ctrl'];
+      TaxonomyCrudRouter::register(
+          $router, 'genre',
+          fn() => $ctrl->genreList(),
+          fn() => $ctrl->genreSetList(),
+          fn() => $ctrl->genreEdit(null),
+          fn(int $id) => $ctrl->genreEdit($id),
+          fn() => $ctrl->genreSave($_POST, $_FILES),
+          fn() => $ctrl->genreDelete($_POST),
+          fn() => $ctrl->genreSetEdit(null),
+          fn(int $id) => $ctrl->genreSetEdit($id),
+          fn() => $ctrl->genreSetSave($_POST),
+          fn() => $ctrl->genreSetDelete($_POST),
+          $rvn['input'],
+          true,
+          $context['renderPublicNotFound']
+      );
+  };
+  ```
+
+### Public — `PrefixedSlugPageRouter`
+- Class: `Raven\Core\Routing\Public\PrefixedSlugPageRouter`
+- Registers the standard 2-route prefixed taxonomy browsing pattern:
+  `/{prefix}/{slug}` and `/{prefix}/{slug}/{page}`.
+- Reads the URL prefix from a route-config array entry (`$routeConfig[$configKey]`); skips
+  registration silently when the prefix is empty or not set.
+- Static entry point:
+  ```php
+  PrefixedSlugPageRouter::register(
+      Router $router,
+      string $configKey,         // key in $routeConfig whose value is the URL prefix
+      array  $routeConfig,       // route config map (from rvn['config'] or RouteDeps)
+      Closure $onSlug,           // receives string $slug
+      Closure $onSlugPage,       // receives string $slug, int $page
+      callable $publicRequestContext,
+      InputSanitizer $input
+  ): void
+  ```
+- Typical call from `routes_public.php` (module extensions only):
+  ```php
+  use Raven\Core\Routing\Public\PrefixedSlugPageRouter;
+
+  return static function (Router $router, array $context): void {
+      $rvn = $context['rvn'];
+      $ctrl = $rvn['extension_services']['my-ext']['genre_ctrl'];
+      $routeConfig = (array) $rvn['config']->get('routes', []);
+      PrefixedSlugPageRouter::register(
+          $router, 'genre_prefix', $routeConfig,
+          fn(string $slug) => $ctrl->genre($slug, 1),
+          fn(string $slug, int $page) => $ctrl->genre($slug, $page),
+          fn() => $context['controller']->publicRequestContext(),
+          $rvn['input']
+      );
+  };
+  ```
+- The `genre_prefix` config key value (e.g., `'genres'`) must be present in the site config
+  under `routes.genre_prefix` for routes to be registered. An empty or missing prefix is
+  treated as "disabled" — no routes are added and no error is thrown.
+
 ## Extension Service Bootstrap Contract
 - If enabled, Raven attempts to load `private/ext/{name}/ext.php` during `private/raven.php`.
 - File must return an array with these optional top-level keys:

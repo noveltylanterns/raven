@@ -1,0 +1,537 @@
+{
+    "schema": 1,
+    "generated_at": "2026-04-30T07:57:33+00:00",
+    "scope": "public",
+    "routes": [
+        {
+            "scope": "public",
+            "order": 1,
+            "method": "GET",
+            "regex": "#^/login$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Public/AuthRouter.php",
+                "line": 42,
+                "static_uses": [
+                    "publicAuthController"
+                ]
+            },
+            "signature": "e009b6f35ef5774dce2495dbf82a4d606293104b"
+        },
+        {
+            "scope": "public",
+            "order": 2,
+            "method": "POST",
+            "regex": "#^/login$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Public/AuthRouter.php",
+                "line": 46,
+                "static_uses": [
+                    "publicAuthController"
+                ]
+            },
+            "signature": "a0d629bb2e07253d527b7d07f0a3a20ea747b3e6"
+        },
+        {
+            "scope": "public",
+            "order": 3,
+            "method": "GET",
+            "regex": "#^/login/2fa$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Public/AuthRouter.php",
+                "line": 50,
+                "static_uses": [
+                    "publicAuthController"
+                ]
+            },
+            "signature": "b03b736e2eee6e6fbea3011e3cb1821a4d7b3be7"
+        },
+        {
+            "scope": "public",
+            "order": 4,
+            "method": "POST",
+            "regex": "#^/login/2fa$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Public/AuthRouter.php",
+                "line": 54,
+                "static_uses": [
+                    "publicAuthController"
+                ]
+            },
+            "signature": "28ce5d7fe1a469a757ddb3d40a0ed9651292d7b9"
+        },
+        {
+            "scope": "public",
+            "order": 5,
+            "method": "POST",
+            "regex": "#^/login/2fa/select$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Public/AuthRouter.php",
+                "line": 58,
+                "static_uses": [
+                    "publicAuthController"
+                ]
+            },
+            "signature": "bae02360db4f6cf11b1c78b4b232121e46228d9d"
+        },
+        {
+            "scope": "public",
+            "order": 6,
+            "method": "POST",
+            "regex": "#^/login/2fa/webauthn/options$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Public/AuthRouter.php",
+                "line": 62,
+                "static_uses": [
+                    "publicAuthController"
+                ]
+            },
+            "signature": "b973b181cddb1c851bfe443303a6b6ac2405d975"
+        },
+        {
+            "scope": "public",
+            "order": 7,
+            "method": "POST",
+            "regex": "#^/login/2fa/webauthn/verify$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Public/AuthRouter.php",
+                "line": 66,
+                "static_uses": [
+                    "publicAuthController"
+                ]
+            },
+            "signature": "5b6a53b324d9e364f6c91887d818f0c4896e98e6"
+        },
+        {
+            "scope": "public",
+            "order": 8,
+            "method": "GET",
+            "regex": "#^/register$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Public/AuthRouter.php",
+                "line": 70,
+                "static_uses": [
+                    "publicAuthController"
+                ]
+            },
+            "signature": "95f46d37c998f1c95150ed892d700dcb7046e9de"
+        },
+        {
+            "scope": "public",
+            "order": 9,
+            "method": "POST",
+            "regex": "#^/register$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Public/AuthRouter.php",
+                "line": 74,
+                "static_uses": [
+                    "publicAuthController"
+                ]
+            },
+            "signature": "30732754f5d9d4a6222e7ef00e6e795902bd0e9d"
+        },
+        {
+            "scope": "public",
+            "order": 10,
+            "method": "POST",
+            "regex": "#^/forms/submit$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Public/FormRouter.php",
+                "line": 51,
+                "static_uses": [
+                    "input",
+                    "publicPageController",
+                    "publicRequestContext"
+                ]
+            },
+            "signature": "3bdb9236c22484efe1af097971d36879837e1775"
+        },
+        {
+            "scope": "public",
+            "order": 11,
+            "method": "GET",
+            "regex": "#^/repo$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/ext/repo/routes_public.php",
+                "line": 129,
+                "static_uses": [
+                    "indexUrl",
+                    "notFound",
+                    "renderPage",
+                    "repoService"
+                ]
+            },
+            "signature": "845a70a25f9933dc5bdd45e871875f02dcd73db0"
+        },
+        {
+            "scope": "public",
+            "order": 12,
+            "method": "GET",
+            "regex": "#^/repo/(?P<slug>[^/]+)$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/ext/repo/routes_public.php",
+                "line": 148,
+                "static_uses": [
+                    "indexUrl",
+                    "normalizeRepoSlug",
+                    "notFound",
+                    "renderPage",
+                    "repoService"
+                ]
+            },
+            "signature": "7ffae168e9dfd20c737798052c1cf1bfd6e0d01c"
+        },
+        {
+            "scope": "public",
+            "order": 13,
+            "method": "GET",
+            "regex": "#^/repo/(?P<slug>[^/]+)/raw$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/ext/repo/routes_public.php",
+                "line": 211,
+                "static_uses": [
+                    "normalizeRepoSlug",
+                    "notFound",
+                    "repoService",
+                    "streamFile"
+                ]
+            },
+            "signature": "05ad94ca12c115b1a50a4ced35be81ef2740eeb5"
+        },
+        {
+            "scope": "public",
+            "order": 14,
+            "method": "GET",
+            "regex": "#^/repo/(?P<slug>[^/]+)/download$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/ext/repo/routes_public.php",
+                "line": 243,
+                "static_uses": [
+                    "normalizeRepoSlug",
+                    "notFound",
+                    "repoService",
+                    "streamFile"
+                ]
+            },
+            "signature": "ea4557e370cc7dd3ee35c3b231c1ccdc15394fed"
+        },
+        {
+            "scope": "public",
+            "order": 15,
+            "method": "GET",
+            "regex": "#^/repo/(?P<slug>[^/]+)/archive$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/ext/repo/routes_public.php",
+                "line": 275,
+                "static_uses": [
+                    "normalizeRepoSlug",
+                    "notFound",
+                    "repoService",
+                    "streamFile"
+                ]
+            },
+            "signature": "bb342f789e98fada55000c62fee807527e0da245"
+        },
+        {
+            "scope": "public",
+            "order": 16,
+            "method": "GET",
+            "regex": "#^/cat/(?P<slug>[^/]+)$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Public/PrefixedSlugPageRouter.php",
+                "line": 62,
+                "static_uses": [
+                    "input",
+                    "onSlug",
+                    "publicRequestContext"
+                ]
+            },
+            "signature": "62b4c5b773dc7301cc9907e17b002b1bb375b57d"
+        },
+        {
+            "scope": "public",
+            "order": 17,
+            "method": "GET",
+            "regex": "#^/cat/(?P<slug>[^/]+)/(?P<page>[^/]+)$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Public/PrefixedSlugPageRouter.php",
+                "line": 72,
+                "static_uses": [
+                    "input",
+                    "onSlugPage",
+                    "publicRequestContext"
+                ]
+            },
+            "signature": "5d88ca08d34046f1f34b1e5919e9c3f0b5420a3c"
+        },
+        {
+            "scope": "public",
+            "order": 18,
+            "method": "GET",
+            "regex": "#^/(?P<slug>[^/]+)$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Public/ChannelRouter.php",
+                "line": 63,
+                "static_uses": [
+                    "input",
+                    "publicChannelController",
+                    "publicRequestContext",
+                    "reservedPrefixes"
+                ]
+            },
+            "signature": "99515272da8cee3953790b2a5aab439d7280c352"
+        },
+        {
+            "scope": "public",
+            "order": 19,
+            "method": "GET",
+            "regex": "#^/rss$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Public/FeedRouter.php",
+                "line": 75,
+                "static_uses": [
+                    "publicFeedController"
+                ]
+            },
+            "signature": "888373b25968482524a41db83347b07a2c160826"
+        },
+        {
+            "scope": "public",
+            "order": 20,
+            "method": "GET",
+            "regex": "#^/rss/(?P<channel>[^/]+)$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Public/FeedRouter.php",
+                "line": 79,
+                "static_uses": [
+                    "input",
+                    "publicFeedController",
+                    "publicRequestContext",
+                    "reservedPrefixes"
+                ]
+            },
+            "signature": "97a90b87c32ee51856fb203d4bf355eacd2b7915"
+        },
+        {
+            "scope": "public",
+            "order": 21,
+            "method": "GET",
+            "regex": "#^/rss/cat/(?P<slug>[^/]+)$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Public/FeedRouter.php",
+                "line": 94,
+                "static_uses": [
+                    "input",
+                    "publicFeedController",
+                    "publicRequestContext"
+                ]
+            },
+            "signature": "f51ae6227585cdfde1fb0b9739eccdab51d9ff00"
+        },
+        {
+            "scope": "public",
+            "order": 22,
+            "method": "GET",
+            "regex": "#^/rss/tag/(?P<slug>[^/]+)$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Public/FeedRouter.php",
+                "line": 107,
+                "static_uses": [
+                    "input",
+                    "publicFeedController",
+                    "publicRequestContext"
+                ]
+            },
+            "signature": "f4615f863323235e8052fa0cea4259e909302f96"
+        },
+        {
+            "scope": "public",
+            "order": 23,
+            "method": "GET",
+            "regex": "#^/atom$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Public/FeedRouter.php",
+                "line": 121,
+                "static_uses": [
+                    "publicFeedController"
+                ]
+            },
+            "signature": "1e06f64d0e1b309e6e0d83a9a060c51fa4323a29"
+        },
+        {
+            "scope": "public",
+            "order": 24,
+            "method": "GET",
+            "regex": "#^/atom/(?P<channel>[^/]+)$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Public/FeedRouter.php",
+                "line": 125,
+                "static_uses": [
+                    "input",
+                    "publicFeedController",
+                    "publicRequestContext",
+                    "reservedPrefixes"
+                ]
+            },
+            "signature": "2ce725b6b82b91a2d08de3f9c4673dfbe69c64b3"
+        },
+        {
+            "scope": "public",
+            "order": 25,
+            "method": "GET",
+            "regex": "#^/atom/cat/(?P<slug>[^/]+)$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Public/FeedRouter.php",
+                "line": 140,
+                "static_uses": [
+                    "input",
+                    "publicFeedController",
+                    "publicRequestContext"
+                ]
+            },
+            "signature": "493aa874eb83a57678a1558f04de75f21d254082"
+        },
+        {
+            "scope": "public",
+            "order": 26,
+            "method": "GET",
+            "regex": "#^/atom/tag/(?P<slug>[^/]+)$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Public/FeedRouter.php",
+                "line": 153,
+                "static_uses": [
+                    "input",
+                    "publicFeedController",
+                    "publicRequestContext"
+                ]
+            },
+            "signature": "45eb5511d29d2d00225d704a3e412ca68b33e624"
+        },
+        {
+            "scope": "public",
+            "order": 27,
+            "method": "GET",
+            "regex": "#^/user/(?P<username>[^/]+)$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Public/ProfileRouter.php",
+                "line": 63,
+                "static_uses": [
+                    "input",
+                    "publicRequestContext",
+                    "publicUserController"
+                ]
+            },
+            "signature": "be8cf83f841a84391103a1a9bd209e64c3f6b922"
+        },
+        {
+            "scope": "public",
+            "order": 28,
+            "method": "GET",
+            "regex": "#^/group/(?P<slug>[^/]+)$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Public/GroupRouter.php",
+                "line": 64,
+                "static_uses": [
+                    "input",
+                    "publicGroupController",
+                    "publicRequestContext"
+                ]
+            },
+            "signature": "15bf8d94ea354058e718926599c81dbd0543d7b9"
+        },
+        {
+            "scope": "public",
+            "order": 29,
+            "method": "GET",
+            "regex": "#^/tag/(?P<slug>[^/]+)$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Public/PrefixedSlugPageRouter.php",
+                "line": 62,
+                "static_uses": [
+                    "input",
+                    "onSlug",
+                    "publicRequestContext"
+                ]
+            },
+            "signature": "f0dbbd5b7a32c6079248c3d5aa022dc278bcb2d5"
+        },
+        {
+            "scope": "public",
+            "order": 30,
+            "method": "GET",
+            "regex": "#^/tag/(?P<slug>[^/]+)/(?P<page>[^/]+)$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Public/PrefixedSlugPageRouter.php",
+                "line": 72,
+                "static_uses": [
+                    "input",
+                    "onSlugPage",
+                    "publicRequestContext"
+                ]
+            },
+            "signature": "5ec462f5d87d592cd06fb3f397705b464e3b114a"
+        },
+        {
+            "scope": "public",
+            "order": 31,
+            "method": "GET",
+            "regex": "#^/$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Public/ContentRouter.php",
+                "line": 62,
+                "static_uses": [
+                    "publicPageController"
+                ]
+            },
+            "signature": "1853d2e741ee37e46ed955e459790bffff2bf285"
+        },
+        {
+            "scope": "public",
+            "order": 32,
+            "method": "GET",
+            "regex": "#^/(?P<channel>[^/]+)/(?P<slug>[^/]+)$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Public/ContentRouter.php",
+                "line": 67,
+                "static_uses": [
+                    "input",
+                    "publicPageController",
+                    "publicRequestContext",
+                    "reservedPrefixes"
+                ]
+            },
+            "signature": "40691ed48c213dcc6611239d82ab01d645a47a8a"
+        }
+    ]
+}

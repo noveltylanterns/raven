@@ -19,6 +19,18 @@ use Raven\Core\Routing\Router;
 final class SystemRouter
 {
     /**
+     * Registers system routes from one shared dependency payload.
+     *
+     * @param Router $router Mutable router receiving system routes.
+     * @param RouteDeps $deps Shared panel route dependency payload.
+     * @return void
+     */
+    public static function registerWithDeps(Router $router, RouteDeps $deps): void
+    {
+        self::register($router, $deps->panelSystemController);
+    }
+
+    /**
      * Registers the panel system route family.
      *
      * @param Router $router Mutable router receiving system routes.

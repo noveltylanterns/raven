@@ -11,6 +11,7 @@ declare(strict_types=1);
 
 namespace Raven\Core\Routing\Public;
 
+use Raven\Core\Routing\RouteParamGuard;
 use Raven\Core\Routing\Router;
 use Raven\Lib\Security\InputSanitizer;
 
@@ -19,6 +20,24 @@ use Raven\Lib\Security\InputSanitizer;
  */
 final class FeedRouter
 {
+    /**
+     * Registers feed routes from one shared dependency payload.
+     *
+     * @param Router $router Mutable router receiving feed routes.
+     * @param RouteDeps $deps Shared public route dependency payload.
+     * @return void
+     */
+    public static function registerWithDeps(Router $router, RouteDeps $deps): void
+    {
+        self::register(
+            $router,
+            $deps->publicFeedController,
+            $deps->publicRequestContext,
+            $deps->input,
+            $deps->routeConfig
+        );
+    }
+
     /**
      * Registers the public feed route family.
      *
@@ -58,10 +77,13 @@ final class FeedRouter
             });
 
             $router->add('GET', '/' . $rssFeedRoute . '/{channel}', static function (array $params) use ($publicFeedController, $publicRequestContext, $input, $reservedPrefixes): void {
-                $channel = $input->slug($params['channel'] ?? null);
-
-                if ($channel === null || in_array($channel, $reservedPrefixes, true)) {
+                $channel = RouteParamGuard::slugOrNotFound($input, $params['channel'] ?? null, static function () use ($publicRequestContext): void {
                     $publicRequestContext()->notFound();
+                });
+                $channel = RouteParamGuard::slugAllowedOrNotFound($channel, $reservedPrefixes, static function () use ($publicRequestContext): void {
+                    $publicRequestContext()->notFound();
+                });
+                if ($channel === null) {
                     return;
                 }
 
@@ -70,10 +92,10 @@ final class FeedRouter
 
             if ($categoryPrefix !== '') {
                 $router->add('GET', '/' . $rssFeedRoute . '/' . $categoryPrefix . '/{slug}', static function (array $params) use ($publicFeedController, $publicRequestContext, $input): void {
-                    $slug = $input->slug($params['slug'] ?? null);
-
-                    if ($slug === null) {
+                    $slug = RouteParamGuard::slugOrNotFound($input, $params['slug'] ?? null, static function () use ($publicRequestContext): void {
                         $publicRequestContext()->notFound();
+                    });
+                    if ($slug === null) {
                         return;
                     }
 
@@ -83,10 +105,10 @@ final class FeedRouter
 
             if ($tagPrefix !== '') {
                 $router->add('GET', '/' . $rssFeedRoute . '/' . $tagPrefix . '/{slug}', static function (array $params) use ($publicFeedController, $publicRequestContext, $input): void {
-                    $slug = $input->slug($params['slug'] ?? null);
-
-                    if ($slug === null) {
+                    $slug = RouteParamGuard::slugOrNotFound($input, $params['slug'] ?? null, static function () use ($publicRequestContext): void {
                         $publicRequestContext()->notFound();
+                    });
+                    if ($slug === null) {
                         return;
                     }
 
@@ -101,10 +123,13 @@ final class FeedRouter
             });
 
             $router->add('GET', '/' . $atomFeedRoute . '/{channel}', static function (array $params) use ($publicFeedController, $publicRequestContext, $input, $reservedPrefixes): void {
-                $channel = $input->slug($params['channel'] ?? null);
-
-                if ($channel === null || in_array($channel, $reservedPrefixes, true)) {
+                $channel = RouteParamGuard::slugOrNotFound($input, $params['channel'] ?? null, static function () use ($publicRequestContext): void {
                     $publicRequestContext()->notFound();
+                });
+                $channel = RouteParamGuard::slugAllowedOrNotFound($channel, $reservedPrefixes, static function () use ($publicRequestContext): void {
+                    $publicRequestContext()->notFound();
+                });
+                if ($channel === null) {
                     return;
                 }
 
@@ -113,10 +138,10 @@ final class FeedRouter
 
             if ($categoryPrefix !== '') {
                 $router->add('GET', '/' . $atomFeedRoute . '/' . $categoryPrefix . '/{slug}', static function (array $params) use ($publicFeedController, $publicRequestContext, $input): void {
-                    $slug = $input->slug($params['slug'] ?? null);
-
-                    if ($slug === null) {
+                    $slug = RouteParamGuard::slugOrNotFound($input, $params['slug'] ?? null, static function () use ($publicRequestContext): void {
                         $publicRequestContext()->notFound();
+                    });
+                    if ($slug === null) {
                         return;
                     }
 
@@ -126,10 +151,10 @@ final class FeedRouter
 
             if ($tagPrefix !== '') {
                 $router->add('GET', '/' . $atomFeedRoute . '/' . $tagPrefix . '/{slug}', static function (array $params) use ($publicFeedController, $publicRequestContext, $input): void {
-                    $slug = $input->slug($params['slug'] ?? null);
-
-                    if ($slug === null) {
+                    $slug = RouteParamGuard::slugOrNotFound($input, $params['slug'] ?? null, static function () use ($publicRequestContext): void {
                         $publicRequestContext()->notFound();
+                    });
+                    if ($slug === null) {
                         return;
                     }
 

@@ -1,0 +1,2446 @@
+{
+    "schema": 1,
+    "generated_at": "2026-04-30T07:57:33+00:00",
+    "scope": "panel",
+    "routes": [
+        {
+            "scope": "panel",
+            "order": 1,
+            "method": "GET",
+            "regex": "#^/login$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Panel/AuthRouter.php",
+                "line": 42,
+                "static_uses": [
+                    "authController"
+                ]
+            },
+            "signature": "cd2c367cd21782669d973eb6ee096344d3def973"
+        },
+        {
+            "scope": "panel",
+            "order": 2,
+            "method": "POST",
+            "regex": "#^/login$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Panel/AuthRouter.php",
+                "line": 46,
+                "static_uses": [
+                    "authController"
+                ]
+            },
+            "signature": "24c20f474c96b0a2270d5366bf11b501c912c00e"
+        },
+        {
+            "scope": "panel",
+            "order": 3,
+            "method": "GET",
+            "regex": "#^/login/2fa$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Panel/AuthRouter.php",
+                "line": 50,
+                "static_uses": [
+                    "authController"
+                ]
+            },
+            "signature": "adb81ba83eace1a3887470a3aa10eb8b861224c7"
+        },
+        {
+            "scope": "panel",
+            "order": 4,
+            "method": "POST",
+            "regex": "#^/login/2fa$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Panel/AuthRouter.php",
+                "line": 54,
+                "static_uses": [
+                    "authController"
+                ]
+            },
+            "signature": "2cf396dff1d8837b567a0aba67ad785112232bc2"
+        },
+        {
+            "scope": "panel",
+            "order": 5,
+            "method": "POST",
+            "regex": "#^/login/2fa/select$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Panel/AuthRouter.php",
+                "line": 58,
+                "static_uses": [
+                    "authController"
+                ]
+            },
+            "signature": "6e9c9f3382736305810cd7f0b5e15bd350c983d3"
+        },
+        {
+            "scope": "panel",
+            "order": 6,
+            "method": "POST",
+            "regex": "#^/login/2fa/webauthn/options$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Panel/AuthRouter.php",
+                "line": 62,
+                "static_uses": [
+                    "authController"
+                ]
+            },
+            "signature": "3252464f263a91e7cb3c6e58e76eaeb1177eda76"
+        },
+        {
+            "scope": "panel",
+            "order": 7,
+            "method": "POST",
+            "regex": "#^/login/2fa/webauthn/verify$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Panel/AuthRouter.php",
+                "line": 66,
+                "static_uses": [
+                    "authController"
+                ]
+            },
+            "signature": "b5bdf337509b97e28263004d7631a92cda019165"
+        },
+        {
+            "scope": "panel",
+            "order": 8,
+            "method": "POST",
+            "regex": "#^/logout$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Panel/AuthRouter.php",
+                "line": 70,
+                "static_uses": [
+                    "authController"
+                ]
+            },
+            "signature": "4e7beab7efc72b43d036cbb64e5f1ded84fda812"
+        },
+        {
+            "scope": "panel",
+            "order": 9,
+            "method": "GET",
+            "regex": "#^/$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Panel/DashboardRouter.php",
+                "line": 42,
+                "static_uses": [
+                    "panelDashboardController"
+                ]
+            },
+            "signature": "220f815520af4c8c0f39191942bce9ef5c4947b8"
+        },
+        {
+            "scope": "panel",
+            "order": 10,
+            "method": "GET",
+            "regex": "#^/page$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Panel/ContentRouter.php",
+                "line": 58,
+                "static_uses": [
+                    "panelPageListController"
+                ]
+            },
+            "signature": "b630bb49b16e31783203ccfbc9d15e7530c7c3d2"
+        },
+        {
+            "scope": "panel",
+            "order": 11,
+            "method": "GET",
+            "regex": "#^/page/edit$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Panel/ContentRouter.php",
+                "line": 62,
+                "static_uses": [
+                    "panelPageEditController"
+                ]
+            },
+            "signature": "f649f6199f79a80fd47054583d82c9005c3acaec"
+        },
+        {
+            "scope": "panel",
+            "order": 12,
+            "method": "GET",
+            "regex": "#^/page/edit/(?P<id>[^/]+)$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Panel/ContentRouter.php",
+                "line": 66,
+                "static_uses": [
+                    "input",
+                    "panelPageEditController",
+                    "renderNotFound"
+                ]
+            },
+            "signature": "b9c556a231c5844aba9de1545f4a45e4ede3b2b6"
+        },
+        {
+            "scope": "panel",
+            "order": 13,
+            "method": "POST",
+            "regex": "#^/page/save$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Panel/ContentRouter.php",
+                "line": 75,
+                "static_uses": [
+                    "panelPageEditController"
+                ]
+            },
+            "signature": "7e615a3c0e1a13253349821dacedc3158f04ad28"
+        },
+        {
+            "scope": "panel",
+            "order": 14,
+            "method": "POST",
+            "regex": "#^/page/gallery/upload$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Panel/ContentRouter.php",
+                "line": 79,
+                "static_uses": [
+                    "panelPageEditController"
+                ]
+            },
+            "signature": "8ed670ef4149be2779d57ba7aff584a49ccf4b36"
+        },
+        {
+            "scope": "panel",
+            "order": 15,
+            "method": "POST",
+            "regex": "#^/page/gallery/delete$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Panel/ContentRouter.php",
+                "line": 83,
+                "static_uses": [
+                    "panelPageEditController"
+                ]
+            },
+            "signature": "33546f5481e3d71dc99fa6b565dce3e09dd8af82"
+        },
+        {
+            "scope": "panel",
+            "order": 16,
+            "method": "POST",
+            "regex": "#^/page/delete$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Panel/ContentRouter.php",
+                "line": 87,
+                "static_uses": [
+                    "panelPageEditController"
+                ]
+            },
+            "signature": "3f5918f1a645c65fad6f51d50c09365207e8262d"
+        },
+        {
+            "scope": "panel",
+            "order": 17,
+            "method": "GET",
+            "regex": "#^/channel$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Panel/ChannelRouter.php",
+                "line": 58,
+                "static_uses": [
+                    "panelChannelListController"
+                ]
+            },
+            "signature": "347b77ad73e61411b825859def9369786cc77636"
+        },
+        {
+            "scope": "panel",
+            "order": 18,
+            "method": "GET",
+            "regex": "#^/channel/edit$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Panel/ChannelRouter.php",
+                "line": 62,
+                "static_uses": [
+                    "panelChannelEditController"
+                ]
+            },
+            "signature": "dca599d68e5c07a90d8604478bdd215077abb41e"
+        },
+        {
+            "scope": "panel",
+            "order": 19,
+            "method": "GET",
+            "regex": "#^/channel/edit/(?P<id>[^/]+)$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Panel/ChannelRouter.php",
+                "line": 66,
+                "static_uses": [
+                    "input",
+                    "panelChannelEditController",
+                    "renderNotFound"
+                ]
+            },
+            "signature": "c982103cf3d1de2ac622e3013cbd4bc859d10cc5"
+        },
+        {
+            "scope": "panel",
+            "order": 20,
+            "method": "POST",
+            "regex": "#^/channel/save$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Panel/ChannelRouter.php",
+                "line": 75,
+                "static_uses": [
+                    "panelChannelEditController"
+                ]
+            },
+            "signature": "8743b976355fb30f5c57e411d0d0e48db56c75a8"
+        },
+        {
+            "scope": "panel",
+            "order": 21,
+            "method": "POST",
+            "regex": "#^/channel/delete$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Panel/ChannelRouter.php",
+                "line": 79,
+                "static_uses": [
+                    "panelChannelEditController"
+                ]
+            },
+            "signature": "0a57974c51490e059b1b8428befe98c9c515aae0"
+        },
+        {
+            "scope": "panel",
+            "order": 22,
+            "method": "GET",
+            "regex": "#^/category$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Panel/TaxonomyCrudRouter.php",
+                "line": 77,
+                "static_uses": [
+                    "onList"
+                ]
+            },
+            "signature": "ee4f022cce86de5de6c2b473a445b859f38db034"
+        },
+        {
+            "scope": "panel",
+            "order": 23,
+            "method": "GET",
+            "regex": "#^/category/edit$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Panel/TaxonomyCrudRouter.php",
+                "line": 81,
+                "static_uses": [
+                    "onEditNew"
+                ]
+            },
+            "signature": "5238e1ee6408111136b7a01c9bd59a12757d6a4b"
+        },
+        {
+            "scope": "panel",
+            "order": 24,
+            "method": "GET",
+            "regex": "#^/category/edit/(?P<id>[^/]+)$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Panel/TaxonomyCrudRouter.php",
+                "line": 85,
+                "static_uses": [
+                    "input",
+                    "onEditById",
+                    "renderNotFound"
+                ]
+            },
+            "signature": "68349057ac405ef046f3a1119e3ad1b2bed06a93"
+        },
+        {
+            "scope": "panel",
+            "order": 25,
+            "method": "POST",
+            "regex": "#^/category/save$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Panel/TaxonomyCrudRouter.php",
+                "line": 93,
+                "static_uses": [
+                    "onSave"
+                ]
+            },
+            "signature": "c352528bbcdf5c91858f567ff545016148d33398"
+        },
+        {
+            "scope": "panel",
+            "order": 26,
+            "method": "POST",
+            "regex": "#^/category/delete$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Panel/TaxonomyCrudRouter.php",
+                "line": 97,
+                "static_uses": [
+                    "onDelete"
+                ]
+            },
+            "signature": "fda562766cdf5f3386e55d67f676b69e6f9515bd"
+        },
+        {
+            "scope": "panel",
+            "order": 27,
+            "method": "GET",
+            "regex": "#^/category/set$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Panel/TaxonomyCrudRouter.php",
+                "line": 101,
+                "static_uses": [
+                    "onSetList"
+                ]
+            },
+            "signature": "0b7181409b9a22d457bba4c50b62ebb11945f5aa"
+        },
+        {
+            "scope": "panel",
+            "order": 28,
+            "method": "GET",
+            "regex": "#^/category/set/edit$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Panel/TaxonomyCrudRouter.php",
+                "line": 105,
+                "static_uses": [
+                    "onSetEditNew"
+                ]
+            },
+            "signature": "1449e94c15f74799715a4d0e4184d71b900779ff"
+        },
+        {
+            "scope": "panel",
+            "order": 29,
+            "method": "GET",
+            "regex": "#^/category/set/edit/(?P<id>[^/]+)$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Panel/TaxonomyCrudRouter.php",
+                "line": 110,
+                "static_uses": [
+                    "input",
+                    "onSetEditById",
+                    "renderNotFound"
+                ]
+            },
+            "signature": "34aa8be7bafab00a2945665cfddfd0b94874a0bc"
+        },
+        {
+            "scope": "panel",
+            "order": 30,
+            "method": "POST",
+            "regex": "#^/category/set/save$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Panel/TaxonomyCrudRouter.php",
+                "line": 118,
+                "static_uses": [
+                    "onSetSave"
+                ]
+            },
+            "signature": "5cad19991b943d4168d80d6c361cd54b3c45a581"
+        },
+        {
+            "scope": "panel",
+            "order": 31,
+            "method": "POST",
+            "regex": "#^/category/set/delete$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Panel/TaxonomyCrudRouter.php",
+                "line": 122,
+                "static_uses": [
+                    "onSetDelete"
+                ]
+            },
+            "signature": "e99f36b2f5963b0ecaddff3b12cc42ded5039a63"
+        },
+        {
+            "scope": "panel",
+            "order": 32,
+            "method": "GET",
+            "regex": "#^/tag$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Panel/TaxonomyCrudRouter.php",
+                "line": 77,
+                "static_uses": [
+                    "onList"
+                ]
+            },
+            "signature": "9789408f29d0330a13c53524eca5771dd86f7faf"
+        },
+        {
+            "scope": "panel",
+            "order": 33,
+            "method": "GET",
+            "regex": "#^/tag/edit$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Panel/TaxonomyCrudRouter.php",
+                "line": 81,
+                "static_uses": [
+                    "onEditNew"
+                ]
+            },
+            "signature": "8cfc837aad06582c16ec3d7091da07f0cb7e9451"
+        },
+        {
+            "scope": "panel",
+            "order": 34,
+            "method": "GET",
+            "regex": "#^/tag/edit/(?P<id>[^/]+)$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Panel/TaxonomyCrudRouter.php",
+                "line": 85,
+                "static_uses": [
+                    "input",
+                    "onEditById",
+                    "renderNotFound"
+                ]
+            },
+            "signature": "badcb095ef2ad295173c4d1c93d3dd88aa5bea25"
+        },
+        {
+            "scope": "panel",
+            "order": 35,
+            "method": "POST",
+            "regex": "#^/tag/save$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Panel/TaxonomyCrudRouter.php",
+                "line": 93,
+                "static_uses": [
+                    "onSave"
+                ]
+            },
+            "signature": "6dba982c52ade589fb4f2954ea06012c026eda5c"
+        },
+        {
+            "scope": "panel",
+            "order": 36,
+            "method": "POST",
+            "regex": "#^/tag/delete$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Panel/TaxonomyCrudRouter.php",
+                "line": 97,
+                "static_uses": [
+                    "onDelete"
+                ]
+            },
+            "signature": "7c76836bf041d3564790e0828162c6f1376c409d"
+        },
+        {
+            "scope": "panel",
+            "order": 37,
+            "method": "GET",
+            "regex": "#^/tag/set$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Panel/TaxonomyCrudRouter.php",
+                "line": 101,
+                "static_uses": [
+                    "onSetList"
+                ]
+            },
+            "signature": "272034f90b5f22dbd127b07f13a1b47c27359eb5"
+        },
+        {
+            "scope": "panel",
+            "order": 38,
+            "method": "GET",
+            "regex": "#^/tag/set/edit$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Panel/TaxonomyCrudRouter.php",
+                "line": 105,
+                "static_uses": [
+                    "onSetEditNew"
+                ]
+            },
+            "signature": "52220e02c9f07b4b1af6a563a0b8109de01fa53f"
+        },
+        {
+            "scope": "panel",
+            "order": 39,
+            "method": "GET",
+            "regex": "#^/tag/set/edit/(?P<id>[^/]+)$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Panel/TaxonomyCrudRouter.php",
+                "line": 110,
+                "static_uses": [
+                    "input",
+                    "onSetEditById",
+                    "renderNotFound"
+                ]
+            },
+            "signature": "c0aeb6f75d39a3efbc63d14f61f53bf238f00581"
+        },
+        {
+            "scope": "panel",
+            "order": 40,
+            "method": "POST",
+            "regex": "#^/tag/set/save$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Panel/TaxonomyCrudRouter.php",
+                "line": 118,
+                "static_uses": [
+                    "onSetSave"
+                ]
+            },
+            "signature": "fe7c17486d3b03389c8a6d0735d5018e82dd7b8f"
+        },
+        {
+            "scope": "panel",
+            "order": 41,
+            "method": "POST",
+            "regex": "#^/tag/set/delete$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Panel/TaxonomyCrudRouter.php",
+                "line": 122,
+                "static_uses": [
+                    "onSetDelete"
+                ]
+            },
+            "signature": "0608b7cab5440f10c7f669ac22e3013f6fe4a811"
+        },
+        {
+            "scope": "panel",
+            "order": 42,
+            "method": "GET",
+            "regex": "#^/redirect$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Panel/RedirectRouter.php",
+                "line": 58,
+                "static_uses": [
+                    "panelRedirectListController"
+                ]
+            },
+            "signature": "7d4bebda96e40b35596ebdb9fbb6a6cec3c74cfb"
+        },
+        {
+            "scope": "panel",
+            "order": 43,
+            "method": "GET",
+            "regex": "#^/redirect/edit$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Panel/RedirectRouter.php",
+                "line": 62,
+                "static_uses": [
+                    "panelRedirectEditController"
+                ]
+            },
+            "signature": "612f28825d0392c16da0d78f120232857c1df351"
+        },
+        {
+            "scope": "panel",
+            "order": 44,
+            "method": "GET",
+            "regex": "#^/redirect/edit/(?P<id>[^/]+)$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Panel/RedirectRouter.php",
+                "line": 66,
+                "static_uses": [
+                    "input",
+                    "panelRedirectEditController",
+                    "renderNotFound"
+                ]
+            },
+            "signature": "7237240ff664854012312ef96e7594c9acba19c3"
+        },
+        {
+            "scope": "panel",
+            "order": 45,
+            "method": "POST",
+            "regex": "#^/redirect/save$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Panel/RedirectRouter.php",
+                "line": 75,
+                "static_uses": [
+                    "panelRedirectEditController"
+                ]
+            },
+            "signature": "161eb374c4f3d7e1162516ecb18b8651aa2aab8f"
+        },
+        {
+            "scope": "panel",
+            "order": 46,
+            "method": "POST",
+            "regex": "#^/redirect/delete$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Panel/RedirectRouter.php",
+                "line": 79,
+                "static_uses": [
+                    "panelRedirectEditController"
+                ]
+            },
+            "signature": "419896f01cc8fa601a1e5fb92daedfe84a915d2b"
+        },
+        {
+            "scope": "panel",
+            "order": 47,
+            "method": "GET",
+            "regex": "#^/user$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Panel/UserRouter.php",
+                "line": 58,
+                "static_uses": [
+                    "panelUserListController"
+                ]
+            },
+            "signature": "6124f79ab7a7f4cae92c6239e7c9d4572162d59b"
+        },
+        {
+            "scope": "panel",
+            "order": 48,
+            "method": "GET",
+            "regex": "#^/user/edit$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Panel/UserRouter.php",
+                "line": 62,
+                "static_uses": [
+                    "panelUserEditController"
+                ]
+            },
+            "signature": "13eb0565114b6072710da8f53a7fc352d096cad3"
+        },
+        {
+            "scope": "panel",
+            "order": 49,
+            "method": "GET",
+            "regex": "#^/user/edit/(?P<id>[^/]+)$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Panel/UserRouter.php",
+                "line": 66,
+                "static_uses": [
+                    "input",
+                    "panelUserEditController",
+                    "renderNotFound"
+                ]
+            },
+            "signature": "d7a384c77229ec893bd403c6b3666eb9479c9f3d"
+        },
+        {
+            "scope": "panel",
+            "order": 50,
+            "method": "POST",
+            "regex": "#^/user/save$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Panel/UserRouter.php",
+                "line": 75,
+                "static_uses": [
+                    "panelUserEditController"
+                ]
+            },
+            "signature": "bc75e5025b920e20c2e94824160223856955518a"
+        },
+        {
+            "scope": "panel",
+            "order": 51,
+            "method": "POST",
+            "regex": "#^/user/delete$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Panel/UserRouter.php",
+                "line": 79,
+                "static_uses": [
+                    "panelUserEditController"
+                ]
+            },
+            "signature": "fd4100ccee0a98dddf14ced86a6dabdcf48ec5a8"
+        },
+        {
+            "scope": "panel",
+            "order": 52,
+            "method": "GET",
+            "regex": "#^/user/invites$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Panel/UserRouter.php",
+                "line": 83,
+                "static_uses": [
+                    "panelUserListController"
+                ]
+            },
+            "signature": "3d9e95bbf96369e061b0b0bd306beb339133b083"
+        },
+        {
+            "scope": "panel",
+            "order": 53,
+            "method": "POST",
+            "regex": "#^/user/invites/create$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Panel/UserRouter.php",
+                "line": 87,
+                "static_uses": [
+                    "panelUserEditController"
+                ]
+            },
+            "signature": "524b57f74f16a8e3fb50ce3960868bbfedcbe303"
+        },
+        {
+            "scope": "panel",
+            "order": 54,
+            "method": "POST",
+            "regex": "#^/user/invites/generate$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Panel/UserRouter.php",
+                "line": 91,
+                "static_uses": [
+                    "panelUserEditController"
+                ]
+            },
+            "signature": "c4a7fb1a2f5dcbec6c5f8c16bcfd7ea3a4710ba7"
+        },
+        {
+            "scope": "panel",
+            "order": 55,
+            "method": "POST",
+            "regex": "#^/user/invites/delete$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Panel/UserRouter.php",
+                "line": 95,
+                "static_uses": [
+                    "panelUserEditController"
+                ]
+            },
+            "signature": "2031a17f1d670f1bca24ee17a712912626773822"
+        },
+        {
+            "scope": "panel",
+            "order": 56,
+            "method": "GET",
+            "regex": "#^/group$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Panel/GroupRouter.php",
+                "line": 58,
+                "static_uses": [
+                    "panelGroupListController"
+                ]
+            },
+            "signature": "0166440c89c2ccb2d57b350212c15ff0ffe2174e"
+        },
+        {
+            "scope": "panel",
+            "order": 57,
+            "method": "GET",
+            "regex": "#^/group/edit$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Panel/GroupRouter.php",
+                "line": 62,
+                "static_uses": [
+                    "panelGroupEditController"
+                ]
+            },
+            "signature": "8c356a36afe4cda8024ca404b10387828d1c0c90"
+        },
+        {
+            "scope": "panel",
+            "order": 58,
+            "method": "GET",
+            "regex": "#^/group/edit/(?P<id>[^/]+)$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Panel/GroupRouter.php",
+                "line": 66,
+                "static_uses": [
+                    "input",
+                    "panelGroupEditController",
+                    "renderNotFound"
+                ]
+            },
+            "signature": "f0bcb55a436ce3aa4818b19712e17b0aa6ebab78"
+        },
+        {
+            "scope": "panel",
+            "order": 59,
+            "method": "POST",
+            "regex": "#^/group/save$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Panel/GroupRouter.php",
+                "line": 75,
+                "static_uses": [
+                    "panelGroupEditController"
+                ]
+            },
+            "signature": "882cea2d7ff4be05c26f90df51844485c4e2eb36"
+        },
+        {
+            "scope": "panel",
+            "order": 60,
+            "method": "POST",
+            "regex": "#^/group/delete$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Panel/GroupRouter.php",
+                "line": 79,
+                "static_uses": [
+                    "panelGroupEditController"
+                ]
+            },
+            "signature": "549ef3f5f06c8792ed5406f68088344eb22c22c2"
+        },
+        {
+            "scope": "panel",
+            "order": 61,
+            "method": "GET",
+            "regex": "#^/logs$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Panel/LogRouter.php",
+                "line": 44,
+                "static_uses": [
+                    "panelLogsController"
+                ]
+            },
+            "signature": "11718e0d3546f2d16da167a8ab277369f832435a"
+        },
+        {
+            "scope": "panel",
+            "order": 62,
+            "method": "GET",
+            "regex": "#^/logs/export$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Panel/LogRouter.php",
+                "line": 48,
+                "static_uses": [
+                    "panelLogsController"
+                ]
+            },
+            "signature": "c147bb81dbd19b2e5462cf88c3c995d2a8d5b9e4"
+        },
+        {
+            "scope": "panel",
+            "order": 63,
+            "method": "POST",
+            "regex": "#^/logs/clear$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Panel/LogRouter.php",
+                "line": 52,
+                "static_uses": [
+                    "panelLogsController"
+                ]
+            },
+            "signature": "920d65304698142666dd7f13f46a0d79631c2856"
+        },
+        {
+            "scope": "panel",
+            "order": 64,
+            "method": "GET",
+            "regex": "#^/routing$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Panel/RoutingRouter.php",
+                "line": 44,
+                "static_uses": [
+                    "panelRoutingController"
+                ]
+            },
+            "signature": "4febc2d9c8c680398301f6b655ab07a0da306dca"
+        },
+        {
+            "scope": "panel",
+            "order": 65,
+            "method": "GET",
+            "regex": "#^/routing/export$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Panel/RoutingRouter.php",
+                "line": 48,
+                "static_uses": [
+                    "panelRoutingController"
+                ]
+            },
+            "signature": "7c3917cd2f279f3889c102354db80193d0e7bf38"
+        },
+        {
+            "scope": "panel",
+            "order": 66,
+            "method": "GET",
+            "regex": "#^/update$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Panel/UpdateRouter.php",
+                "line": 44,
+                "static_uses": [
+                    "panelUpdateController"
+                ]
+            },
+            "signature": "b0600ecd43c55ee2b8aff0544a9566aad09d1fd4"
+        },
+        {
+            "scope": "panel",
+            "order": 67,
+            "method": "POST",
+            "regex": "#^/update/action$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Panel/UpdateRouter.php",
+                "line": 48,
+                "static_uses": [
+                    "panelUpdateController"
+                ]
+            },
+            "signature": "209c01102ddd583124e106b2e706cc6c074405e7"
+        },
+        {
+            "scope": "panel",
+            "order": 68,
+            "method": "GET",
+            "regex": "#^/preferences$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Panel/PreferencesRouter.php",
+                "line": 42,
+                "static_uses": [
+                    "panelPreferencesController"
+                ]
+            },
+            "signature": "ab859d6d6581a0f8a9177e4e2244d7ca2d97f729"
+        },
+        {
+            "scope": "panel",
+            "order": 69,
+            "method": "POST",
+            "regex": "#^/preferences/save$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Panel/PreferencesRouter.php",
+                "line": 46,
+                "static_uses": [
+                    "panelPreferencesController"
+                ]
+            },
+            "signature": "d42bdb744f4cf9e67f60ff3b1fa6ce99d2ece5dc"
+        },
+        {
+            "scope": "panel",
+            "order": 70,
+            "method": "POST",
+            "regex": "#^/preferences/2fa/totp/setup$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Panel/PreferencesRouter.php",
+                "line": 50,
+                "static_uses": [
+                    "panelPreferencesController"
+                ]
+            },
+            "signature": "32e61533a1b02114ff5b42ed511258f6a1b04c80"
+        },
+        {
+            "scope": "panel",
+            "order": 71,
+            "method": "POST",
+            "regex": "#^/preferences/2fa/recovery/generate$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Panel/PreferencesRouter.php",
+                "line": 54,
+                "static_uses": [
+                    "panelPreferencesController"
+                ]
+            },
+            "signature": "9c8d787215b51ab9b755f9b5a281dbfda2f531bb"
+        },
+        {
+            "scope": "panel",
+            "order": 72,
+            "method": "POST",
+            "regex": "#^/preferences/2fa/webauthn/options$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Panel/PreferencesRouter.php",
+                "line": 58,
+                "static_uses": [
+                    "panelPreferencesController"
+                ]
+            },
+            "signature": "0a6b86b2f906305bfe3f7e1e7cc303f98b78cda6"
+        },
+        {
+            "scope": "panel",
+            "order": 73,
+            "method": "POST",
+            "regex": "#^/preferences/2fa/webauthn/register$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Panel/PreferencesRouter.php",
+                "line": 62,
+                "static_uses": [
+                    "panelPreferencesController"
+                ]
+            },
+            "signature": "ff2d9e7ed08a504608cd65d84144fd5751705484"
+        },
+        {
+            "scope": "panel",
+            "order": 74,
+            "method": "GET",
+            "regex": "#^/configuration$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Panel/ConfigRouter.php",
+                "line": 42,
+                "static_uses": [
+                    "panelConfigController"
+                ]
+            },
+            "signature": "7fe773e412b55db48a7231256c9b7ba33c5e3cd8"
+        },
+        {
+            "scope": "panel",
+            "order": 75,
+            "method": "POST",
+            "regex": "#^/configuration/save$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Panel/ConfigRouter.php",
+                "line": 46,
+                "static_uses": [
+                    "panelConfigController"
+                ]
+            },
+            "signature": "904c67be0d97af1deb0a673f0433455e167cd52e"
+        },
+        {
+            "scope": "panel",
+            "order": 76,
+            "method": "GET",
+            "regex": "#^/themes$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Panel/SystemRouter.php",
+                "line": 42,
+                "static_uses": [
+                    "panelSystemController"
+                ]
+            },
+            "signature": "92be182ab66e9eacd43322dea18fc5d4ef813499"
+        },
+        {
+            "scope": "panel",
+            "order": 77,
+            "method": "POST",
+            "regex": "#^/themes/enable$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Panel/SystemRouter.php",
+                "line": 46,
+                "static_uses": [
+                    "panelSystemController"
+                ]
+            },
+            "signature": "a583418276bf04820976fff20b576006a7579762"
+        },
+        {
+            "scope": "panel",
+            "order": 78,
+            "method": "POST",
+            "regex": "#^/themes/create$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Panel/SystemRouter.php",
+                "line": 50,
+                "static_uses": [
+                    "panelSystemController"
+                ]
+            },
+            "signature": "5c7a7a0bae628c6f365aff5e9c801fa1f32c2287"
+        },
+        {
+            "scope": "panel",
+            "order": 79,
+            "method": "POST",
+            "regex": "#^/themes/upload$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Panel/SystemRouter.php",
+                "line": 54,
+                "static_uses": [
+                    "panelSystemController"
+                ]
+            },
+            "signature": "19f311730d9af82447e1cac32251a52f05e864e5"
+        },
+        {
+            "scope": "panel",
+            "order": 80,
+            "method": "GET",
+            "regex": "#^/themes/export$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Panel/SystemRouter.php",
+                "line": 58,
+                "static_uses": [
+                    "panelSystemController"
+                ]
+            },
+            "signature": "2290024a7f27ff7c17d7c77ba6e76c117d3dff8e"
+        },
+        {
+            "scope": "panel",
+            "order": 81,
+            "method": "POST",
+            "regex": "#^/themes/uninstall$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Panel/SystemRouter.php",
+                "line": 62,
+                "static_uses": [
+                    "panelSystemController"
+                ]
+            },
+            "signature": "aa26a79d7aba9c57938c96d2f384b310024fd742"
+        },
+        {
+            "scope": "panel",
+            "order": 82,
+            "method": "GET",
+            "regex": "#^/extensions$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Panel/SystemRouter.php",
+                "line": 66,
+                "static_uses": [
+                    "panelSystemController"
+                ]
+            },
+            "signature": "1ce9f44fff15080a46c7538dd242b105b166e568"
+        },
+        {
+            "scope": "panel",
+            "order": 83,
+            "method": "POST",
+            "regex": "#^/extensions/toggle$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Panel/SystemRouter.php",
+                "line": 70,
+                "static_uses": [
+                    "panelSystemController"
+                ]
+            },
+            "signature": "b37de45950ee49b92ae9b50d00858f7f6cde914c"
+        },
+        {
+            "scope": "panel",
+            "order": 84,
+            "method": "POST",
+            "regex": "#^/extensions/upload$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Panel/SystemRouter.php",
+                "line": 74,
+                "static_uses": [
+                    "panelSystemController"
+                ]
+            },
+            "signature": "f61174c5a785fdb1398a3c5954aca9624ed4c227"
+        },
+        {
+            "scope": "panel",
+            "order": 85,
+            "method": "GET",
+            "regex": "#^/extensions/export$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Panel/SystemRouter.php",
+                "line": 78,
+                "static_uses": [
+                    "panelSystemController"
+                ]
+            },
+            "signature": "0106966a49b60a8d2685d531d77145e493b14160"
+        },
+        {
+            "scope": "panel",
+            "order": 86,
+            "method": "POST",
+            "regex": "#^/extensions/create$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Panel/SystemRouter.php",
+                "line": 82,
+                "static_uses": [
+                    "panelSystemController"
+                ]
+            },
+            "signature": "431a19db8d04ef02b7689fd6b30086794d4e0c83"
+        },
+        {
+            "scope": "panel",
+            "order": 87,
+            "method": "POST",
+            "regex": "#^/extensions/uninstall$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Panel/SystemRouter.php",
+                "line": 86,
+                "static_uses": [
+                    "panelSystemController"
+                ]
+            },
+            "signature": "f49f5f9357310b4ebbf142bf6ce69924f6af9279"
+        },
+        {
+            "scope": "panel",
+            "order": 88,
+            "method": "POST",
+            "regex": "#^/extensions/permission$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Routing/Panel/SystemRouter.php",
+                "line": 90,
+                "static_uses": [
+                    "panelSystemController"
+                ]
+            },
+            "signature": "d0755b3d11d7d1fba0f2ba58e140f9e527085372"
+        },
+        {
+            "scope": "panel",
+            "order": 89,
+            "method": "GET",
+            "regex": "#^/contact$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/ext/contact/routes_panel.php",
+                "line": 373,
+                "static_uses": [
+                    "deletePath",
+                    "editBasePath",
+                    "extensionMeta",
+                    "listViewFile",
+                    "loadForms",
+                    "pullFlash",
+                    "renderView",
+                    "requirePanelLogin",
+                    "savePath",
+                    "submissionsBasePath"
+                ]
+            },
+            "signature": "f2525a650eb98d4db32b8ac7cc66d4fde34b17bb"
+        },
+        {
+            "scope": "panel",
+            "order": 90,
+            "method": "GET",
+            "regex": "#^/contact/edit$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/ext/contact/routes_panel.php",
+                "line": 400,
+                "static_uses": [
+                    "deletePath",
+                    "editViewFile",
+                    "extensionMeta",
+                    "indexPath",
+                    "pullFlash",
+                    "renderView",
+                    "requirePanelLogin",
+                    "savePath",
+                    "submissionsBasePath"
+                ]
+            },
+            "signature": "8df1446bf248e08889f84fe55a376e682eab7602"
+        },
+        {
+            "scope": "panel",
+            "order": 91,
+            "method": "GET",
+            "regex": "#^/contact/edit/(?P<slug>[^/]+)$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/ext/contact/routes_panel.php",
+                "line": 426,
+                "static_uses": [
+                    "deletePath",
+                    "editViewFile",
+                    "extensionMeta",
+                    "findFormBySlug",
+                    "indexPath",
+                    "pullFlash",
+                    "renderView",
+                    "requirePanelLogin",
+                    "rvn",
+                    "savePath",
+                    "submissionsBasePath"
+                ]
+            },
+            "signature": "47978aed71995e77c808ef0d532893e54ef4142a"
+        },
+        {
+            "scope": "panel",
+            "order": 92,
+            "method": "GET",
+            "regex": "#^/contact/submissions/(?P<slug>[^/]+)$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/ext/contact/routes_panel.php",
+                "line": 470,
+                "static_uses": [
+                    "contactSubmissionsRepository",
+                    "editBasePath",
+                    "extensionMeta",
+                    "findFormBySlug",
+                    "flash",
+                    "indexPath",
+                    "pullFlash",
+                    "renderView",
+                    "requirePanelLogin",
+                    "rvn",
+                    "submissionsBasePath",
+                    "submissionsClearPath",
+                    "submissionsDeletePath",
+                    "submissionsListPath",
+                    "submissionsViewFile"
+                ]
+            },
+            "signature": "18e1a052a8871abe5abd47a24f8aa7c15a29b98b"
+        },
+        {
+            "scope": "panel",
+            "order": 93,
+            "method": "GET",
+            "regex": "#^/contact/submissions/(?P<slug>[^/]+)/export$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/ext/contact/routes_panel.php",
+                "line": 551,
+                "static_uses": [
+                    "contactSubmissionsRepository",
+                    "csv",
+                    "findFormBySlug",
+                    "flash",
+                    "indexPath",
+                    "requirePanelLogin",
+                    "rvn",
+                    "submissionsListPath"
+                ]
+            },
+            "signature": "4c215fbf5446b92e9dc0c7e08e20417907f44164"
+        },
+        {
+            "scope": "panel",
+            "order": 94,
+            "method": "POST",
+            "regex": "#^/contact/submissions/delete$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/ext/contact/routes_panel.php",
+                "line": 614,
+                "static_uses": [
+                    "contactSubmissionsRepository",
+                    "findFormBySlug",
+                    "flash",
+                    "indexPath",
+                    "requirePanelLogin",
+                    "rvn",
+                    "submissionsListPath"
+                ]
+            },
+            "signature": "8d41a1ab444b3f955c26e2c1019185d5317494e2"
+        },
+        {
+            "scope": "panel",
+            "order": 95,
+            "method": "POST",
+            "regex": "#^/contact/submissions/clear$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/ext/contact/routes_panel.php",
+                "line": 665,
+                "static_uses": [
+                    "contactSubmissionsRepository",
+                    "findFormBySlug",
+                    "flash",
+                    "indexPath",
+                    "requirePanelLogin",
+                    "rvn",
+                    "submissionsListPath"
+                ]
+            },
+            "signature": "b3ab758d03ee11ff27e0c28daf8ab3e910d039e4"
+        },
+        {
+            "scope": "panel",
+            "order": 96,
+            "method": "POST",
+            "regex": "#^/contact/save$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/ext/contact/routes_panel.php",
+                "line": 709,
+                "static_uses": [
+                    "contactSubmissionsRepository",
+                    "editBasePath",
+                    "flash",
+                    "indexPath",
+                    "loadForms",
+                    "parseEmailList",
+                    "requirePanelLogin",
+                    "rvn",
+                    "saveForms"
+                ]
+            },
+            "signature": "b8ad2aa6d8dbf47eb3da6fd631b31485eac05450"
+        },
+        {
+            "scope": "panel",
+            "order": 97,
+            "method": "POST",
+            "regex": "#^/contact/delete$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/ext/contact/routes_panel.php",
+                "line": 939,
+                "static_uses": [
+                    "contactSubmissionsRepository",
+                    "flash",
+                    "indexPath",
+                    "loadForms",
+                    "requirePanelLogin",
+                    "rvn",
+                    "saveForms"
+                ]
+            },
+            "signature": "2f5475ea1cf0469f2e43ac50cab17741c854df85"
+        },
+        {
+            "scope": "panel",
+            "order": 98,
+            "method": "GET",
+            "regex": "#^/cron$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/ext/cron/routes_panel.php",
+                "line": 260,
+                "static_uses": [
+                    "pullFlash",
+                    "pullOldRows",
+                    "renderView",
+                    "requirePanelLogin",
+                    "rvn",
+                    "service"
+                ]
+            },
+            "signature": "d93eb3132893aa4c7c466b494c27cfca2d2a2fba"
+        },
+        {
+            "scope": "panel",
+            "order": 99,
+            "method": "POST",
+            "regex": "#^/cron/save$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/ext/cron/routes_panel.php",
+                "line": 285,
+                "static_uses": [
+                    "flash",
+                    "indexPath",
+                    "requirePanelLogin",
+                    "rvn",
+                    "service",
+                    "storeOldRows"
+                ]
+            },
+            "signature": "6e7095e317ea2b4ac04e0487be514d3597c3b415"
+        },
+        {
+            "scope": "panel",
+            "order": 100,
+            "method": "GET",
+            "regex": "#^/database$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/ext/database/routes_panel.php",
+                "line": 481,
+                "static_uses": [
+                    "buildAdminerLaunchTargets",
+                    "extensionEntrypoint",
+                    "extensionMeta",
+                    "panelUrl",
+                    "renderExtensionView",
+                    "renderPublicNotFound",
+                    "requirePanelLogin",
+                    "resolveAdminerEntrypoint",
+                    "rvn"
+                ]
+            },
+            "signature": "9ffb5b3fe6931feb7ef2278fd3d5265bb2a7a869"
+        },
+        {
+            "scope": "panel",
+            "order": 101,
+            "method": "GET",
+            "regex": "#^/database/adminer$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/ext/database/routes_panel.php",
+                "line": 340,
+                "static_uses": [
+                    "extensionEntrypoint",
+                    "requireDatabaseManagerAccess",
+                    "rvn"
+                ]
+            },
+            "signature": "bb74752a15dbea1ef3ecc8cbc6604d174dd2bbc2"
+        },
+        {
+            "scope": "panel",
+            "order": 102,
+            "method": "POST",
+            "regex": "#^/database/adminer$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/ext/database/routes_panel.php",
+                "line": 340,
+                "static_uses": [
+                    "extensionEntrypoint",
+                    "requireDatabaseManagerAccess",
+                    "rvn"
+                ]
+            },
+            "signature": "8a440db9c66f2617c25eaa94843d1255b69bb88e"
+        },
+        {
+            "scope": "panel",
+            "order": 103,
+            "method": "GET",
+            "regex": "#^/database/adminer/asset$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/ext/database/routes_panel.php",
+                "line": 439,
+                "static_uses": [
+                    "extensionPublicRoot",
+                    "requireDatabaseManagerAccess",
+                    "streamAssetFile"
+                ]
+            },
+            "signature": "8755c977f164da4f85a8042490759df5775a87af"
+        },
+        {
+            "scope": "panel",
+            "order": 104,
+            "method": "GET",
+            "regex": "#^/adminer/static/(?P<file>[^/]+)$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/ext/database/routes_panel.php",
+                "line": 359,
+                "static_uses": [
+                    "extensionPublicRoot",
+                    "isSafeAssetName",
+                    "requireDatabaseManagerAccess",
+                    "streamAssetFile"
+                ]
+            },
+            "signature": "984d972f71e806997d05dfba48336e2ec7f4bcb1"
+        },
+        {
+            "scope": "panel",
+            "order": 105,
+            "method": "GET",
+            "regex": "#^/database/static/(?P<file>[^/]+)$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/ext/database/routes_panel.php",
+                "line": 359,
+                "static_uses": [
+                    "extensionPublicRoot",
+                    "isSafeAssetName",
+                    "requireDatabaseManagerAccess",
+                    "streamAssetFile"
+                ]
+            },
+            "signature": "e02683bcfed8447cc95dcebf2b2d0df30efce239"
+        },
+        {
+            "scope": "panel",
+            "order": 106,
+            "method": "GET",
+            "regex": "#^/database/adminer/static/(?P<file>[^/]+)$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/ext/database/routes_panel.php",
+                "line": 359,
+                "static_uses": [
+                    "extensionPublicRoot",
+                    "isSafeAssetName",
+                    "requireDatabaseManagerAccess",
+                    "streamAssetFile"
+                ]
+            },
+            "signature": "d0d935a26997deb0212f106c30860a0e7af749e0"
+        },
+        {
+            "scope": "panel",
+            "order": 107,
+            "method": "GET",
+            "regex": "#^/externals/jush/(?P<file>[^/]+)$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/ext/database/routes_panel.php",
+                "line": 384,
+                "static_uses": [
+                    "extensionPublicRoot",
+                    "isSafeAssetName",
+                    "requireDatabaseManagerAccess",
+                    "streamAssetFile"
+                ]
+            },
+            "signature": "fcb861292747ed603d01fdf93626819c161b0da8"
+        },
+        {
+            "scope": "panel",
+            "order": 108,
+            "method": "GET",
+            "regex": "#^/externals/jush/modules/(?P<file>[^/]+)$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/ext/database/routes_panel.php",
+                "line": 409,
+                "static_uses": [
+                    "extensionPublicRoot",
+                    "isSafeAssetName",
+                    "requireDatabaseManagerAccess",
+                    "streamAssetFile"
+                ]
+            },
+            "signature": "70f15a8ba127ef00275665595f50eca3c15d6e1c"
+        },
+        {
+            "scope": "panel",
+            "order": 109,
+            "method": "GET",
+            "regex": "#^/database/externals/jush/(?P<file>[^/]+)$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/ext/database/routes_panel.php",
+                "line": 384,
+                "static_uses": [
+                    "extensionPublicRoot",
+                    "isSafeAssetName",
+                    "requireDatabaseManagerAccess",
+                    "streamAssetFile"
+                ]
+            },
+            "signature": "5a8112c6020c2f3f1530302e6295bb70bb6a8367"
+        },
+        {
+            "scope": "panel",
+            "order": 110,
+            "method": "GET",
+            "regex": "#^/database/externals/jush/modules/(?P<file>[^/]+)$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/ext/database/routes_panel.php",
+                "line": 409,
+                "static_uses": [
+                    "extensionPublicRoot",
+                    "isSafeAssetName",
+                    "requireDatabaseManagerAccess",
+                    "streamAssetFile"
+                ]
+            },
+            "signature": "efe5069ece3616e136a41c59c43f3dbc330772b2"
+        },
+        {
+            "scope": "panel",
+            "order": 111,
+            "method": "GET",
+            "regex": "#^/phpinfo$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/ext/phpinfo/routes_panel.php",
+                "line": 198,
+                "static_uses": [
+                    "renderExtensionView",
+                    "requirePanelLogin"
+                ]
+            },
+            "signature": "f132e7d37d2b787549cf5e244e3a3565d4e2d226"
+        },
+        {
+            "scope": "panel",
+            "order": 112,
+            "method": "GET",
+            "regex": "#^/repo$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/ext/repo/routes_panel.php",
+                "line": 290,
+                "static_uses": [
+                    "deleteBasePath",
+                    "editBasePath",
+                    "extensionMeta",
+                    "indexPath",
+                    "indexViewFile",
+                    "logsPath",
+                    "normalizeRepoSlug",
+                    "pullFlash",
+                    "renderView",
+                    "requirePanelLogin",
+                    "savePath",
+                    "settingsPath",
+                    "sourceRowsForForm",
+                    "svc",
+                    "syncBasePath"
+                ]
+            },
+            "signature": "97d2d70f610a1825fb6030c9614b0c8cb6d785ff"
+        },
+        {
+            "scope": "panel",
+            "order": 113,
+            "method": "GET",
+            "regex": "#^/repo/settings$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/ext/repo/routes_panel.php",
+                "line": 332,
+                "static_uses": [
+                    "extensionMeta",
+                    "indexPath",
+                    "logsPath",
+                    "pullFlash",
+                    "renderView",
+                    "requirePanelLogin",
+                    "settingsPath",
+                    "settingsViewFile",
+                    "svc"
+                ]
+            },
+            "signature": "aaad6cc7676940b02601c28ddf2eccb8a0935a53"
+        },
+        {
+            "scope": "panel",
+            "order": 114,
+            "method": "POST",
+            "regex": "#^/repo/settings$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/ext/repo/routes_panel.php",
+                "line": 360,
+                "static_uses": [
+                    "flash",
+                    "requirePanelLogin",
+                    "rvn",
+                    "settingsPath",
+                    "svc"
+                ]
+            },
+            "signature": "b79044d2ed66eecd12cc2e5ca49697db7ac05bc6"
+        },
+        {
+            "scope": "panel",
+            "order": 115,
+            "method": "GET",
+            "regex": "#^/repo/edit/(?P<slug>[^/]+)$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/ext/repo/routes_panel.php",
+                "line": 396,
+                "static_uses": [
+                    "deleteBasePath",
+                    "editViewFile",
+                    "extensionMeta",
+                    "indexPath",
+                    "logsPath",
+                    "normalizeRepoSlug",
+                    "pullFlash",
+                    "renderNotFound",
+                    "renderView",
+                    "requirePanelLogin",
+                    "savePath",
+                    "sourceRowsForForm",
+                    "svc",
+                    "syncBasePath"
+                ]
+            },
+            "signature": "98ef043f88fc6a119f7135d455ef783dd6f24093"
+        },
+        {
+            "scope": "panel",
+            "order": 116,
+            "method": "POST",
+            "regex": "#^/repo/save$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/ext/repo/routes_panel.php",
+                "line": 439,
+                "static_uses": [
+                    "deriveRepoIdentityFromUrl",
+                    "editBasePath",
+                    "flash",
+                    "indexPath",
+                    "normalizeRepoSlug",
+                    "normalizeSourceRows",
+                    "requirePanelLogin",
+                    "rvn",
+                    "svc"
+                ]
+            },
+            "signature": "d12c3fd76b817ad98179208e9713fdd3c430f85d"
+        },
+        {
+            "scope": "panel",
+            "order": 117,
+            "method": "POST",
+            "regex": "#^/repo/sync/(?P<slug>[^/]+)$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/ext/repo/routes_panel.php",
+                "line": 534,
+                "static_uses": [
+                    "editBasePath",
+                    "flash",
+                    "indexPath",
+                    "normalizeRepoSlug",
+                    "requirePanelLogin",
+                    "rvn",
+                    "svc"
+                ]
+            },
+            "signature": "468bd4fbc9bb4984509ee537bb797c72243f7b8f"
+        },
+        {
+            "scope": "panel",
+            "order": 118,
+            "method": "POST",
+            "regex": "#^/repo/delete/(?P<slug>[^/]+)$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/ext/repo/routes_panel.php",
+                "line": 570,
+                "static_uses": [
+                    "flash",
+                    "indexPath",
+                    "normalizeRepoSlug",
+                    "requirePanelLogin",
+                    "rvn",
+                    "svc"
+                ]
+            },
+            "signature": "ac42729c4db3f31f5b09026fb6b3422f61a1c01c"
+        },
+        {
+            "scope": "panel",
+            "order": 119,
+            "method": "GET",
+            "regex": "#^/repo/logs$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/ext/repo/routes_panel.php",
+                "line": 605,
+                "static_uses": [
+                    "extensionMeta",
+                    "indexPath",
+                    "logsPath",
+                    "logsViewFile",
+                    "normalizeRepoSlug",
+                    "pullFlash",
+                    "renderView",
+                    "requirePanelLogin",
+                    "settingsPath",
+                    "svc"
+                ]
+            },
+            "signature": "fd57518a66660a4b5659a57fdf315ff3db250c6d"
+        },
+        {
+            "scope": "panel",
+            "order": 120,
+            "method": "GET",
+            "regex": "#^/signups$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/ext/signups/routes_panel.php",
+                "line": 311,
+                "static_uses": [
+                    "deletePath",
+                    "editBasePath",
+                    "extensionMeta",
+                    "listViewFile",
+                    "loadForms",
+                    "pullFlash",
+                    "renderView",
+                    "requirePanelLogin",
+                    "savePath",
+                    "submissionsBasePath"
+                ]
+            },
+            "signature": "5934930596494811f92222e0f875e2c5186efa22"
+        },
+        {
+            "scope": "panel",
+            "order": 121,
+            "method": "GET",
+            "regex": "#^/signups/edit$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/ext/signups/routes_panel.php",
+                "line": 338,
+                "static_uses": [
+                    "deletePath",
+                    "editViewFile",
+                    "extensionMeta",
+                    "indexPath",
+                    "pullFlash",
+                    "renderView",
+                    "requirePanelLogin",
+                    "savePath",
+                    "submissionsBasePath"
+                ]
+            },
+            "signature": "e31ff4abd9d02e1aca8fddf178b1982413d35010"
+        },
+        {
+            "scope": "panel",
+            "order": 122,
+            "method": "GET",
+            "regex": "#^/signups/edit/(?P<slug>[^/]+)$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/ext/signups/routes_panel.php",
+                "line": 364,
+                "static_uses": [
+                    "deletePath",
+                    "editViewFile",
+                    "extensionMeta",
+                    "findFormBySlug",
+                    "indexPath",
+                    "pullFlash",
+                    "renderView",
+                    "requirePanelLogin",
+                    "rvn",
+                    "savePath",
+                    "submissionsBasePath"
+                ]
+            },
+            "signature": "6051e45f7eb733da617f413dacef064ac02f87d7"
+        },
+        {
+            "scope": "panel",
+            "order": 123,
+            "method": "GET",
+            "regex": "#^/signups/submissions/(?P<slug>[^/]+)$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/ext/signups/routes_panel.php",
+                "line": 408,
+                "static_uses": [
+                    "editBasePath",
+                    "extensionMeta",
+                    "findFormBySlug",
+                    "flash",
+                    "indexPath",
+                    "pullFlash",
+                    "renderView",
+                    "requirePanelLogin",
+                    "rvn",
+                    "signupsRepository",
+                    "submissionsBasePath",
+                    "submissionsClearPath",
+                    "submissionsDeletePath",
+                    "submissionsImportPath",
+                    "submissionsListPath",
+                    "submissionsViewFile"
+                ]
+            },
+            "signature": "8e2cb85a3eae2eb9130a5a5ce8926da036c50d61"
+        },
+        {
+            "scope": "panel",
+            "order": 124,
+            "method": "GET",
+            "regex": "#^/signups/submissions/(?P<slug>[^/]+)/export$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/ext/signups/routes_panel.php",
+                "line": 491,
+                "static_uses": [
+                    "csv",
+                    "findFormBySlug",
+                    "flash",
+                    "indexPath",
+                    "requirePanelLogin",
+                    "rvn",
+                    "signupsRepository",
+                    "submissionsListPath"
+                ]
+            },
+            "signature": "5e7a689c463909b01abea50b02b01c4af51f5378"
+        },
+        {
+            "scope": "panel",
+            "order": 125,
+            "method": "POST",
+            "regex": "#^/signups/submissions/import$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/ext/signups/routes_panel.php",
+                "line": 554,
+                "static_uses": [
+                    "csv",
+                    "findFormBySlug",
+                    "flash",
+                    "indexPath",
+                    "requirePanelLogin",
+                    "rvn",
+                    "signupsRepository",
+                    "submissionsListPath",
+                    "uploads"
+                ]
+            },
+            "signature": "12af6c802755836168bb7dbbca5a57aa18495df4"
+        },
+        {
+            "scope": "panel",
+            "order": 126,
+            "method": "POST",
+            "regex": "#^/signups/submissions/delete$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/ext/signups/routes_panel.php",
+                "line": 858,
+                "static_uses": [
+                    "findFormBySlug",
+                    "flash",
+                    "indexPath",
+                    "requirePanelLogin",
+                    "rvn",
+                    "signupsRepository",
+                    "submissionsListPath"
+                ]
+            },
+            "signature": "86e59dab3b87e10d481cec1cc682c31f844402e5"
+        },
+        {
+            "scope": "panel",
+            "order": 127,
+            "method": "POST",
+            "regex": "#^/signups/submissions/clear$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/ext/signups/routes_panel.php",
+                "line": 909,
+                "static_uses": [
+                    "findFormBySlug",
+                    "flash",
+                    "indexPath",
+                    "requirePanelLogin",
+                    "rvn",
+                    "signupsRepository",
+                    "submissionsListPath"
+                ]
+            },
+            "signature": "17f0f2f71f2cc6b3f547e4bcddad6f03611af715"
+        },
+        {
+            "scope": "panel",
+            "order": 128,
+            "method": "POST",
+            "regex": "#^/signups/save$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/ext/signups/routes_panel.php",
+                "line": 953,
+                "static_uses": [
+                    "editBasePath",
+                    "flash",
+                    "indexPath",
+                    "loadForms",
+                    "requirePanelLogin",
+                    "rvn",
+                    "saveForms",
+                    "signupsRepository"
+                ]
+            },
+            "signature": "d92572fe87afe78ba3f0249937e8c8e8d7dd581e"
+        },
+        {
+            "scope": "panel",
+            "order": 129,
+            "method": "POST",
+            "regex": "#^/signups/delete$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/ext/signups/routes_panel.php",
+                "line": 1148,
+                "static_uses": [
+                    "flash",
+                    "indexPath",
+                    "loadForms",
+                    "requirePanelLogin",
+                    "rvn",
+                    "saveForms",
+                    "signupsRepository"
+                ]
+            },
+            "signature": "95b3481e26b2ff441c74cde9e7db0524c531a65c"
+        },
+        {
+            "scope": "panel",
+            "order": 130,
+            "method": "GET",
+            "regex": "#^/smallweb$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/ext/smallweb/routes_panel.php",
+                "line": 227,
+                "static_uses": [
+                    "extensionMeta",
+                    "indexPath",
+                    "panelUrl",
+                    "pullFlash",
+                    "renderView",
+                    "requirePanelLogin",
+                    "settingsSavePath",
+                    "settingsViewFile",
+                    "svc"
+                ]
+            },
+            "signature": "0639eaae09f991264b1cb1cb77e9a4be00b193bb"
+        },
+        {
+            "scope": "panel",
+            "order": 131,
+            "method": "GET",
+            "regex": "#^/smallweb/(?P<protocol>[^/]+)$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/ext/smallweb/routes_panel.php",
+                "line": 261,
+                "static_uses": [
+                    "extensionMeta",
+                    "indexPath",
+                    "panelUrl",
+                    "pullFlash",
+                    "renderView",
+                    "requireEnabledProtocol",
+                    "requirePanelLogin",
+                    "settingsSavePath",
+                    "settingsViewFile",
+                    "svc"
+                ]
+            },
+            "signature": "5218d4d1a12210fde00de6802ddc610c50c1a704"
+        },
+        {
+            "scope": "panel",
+            "order": 132,
+            "method": "POST",
+            "regex": "#^/smallweb/settings$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/ext/smallweb/routes_panel.php",
+                "line": 310,
+                "static_uses": [
+                    "flash",
+                    "indexPath",
+                    "input",
+                    "requirePanelLogin",
+                    "rvn",
+                    "svc"
+                ]
+            },
+            "signature": "93939afaf8636f582a14f90bd5772a46d47f53f5"
+        },
+        {
+            "scope": "panel",
+            "order": 133,
+            "method": "GET",
+            "regex": "#^/smallweb/(?P<protocol>[^/]+)/new$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/ext/smallweb/routes_panel.php",
+                "line": 359,
+                "static_uses": [
+                    "extensionMeta",
+                    "fileEditViewFile",
+                    "indexPath",
+                    "panelUrl",
+                    "pullFlash",
+                    "renderView",
+                    "requireEnabledProtocol",
+                    "requirePanelLogin",
+                    "svc"
+                ]
+            },
+            "signature": "a02624dd26be5db73aa92548fab57ef3252df7d0"
+        },
+        {
+            "scope": "panel",
+            "order": 134,
+            "method": "GET",
+            "regex": "#^/smallweb/(?P<protocol>[^/]+)/edit/(?P<filename>[^/]+)$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/ext/smallweb/routes_panel.php",
+                "line": 408,
+                "static_uses": [
+                    "editorTabs",
+                    "extensionMeta",
+                    "fileEditViewFile",
+                    "indexPath",
+                    "panelUrl",
+                    "pullFlash",
+                    "renderView",
+                    "requireEnabledProtocol",
+                    "requirePanelLogin",
+                    "svc"
+                ]
+            },
+            "signature": "b8502bea2550efef61a53155f00f1d5af95569c1"
+        },
+        {
+            "scope": "panel",
+            "order": 135,
+            "method": "POST",
+            "regex": "#^/smallweb/(?P<protocol>[^/]+)/save$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/ext/smallweb/routes_panel.php",
+                "line": 491,
+                "static_uses": [
+                    "flash",
+                    "indexPath",
+                    "input",
+                    "panelUrl",
+                    "requireEnabledProtocol",
+                    "requirePanelLogin",
+                    "rvn",
+                    "svc"
+                ]
+            },
+            "signature": "3a5dca7341fff42e2146f1984cc746125551029a"
+        },
+        {
+            "scope": "panel",
+            "order": 136,
+            "method": "POST",
+            "regex": "#^/smallweb/(?P<protocol>[^/]+)/delete$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/ext/smallweb/routes_panel.php",
+                "line": 582,
+                "static_uses": [
+                    "flash",
+                    "panelUrl",
+                    "requireEnabledProtocol",
+                    "requirePanelLogin",
+                    "rvn",
+                    "svc"
+                ]
+            },
+            "signature": "e068f67565f98fc61e740e7310af81c0590dc900"
+        },
+        {
+            "scope": "panel",
+            "order": 137,
+            "method": "POST",
+            "regex": "#^/smallweb/(?P<protocol>[^/]+)/mkdir$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/ext/smallweb/routes_panel.php",
+                "line": 629,
+                "static_uses": [
+                    "flash",
+                    "input",
+                    "panelUrl",
+                    "requireEnabledProtocol",
+                    "requirePanelLogin",
+                    "rvn",
+                    "svc"
+                ]
+            },
+            "signature": "4e2e7b72f9768279f7d904eee8966acbe923c968"
+        },
+        {
+            "scope": "panel",
+            "order": 138,
+            "method": "POST",
+            "regex": "#^/smallweb/(?P<protocol>[^/]+)/rmdir$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/ext/smallweb/routes_panel.php",
+                "line": 687,
+                "static_uses": [
+                    "flash",
+                    "panelUrl",
+                    "requireEnabledProtocol",
+                    "requirePanelLogin",
+                    "rvn",
+                    "svc"
+                ]
+            },
+            "signature": "d95a0e04092a60352492f67bf3d96d1ad8c3506a"
+        },
+        {
+            "scope": "panel",
+            "order": 139,
+            "method": "POST",
+            "regex": "#^/smallweb/(?P<protocol>[^/]+)/upload$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/ext/smallweb/routes_panel.php",
+                "line": 735,
+                "static_uses": [
+                    "flash",
+                    "panelUrl",
+                    "requireEnabledProtocol",
+                    "requirePanelLogin",
+                    "rvn",
+                    "svc"
+                ]
+            },
+            "signature": "fc32b2f5e669c39b2fd3669df6e2d1aa07a74d9b"
+        }
+    ]
+}

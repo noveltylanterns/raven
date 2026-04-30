@@ -43,6 +43,9 @@ NOTE: All paths relative to project root. (../ from the perspective of this dire
 - `php debug/smoke/security-aggressive.php`
 - Routing smoke checks:
 - `php debug/smoke/routing.php`
+- Route inventory snapshot smoke checks:
+- `php debug/smoke/router-inventory.php`
+- `php debug/smoke/router-inventory.php --write-snapshots`
 - Theme/template-tag smoke checks:
 - `php debug/smoke/themes.php`
 - Panel navigation permission matrix:

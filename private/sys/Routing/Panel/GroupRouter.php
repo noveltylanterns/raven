@@ -11,6 +11,7 @@ declare(strict_types=1);
 
 namespace Raven\Core\Routing\Panel;
 
+use Raven\Core\Routing\RouteParamGuard;
 use Raven\Core\Routing\Router;
 use Raven\Lib\Security\InputSanitizer;
 
@@ -19,6 +20,24 @@ use Raven\Lib\Security\InputSanitizer;
  */
 final class GroupRouter
 {
+    /**
+     * Registers group routes from one shared dependency payload.
+     *
+     * @param Router $router Mutable router receiving group routes.
+     * @param RouteDeps $deps Shared panel route dependency payload.
+     * @return void
+     */
+    public static function registerWithDeps(Router $router, RouteDeps $deps): void
+    {
+        self::register(
+            $router,
+            $deps->panelGroupListController,
+            $deps->panelGroupEditController,
+            $deps->input,
+            $deps->renderNotFound
+        );
+    }
+
     /**
      * Registers the panel group route family.
      *
@@ -45,10 +64,8 @@ final class GroupRouter
         });
 
         $router->add('GET', '/group/edit/{id}', static function (array $params) use ($panelGroupEditController, $input, $renderNotFound): void {
-            $id = $input->int($params['id'] ?? null, 1);
-
+            $id = RouteParamGuard::intOrNotFound($input, $params['id'] ?? null, 1, $renderNotFound);
             if ($id === null) {
-                $renderNotFound();
                 return;
             }
 

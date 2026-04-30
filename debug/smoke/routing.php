@@ -272,9 +272,9 @@ PHP;
         }
 
         if ((string) ($lookupTarget['type'] ?? '') === 'id') {
-            $page = $pages->findPublicPageById((int) ($lookupTarget['id'] ?? 0), $channelSlug);
+            $page = $pages->findPublishedById((int) ($lookupTarget['id'] ?? 0), $channelSlug);
         } else {
-            $page = $pages->findPublicPage($lookupSlug, $channelSlug);
+            $page = $pages->findPublishedBySlug($lookupSlug, $channelSlug);
         }
         $this->assert(is_array($page), 'Repository lookup failed for "' . $requestedSegment . '".');
 

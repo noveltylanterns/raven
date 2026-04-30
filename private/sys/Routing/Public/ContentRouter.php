@@ -11,6 +11,7 @@ declare(strict_types=1);
 
 namespace Raven\Core\Routing\Public;
 
+use Raven\Core\Routing\RouteParamGuard;
 use Raven\Core\Routing\Router;
 use Raven\Lib\Security\InputSanitizer;
 
@@ -19,6 +20,24 @@ use Raven\Lib\Security\InputSanitizer;
  */
 final class ContentRouter
 {
+    /**
+     * Registers page routes from one shared dependency payload.
+     *
+     * @param Router $router Mutable router receiving page routes.
+     * @param RouteDeps $deps Shared public route dependency payload.
+     * @return void
+     */
+    public static function registerWithDeps(Router $router, RouteDeps $deps): void
+    {
+        self::register(
+            $router,
+            $deps->publicPageController,
+            $deps->publicRequestContext,
+            $deps->input,
+            $deps->routeConfig
+        );
+    }
+
     /**
      * Registers the public page route family.
      *
@@ -46,7 +65,9 @@ final class ContentRouter
 
         // Channel + page route for pages assigned to channels.
         $router->add('GET', '/{channel}/{slug}', static function (array $params) use ($publicPageController, $publicRequestContext, $input, $reservedPrefixes): void {
-            $channel = $input->slug($params['channel'] ?? null);
+            $channel = RouteParamGuard::slugOrNotFound($input, $params['channel'] ?? null, static function () use ($publicRequestContext): void {
+                $publicRequestContext()->notFound();
+            });
             $slugRaw = strtolower(trim((string) ($params['slug'] ?? '')));
 
             if (

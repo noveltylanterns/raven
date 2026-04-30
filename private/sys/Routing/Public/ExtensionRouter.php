@@ -21,6 +21,18 @@ use Raven\Lib\Security\InputSanitizer;
 final class ExtensionRouter
 {
     /**
+     * Registers extension public routes from one shared dependency payload.
+     *
+     * @param Router $router Mutable router receiving extension routes.
+     * @param RouteDeps $deps Shared public route dependency payload.
+     * @return void
+     */
+    public static function registerWithDeps(Router $router, RouteDeps $deps): void
+    {
+        self::register($router, $deps->rvn, $deps->publicRequestContext, $deps->input);
+    }
+
+    /**
      * Registers all enabled module extension public routes.
      *
      * @param Router $router Mutable router receiving extension routes.

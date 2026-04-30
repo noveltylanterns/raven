@@ -14,7 +14,7 @@ namespace Raven\Lib\View\Public;
 use Raven\Core\Config;
 use Raven\Lib\Parser\FeedRouteParser;
 use Raven\Lib\Transport\Request;
-use Raven\Lib\Parser\UserDataParser;
+use Raven\Lib\Parser\UserProfileParser;
 
 /**
  * Shared site/public meta payload builder and social-image URL resolver.
@@ -23,20 +23,20 @@ final class MetaService
 {
     private Request $requestContextResolver;
     private ThemeCatalog $themeCatalogService;
-    private UserDataParser $profileContactService;
+    private UserProfileParser $profileContactService;
     private FeedRouteParser $feedParser;
 
     /**
      * @param Request $requestContextResolver Shared request-context helper.
      * @param ThemeCatalog $themeCatalogService Public-theme catalog helper.
-     * @param UserDataParser $profileContactService Profile-contact helper for author social metadata.
+     * @param UserProfileParser $profileContactService Profile-contact helper for author social metadata.
      * @param FeedRouteParser $feedParser Feed-route policy helper for root feed URLs.
      * @return void
      */
     public function __construct(
         Request $requestContextResolver,
         ThemeCatalog $themeCatalogService,
-        UserDataParser $profileContactService,
+        UserProfileParser $profileContactService,
         FeedRouteParser $feedParser
     ) {
         $this->requestContextResolver = $requestContextResolver;

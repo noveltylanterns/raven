@@ -8,6 +8,11 @@ Maintenance note: keep this file updated whenever Routing Table routes, row-buil
 
 Public-routing note: public entry orchestration lives directly in `public/index.php`, where controller-aligned registrars from `private/sys/Routing/Public/` map stock public route families onto the split handlers under `private/sys/Controller/Public/`. Shared low-level routing primitives live in `private/sys/Routing/`, while scope-specific gating stays in the index entry files. Keep those files and `public/theme/AGENTS.md` in sync when public route families are added or changed.
 
+Developer note — dispatch contracts vs HTTP helpers: Raven has two pairs of `Request`/`Response` classes with distinct roles; do not confuse them.
+- `Raven\Core\Routing\Request` / `Raven\Core\Routing\Response` — immutable dispatch contracts passed to and returned by the router. They carry only method + path (request) and handled state + params (response).
+- `Raven\Lib\Transport\Request` / `Raven\Lib\Transport\Response` — HTTP environment helpers. `Transport\Request` reads from `$_SERVER` (path extraction, URL/host/client normalization). `Transport\Response` emits HTTP output helpers (JSON encoding, cache headers).
+Files that need both should import `Raven\Lib\Transport\Request as HttpRequest` to avoid the name collision.
+
 ## 1) Panel Guide (Routing Table)
 
 ### Where To Go

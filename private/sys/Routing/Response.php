@@ -3,7 +3,8 @@
 /**
  * RAVEN CMS
  * ~/private/sys/Routing/Response.php
- * Immutable routing dispatch response value object.
+ * Immutable routing dispatch result — handled state + matched params returned by the router.
+ * Not to be confused with Raven\Lib\Transport\Response, which emits HTTP output helpers.
  * Docs: https://raven.lanterns.io
  */
 

@@ -11,20 +11,14 @@ declare(strict_types=1);
 
 use Raven\Core\Debug\OutputProfilerConfigResolver;
 use Raven\Core\Debug\OutputProfilerResponseHook;
+use Raven\Core\Factory\Public\RuntimeContract as PublicRuntimeContract;
+use Raven\Core\Factory\RuntimePayloadAssert;
 use Raven\Core\Routing\Request;
-use Raven\Core\Routing\Router;
-use Raven\Core\Routing\Public\AuthRouter;
-use Raven\Core\Routing\Public\CategoryRouter;
-use Raven\Core\Routing\Public\ChannelRouter;
-use Raven\Core\Routing\Public\ContentRouter;
-use Raven\Core\Routing\Public\ExtensionRouter;
-use Raven\Core\Routing\Public\FeedRouter;
-use Raven\Core\Routing\Public\FormRouter;
-use Raven\Core\Routing\Public\GroupRouter;
-use Raven\Core\Routing\Public\ProfileRouter;
+use Raven\Core\Routing\Public\PublicRouter;
+use Raven\Lib\Transport\Request as HttpRequest;
 use Raven\Core\Routing\Public\PublicRuntimeBuilder;
+use Raven\Core\Routing\Public\RouteDeps;
 use Raven\Core\Routing\Public\RouteConfig;
-use Raven\Core\Routing\Public\TagRouter;
 use Raven\Lib\Scheduler\Cron;
 
 $root = dirname(__DIR__);
@@ -81,6 +75,7 @@ require_once $root . '/private/Raven.php';
 /** @var array<string, mixed> $rvn */
 $rvn = \Raven\Raven::boot();
 $rvn = PublicRuntimeBuilder::build($rvn);
+PublicRuntimeContract::assert($rvn);
 
 $requestMethod = strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET'));
 $profilerSettings = OutputProfilerConfigResolver::fromConfig($rvn['config']);
@@ -129,86 +124,53 @@ OutputProfilerResponseHook::arm(
     $canRenderPublicProfiler
 );
 
+/**
+ * Resolves one required public runtime factory from the built payload.
+ */
+$requirePublicFactory = static function (string $key) use ($rvn): callable {
+    return RuntimePayloadAssert::requireCallable($rvn, $key, 'public');
+};
+
 /** @var callable(): object $publicPageController */
-$publicPageController = is_callable($rvn['public_page_controller'] ?? null)
-    ? $rvn['public_page_controller']
-    : static function (): object {
-        throw new RuntimeException('Public page controller factory is unavailable.');
-    };
-
+$publicPageController = $requirePublicFactory('public_page_controller');
 /** @var callable(): object $publicAuthController */
-$publicAuthController = is_callable($rvn['public_auth_controller'] ?? null)
-    ? $rvn['public_auth_controller']
-    : static function (): object {
-        throw new RuntimeException('Public auth controller factory is unavailable.');
-    };
-
+$publicAuthController = $requirePublicFactory('public_auth_controller');
 /** @var callable(): object $publicUserController */
-$publicUserController = is_callable($rvn['public_user_controller'] ?? null)
-    ? $rvn['public_user_controller']
-    : static function (): object {
-        throw new RuntimeException('Public user controller factory is unavailable.');
-    };
-
+$publicUserController = $requirePublicFactory('public_user_controller');
 /** @var callable(): object $publicCategoryController */
-$publicCategoryController = is_callable($rvn['public_category_controller'] ?? null)
-    ? $rvn['public_category_controller']
-    : static function (): object {
-        throw new RuntimeException('Public category controller factory is unavailable.');
-    };
-
+$publicCategoryController = $requirePublicFactory('public_category_controller');
 /** @var callable(): object $publicChannelController */
-$publicChannelController = is_callable($rvn['public_channel_controller'] ?? null)
-    ? $rvn['public_channel_controller']
-    : static function (): object {
-        throw new RuntimeException('Public channel controller factory is unavailable.');
-    };
-
+$publicChannelController = $requirePublicFactory('public_channel_controller');
 /** @var callable(): object $publicGroupController */
-$publicGroupController = is_callable($rvn['public_group_controller'] ?? null)
-    ? $rvn['public_group_controller']
-    : static function (): object {
-        throw new RuntimeException('Public group controller factory is unavailable.');
-    };
-
+$publicGroupController = $requirePublicFactory('public_group_controller');
 /** @var callable(): object $publicFeedController */
-$publicFeedController = is_callable($rvn['public_feed_controller'] ?? null)
-    ? $rvn['public_feed_controller']
-    : static function (): object {
-        throw new RuntimeException('Public feed controller factory is unavailable.');
-    };
-
+$publicFeedController = $requirePublicFactory('public_feed_controller');
 /** @var callable(): object $publicTagController */
-$publicTagController = is_callable($rvn['public_tag_controller'] ?? null)
-    ? $rvn['public_tag_controller']
-    : static function (): object {
-        throw new RuntimeException('Public tag controller factory is unavailable.');
-    };
-
+$publicTagController = $requirePublicFactory('public_tag_controller');
 /** @var callable(): object $publicRequestContext */
-$publicRequestContext = is_callable($rvn['public_request_context'] ?? null)
-    ? $rvn['public_request_context']
-    : static function (): object {
-        throw new RuntimeException('Public request context factory is unavailable.');
-    };
+$publicRequestContext = $requirePublicFactory('public_request_context');
 
 $input = $rvn['input'];
 $routeConfig = RouteConfig::build($rvn['config'], $input);
-$router = new Router();
-
-AuthRouter::register($router, $publicAuthController);
-FormRouter::register($router, $publicPageController, $publicRequestContext, $input);
-ExtensionRouter::register($router, $rvn, $publicRequestContext, $input);
-CategoryRouter::register($router, $publicCategoryController, $publicRequestContext, $input, $routeConfig);
-ChannelRouter::register($router, $publicChannelController, $publicRequestContext, $input, $routeConfig);
-FeedRouter::register($router, $publicFeedController, $publicRequestContext, $input, $routeConfig);
-ProfileRouter::register($router, $publicUserController, $publicRequestContext, $input, $routeConfig);
-GroupRouter::register($router, $publicGroupController, $publicRequestContext, $input, $routeConfig);
-TagRouter::register($router, $publicTagController, $publicRequestContext, $input, $routeConfig);
-ContentRouter::register($router, $publicPageController, $publicRequestContext, $input, $routeConfig);
+$routeDeps = new RouteDeps(
+    $rvn,
+    $publicAuthController,
+    $publicPageController,
+    $publicUserController,
+    $publicCategoryController,
+    $publicChannelController,
+    $publicGroupController,
+    $publicFeedController,
+    $publicTagController,
+    $publicRequestContext,
+    $input,
+    $routeConfig
+);
+$router = new PublicRouter();
+$router->register($routeDeps);
 
 $method = $requestMethod;
-$path = \Raven\Lib\Transport\Request::path();
+$path = HttpRequest::path();
 
 if (!in_array($method, ['GET', 'POST'], true)) {
     http_response_code(405);

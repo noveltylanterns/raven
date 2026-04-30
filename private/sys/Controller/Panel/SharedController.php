@@ -87,6 +87,14 @@ final class SharedController
     }
 
     /**
+     * Returns the shared runtime configuration reader.
+     */
+    public function config(): Config
+    {
+        return $this->config;
+    }
+
+    /**
      * Returns one CSRF form field string for panel templates.
      */
     public function csrfField(): string

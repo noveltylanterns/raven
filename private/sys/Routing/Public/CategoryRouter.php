@@ -12,57 +12,32 @@ declare(strict_types=1);
 namespace Raven\Core\Routing\Public;
 
 use Raven\Core\Routing\Router;
-use Raven\Lib\Security\InputSanitizer;
 
 /**
  * Registers public category routes.
+ *
+ * Delegates the slug+pagination route layout to PrefixedSlugPageRouter,
+ * supplying the category prefix config key and category controller closure.
  */
 final class CategoryRouter
 {
     /**
-     * Registers the public category route family.
+     * Registers category routes from one shared dependency payload.
      *
      * @param Router $router Mutable router receiving category routes.
-     * @param callable(): object $publicCategoryController Lazy public-category controller factory.
-     * @param callable(): object $publicRequestContext Lazy public request-context factory.
-     * @param InputSanitizer $input Shared input normalizer for route params.
-     * @param array{category_prefix: string} $routeConfig Normalized public route policy.
+     * @param RouteDeps $deps Shared public route dependency payload.
      * @return void
      */
-    public static function register(
-        Router $router,
-        callable $publicCategoryController,
-        callable $publicRequestContext,
-        InputSanitizer $input,
-        array $routeConfig
-    ): void {
-        $categoryPrefix = (string) ($routeConfig['category_prefix'] ?? '');
-        if ($categoryPrefix === '') {
-            return;
-        }
-
-        $categoryRouteBase = '/' . $categoryPrefix;
-        $router->add('GET', $categoryRouteBase . '/{slug}', static function (array $params) use ($publicCategoryController, $publicRequestContext, $input): void {
-            $slug = $input->slug($params['slug'] ?? null);
-
-            if ($slug === null) {
-                $publicRequestContext()->notFound();
-                return;
-            }
-
-            $publicCategoryController()->category($slug, 1);
-        });
-
-        $router->add('GET', $categoryRouteBase . '/{slug}/{page}', static function (array $params) use ($publicCategoryController, $publicRequestContext, $input): void {
-            $slug = $input->slug($params['slug'] ?? null);
-            $page = $input->int($params['page'] ?? null, 1);
-
-            if ($slug === null || $page === null) {
-                $publicRequestContext()->notFound();
-                return;
-            }
-
-            $publicCategoryController()->category($slug, $page);
-        });
+    public static function registerWithDeps(Router $router, RouteDeps $deps): void
+    {
+        PrefixedSlugPageRouter::register(
+            $router,
+            'category_prefix',
+            $deps->routeConfig,
+            fn(string $slug) => $deps->publicCategoryController()->category($slug, 1),
+            fn(string $slug, int $page) => $deps->publicCategoryController()->category($slug, $page),
+            $deps->publicRequestContext,
+            $deps->input
+        );
     }
 }

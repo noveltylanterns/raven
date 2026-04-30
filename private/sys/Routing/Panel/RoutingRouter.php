@@ -19,6 +19,18 @@ use Raven\Core\Routing\Router;
 final class RoutingRouter
 {
     /**
+     * Registers routing-diagnostics routes from one shared dependency payload.
+     *
+     * @param Router $router Mutable router receiving routing routes.
+     * @param RouteDeps $deps Shared panel route dependency payload.
+     * @return void
+     */
+    public static function registerWithDeps(Router $router, RouteDeps $deps): void
+    {
+        self::register($router, $deps->panelRoutingController);
+    }
+
+    /**
      * Registers the panel routing diagnostics route family.
      *
      * @param Router $router Mutable router receiving routing routes.

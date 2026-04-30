@@ -19,6 +19,18 @@ use Raven\Core\Routing\Router;
 final class ConfigRouter
 {
     /**
+     * Registers config routes from one shared dependency payload.
+     *
+     * @param Router $router Mutable router receiving configuration routes.
+     * @param RouteDeps $deps Shared panel route dependency payload.
+     * @return void
+     */
+    public static function registerWithDeps(Router $router, RouteDeps $deps): void
+    {
+        self::register($router, $deps->panelConfigController);
+    }
+
+    /**
      * Registers the panel configuration routes.
      *
      * @param Router $router Mutable router receiving configuration routes.

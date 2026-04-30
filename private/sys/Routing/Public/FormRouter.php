@@ -11,6 +11,7 @@ declare(strict_types=1);
 
 namespace Raven\Core\Routing\Public;
 
+use Raven\Core\Routing\RouteParamGuard;
 use Raven\Core\Routing\Router;
 use Raven\Lib\Security\InputSanitizer;
 
@@ -19,6 +20,18 @@ use Raven\Lib\Security\InputSanitizer;
  */
 final class FormRouter
 {
+    /**
+     * Registers embedded-form routes from one shared dependency payload.
+     *
+     * @param Router $router Mutable router receiving the form route.
+     * @param RouteDeps $deps Shared public route dependency payload.
+     * @return void
+     */
+    public static function registerWithDeps(Router $router, RouteDeps $deps): void
+    {
+        self::register($router, $deps->publicPageController, $deps->publicRequestContext, $deps->input);
+    }
+
     /**
      * Registers the embedded-form submission route family.
      *
@@ -36,10 +49,12 @@ final class FormRouter
     ): void {
         // This route is extension-agnostic and remains globally available to embedded forms.
         $router->add('POST', '/forms/submit', static function () use ($publicPageController, $publicRequestContext, $input): void {
-            $type = $input->slug((string) ($_POST['_rvn_form_type'] ?? ''));
-            $slug = $input->slug((string) ($_POST['_rvn_form_slug'] ?? ''));
-            if ($type === null || $slug === null) {
+            $notFound = static function () use ($publicRequestContext): void {
                 $publicRequestContext()->notFound();
+            };
+            $type = RouteParamGuard::slugOrNotFound($input, (string) ($_POST['_rvn_form_type'] ?? ''), $notFound);
+            $slug = RouteParamGuard::slugOrNotFound($input, (string) ($_POST['_rvn_form_slug'] ?? ''), $notFound);
+            if ($type === null || $slug === null) {
                 return;
             }
 

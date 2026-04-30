@@ -72,8 +72,8 @@ spl_autoload_register(static function (string $class) use ($root): void {
     }
 });
 
-use Raven\Lib\Extension\ExtensionRegistry;
-use Raven\Lib\Extension\Layout;
+use Raven\Lib\Extension\Registry as ExtensionRegistry;
+use Raven\Lib\Extension\Resolver as Layout;
 
 /**
  * Validates extension type contracts and optionally manages local debug fixtures.

@@ -11,6 +11,7 @@ declare(strict_types=1);
 
 namespace Raven\Core\Routing\Public;
 
+use Raven\Core\Routing\RouteParamGuard;
 use Raven\Core\Routing\Router;
 use Raven\Lib\Security\InputSanitizer;
 
@@ -19,6 +20,24 @@ use Raven\Lib\Security\InputSanitizer;
  */
 final class ChannelRouter
 {
+    /**
+     * Registers channel routes from one shared dependency payload.
+     *
+     * @param Router $router Mutable router receiving channel routes.
+     * @param RouteDeps $deps Shared public route dependency payload.
+     * @return void
+     */
+    public static function registerWithDeps(Router $router, RouteDeps $deps): void
+    {
+        self::register(
+            $router,
+            $deps->publicChannelController,
+            $deps->publicRequestContext,
+            $deps->input,
+            $deps->routeConfig
+        );
+    }
+
     /**
      * Registers the public channel route family.
      *
@@ -42,10 +61,13 @@ final class ChannelRouter
 
         // Single-segment route: channel landing first, then root page/redirect fallback.
         $router->add('GET', '/{slug}', static function (array $params) use ($publicChannelController, $publicRequestContext, $input, $reservedPrefixes): void {
-            $slug = $input->slug($params['slug'] ?? null);
-
-            if ($slug === null || in_array($slug, $reservedPrefixes, true)) {
+            $slug = RouteParamGuard::slugOrNotFound($input, $params['slug'] ?? null, static function () use ($publicRequestContext): void {
                 $publicRequestContext()->notFound();
+            });
+            $slug = RouteParamGuard::slugAllowedOrNotFound($slug, $reservedPrefixes, static function () use ($publicRequestContext): void {
+                $publicRequestContext()->notFound();
+            });
+            if ($slug === null) {
                 return;
             }
 

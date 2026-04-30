@@ -12,88 +12,40 @@ declare(strict_types=1);
 namespace Raven\Core\Routing\Panel;
 
 use Raven\Core\Routing\Router;
-use Raven\Lib\Security\InputSanitizer;
 
 /**
  * Registers category-management routes for the panel runtime.
+ *
+ * Delegates the full 10-route CRUD and set-management layout to
+ * TaxonomyCrudRouter, supplying category-specific controller closures.
  */
 final class CategoryRouter
 {
     /**
-     * Registers the panel category route family when category support is enabled.
+     * Registers category routes from one shared dependency payload.
      *
      * @param Router $router Mutable router receiving category routes.
-     * @param callable(): object $panelCategoryListController Lazy category list controller factory for GET /category and GET /category/set.
-     * @param callable(): object $panelCategoryEditController Lazy category edit controller factory for create/edit/save/delete routes.
-     * @param InputSanitizer $input Shared input normalizer for route params.
-     * @param bool $categoryEnabled Whether category routes are enabled for this request.
-     * @param callable(): void $renderNotFound Renders a 404 response when a route param is invalid.
+     * @param RouteDeps $deps Shared panel route dependency payload.
      * @return void
      */
-    public static function register(
-        Router $router,
-        callable $panelCategoryListController,
-        callable $panelCategoryEditController,
-        InputSanitizer $input,
-        bool $categoryEnabled,
-        callable $renderNotFound
-    ): void {
-        if (!$categoryEnabled) {
-            return;
-        }
-
-        $router->add('GET', '/category', static function () use ($panelCategoryListController): void {
-            $panelCategoryListController()->categoryList();
-        });
-
-        $router->add('GET', '/category/edit', static function () use ($panelCategoryEditController): void {
-            $panelCategoryEditController()->categoryEdit(null);
-        });
-
-        $router->add('GET', '/category/edit/{id}', static function (array $params) use ($panelCategoryEditController, $input, $renderNotFound): void {
-            $id = $input->int($params['id'] ?? null, 1);
-
-            if ($id === null) {
-                $renderNotFound();
-                return;
-            }
-
-            $panelCategoryEditController()->categoryEdit($id);
-        });
-
-        $router->add('POST', '/category/save', static function () use ($panelCategoryEditController): void {
-            $panelCategoryEditController()->categorySave($_POST, $_FILES);
-        });
-
-        $router->add('POST', '/category/delete', static function () use ($panelCategoryEditController): void {
-            $panelCategoryEditController()->categoryDelete($_POST);
-        });
-
-        $router->add('GET', '/category/set', static function () use ($panelCategoryListController): void {
-            $panelCategoryListController()->categorySetList();
-        });
-
-        $router->add('GET', '/category/set/edit', static function () use ($panelCategoryEditController): void {
-            $panelCategoryEditController()->categorySetEdit(null);
-        });
-
-        $router->add('GET', '/category/set/edit/{id}', static function (array $params) use ($panelCategoryEditController, $input, $renderNotFound): void {
-            $id = $input->int($params['id'] ?? null, 0);
-
-            if ($id === null) {
-                $renderNotFound();
-                return;
-            }
-
-            $panelCategoryEditController()->categorySetEdit($id);
-        });
-
-        $router->add('POST', '/category/set/save', static function () use ($panelCategoryEditController): void {
-            $panelCategoryEditController()->categorySetSave($_POST);
-        });
-
-        $router->add('POST', '/category/set/delete', static function () use ($panelCategoryEditController): void {
-            $panelCategoryEditController()->categorySetDelete($_POST);
-        });
+    public static function registerWithDeps(Router $router, RouteDeps $deps): void
+    {
+        TaxonomyCrudRouter::register(
+            $router,
+            'category',
+            fn() => ($deps->panelCategoryListController)()->categoryList(),
+            fn() => ($deps->panelCategoryListController)()->categorySetList(),
+            fn() => ($deps->panelCategoryEditController)()->categoryEdit(null),
+            fn(int $id) => ($deps->panelCategoryEditController)()->categoryEdit($id),
+            fn() => ($deps->panelCategoryEditController)()->categorySave($_POST, $_FILES),
+            fn() => ($deps->panelCategoryEditController)()->categoryDelete($_POST),
+            fn() => ($deps->panelCategoryEditController)()->categorySetEdit(null),
+            fn(int $id) => ($deps->panelCategoryEditController)()->categorySetEdit($id),
+            fn() => ($deps->panelCategoryEditController)()->categorySetSave($_POST),
+            fn() => ($deps->panelCategoryEditController)()->categorySetDelete($_POST),
+            $deps->input,
+            $deps->categoryEnabled,
+            $deps->renderNotFound
+        );
     }
 }

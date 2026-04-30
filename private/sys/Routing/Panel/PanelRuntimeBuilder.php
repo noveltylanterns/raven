@@ -13,81 +13,25 @@ namespace Raven\Core\Routing\Panel;
 
 use Closure;
 use PDO;
-use Raven\Core\Controller\Panel\AuthController;
-use Raven\Core\Controller\Panel\CategoryEditController;
-use Raven\Core\Controller\Panel\CategoryListController;
-use Raven\Core\Controller\Panel\ChannelEditController;
-use Raven\Core\Controller\Panel\ChannelListController;
-use Raven\Core\Controller\Panel\ConfigController;
-use Raven\Core\Controller\Panel\DashboardController;
-use Raven\Core\Controller\Panel\GroupEditController;
-use Raven\Core\Controller\Panel\GroupListController;
-use Raven\Core\Controller\Panel\LogsController;
-use Raven\Core\Controller\Panel\PageEditController;
-use Raven\Core\Controller\Panel\PageListController;
-use Raven\Core\Controller\Panel\PreferencesController;
-use Raven\Core\Controller\Panel\RedirectEditController;
-use Raven\Core\Controller\Panel\RedirectListController;
-use Raven\Core\Controller\Panel\RoutingController;
-use Raven\Core\Controller\Panel\SharedController;
-use Raven\Core\Controller\Panel\SystemController;
-use Raven\Core\Controller\Panel\TagEditController;
-use Raven\Core\Controller\Panel\TagListController;
-use Raven\Core\Controller\Panel\UpdateController;
-use Raven\Core\Controller\Panel\UserEditController;
-use Raven\Core\Controller\Panel\UserListController;
-use Raven\Core\Repository\CategoryRead;
-use Raven\Core\Repository\CategoryWrite;
-use Raven\Core\Repository\ChannelRead;
-use Raven\Core\Repository\ChannelWrite;
-use Raven\Core\Repository\GroupRead;
-use Raven\Core\Repository\GroupWrite;
-use Raven\Core\Repository\InviteRead;
-use Raven\Core\Repository\InviteWrite;
-use Raven\Core\Repository\MediaRead;
-use Raven\Core\Repository\MediaWrite;
-use Raven\Core\Repository\PageRead;
-use Raven\Core\Repository\PageWrite;
-use Raven\Core\Repository\RedirectRead;
-use Raven\Core\Repository\RedirectWrite;
-use Raven\Core\Repository\SetRead;
-use Raven\Core\Repository\SetWrite;
-use Raven\Core\Repository\TagRead;
-use Raven\Core\Repository\TagWrite;
-use Raven\Core\Repository\UserRead;
-use Raven\Core\Repository\UserWrite;
+use Raven\Core\Factory\Panel\ControllerFactories;
+use Raven\Core\Factory\Panel\DomainFactories;
+use Raven\Core\Factory\Panel\RepoFactories;
+use Raven\Core\Factory\Panel\RuntimeInitializer;
 use Raven\Core\Logger;
 use Raven\Core\Renderer;
 use Raven\Lib\Auth\AuthService;
-use Raven\Lib\Auth\LoginIdentifierResolver;
-use Raven\Lib\Auth\Panel\PanelInvitePolicyService;
-use Raven\Lib\Auth\Panel\PanelPermissionDefinitionCatalog;
-use Raven\Lib\Auth\Panel\PanelTwoFactorPreferencesService;
-use Raven\Lib\Auth\PasswordChangePolicy;
-use Raven\Lib\Auth\SessionFlash;
 use Raven\Lib\Extension\ExtensionEditorCatalogService;
-use Raven\Lib\Extension\StateRead;
 use Raven\Lib\Extension\Panel\ExtensionCatalogService;
 use Raven\Lib\Extension\Panel\ExtensionPermissionCatalogService;
+use Raven\Lib\Extension\StateRead;
 use Raven\Lib\Parser\ConfigParser;
-use Raven\Lib\Parser\FeedRouteParser;
-use Raven\Lib\Parser\GroupRouteParser;
-use Raven\Lib\Parser\TaxonomyRepoParser;
 use Raven\Lib\Media\Panel\MediaManager;
-use Raven\Lib\Media\Panel\TaxonomyImageService;
-use Raven\Lib\Media\Panel\UserMediaPathService;
-use Raven\Lib\Parser\UserProfileParser;
-use Raven\Lib\Scribe\MediaScribe;
-use Raven\Lib\Scribe\UserMediaScribe;
 use Raven\Lib\View\Panel\Editor;
 use Raven\Lib\View\Panel\EditorBlocks;
 use Raven\Lib\View\Panel\EditorMCE;
 use Raven\Lib\View\Panel\EditorMDE;
 use Raven\Lib\View\Panel\EditorTabs;
-use Raven\Lib\View\Panel\PanelMediaConfigService;
-use Raven\Lib\View\Error as ViewError;
 use Raven\Lib\View\Public\ThemeCatalog;
-use Raven\Lib\Transport\Upload;
 use RuntimeException;
 
 /**
@@ -121,60 +65,13 @@ final class PanelRuntimeBuilder
             $rvn['auth'] = ($rvn['auth'])();
         }
 
-        $authController = null;
-        $categoryListController = null;
-        $categoryEditController = null;
-        $channelListController = null;
-        $channelEditController = null;
-        $configController = null;
-        $pageListController = null;
-        $pageEditController = null;
-        $dashboardController = null;
-        $groupListController = null;
-        $groupEditController = null;
-        $preferencesController = null;
-        $panelSharedController = null;
-        $panelRuntime = null;
-        $redirectListController = null;
-        $redirectEditController = null;
-        $logsController = null;
-        $routingController = null;
-        $systemController = null;
-        $tagListController = null;
-        $tagEditController = null;
-        $updateController = null;
-        $userListController = null;
-        $userEditController = null;
-        $categoryRead = null;
-        $categoryWrite = null;
-        $categorySetRead = null;
-        $categorySetWrite = null;
-        $tagRead = null;
-        $tagWrite = null;
-        $tagSetRead = null;
-        $tagSetWrite = null;
-        $inviteRead = null;
-        $inviteWrite = null;
-        $mediaRead = null;
-        $mediaWrite = null;
         $mediaManager = null;
         $logger = null;
-        $taxonomyLookupRepository = null;
-        $channelRead = null;
-        $channelWrite = null;
         $extensionStateStore = null;
         $extensionPermissionCatalogService = null;
         $extensionCatalogService = null;
         $extensionEditorCatalogService = null;
         $themeCatalogService = null;
-        $groupRead = null;
-        $groupWrite = null;
-        $pageRead = null;
-        $pageWrite = null;
-        $redirectRead = null;
-        $redirectWrite = null;
-        $userRead = null;
-        $userWrite = null;
 
         $rvn['view'] = new Renderer((string) $rvn['root'] . '/private/tpl');
         $categoryEnabled = ConfigParser::bool($rvn['config']->get('category.enabled', true), true);
@@ -247,234 +144,31 @@ final class PanelRuntimeBuilder
             };
         };
 
-        /**
-         * Builds channel read side for panel content and routing flows.
-         */
-        $channelReadFactory = $memoize(static function () use (&$channelRead, $rvn): ChannelRead {
-            $channelRead = new ChannelRead(
-                $rvn['db'],
-                (string) $rvn['driver'],
-                (string) $rvn['prefix'],
-                (string) $rvn['root'] . '/private/dat/channel'
-            );
-
-            return $channelRead;
-        });
-
-        /**
-         * Builds channel write side for panel channel-save and delete routes.
-         */
-        $channelWriteFactory = $memoize(static function () use (&$channelWrite, $rvn, $channelReadFactory): ChannelWrite {
-            $channelWrite = new ChannelWrite(
-                $rvn['db'],
-                (string) $rvn['driver'],
-                (string) $rvn['prefix'],
-                $channelReadFactory(),
-                (string) $rvn['root'] . '/private/dat/channel'
-            );
-
-            return $channelWrite;
-        });
-
-        /**
-         * Builds group read side for panel group-listing flows.
-         */
-        $groupReadFactory = $memoize(static function () use (&$groupRead, $rvn): GroupRead {
-            $groupRead = new GroupRead(
-                $rvn['db'],
-                (string) $rvn['driver'],
-                (string) $rvn['prefix']
-            );
-
-            return $groupRead;
-        });
-
-        /**
-         * Builds group write side for panel group-save and delete routes.
-         */
-        $groupWriteFactory = $memoize(static function () use (&$groupWrite, $rvn, $groupReadFactory): GroupWrite {
-            $groupWrite = new GroupWrite(
-                $rvn['db'],
-                (string) $rvn['driver'],
-                (string) $rvn['prefix'],
-                $groupReadFactory()
-            );
-
-            return $groupWrite;
-        });
-
-        /**
-         * Builds media read side for panel gallery renders and existence checks.
-         */
-        $mediaReadFactory = $memoize(static function () use (&$mediaRead, $rvn): MediaRead {
-            $mediaRead = new MediaRead(
-                $rvn['db'],
-                (string) $rvn['driver'],
-                (string) $rvn['prefix']
-            );
-
-            return $mediaRead;
-        });
-
-        /**
-         * Builds media write side for panel gallery persistence.
-         */
-        $mediaWriteFactory = $memoize(static function () use (&$mediaWrite, $rvn): MediaWrite {
-            $mediaWrite = new MediaWrite(
-                $rvn['db'],
-                (string) $rvn['driver'],
-                (string) $rvn['prefix']
-            );
-
-            return $mediaWrite;
-        });
-
-        /**
-         * Builds page read side for panel content/routing flows.
-         */
-        $pageReadFactory = $memoize(static function () use (&$pageRead, $rvn, $channelReadFactory, $categoryEnabled, $tagEnabled): PageRead {
-            $pageRead = new PageRead(
-                $rvn['db'],
-                (string) $rvn['driver'],
-                (string) $rvn['prefix'],
-                $channelReadFactory(),
-                $categoryEnabled,
-                $tagEnabled
-            );
-
-            return $pageRead;
-        });
-
-        /**
-         * Builds page write side for panel page-save and delete routes.
-         */
-        $pageWriteFactory = $memoize(static function () use (&$pageWrite, $rvn, $pageReadFactory, $channelReadFactory, $categoryEnabled, $tagEnabled): PageWrite {
-            $pageWrite = new PageWrite(
-                $rvn['db'],
-                (string) $rvn['driver'],
-                (string) $rvn['prefix'],
-                $channelReadFactory(),
-                $categoryEnabled,
-                $tagEnabled
-            );
-
-            return $pageWrite;
-        });
-
-        /**
-         * Builds redirect read side for panel routing inventory flows.
-         */
-        $redirectReadFactory = $memoize(static function () use (&$redirectRead, $rvn, $channelReadFactory): RedirectRead {
-            $redirectRead = new RedirectRead(
-                $rvn['db'],
-                (string) $rvn['driver'],
-                (string) $rvn['prefix'],
-                $channelReadFactory()
-            );
-
-            return $redirectRead;
-        });
-
-        /**
-         * Builds redirect write side for panel redirect-save and delete routes.
-         */
-        $redirectWriteFactory = $memoize(static function () use (&$redirectWrite, $rvn, $channelReadFactory): RedirectWrite {
-            $redirectWrite = new RedirectWrite(
-                $rvn['db'],
-                (string) $rvn['driver'],
-                (string) $rvn['prefix'],
-                $channelReadFactory()
-            );
-
-            return $redirectWrite;
-        });
-
-        /**
-         * Builds user read side for panel user listings and parser seams.
-         */
-        $userReadFactory = $memoize(static function () use (&$userRead, $rvn, $resolveAuthDb): UserRead {
-            $userRead = new UserRead(
-                $resolveAuthDb(),
-                $rvn['db'],
-                (string) $rvn['driver'],
-                (string) $rvn['prefix']
-            );
-
-            return $userRead;
-        });
-
-        /**
-         * Builds user write side for panel user-save and delete routes.
-         */
-        $userWriteFactory = $memoize(static function () use (&$userWrite, $rvn, $resolveAuthDb): UserWrite {
-            $userWrite = new UserWrite(
-                $resolveAuthDb(),
-                $rvn['db'],
-                (string) $rvn['driver'],
-                (string) $rvn['prefix']
-            );
-
-            return $userWrite;
-        });
-
-        /**
-         * Builds the file-backed category set read side only for panel taxonomy editors.
-         */
-        $categorySetFactory = $memoize(static function () use (&$categorySetRead, $rvn): SetRead {
-            $categorySetRead = new SetRead('category', (string) $rvn['root'] . '/private/dat/category-set');
-            return $categorySetRead;
-        });
-
-        /**
-         * Builds the file-backed tag set read side only for panel taxonomy editors.
-         */
-        $tagSetFactory = $memoize(static function () use (&$tagSetRead, $rvn): SetRead {
-            $tagSetRead = new SetRead('tag', (string) $rvn['root'] . '/private/dat/tag-set');
-            return $tagSetRead;
-        });
-
-        /**
-         * Builds the file-backed category set write side only for panel category-set save and delete routes.
-         */
-        $categorySetWriteFactory = $memoize(static function () use (&$categorySetWrite, $rvn, $categorySetFactory): SetWrite {
-            $categorySetWrite = new SetWrite('category', (string) $rvn['root'] . '/private/dat/category-set', $categorySetFactory());
-            return $categorySetWrite;
-        });
-
-        /**
-         * Builds the file-backed tag set write side only for panel tag-set save and delete routes.
-         */
-        $tagSetWriteFactory = $memoize(static function () use (&$tagSetWrite, $rvn, $tagSetFactory): SetWrite {
-            $tagSetWrite = new SetWrite('tag', (string) $rvn['root'] . '/private/dat/tag-set', $tagSetFactory());
-            return $tagSetWrite;
-        });
-
-        /**
-         * Builds invite read side only for panel invite listing.
-         */
-        $inviteReadFactory = $memoize(static function () use (&$inviteRead, $rvn, $resolveAuthDb): InviteRead {
-            $inviteRead = new InviteRead(
-                $resolveAuthDb(),
-                (string) $rvn['driver'],
-                (string) $rvn['prefix']
-            );
-
-            return $inviteRead;
-        });
-
-        /**
-         * Builds invite write side only for panel invite creation/deletion.
-         */
-        $inviteWriteFactory = $memoize(static function () use (&$inviteWrite, $rvn, $resolveAuthDb, $inviteReadFactory): InviteWrite {
-            $inviteWrite = new InviteWrite(
-                $resolveAuthDb(),
-                (string) $rvn['driver'],
-                (string) $rvn['prefix'],
-                $inviteReadFactory()
-            );
-
-            return $inviteWrite;
-        });
+        /** @var array<string, Closure> $repoFactories */
+        $repoFactories = RepoFactories::build($rvn, $memoize, $resolveAuthDb, $categoryEnabled, $tagEnabled);
+        $channelReadFactory = $repoFactories['channel_read'];
+        $channelWriteFactory = $repoFactories['channel_write'];
+        $groupReadFactory = $repoFactories['group_read'];
+        $groupWriteFactory = $repoFactories['group_write'];
+        $mediaReadFactory = $repoFactories['media_read'];
+        $mediaWriteFactory = $repoFactories['media_write'];
+        $pageReadFactory = $repoFactories['page_read'];
+        $pageWriteFactory = $repoFactories['page_write'];
+        $redirectReadFactory = $repoFactories['redirect_read'];
+        $redirectWriteFactory = $repoFactories['redirect_write'];
+        $userReadFactory = $repoFactories['user_read'];
+        $userWriteFactory = $repoFactories['user_write'];
+        $categorySetFactory = $repoFactories['category_set'];
+        $tagSetFactory = $repoFactories['tag_set'];
+        $categorySetWriteFactory = $repoFactories['category_set_write'];
+        $tagSetWriteFactory = $repoFactories['tag_set_write'];
+        $inviteReadFactory = $repoFactories['invite_read'];
+        $inviteWriteFactory = $repoFactories['invite_write'];
+        $categoryReadFactory = $repoFactories['category_read'];
+        $categoryWriteFactory = $repoFactories['category_write'];
+        $tagReadFactory = $repoFactories['tag_read'];
+        $tagWriteFactory = $repoFactories['tag_write'];
+        $taxonomyLookupFactory = $repoFactories['taxonomy_lookup'];
 
         /**
          * Builds the panel media helper only when page editing enters media flows.
@@ -508,111 +202,22 @@ final class PanelRuntimeBuilder
             return $logger;
         });
 
-        /**
-         * Builds category read side only for panel taxonomy flows that actually use categories.
-         */
-        $categoryReadFactory = $memoize(static function () use (&$categoryRead, $rvn): CategoryRead {
-            $categoryRead = new CategoryRead(
-                $rvn['db'],
-                (string) $rvn['driver'],
-                (string) $rvn['prefix']
-            );
-
-            return $categoryRead;
-        });
-
-        /**
-         * Builds category write side only for panel category-save and delete routes.
-         */
-        $categoryWriteFactory = $memoize(static function () use (&$categoryWrite, $rvn, $categoryReadFactory): CategoryWrite {
-            $categoryWrite = new CategoryWrite(
-                $rvn['db'],
-                (string) $rvn['driver'],
-                (string) $rvn['prefix'],
-                $categoryReadFactory()
-            );
-
-            return $categoryWrite;
-        });
-
-        /**
-         * Builds tag read side only for panel taxonomy flows that actually use tags.
-         */
-        $tagReadFactory = $memoize(static function () use (&$tagRead, $rvn): TagRead {
-            $tagRead = new TagRead(
-                $rvn['db'],
-                (string) $rvn['driver'],
-                (string) $rvn['prefix']
-            );
-
-            return $tagRead;
-        });
-
-        /**
-         * Builds tag write side only for panel tag-save and delete routes.
-         */
-        $tagWriteFactory = $memoize(static function () use (&$tagWrite, $rvn, $tagReadFactory): TagWrite {
-            $tagWrite = new TagWrite(
-                $rvn['db'],
-                (string) $rvn['driver'],
-                (string) $rvn['prefix'],
-                $tagReadFactory()
-            );
-
-            return $tagWrite;
-        });
-
-        /**
-         * Builds taxonomy lookup parsing only for routing and page-editor flows
-         * that need category/tag option lookups beyond channel routing.
-         */
-        $taxonomyLookupFactory = $memoize(static function () use (&$taxonomyLookupRepository, $rvn, $channelReadFactory): TaxonomyRepoParser {
-            $taxonomyLookupRepository = new TaxonomyRepoParser(
-                $rvn['db'],
-                (string) $rvn['driver'],
-                (string) $rvn['prefix'],
-                $channelReadFactory()
-            );
-
-            return $taxonomyLookupRepository;
-        });
-
-        /**
-         * Content routes share page/channel/media/user dependencies mapped to the
-         * panel content sub-controller. User storage is included because page-editor
-         * author validation and author select options need the user repository.
-         *
-         * @return array<string, mixed>
-         */
-        $panelContentDomain = $memoize(static function () use (
+        /** @var array<string, Closure> $domainFactories */
+        $domainFactories = DomainFactories::build(
+            $memoize,
             $channelReadFactory,
+            $channelWriteFactory,
             $pageReadFactory,
             $pageWriteFactory,
             $mediaReadFactory,
             $mediaWriteFactory,
             $mediaManagerFactory,
-            $userReadFactory
-        ): array {
-            return [
-                'channel_read' => $channelReadFactory(),
-                'page_read' => $pageReadFactory(),
-                'page_write' => $pageWriteFactory(),
-                'media_read' => $mediaReadFactory(),
-                'media_write' => $mediaWriteFactory(),
-                'media_manager' => $mediaManagerFactory,
-                'user_read' => $userReadFactory(),
-            ];
-        });
-
-        /**
-         * Taxonomy routes share channel/routing deps plus lazy category/tag
-         * resolvers, matching the future taxonomy sub-controller seam.
-         *
-         * @return array<string, mixed>
-         */
-        $panelTaxonomyDomain = $memoize(static function () use (
-            $channelReadFactory,
-            $channelWriteFactory,
+            $userReadFactory,
+            $userWriteFactory,
+            $groupReadFactory,
+            $groupWriteFactory,
+            $inviteReadFactory,
+            $inviteWriteFactory,
             $redirectReadFactory,
             $redirectWriteFactory,
             $categoryReadFactory,
@@ -626,82 +231,12 @@ final class PanelRuntimeBuilder
             $taxonomyLookupFactory,
             $categoryEnabled,
             $tagEnabled
-        ): array {
-            return [
-                'channel_read' => $channelReadFactory(),
-                'channel_write' => $channelWriteFactory(),
-                'redirect_read' => $redirectReadFactory(),
-                'redirect_write' => $redirectWriteFactory(),
-                'category' => $categoryReadFactory,
-                'category_write' => $categoryWriteFactory,
-                'category_set' => $categorySetFactory,
-                'category_set_write' => $categorySetWriteFactory,
-                'tag' => $tagReadFactory,
-                'tag_write' => $tagWriteFactory,
-                'tag_set' => $tagSetFactory,
-                'tag_set_write' => $tagSetWriteFactory,
-                'taxonomy_lookup' => $taxonomyLookupFactory,
-                'category_enabled' => $categoryEnabled,
-                'tag_enabled' => $tagEnabled,
-            ];
-        });
-
-        /**
-         * User/group/invite deps stay clustered so account-facing routes can split
-         * away from the monolith without another bootstrap rewrite.
-         *
-         * @return array<string, mixed>
-         */
-        $panelUserDomain = $memoize(static function () use (
-            $groupReadFactory,
-            $groupWriteFactory,
-            $userReadFactory,
-            $userWriteFactory,
-            $inviteReadFactory,
-            $inviteWriteFactory
-        ): array {
-            return [
-                'group_read' => $groupReadFactory(),
-                'group_write' => $groupWriteFactory(),
-                'user_read' => $userReadFactory(),
-                'user_write' => $userWriteFactory(),
-                'invite_read' => $inviteReadFactory,
-                'invite_write' => $inviteWriteFactory,
-            ];
-        });
-
-        /**
-         * Preferences currently share the user/group account seam.
-         *
-         * @return array<string, mixed>
-         */
-        $panelPreferencesDomain = $panelUserDomain;
-
-        /**
-         * System routes currently need logging plus the same routing/content seams.
-         *
-         * @return array<string, mixed>
-         */
-        $panelSystemDomain = $memoize(static function () use (
-            $channelReadFactory,
-            $categorySetFactory,
-            $pageReadFactory,
-            $redirectReadFactory,
-            $tagSetFactory,
-            $taxonomyLookupFactory,
-            $userReadFactory,
-            $loggerFactory
-        ): array {
-            return [
-                'channel' => $channelReadFactory(),
-                'category_set' => $categorySetFactory,
-                'page' => $pageReadFactory(),
-                'redirect' => $redirectReadFactory(),
-                'tag_set' => $tagSetFactory,
-                'taxonomy_lookup' => $taxonomyLookupFactory,
-                'user' => $userReadFactory(),
-            ];
-        });
+        );
+        $panelContentDomain = $domainFactories['panel_domain_content'];
+        $panelTaxonomyDomain = $domainFactories['panel_domain_taxonomy'];
+        $panelUserDomain = $domainFactories['panel_domain_user'];
+        $panelPreferencesDomain = $domainFactories['panel_domain_preferences'];
+        $panelSystemDomain = $domainFactories['panel_domain_system'];
 
         $rvn['panel_domain_content'] = $panelContentDomain;
         $rvn['panel_domain_taxonomy'] = $panelTaxonomyDomain;
@@ -844,725 +379,43 @@ final class PanelRuntimeBuilder
             return $themeCatalogService;
         });
 
-        /**
-         * Builds a session-scoped extension permission map for the current panel user.
-         *
-         * Guests and unauthenticated requests keep the immutable stock/guest-only
-         * permission surface, so extension permission metadata resolves to empty.
-         *
-         * @param array<int, string> $directoryFilter Optional extension-directory whitelist.
-         * @return array<string, array<string, mixed>>
-         */
-        $rvn['panel_permission_map_provider'] = static function (array $directoryFilter = []) use (
+        ControllerFactories::registerBase(
+            $rvn,
             $resolveAuth,
             $extensionCatalogFactory,
-            $extensionFormsProvider
-        ): array {
-            if (($resolveAuth()->userId() ?? null) === null) {
-                return [];
-            }
+            $extensionFormsProvider,
+            $categoryEnabled,
+            $tagEnabled
+        );
 
-            $extensionCatalog = $extensionCatalogFactory();
-            return $extensionCatalog->panelPermissionMapForDirectories(
-                $directoryFilter,
-                static fn (string $extensionPath): array => $extensionCatalog->readManifest($extensionPath, $extensionFormsProvider)
-            );
-        };
-
-        /**
-         * Builds the auth controller on first use so login routes avoid panel-only dependencies.
-         */
-        $rvn['auth_controller'] = static function () use (&$authController, $rvn, $resolveAuth): AuthController {
-            if ($authController instanceof AuthController) {
-                return $authController;
-            }
-
-            $authController = new AuthController(
-                $rvn['view'],
-                $rvn['config'],
-                $resolveAuth(),
-                $rvn['input'],
-                $rvn['csrf']
-            );
-
-            return $authController;
-        };
-
-        /**
-         * Builds the shared request context for split panel sub-controllers.
-         */
-        $rvn['panel_request_context'] = static function () use (&$panelSharedController, &$rvn, $categoryEnabled, $tagEnabled, $resolveAuth): SharedController {
-            if ($panelSharedController instanceof SharedController) {
-                return $panelSharedController;
-            }
-
-            $panelSharedController = new SharedController(
-                $rvn['view'],
-                $rvn['config'],
-                $resolveAuth(),
-                $rvn['csrf'],
-                new SessionFlash('_raven_flash'),
-                $categoryEnabled,
-                $tagEnabled,
-                static function () use (&$rvn): void {
-                    (new ViewError($rvn['config'], (string) $rvn['root']))->render404();
-                }
-            );
-
-            return $panelSharedController;
-        };
-
-        /**
-         * Builds the split dashboard controller on first use.
-         */
-        $rvn['panel_dashboard_controller'] = static function () use (&$dashboardController, &$rvn): DashboardController {
-            if ($dashboardController instanceof DashboardController) {
-                return $dashboardController;
-            }
-
-            /** @var callable(): SharedController $requestContextFactory */
-            $requestContextFactory = $rvn['panel_request_context'];
-            $dashboardController = new DashboardController($requestContextFactory());
-            return $dashboardController;
-        };
-
-        /**
-         * Builds the page list controller on first use.
-         * Owns GET /page only.
-         */
-        $rvn['panel_page_list_controller'] = static function () use (
-            &$pageListController,
-            &$rvn,
-            $panelContentDomain
-        ): PageListController {
-            if ($pageListController instanceof PageListController) {
-                return $pageListController;
-            }
-
-            /** @var callable(): SharedController $requestContextFactory */
-            $requestContextFactory = $rvn['panel_request_context'];
-            $contentDomain = $panelContentDomain();
-            $pageListController = new PageListController(
-                $requestContextFactory(),
-                $rvn['input'],
-                $contentDomain['page_read'],
-                $contentDomain['channel_read']
-            );
-
-            return $pageListController;
-        };
-
-        /**
-         * Builds the page edit controller on first use.
-         * Owns page create/edit, save, gallery upload/delete, and page delete.
-         */
-        $rvn['panel_page_edit_controller'] = static function () use (
-            &$pageEditController,
-            &$rvn,
+        ControllerFactories::registerContentTaxonomyControllers(
+            $rvn,
             $panelContentDomain,
             $panelTaxonomyDomain,
             $extensionStateStoreFactory,
             $extensionCatalogFactory,
             $extensionEditorCatalogFactory
-        ): PageEditController {
-            if ($pageEditController instanceof PageEditController) {
-                return $pageEditController;
-            }
+        );
 
-            /** @var callable(): SharedController $requestContextFactory */
-            $requestContextFactory = $rvn['panel_request_context'];
-            $contentDomain = $panelContentDomain();
-            $taxonomyDomain = $panelTaxonomyDomain();
-            $pageEditController = new PageEditController(
-                $requestContextFactory(),
-                $rvn['config'],
-                $rvn['input'],
-                $contentDomain['page_read'],
-                $contentDomain['page_write'],
-                $contentDomain['media_read'],
-                $contentDomain['media_write'],
-                $contentDomain['media_manager'],
-                $taxonomyDomain['category'],
-                $taxonomyDomain['category_set'],
-                $taxonomyDomain['tag'],
-                $taxonomyDomain['tag_set'],
-                $taxonomyDomain['taxonomy_lookup'],
-                $contentDomain['user_read'],
-                $contentDomain['channel_read'],
-                $rvn['panel_editor_tabs'],
-                $rvn['panel_editor'],
-                $rvn['panel_editor_blocks'],
-                $rvn['panel_editor_mce'],
-                $rvn['panel_editor_mde'],
-                $extensionStateStoreFactory(),
-                $extensionCatalogFactory(),
-                $extensionEditorCatalogFactory(),
-                is_callable($rvn['extension_services_for'] ?? null)
-                    ? $rvn['extension_services_for']
-                    : static fn (?string $extensionDirectory = null): array => []
-            );
-
-            return $pageEditController;
-        };
-
-        /**
-         * Builds the channel list controller on first use.
-         * Owns GET /channel only.
-         */
-        $rvn['panel_channel_list_controller'] = static function () use (&$channelListController, &$rvn, $panelTaxonomyDomain): ChannelListController {
-            if ($channelListController instanceof ChannelListController) {
-                return $channelListController;
-            }
-
-            /** @var callable(): SharedController $requestContextFactory */
-            $requestContextFactory = $rvn['panel_request_context'];
-            $taxonomyDomain = $panelTaxonomyDomain();
-            $channelListController = new ChannelListController(
-                $requestContextFactory(),
-                $rvn['input'],
-                $taxonomyDomain['channel_read']
-            );
-
-            return $channelListController;
-        };
-
-        /**
-         * Builds the channel edit controller on first use.
-         * Owns channel create/edit, save, and delete routes.
-         */
-        $rvn['panel_channel_edit_controller'] = static function () use (&$channelEditController, &$rvn, $panelTaxonomyDomain): ChannelEditController {
-            if ($channelEditController instanceof ChannelEditController) {
-                return $channelEditController;
-            }
-
-            /** @var callable(): SharedController $requestContextFactory */
-            $requestContextFactory = $rvn['panel_request_context'];
-            $taxonomyDomain = $panelTaxonomyDomain();
-            $channelEditController = new ChannelEditController(
-                $requestContextFactory(),
-                $rvn['input'],
-                $taxonomyDomain['channel_read'],
-                $taxonomyDomain['channel_write'],
-                $taxonomyDomain['category_set'],
-                $taxonomyDomain['tag_set'],
-                $taxonomyDomain['category_enabled'],
-                $taxonomyDomain['tag_enabled'],
-                new TaxonomyImageService($rvn['config']),
-                new MediaScribe($rvn['db'], $rvn['driver'], $rvn['prefix'], $rvn['config'], (string) $rvn['root']),
-                new FeedRouteParser($rvn['config'], $rvn['input']),
-                $rvn['panel_editor_tabs'],
-                $rvn['panel_editor'],
-                new Upload()
-            );
-
-            return $channelEditController;
-        };
-
-        /**
-         * Builds the category list controller on first use.
-         * Owns GET /category and GET /category/set only.
-         */
-        $rvn['panel_category_list_controller'] = static function () use (&$categoryListController, &$rvn, $panelTaxonomyDomain): CategoryListController {
-            if ($categoryListController instanceof CategoryListController) {
-                return $categoryListController;
-            }
-
-            /** @var callable(): SharedController $requestContextFactory */
-            $requestContextFactory = $rvn['panel_request_context'];
-            $taxonomyDomain = $panelTaxonomyDomain();
-            $categoryListController = new CategoryListController(
-                $requestContextFactory(),
-                $rvn['input'],
-                $taxonomyDomain['category'],
-                $taxonomyDomain['category_set'],
-                $taxonomyDomain['category_enabled'],
-                $taxonomyDomain['channel_read']
-            );
-
-            return $categoryListController;
-        };
-
-        /**
-         * Builds the category edit controller on first use.
-         * Owns category create/edit, save, delete, and category-set CRUD routes.
-         */
-        $rvn['panel_category_edit_controller'] = static function () use (&$categoryEditController, &$rvn, $panelTaxonomyDomain): CategoryEditController {
-            if ($categoryEditController instanceof CategoryEditController) {
-                return $categoryEditController;
-            }
-
-            /** @var callable(): SharedController $requestContextFactory */
-            $requestContextFactory = $rvn['panel_request_context'];
-            $taxonomyDomain = $panelTaxonomyDomain();
-            $categoryEditController = new CategoryEditController(
-                $requestContextFactory(),
-                $rvn['input'],
-                $taxonomyDomain['category'],
-                $taxonomyDomain['category_write'],
-                $taxonomyDomain['category_set'],
-                $taxonomyDomain['category_set_write'],
-                $taxonomyDomain['category_enabled'],
-                new TaxonomyImageService($rvn['config']),
-                new MediaScribe($rvn['db'], $rvn['driver'], $rvn['prefix'], $rvn['config'], (string) $rvn['root']),
-                $taxonomyDomain['channel_read'],
-                $rvn['panel_editor_tabs'],
-                new Upload()
-            );
-
-            return $categoryEditController;
-        };
-
-        /**
-         * Builds the redirect list controller on first use.
-         * Owns GET /redirect only.
-         */
-        $rvn['panel_redirect_list_controller'] = static function () use (&$redirectListController, &$rvn, $panelTaxonomyDomain): RedirectListController {
-            if ($redirectListController instanceof RedirectListController) {
-                return $redirectListController;
-            }
-
-            /** @var callable(): SharedController $requestContextFactory */
-            $requestContextFactory = $rvn['panel_request_context'];
-            $taxonomyDomain = $panelTaxonomyDomain();
-            $redirectListController = new RedirectListController(
-                $requestContextFactory(),
-                $rvn['input'],
-                $taxonomyDomain['redirect_read']
-            );
-
-            return $redirectListController;
-        };
-
-        /**
-         * Builds the redirect edit controller on first use.
-         * Owns redirect create/edit, save, and delete routes.
-         */
-        $rvn['panel_redirect_edit_controller'] = static function () use (&$redirectEditController, &$rvn, $panelTaxonomyDomain): RedirectEditController {
-            if ($redirectEditController instanceof RedirectEditController) {
-                return $redirectEditController;
-            }
-
-            /** @var callable(): SharedController $requestContextFactory */
-            $requestContextFactory = $rvn['panel_request_context'];
-            $taxonomyDomain = $panelTaxonomyDomain();
-            $redirectEditController = new RedirectEditController(
-                $requestContextFactory(),
-                $rvn['input'],
-                $taxonomyDomain['channel_read'],
-                $taxonomyDomain['redirect_read'],
-                $taxonomyDomain['redirect_write'],
-            );
-
-            return $redirectEditController;
-        };
-
-        /**
-         * Builds the tag list controller on first use.
-         * Owns GET /tag and GET /tag/set only.
-         */
-        $rvn['panel_tag_list_controller'] = static function () use (&$tagListController, &$rvn, $panelTaxonomyDomain): TagListController {
-            if ($tagListController instanceof TagListController) {
-                return $tagListController;
-            }
-
-            /** @var callable(): SharedController $requestContextFactory */
-            $requestContextFactory = $rvn['panel_request_context'];
-            $taxonomyDomain = $panelTaxonomyDomain();
-            $tagListController = new TagListController(
-                $requestContextFactory(),
-                $rvn['input'],
-                $taxonomyDomain['tag'],
-                $taxonomyDomain['tag_set'],
-                $taxonomyDomain['tag_enabled'],
-                $taxonomyDomain['channel_read']
-            );
-
-            return $tagListController;
-        };
-
-        /**
-         * Builds the tag edit controller on first use.
-         * Owns tag create/edit, save, delete, and tag-set CRUD routes.
-         */
-        $rvn['panel_tag_edit_controller'] = static function () use (&$tagEditController, &$rvn, $panelTaxonomyDomain): TagEditController {
-            if ($tagEditController instanceof TagEditController) {
-                return $tagEditController;
-            }
-
-            /** @var callable(): SharedController $requestContextFactory */
-            $requestContextFactory = $rvn['panel_request_context'];
-            $taxonomyDomain = $panelTaxonomyDomain();
-            $tagEditController = new TagEditController(
-                $requestContextFactory(),
-                $rvn['input'],
-                $taxonomyDomain['tag'],
-                $taxonomyDomain['tag_write'],
-                $taxonomyDomain['tag_set'],
-                $taxonomyDomain['tag_set_write'],
-                $taxonomyDomain['tag_enabled'],
-                new TaxonomyImageService($rvn['config']),
-                new MediaScribe($rvn['db'], $rvn['driver'], $rvn['prefix'], $rvn['config'], (string) $rvn['root']),
-                $taxonomyDomain['channel_read'],
-                $rvn['panel_editor_tabs'],
-                new Upload()
-            );
-
-            return $tagEditController;
-        };
-
-        /**
-         * Builds the user list controller on first use.
-         * Owns GET /user and GET /user/invites.
-         */
-        $rvn['panel_user_list_controller'] = static function () use (&$userListController, &$rvn, $panelUserDomain): UserListController {
-            if ($userListController instanceof UserListController) {
-                return $userListController;
-            }
-
-            /** @var callable(): SharedController $requestContextFactory */
-            $requestContextFactory = $rvn['panel_request_context'];
-            $userDomain = $panelUserDomain();
-            $userListController = new UserListController(
-                $requestContextFactory(),
-                $rvn['config'],
-                $rvn['input'],
-                $userDomain['group_read'],
-                $userDomain['user_read'],
-                $userDomain['invite_read'],
-                new SessionFlash('_raven_flash_list'),
-                new GroupRouteParser($rvn['config'], $rvn['input']),
-                new LoginIdentifierResolver()
-            );
-
-            return $userListController;
-        };
-
-        /**
-         * Builds the user edit controller on first use.
-         * Owns user create/edit, save, delete, and invite token create/generate/delete routes.
-         */
-        $rvn['panel_user_edit_controller'] = static function () use (&$userEditController, &$rvn, $panelUserDomain): UserEditController {
-            if ($userEditController instanceof UserEditController) {
-                return $userEditController;
-            }
-
-            /** @var callable(): SharedController $requestContextFactory */
-            $requestContextFactory = $rvn['panel_request_context'];
-            $userDomain = $panelUserDomain();
-            $userEditController = new UserEditController(
-                $requestContextFactory(),
-                $rvn['config'],
-                $rvn['input'],
-                (string) $rvn['root'],
-                $userDomain['group_read'],
-                $userDomain['user_read'],
-                $userDomain['user_write'],
-                $userDomain['invite_write'],
-                new SessionFlash('_raven_flash_list'),
-                new GroupRouteParser($rvn['config'], $rvn['input']),
-                new PanelInvitePolicyService($rvn['input']),
-                new LoginIdentifierResolver(),
-                $rvn['panel_editor_tabs'],
-                $rvn['panel_editor'],
-                $rvn['panel_editor_blocks'],
-                new PanelMediaConfigService($rvn['config']),
-                new UserProfileParser($rvn['input']),
-                new PanelTwoFactorPreferencesService($rvn['input']),
-                new UserMediaScribe((string) $rvn['root']),
-                new UserMediaPathService()
-            );
-
-            return $userEditController;
-        };
-
-        /**
-         * Builds the group list controller on first use.
-         * Owns GET /group only.
-         */
-        $rvn['panel_group_list_controller'] = static function () use (&$groupListController, &$rvn, $panelUserDomain): GroupListController {
-            if ($groupListController instanceof GroupListController) {
-                return $groupListController;
-            }
-
-            /** @var callable(): SharedController $requestContextFactory */
-            $requestContextFactory = $rvn['panel_request_context'];
-            $groupDomain = $panelUserDomain();
-            $groupListController = new GroupListController(
-                $requestContextFactory(),
-                $rvn['input'],
-                $groupDomain['group_read'],
-                new GroupRouteParser($rvn['config'], $rvn['input'])
-            );
-
-            return $groupListController;
-        };
-
-        /**
-         * Builds the group edit controller on first use.
-         * Owns group create/edit, save, and delete routes.
-         */
-        $rvn['panel_group_edit_controller'] = static function () use (&$groupEditController, &$rvn, $panelUserDomain): GroupEditController {
-            if ($groupEditController instanceof GroupEditController) {
-                return $groupEditController;
-            }
-
-            /** @var callable(): SharedController $requestContextFactory */
-            $requestContextFactory = $rvn['panel_request_context'];
-            $groupDomain = $panelUserDomain();
-            $groupEditController = new GroupEditController(
-                $requestContextFactory(),
-                $rvn['input'],
-                $groupDomain['group_write'],
-                $groupDomain['group_read'],
-                new GroupRouteParser($rvn['config'], $rvn['input']),
-                $rvn['panel_editor_tabs'],
-                $rvn['panel_editor'],
-                new TaxonomyImageService($rvn['config']),
-                new MediaScribe($rvn['db'], $rvn['driver'], $rvn['prefix'], $rvn['config'], (string) $rvn['root']),
-                new PanelPermissionDefinitionCatalog(),
-                new Upload(),
-                static function () use (&$rvn): array {
-                    $provider = $rvn['panel_permission_map_provider'] ?? null;
-                    if (!is_callable($provider)) {
-                        return [];
-                    }
-
-                    $map = $provider();
-                    return is_array($map) ? $map : [];
-                }
-            );
-
-            return $groupEditController;
-        };
-
-        /**
-         * Builds the split preferences controller on first use.
-         */
-        $rvn['panel_preferences_controller'] = static function () use (&$preferencesController, &$rvn): PreferencesController {
-            if ($preferencesController instanceof PreferencesController) {
-                return $preferencesController;
-            }
-
-            /** @var callable(): SharedController $requestContextFactory */
-            $requestContextFactory = $rvn['panel_request_context'];
-            $preferencesController = new PreferencesController(
-                $requestContextFactory(),
-                $rvn['config'],
-                $rvn['input'],
-                (string) $rvn['root'],
-                new LoginIdentifierResolver(),
-                $rvn['panel_editor_tabs'],
-                $rvn['panel_editor'],
-                $rvn['panel_editor_blocks'],
-                new PanelMediaConfigService($rvn['config']),
-                new UserProfileParser($rvn['input']),
-                new PanelTwoFactorPreferencesService($rvn['input']),
-                new UserMediaScribe((string) $rvn['root']),
-                new UserMediaPathService(),
-                new PasswordChangePolicy()
-            );
-
-            return $preferencesController;
-        };
-
-        /**
-         * Builds the split logs controller on first use.
-         * Owns `/logs*` only.
-         */
-        $rvn['panel_logs_controller'] = static function () use (&$logsController, &$rvn, $loggerFactory): LogsController {
-            if ($logsController instanceof LogsController) {
-                return $logsController;
-            }
-
-            /** @var callable(): SharedController $requestContextFactory */
-            $requestContextFactory = $rvn['panel_request_context'];
-            $logsController = new LogsController(
-                $requestContextFactory(),
-                $rvn['input'],
-                $loggerFactory
-            );
-
-            return $logsController;
-        };
-
-        /**
-         * Builds the split routing controller on first use.
-         * Owns `/routing*` only.
-         */
-        $rvn['panel_routing_controller'] = static function () use (&$routingController, &$rvn, $panelSystemDomain, $themeCatalogFactory): RoutingController {
-            if ($routingController instanceof RoutingController) {
-                return $routingController;
-            }
-
-            /** @var callable(): SharedController $requestContextFactory */
-            $requestContextFactory = $rvn['panel_request_context'];
-            $systemDomain = $panelSystemDomain();
-            $routingController = new RoutingController(
-                $requestContextFactory(),
-                $rvn['config'],
-                $rvn['input'],
-                (string) $rvn['root'],
-                $systemDomain['channel'],
-                $systemDomain['page'],
-                $systemDomain['redirect'],
-                $systemDomain['user'],
-                $systemDomain['taxonomy_lookup'],
-                $themeCatalogFactory()
-            );
-
-            return $routingController;
-        };
-
-        /**
-         * Builds the split update controller on first use.
-         * Owns `/update*` only.
-         */
-        $rvn['panel_update_controller'] = static function () use (
-            &$updateController,
-            &$rvn,
-            $extensionCatalogFactory,
-            $themeCatalogFactory
-        ): UpdateController {
-            if ($updateController instanceof UpdateController) {
-                return $updateController;
-            }
-
-            /** @var callable(): SharedController $requestContextFactory */
-            $requestContextFactory = $rvn['panel_request_context'];
-            $updateController = new UpdateController(
-                $requestContextFactory(),
-                $rvn['config'],
-                $rvn['input'],
-                (string) $rvn['root'],
-                $themeCatalogFactory()->stockSlugs(),
-                $extensionCatalogFactory()->stockExtensionDirectories()
-            );
-
-            return $updateController;
-        };
-
-        /**
-         * Builds the split configuration controller on first use.
-         * Owns `/configuration` and `/configuration/save` only.
-         */
-        $rvn['panel_config_controller'] = static function () use (&$configController, &$rvn, $panelSystemDomain, $themeCatalogFactory): ConfigController {
-            if ($configController instanceof ConfigController) {
-                return $configController;
-            }
-
-            /** @var callable(): SharedController $requestContextFactory */
-            $requestContextFactory = $rvn['panel_request_context'];
-            $systemDomain = $panelSystemDomain();
-            $configController = new ConfigController(
-                $requestContextFactory(),
-                $rvn['config'],
-                $rvn['input'],
-                $systemDomain['channel'],
-                $systemDomain['category_set'],
-                $systemDomain['tag_set'],
-                $rvn['panel_editor_tabs'],
-                $rvn['panel_editor'],
-                $rvn['panel_editor_blocks'],
-                $themeCatalogFactory()
-            );
-
-            return $configController;
-        };
-
-        /**
-         * Builds the split system controller on first use.
-         * Owns themes and extensions.
-         */
-        $rvn['panel_system_controller'] = static function () use (
-            &$systemController,
-            &$rvn,
+        ControllerFactories::registerUserSystemControllers(
+            $rvn,
+            $panelUserDomain,
+            $panelSystemDomain,
+            $loggerFactory,
+            $themeCatalogFactory,
             $extensionStateStoreFactory,
-            $extensionCatalogFactory,
-            $themeCatalogFactory
-        ): SystemController {
-            if ($systemController instanceof SystemController) {
-                return $systemController;
-            }
+            $extensionCatalogFactory
+        );
 
-            /** @var callable(): SharedController $requestContextFactory */
-            $requestContextFactory = $rvn['panel_request_context'];
-            $systemController = new SystemController(
-                $requestContextFactory(),
-                $rvn['config'],
-                $rvn['input'],
-                (string) $rvn['root'],
-                $extensionStateStoreFactory(),
-                $extensionCatalogFactory(),
-                $themeCatalogFactory(),
-                is_callable($rvn['extension_services_for'] ?? null)
-                    ? $rvn['extension_services_for']
-                    : static fn (?string $extensionDirectory = null): array => []
-            );
-
-            return $systemController;
-        };
-
-        /**
-         * Builds panel-only repositories, extension services, and route-registration data on demand.
-         *
-         * @return array<string, mixed>
-         */
-        $rvn['initialize_panel_runtime'] = static function () use (
-            &$panelRuntime,
-            &$rvn,
+        RuntimeInitializer::register(
+            $rvn,
             $panelContentDomain,
             $panelTaxonomyDomain,
             $panelUserDomain,
             $panelSystemDomain,
             $categoryEnabled,
             $tagEnabled
-        ): array {
-            if (is_array($panelRuntime)) {
-                return $rvn + $panelRuntime;
-            }
-
-            $contentDomain = $panelContentDomain();
-            $taxonomyDomain = $panelTaxonomyDomain();
-            $userDomain = $panelUserDomain();
-            $panelSystemDomain();
-
-            // Panel route files depend on this closure, so populate it only when panel runtime is active.
-            $rvn['panel_site_data'] = static function (bool $includeDomain = true) use ($rvn, $categoryEnabled, $tagEnabled): array {
-                $site = [
-                    'name' => (string) $rvn['config']->get('site.name', 'Raven CMS'),
-                    'panel_path' => (string) $rvn['config']->get('panel.path', 'panel'),
-                    'panel_brand_name' => (string) $rvn['config']->get('panel.brand_name', ''),
-                    'panel_brand_logo' => (string) $rvn['config']->get('panel.brand_logo', ''),
-                    'category_enabled' => $categoryEnabled,
-                    'tag_enabled' => $tagEnabled,
-                ];
-
-                if ($includeDomain) {
-                    $site['domain'] = (string) $rvn['config']->get('site.domain', 'localhost');
-                }
-
-                return $site;
-            };
-
-            $enabledExtensionManifests = is_array($rvn['enabled_extension_manifests'] ?? null)
-                ? (array) $rvn['enabled_extension_manifests']
-                : [];
-            $enabledExtensions = [];
-            foreach (array_keys($enabledExtensionManifests) as $directoryName) {
-                if (is_dir((string) $rvn['root'] . '/private/ext/' . $directoryName)) {
-                    $enabledExtensions[$directoryName] = true;
-                }
-            }
-
-            $panelRuntime = [
-                'category_enabled' => $categoryEnabled,
-                'tag_enabled' => $tagEnabled,
-                'enabled_extensions' => $enabledExtensions,
-                'enabled_extension_manifests' => $enabledExtensionManifests,
-            ];
-
-            return $rvn + $panelRuntime;
-        };
+        );
 
         return $rvn;
     }

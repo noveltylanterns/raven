@@ -20,6 +20,24 @@ use Raven\Lib\Security\InputSanitizer;
 final class ProfileRouter
 {
     /**
+     * Registers profile routes from one shared dependency payload.
+     *
+     * @param Router $router Mutable router receiving profile routes.
+     * @param RouteDeps $deps Shared public route dependency payload.
+     * @return void
+     */
+    public static function registerWithDeps(Router $router, RouteDeps $deps): void
+    {
+        self::register(
+            $router,
+            $deps->publicUserController,
+            $deps->publicRequestContext,
+            $deps->input,
+            $deps->routeConfig
+        );
+    }
+
+    /**
      * Registers the public profile route family.
      *
      * @param Router $router Mutable router receiving profile routes.
