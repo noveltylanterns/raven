@@ -2,7 +2,7 @@
 
 /**
  * RAVEN CMS
- * ~/private/sys/Router/Panel/ExtensionManagerRouter.php
+ * ~/private/sys/Router/Panel/ExtensionRouter.php
  * Panel extension-manager route registration.
  * Docs: https://raven.lanterns.io
  */
@@ -16,7 +16,7 @@ use Raven\Core\Router\RouteHandler;
 /**
  * Registers panel routes for extension management.
  */
-final class ExtensionManagerRouter
+final class ExtensionRouter
 {
     /**
      * Registers extension-manager routes from one shared dependency payload.
@@ -68,4 +68,3 @@ final class ExtensionManagerRouter
         });
     }
 }
-

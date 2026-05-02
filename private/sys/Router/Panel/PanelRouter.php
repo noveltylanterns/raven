@@ -54,7 +54,7 @@ final class PanelRouter
         PreferencesRouter::registerWithDeps($this->router, $deps);
         ConfigRouter::registerWithDeps($this->router, $deps);
         ThemeRouter::registerWithDeps($this->router, $deps);
-        ExtensionManagerRouter::registerWithDeps($this->router, $deps);
+        ExtensionRouter::registerWithDeps($this->router, $deps);
         PanelRouteRegistrar::register(
             $this->router,
             $deps->rvn,

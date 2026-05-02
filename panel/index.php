@@ -9,7 +9,7 @@
 
 declare(strict_types=1);
 
-use Raven\Core\Debug\OutputProfilerConfig;
+use Raven\Core\Debug\OutputProfilerPolicy;
 use Raven\Core\Debug\OutputProfiler;
 use Raven\Core\Controller\Panel\SharedController;
 use Raven\Core\Factory\Panel\RuntimeContract as PanelRuntimeContract;
@@ -217,7 +217,7 @@ $routeDeps = new PanelRouteDeps(
 $router->register($routeDeps);
 
 $method = $requestMethod;
-$profilerSettings = OutputProfilerConfig::fromConfig($rvn['config']);
+$profilerSettings = OutputProfilerPolicy::fromConfig($rvn['config']);
 $canRenderPanelProfiler = static function () use ($rvn, $isPanelAuthHelperInternalPath, $internalPath): bool {
     if (!isset($rvn['auth']) || $isPanelAuthHelperInternalPath($internalPath)) {
         return false;

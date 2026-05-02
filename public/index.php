@@ -9,7 +9,7 @@
 
 declare(strict_types=1);
 
-use Raven\Core\Debug\OutputProfilerConfig;
+use Raven\Core\Debug\OutputProfilerPolicy;
 use Raven\Core\Debug\OutputProfiler;
 use Raven\Core\Factory\Public\RuntimeContract as PublicRuntimeContract;
 use Raven\Core\Factory\RuntimePayloadAssert;
@@ -78,7 +78,7 @@ $rvn = PublicRuntimeBuilder::build($rvn);
 PublicRuntimeContract::assert($rvn);
 
 $requestMethod = strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET'));
-$profilerSettings = OutputProfilerConfig::fromConfig($rvn['config']);
+$profilerSettings = OutputProfilerPolicy::fromConfig($rvn['config']);
 $isPublicAuthHelperPath = static function (string $path) use ($requestPath): bool {
     $normalized = trim($path !== '' ? $path : $requestPath);
     $normalized = (string) parse_url($normalized, PHP_URL_PATH);

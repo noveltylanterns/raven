@@ -2,7 +2,7 @@
 
 /**
  * RAVEN CMS
- * ~/private/sys/Debug/OutputProfilerConfig.php
+ * ~/private/sys/Debug/OutputProfilerPolicy.php
  * Output profiler config flag resolver.
  * Docs: https://raven.lanterns.io
  */
@@ -17,9 +17,12 @@ use Raven\Lib\Parser\ConfigParser;
 /**
  * Shared resolver for output profiler config flags.
  */
-final class OutputProfilerConfig
+final class OutputProfilerPolicy
 {
     /**
+     * Resolves all output profiler display flags from the site configuration.
+     *
+     * @param Config $config  The site config instance to read debug flag values from.
      * @return array{
      *   show_on_public: bool,
      *   show_on_panel: bool,
@@ -28,7 +31,7 @@ final class OutputProfilerConfig
      *   show_stack_trace: bool,
      *   show_request: bool,
      *   show_environment: bool
-     * }
+     * } Resolved boolean flags controlling which profiler sections are enabled.
      */
     public static function fromConfig(Config $config): array
     {
