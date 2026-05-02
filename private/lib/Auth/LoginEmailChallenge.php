@@ -15,6 +15,9 @@ use Raven\Lib\Auth\TwoFactorMethodKey;
 
 /**
  * Shared login-time email-code challenge issue/verify helpers for pending 2FA sessions.
+ *
+ * Owns the session storage for pending email-code challenges: stores issued code hashes,
+ * retrieves them for verification, and clears entries on success, expiry, or explicit cancel.
  */
 final class LoginEmailChallenge
 {
@@ -22,8 +25,21 @@ final class LoginEmailChallenge
     private const MIN_TTL_SECONDS = 60;
     private const MAX_TTL_SECONDS = 1800;
 
+    /** Session key under which all pending email-code challenge entries are stored. */
+    private const SESSION_EMAIL_CHALLENGES = '_raven_2fa_pending_email_challenges';
+
     /**
-     * @param array<int, array<string, mixed>> $pendingMethods
+     * Issues one email-code challenge for the pending 2FA session.
+     *
+     * Returns an existing unexpired challenge without re-issuing if one is already active
+     * for the same method key. On a fresh issue the returned array includes the plaintext
+     * code for the caller to dispatch via email; on a re-use it is absent.
+     *
+     * @param int|null $pendingUserId     User id from the pending 2FA session (null = no session).
+     * @param array<int, array<string, mixed>> $pendingMethods Active 2FA method rows for this session.
+     * @param string $selectedMethodKey   Method key or pool key chosen by the user.
+     * @param int    $ttlSeconds          Challenge lifetime in seconds (clamped to 60–1800).
+     * @param string $submittedEmail      Submitted email address when using an email-pool method key.
      * @return array{
      *   ok: bool,
      *   message?: string,
@@ -38,7 +54,6 @@ final class LoginEmailChallenge
         ?int $pendingUserId,
         array $pendingMethods,
         string $selectedMethodKey,
-        LoginChallengeState $sessionState,
         int $ttlSeconds = self::DEFAULT_TTL_SECONDS,
         string $submittedEmail = ''
     ): array {
@@ -82,7 +97,7 @@ final class LoginEmailChallenge
         }
 
         $now = time();
-        $existing = $sessionState->pendingEmailCodeChallenge($pendingUserId, $methodKey);
+        $existing = $this->pendingEmailCodeChallenge($pendingUserId, $methodKey);
         if (is_array($existing) && (int) ($existing['expires_at'] ?? 0) > $now) {
             return [
                 'ok' => true,
@@ -104,7 +119,7 @@ final class LoginEmailChallenge
         }
 
         $expiresAt = $now + $this->normalizeTtlSeconds($ttlSeconds);
-        $sessionState->storeEmailCodeChallenge($pendingUserId, $methodKey, $email, $codeHash, $now, $expiresAt);
+        $this->storeEmailCodeChallenge($pendingUserId, $methodKey, $email, $codeHash, $now, $expiresAt);
 
         return [
             'ok' => true,
@@ -116,11 +131,22 @@ final class LoginEmailChallenge
         ];
     }
 
+    /**
+     * Verifies one submitted email code against the stored pending 2FA challenge.
+     *
+     * Clears the challenge entry on success or expiry. Returns false when no challenge
+     * is active, the challenge has expired, or the submitted code does not match.
+     *
+     * @param int|null $pendingUserId    User id from the pending 2FA session.
+     * @param string $selectedMethodKey  Method key (or email-pool key) chosen by the user.
+     * @param string $submittedCode      Numeric code string submitted via the login form.
+     * @param string $submittedEmail     Email address submitted when using the email pool key.
+     * @return bool True when code matches an unexpired challenge, false otherwise.
+     */
     public function verifySubmittedCode(
         ?int $pendingUserId,
         string $selectedMethodKey,
         string $submittedCode,
-        LoginChallengeState $sessionState,
         string $submittedEmail = ''
     ): bool {
         $pendingUserId = (int) $pendingUserId;
@@ -142,13 +168,13 @@ final class LoginEmailChallenge
             return false;
         }
 
-        $challenge = $sessionState->pendingEmailCodeChallenge($pendingUserId, $selectedMethodKey);
+        $challenge = $this->pendingEmailCodeChallenge($pendingUserId, $selectedMethodKey);
         if (!is_array($challenge)) {
             return false;
         }
 
         if ((int) ($challenge['expires_at'] ?? 0) <= time()) {
-            $sessionState->clearEmailCodeChallenge($selectedMethodKey);
+            $this->clearEmailCodeChallenge($selectedMethodKey);
             return false;
         }
 
@@ -162,8 +188,146 @@ final class LoginEmailChallenge
             return false;
         }
 
-        $sessionState->clearEmailCodeChallenge($selectedMethodKey);
+        $this->clearEmailCodeChallenge($selectedMethodKey);
         return true;
+    }
+
+    /**
+     * Stores one email-code challenge entry in the session for the given method key.
+     *
+     * @param int    $userId    Pending 2FA user id.
+     * @param string $methodKey Derived email method key (not a pool key).
+     * @param string $email     Target email address for this challenge.
+     * @param string $codeHash  bcrypt hash of the generated plaintext code.
+     * @param int    $issuedAt  Unix timestamp when the challenge was generated.
+     * @param int    $expiresAt Unix timestamp when the challenge becomes invalid.
+     */
+    public function storeEmailCodeChallenge(
+        int $userId,
+        string $methodKey,
+        string $email,
+        string $codeHash,
+        int $issuedAt,
+        int $expiresAt
+    ): void {
+        $methodKey = trim($methodKey);
+        $email = strtolower(trim($email));
+        $codeHash = trim($codeHash);
+        if (
+            $userId <= 0
+            || $methodKey === ''
+            || $email === ''
+            || $codeHash === ''
+            || $issuedAt <= 0
+            || $expiresAt <= $issuedAt
+        ) {
+            return;
+        }
+
+        $map = $this->emailChallengeMap();
+        $map[$methodKey] = [
+            'user_id' => $userId,
+            'method_key' => $methodKey,
+            'email' => $email,
+            'code_hash' => $codeHash,
+            'issued_at' => $issuedAt,
+            'expires_at' => $expiresAt,
+        ];
+
+        $_SESSION[self::SESSION_EMAIL_CHALLENGES] = $map;
+    }
+
+    /**
+     * Returns a pending email-code challenge for the given user and method key, or null.
+     *
+     * @param int    $userId    Pending 2FA user id.
+     * @param string $methodKey Derived email method key to look up.
+     * @return array{
+     *   user_id: int,
+     *   method_key: string,
+     *   email: string,
+     *   code_hash: string,
+     *   issued_at: int,
+     *   expires_at: int
+     * }|null
+     */
+    public function pendingEmailCodeChallenge(int $userId, string $methodKey): ?array
+    {
+        $methodKey = trim($methodKey);
+        if ($userId <= 0 || $methodKey === '') {
+            return null;
+        }
+
+        $map = $this->emailChallengeMap();
+        $challenge = $map[$methodKey] ?? null;
+        if (!is_array($challenge)) {
+            return null;
+        }
+
+        $challengeUserId = (int) ($challenge['user_id'] ?? 0);
+        if ($challengeUserId !== $userId) {
+            return null;
+        }
+
+        $email = strtolower(trim((string) ($challenge['email'] ?? '')));
+        $codeHash = trim((string) ($challenge['code_hash'] ?? ''));
+        $issuedAt = (int) ($challenge['issued_at'] ?? 0);
+        $expiresAt = (int) ($challenge['expires_at'] ?? 0);
+        if (
+            $email === ''
+            || $codeHash === ''
+            || $issuedAt <= 0
+            || $expiresAt <= $issuedAt
+        ) {
+            return null;
+        }
+
+        return [
+            'user_id' => $challengeUserId,
+            'method_key' => $methodKey,
+            'email' => $email,
+            'code_hash' => $codeHash,
+            'issued_at' => $issuedAt,
+            'expires_at' => $expiresAt,
+        ];
+    }
+
+    /**
+     * Clears one email-code challenge by method key, or clears all when key is empty.
+     *
+     * @param string $methodKey Specific method key to clear; empty string removes all entries.
+     */
+    public function clearEmailCodeChallenge(string $methodKey = ''): void
+    {
+        $methodKey = trim($methodKey);
+        if ($methodKey === '') {
+            unset($_SESSION[self::SESSION_EMAIL_CHALLENGES]);
+            return;
+        }
+
+        $map = $this->emailChallengeMap();
+        if (!array_key_exists($methodKey, $map)) {
+            return;
+        }
+
+        unset($map[$methodKey]);
+        if ($map === []) {
+            unset($_SESSION[self::SESSION_EMAIL_CHALLENGES]);
+            return;
+        }
+
+        $_SESSION[self::SESSION_EMAIL_CHALLENGES] = $map;
+    }
+
+    /**
+     * Clears all pending email-code challenges from the session regardless of method key.
+     *
+     * Called by AuthService when a 2FA challenge begins or the session is fully cleared,
+     * so stale email challenges from prior challenge rounds cannot survive.
+     */
+    public function clearAllEmailChallenges(): void
+    {
+        unset($_SESSION[self::SESSION_EMAIL_CHALLENGES]);
     }
 
     private function generateCode(): string
@@ -193,7 +357,11 @@ final class LoginEmailChallenge
     }
 
     /**
-     * @param array<string, mixed> $selectedMethod
+     * Resolves a pooled-email-method email target from the submitted address.
+     *
+     * @param array<string, mixed> $selectedMethod Pool email method row containing the allowed addresses list.
+     * @param string $submittedEmail User-submitted address to match against the allow list.
+     * @return string|null Normalized email when found in the allow list, null otherwise.
      */
     private function resolvePooledEmailTarget(array $selectedMethod, string $submittedEmail): ?string
     {
@@ -245,6 +413,10 @@ final class LoginEmailChallenge
 
     /**
      * Builds the pooled login code-method list used by email challenge selection.
+     *
+     * Collapses individual email methods into a single pool entry and recovery methods
+     * into a single recovery pool entry, so the challenge UI can present a simpler choice
+     * instead of exposing raw method keys from the user's preference row.
      *
      * @param array<int, array<string, mixed>> $methods Pending 2FA method rows.
      * @return array<int, array<string, mixed>> Pooled code-method rows.
@@ -306,5 +478,30 @@ final class LoginEmailChallenge
         }
 
         return $pooled;
+    }
+
+    /**
+     * Returns the email-challenge map from the session, normalizing keys and values.
+     *
+     * @return array<string, array<string, mixed>> Keyed by method key.
+     */
+    private function emailChallengeMap(): array
+    {
+        $raw = $_SESSION[self::SESSION_EMAIL_CHALLENGES] ?? null;
+        if (!is_array($raw)) {
+            return [];
+        }
+
+        $map = [];
+        foreach ($raw as $key => $value) {
+            $methodKey = trim((string) $key);
+            if ($methodKey === '' || !is_array($value)) {
+                continue;
+            }
+
+            $map[$methodKey] = $value;
+        }
+
+        return $map;
     }
 }

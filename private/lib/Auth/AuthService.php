@@ -14,15 +14,17 @@ namespace Raven\Lib\Auth;
 use PDO;
 use Raven\Lib\Auth\AuthGroupMembershipService;
 use Raven\Lib\Auth\AuthPayloadCodec;
-use Raven\Lib\Auth\ContactProfileNormalizer;
-use Raven\Lib\Auth\LoginChallengeState;
 use Raven\Lib\Auth\LoginEmailChallenge;
-use Raven\Lib\Auth\LoginThrottleService;
-use Raven\Lib\Auth\PermissionMaskService;
-use Raven\Lib\Auth\UserSecurityProfileService;
-use Raven\Lib\Database\TableNameResolver;
+use Raven\Lib\Auth\TwoFactorMethodKey;
 use Raven\Lib\Auth\TwoFactorMethodNormalizer;
+use Raven\Lib\Auth\TwoFactorMethodRules;
+use Raven\Lib\Database\TableNameResolver;
+use Raven\Lib\Permission\PanelAccess;
+use Raven\Lib\Permission\PermissionMaskService;
 use Raven\Lib\Scribe\AuthProfileScribe;
+use Raven\Lib\Scribe\AuthThrottleScribe;
+use Raven\Lib\Security\RecoveryPhrase;
+use Raven\Lib\Security\Totp;
 use RuntimeException;
 
 /**
@@ -45,14 +47,21 @@ final class AuthService
 
     /** Delight Auth instance. */
     private mixed $auth;
-    private LoginThrottleService $loginThrottle;
+    private AuthThrottleScribe $authThrottleScribe;
     private AuthPayloadCodec $authPayloadCodec;
     private PermissionMaskService $permissionMaskService;
-    private UserSecurityProfileService $securityProfiles;
     private AuthGroupMembershipService $groupMembership;
-    private LoginChallengeState $twoFactorSessionState;
     private LoginEmailChallenge $loginEmailChallenge;
     private AuthProfileScribe $authProfileScribe;
+
+    /** Session key for the pending-challenge user id (set after password auth, before 2FA). */
+    private const SESSION_2FA_PENDING_USER_ID = '_raven_2fa_pending_user_id';
+
+    /** Session key for the pending-challenge method list. */
+    private const SESSION_2FA_PENDING_METHODS = '_raven_2fa_pending_methods';
+
+    /** Session key for the verified user id (set after successful 2FA completion). */
+    private const SESSION_2FA_VERIFIED_USER_ID = '_raven_2fa_verified_user_id';
 
     /**
      * Request-local cache for user preference rows by user id.
@@ -77,12 +86,10 @@ final class AuthService
         $this->rvnDb = $rvnDb;
         $this->driver = $driver;
         $this->prefix = preg_replace('/[^a-zA-Z0-9_]/', '', $prefix) ?? '';
-        $this->loginThrottle = new LoginThrottleService($rvnDb, $driver, $prefix);
-        $this->authPayloadCodec = new AuthPayloadCodec(new ContactProfileNormalizer());
+        $this->authThrottleScribe = new AuthThrottleScribe($rvnDb, $driver, $this->prefix);
+        $this->authPayloadCodec = new AuthPayloadCodec();
         $this->permissionMaskService = new PermissionMaskService($rvnDb, $driver, $prefix);
-        $this->securityProfiles = new UserSecurityProfileService();
         $this->groupMembership = new AuthGroupMembershipService($rvnDb, $driver, $prefix);
-        $this->twoFactorSessionState = new LoginChallengeState();
         $this->loginEmailChallenge = new LoginEmailChallenge();
         $this->authProfileScribe = new AuthProfileScribe($authDb, $driver, $this->prefix);
 
@@ -150,15 +157,53 @@ final class AuthService
     }
 
     /**
-     * Returns true when one username+IP bucket is currently locked.
+     * Returns true when one identifier+IP bucket is currently locked out.
+     *
+     * Prunes expired rows before checking so stale buckets do not block new attempts
+     * after the window has naturally elapsed.
+     *
+     * @param string $username  Login identifier submitted by the user.
+     * @param string $ipAddress Client IP address for the bucket key.
+     * @param int    $windowSeconds Active failure-window length in seconds.
+     * @return bool True when the bucket remains locked for this request.
      */
     public function isLoginTemporarilyLocked(string $username, string $ipAddress, int $windowSeconds): bool
     {
-        return $this->loginThrottle->isTemporarilyLocked($username, $ipAddress, $windowSeconds);
+        $windowSeconds = max(1, $windowSeconds);
+        $this->authThrottleScribe->pruneExpiredRows($windowSeconds, $windowSeconds);
+
+        $bucketHash = $this->throttleBucketHash($username, $ipAddress);
+        $row = $this->throttleLoadRow($bucketHash);
+        if ($row === null) {
+            return false;
+        }
+
+        $now = time();
+        $lockedUntil = (int) ($row['locked_until'] ?? 0);
+        if ($lockedUntil > $now) {
+            return true;
+        }
+
+        // Bucket exists but lock expired; clean it up if the window has also passed.
+        $firstFailedAt = (int) ($row['first_failed'] ?? 0);
+        if ($firstFailedAt === 0 || ($now - $firstFailedAt) > $windowSeconds) {
+            $this->authThrottleScribe->deleteRow($bucketHash);
+        }
+
+        return false;
     }
 
     /**
-     * Records one failed login attempt in persistent storage.
+     * Records one failed login attempt and applies a lockout when threshold is reached.
+     *
+     * Resets the failure window when the previous window has naturally expired before
+     * the new attempt, so isolated bursts do not permanently accumulate against a user.
+     *
+     * @param string $username      Login identifier submitted by the user.
+     * @param string $ipAddress     Client IP address for the bucket key.
+     * @param int    $maxAttempts   Failure threshold before lockout starts.
+     * @param int    $windowSeconds Active failure-window length in seconds.
+     * @param int    $lockSeconds   Lockout duration in seconds after threshold is reached.
      */
     public function recordFailedLoginAttempt(
         string $username,
@@ -167,15 +212,50 @@ final class AuthService
         int $windowSeconds,
         int $lockSeconds
     ): void {
-        $this->loginThrottle->recordFailure($username, $ipAddress, $maxAttempts, $windowSeconds, $lockSeconds);
+        $maxAttempts = max(1, $maxAttempts);
+        $windowSeconds = max(1, $windowSeconds);
+        $lockSeconds = max(1, $lockSeconds);
+        $this->authThrottleScribe->pruneExpiredRows($windowSeconds, $lockSeconds);
+
+        $bucketHash = $this->throttleBucketHash($username, $ipAddress);
+        $existing = $this->throttleLoadRow($bucketHash);
+
+        $now = time();
+        $firstFailedAt = (int) ($existing['first_failed'] ?? 0);
+        $failureCount = (int) ($existing['failure_count'] ?? 0);
+
+        // Reset window when no prior bucket exists or the previous window has expired.
+        if ($firstFailedAt === 0 || ($now - $firstFailedAt) > $windowSeconds) {
+            $firstFailedAt = $now;
+            $failureCount = 0;
+        }
+
+        $failureCount++;
+        $lockedUntil = $failureCount >= $maxAttempts
+            ? ($now + $lockSeconds)
+            : 0;
+
+        $this->authThrottleScribe->upsertRow(
+            $bucketHash,
+            $this->throttleNormalizeIdentifier($username),
+            $this->throttleNormalizeIp($ipAddress),
+            $firstFailedAt,
+            $now,
+            $failureCount,
+            $lockedUntil
+        );
     }
 
     /**
-     * Clears one username+IP failure bucket after successful login.
+     * Clears one identifier+IP failure bucket after a successful login.
+     *
+     * @param string $username  Login identifier submitted by the user.
+     * @param string $ipAddress Client IP address for the bucket key.
      */
     public function clearFailedLoginAttempts(string $username, string $ipAddress): void
     {
-        $this->loginThrottle->clearFailures($username, $ipAddress);
+        $bucketHash = $this->throttleBucketHash($username, $ipAddress);
+        $this->authThrottleScribe->deleteRow($bucketHash);
     }
 
     /**
@@ -205,7 +285,12 @@ final class AuthService
     public function logout(): void
     {
         $this->auth->logOut();
-        $this->twoFactorSessionState->clearAll();
+        unset(
+            $_SESSION[self::SESSION_2FA_PENDING_USER_ID],
+            $_SESSION[self::SESSION_2FA_PENDING_METHODS],
+            $_SESSION[self::SESSION_2FA_VERIFIED_USER_ID]
+        );
+        $this->loginEmailChallenge->clearAllEmailChallenges();
         $this->clearPermissionCaches();
     }
 
@@ -244,46 +329,86 @@ final class AuthService
             return true;
         }
 
-        return $this->twoFactorSessionState->isVerifiedForUser($userId);
+        return (int) ($_SESSION[self::SESSION_2FA_VERIFIED_USER_ID] ?? 0) === $userId;
     }
 
     /**
      * Starts one interactive 2FA challenge after successful password auth.
      *
-     * @param array<int, array<string, mixed>> $methods
+     * Records pending user id and method list in session and clears any prior verified
+     * state and email challenge entries so a fresh challenge must be completed.
+     *
+     * @param int $userId   Authenticated user id awaiting 2FA.
+     * @param array<int, array<string, mixed>> $methods Active 2FA method rows for this user.
      */
     public function beginTwoFactorChallenge(int $userId, array $methods): void
     {
-        $this->twoFactorSessionState->beginChallenge($userId, $methods);
+        if ($userId <= 0) {
+            return;
+        }
+
+        $_SESSION[self::SESSION_2FA_PENDING_USER_ID] = $userId;
+        $_SESSION[self::SESSION_2FA_PENDING_METHODS] = $methods;
+        $this->loginEmailChallenge->clearAllEmailChallenges();
+        unset($_SESSION[self::SESSION_2FA_VERIFIED_USER_ID]);
     }
 
     /**
      * Marks current session as 2FA-verified for one user.
+     *
+     * Clears the pending challenge state and records the verified user id so subsequent
+     * gate checks pass without requiring another challenge in this session.
+     *
+     * @param int $userId User id that completed 2FA successfully.
      */
     public function markTwoFactorVerified(int $userId): void
     {
-        $this->twoFactorSessionState->markVerified($userId);
+        if ($userId <= 0) {
+            return;
+        }
+
+        unset(
+            $_SESSION[self::SESSION_2FA_PENDING_USER_ID],
+            $_SESSION[self::SESSION_2FA_PENDING_METHODS]
+        );
+        $this->loginEmailChallenge->clearAllEmailChallenges();
+        $_SESSION[self::SESSION_2FA_VERIFIED_USER_ID] = $userId;
     }
 
     /**
-     * Returns pending 2FA challenge user id.
+     * Returns the user id from the pending 2FA challenge session, or null when absent.
+     *
+     * @return int|null Pending user id, or null when no challenge is in progress.
      */
     public function pendingTwoFactorUserId(): ?int
     {
-        return $this->twoFactorSessionState->pendingUserId();
+        $pendingUserId = (int) ($_SESSION[self::SESSION_2FA_PENDING_USER_ID] ?? 0);
+        return $pendingUserId > 0 ? $pendingUserId : null;
     }
 
     /**
-     * @return array<int, array<string, mixed>>
+     * Returns the method list from the pending 2FA challenge session.
+     *
+     * @return array<int, array<string, mixed>> Active 2FA method rows, or empty when no challenge is pending.
      */
     public function pendingTwoFactorMethods(): array
     {
-        return $this->twoFactorSessionState->pendingMethods();
+        $raw = $_SESSION[self::SESSION_2FA_PENDING_METHODS] ?? null;
+        return is_array($raw) ? array_values($raw) : [];
     }
 
+    /**
+     * Clears the pending 2FA challenge from the session without marking it verified.
+     *
+     * Used when a login attempt is abandoned or a challenge round needs to be reset.
+     */
     public function clearTwoFactorChallenge(): void
     {
-        $this->twoFactorSessionState->clearChallenge();
+        unset(
+            $_SESSION[self::SESSION_2FA_PENDING_USER_ID],
+            $_SESSION[self::SESSION_2FA_PENDING_METHODS]
+        );
+        $this->loginEmailChallenge->clearAllEmailChallenges();
     }
 
     /**
@@ -301,7 +426,7 @@ final class AuthService
         $methods = is_array($preferences['two_factor'] ?? null)
             ? $preferences['two_factor']
             : [];
-        return $this->securityProfiles->interactiveTwoFactorMethods($methods, (string) ($preferences['email'] ?? ''));
+        return $this->interactiveTwoFactorMethods($methods, (string) ($preferences['email'] ?? ''));
     }
 
     /**
@@ -321,7 +446,6 @@ final class AuthService
             $this->pendingTwoFactorUserId(),
             $this->pendingTwoFactorMethods(),
             $selectedMethodKey,
-            $this->twoFactorSessionState,
             600,
             $submittedEmail
         );
@@ -329,7 +453,7 @@ final class AuthService
 
     public function clearPendingEmailCodeChallenge(string $selectedMethodKey = ''): void
     {
-        $this->twoFactorSessionState->clearEmailCodeChallenge($selectedMethodKey);
+        $this->loginEmailChallenge->clearEmailCodeChallenge($selectedMethodKey);
     }
 
     /**
@@ -351,7 +475,7 @@ final class AuthService
             ? $preferences['two_factor']
             : [];
 
-        return $this->securityProfiles->verifyTotpCode($methods, $submittedCode, 'Raven CMS');
+        return $this->verifyTotpCode($methods, $submittedCode, 'Raven CMS');
     }
 
     /**
@@ -374,7 +498,7 @@ final class AuthService
         $methods = is_array($preferences['two_factor'] ?? null)
             ? array_values($preferences['two_factor'])
             : [];
-        $matched = $this->securityProfiles->matchRecoveryMethod($methods, $submittedPhrase, $selectedMethodKey);
+        $matched = $this->matchRecoveryMethod($methods, $submittedPhrase, $selectedMethodKey);
         if (!is_array($matched)) {
             return false;
         }
@@ -406,7 +530,6 @@ final class AuthService
             $this->pendingTwoFactorUserId(),
             $selectedMethodKey,
             $submittedCode,
-            $this->twoFactorSessionState,
             $submittedEmail
         );
     }
@@ -442,7 +565,7 @@ final class AuthService
         $methods = is_array($preferences['two_factor'] ?? null)
             ? $preferences['two_factor']
             : [];
-        $mutation = $this->securityProfiles->withUpdatedWebauthnSignatureCounter(
+        $mutation = $this->withUpdatedWebauthnSignatureCounter(
             $methods,
             $credentialId,
             $signatureCounter
@@ -534,10 +657,7 @@ final class AuthService
             return null;
         }
 
-        $result = $this->securityProfiles->decodeUserPreferencesRow(
-            is_array($row) ? $row : [],
-            $this->authPayloadCodec
-        );
+        $result = $this->decodeUserPreferencesRow(is_array($row) ? $row : []);
 
         if ($userId > 0) {
             $this->userPreferencesCache[$userId] = $result;
@@ -568,7 +688,7 @@ final class AuthService
      */
     public function updateUserPreferences(int $userId, array $payload): array
     {
-        $normalized = $this->securityProfiles->normalizePreferenceUpdatePayload($payload, $this->authPayloadCodec);
+        $normalized = $this->normalizePreferenceUpdatePayload($payload);
         $username = (string) ($normalized['username'] ?? '');
         $displayName = (string) ($normalized['display_name'] ?? '');
         $email = (string) ($normalized['email'] ?? '');
@@ -582,7 +702,7 @@ final class AuthService
         $avatarPath = $normalized['avatar_path'] ?? null;
         $coverImage = $normalized['cover_image'] ?? null;
 
-        $errors = $this->securityProfiles->validatePreferenceUpdate(
+        $errors = $this->validatePreferenceUpdate(
             $email,
             is_string($password) ? $password : null,
             $username !== '' && $this->usernameExistsForOtherUser($userId, $username),
@@ -945,6 +1065,457 @@ final class AuthService
     private function authTable(string $base): string
     {
         return TableNameResolver::authTable($this->driver, $this->prefix, $base);
+    }
+
+    /**
+     * Loads one throttle bucket row by its pre-computed hash.
+     *
+     * @param string $bucketHash SHA-256 bucket key.
+     * @return array{first_failed: int|string, failure_count: int|string, locked_until: int|string}|null
+     */
+    private function throttleLoadRow(string $bucketHash): ?array
+    {
+        $stmt = $this->rvnDb->prepare(
+            'SELECT first_failed, failure_count, locked_until
+             FROM ' . $this->prefix . 'auth_failures
+             WHERE bucket_hash = :bucket_hash
+             LIMIT 1'
+        );
+        $stmt->execute([':bucket_hash' => $bucketHash]);
+        $row = $stmt->fetch();
+
+        return is_array($row) ? $row : null;
+    }
+
+    /**
+     * Normalizes a login identifier for bucket keying.
+     *
+     * @param string $identifier Raw login identifier from the form.
+     * @return string Lowercase, trimmed, 100-character-max identifier.
+     */
+    private function throttleNormalizeIdentifier(string $identifier): string
+    {
+        $normalized = substr(strtolower(trim($identifier)), 0, 100);
+        return $normalized === '' ? 'unknown' : $normalized;
+    }
+
+    /**
+     * Normalizes a client IP address for bucket keying.
+     *
+     * @param string $ipAddress Raw IP address string.
+     * @return string Validated IP (max 64 chars), or 'unknown' when invalid.
+     */
+    private function throttleNormalizeIp(string $ipAddress): string
+    {
+        $candidate = trim($ipAddress);
+        return ($candidate !== '' && filter_var($candidate, FILTER_VALIDATE_IP) !== false)
+            ? substr($candidate, 0, 64)
+            : 'unknown';
+    }
+
+    /**
+     * Returns a SHA-256 bucket hash for one identifier+IP pair.
+     *
+     * @param string $identifier Raw login identifier.
+     * @param string $ipAddress  Raw client IP address.
+     * @return string Hex-encoded SHA-256 hash used as the bucket key.
+     */
+    private function throttleBucketHash(string $identifier, string $ipAddress): string
+    {
+        return hash(
+            'sha256',
+            $this->throttleNormalizeIdentifier($identifier) . '|' . $this->throttleNormalizeIp($ipAddress)
+        );
+    }
+
+    /**
+     * Decodes one raw user preferences row from the DB into the typed preferences array.
+     *
+     * Delegates contact profile and 2FA method JSON decoding to the payload codec.
+     *
+     * @param array<string, mixed> $row Raw DB row from the users table.
+     * @return array{
+     *   id: int,
+     *   username: string,
+     *   string: string,
+     *   name: string,
+     *   email: string,
+     *   bio: string,
+     *   theme: string,
+     *   timezone: string,
+     *   avatar: string|null,
+     *   cover_image: string|null,
+     *   contact: array<int, array{type: string, value: string}>,
+     *   two_factor: array<int, array<string, mixed>>
+     * }
+     */
+    private function decodeUserPreferencesRow(array $row): array
+    {
+        return [
+            'id' => (int) ($row['id'] ?? 0),
+            'username' => (string) ($row['username'] ?? ''),
+            'string' => (string) ($row['string'] ?? ''),
+            'name' => (string) ($row['name'] ?? ''),
+            'email' => (string) ($row['email'] ?? ''),
+            'bio' => (string) ($row['bio'] ?? ''),
+            'theme' => (string) (($row['theme'] ?? '') !== '' ? $row['theme'] : 'default'),
+            // Empty string means "inherit from site/server default"; never default to UTC.
+            'timezone' => (string) ($row['timezone'] ?? ''),
+            'avatar' => isset($row['avatar']) && $row['avatar'] !== ''
+                ? (string) $row['avatar']
+                : null,
+            'cover_image' => isset($row['cover_image']) && $row['cover_image'] !== ''
+                ? (string) $row['cover_image']
+                : null,
+            'contact' => $this->authPayloadCodec->decodeContactProfiles($row['contact'] ?? null),
+            'two_factor' => $this->authPayloadCodec->decodeTwoFactorMethods($row['two_factor'] ?? null),
+        ];
+    }
+
+    /**
+     * Normalizes and encodes a raw preference update payload for persistence.
+     *
+     * Trims all string fields, normalizes contact profiles and 2FA methods through the
+     * codec, and returns a payload array ready for the scribe writer.
+     *
+     * @param array{
+     *   username: string,
+     *   display_name: string,
+     *   email: string,
+     *   bio?: string,
+     *   theme: string,
+     *   timezone?: string,
+     *   password: string|null,
+     *   contact_profiles?: array<int, array{type: string, value: string}>,
+     *   two_factor_methods?: array<int, array<string, mixed>>,
+     *   set_avatar: bool,
+     *   avatar_path: string|null,
+     *   cover_image?: string|null
+     * } $payload
+     * @return array{
+     *   username: string,
+     *   display_name: string,
+     *   email: string,
+     *   bio: string,
+     *   theme: string,
+     *   timezone: string,
+     *   password: string|null,
+     *   contact_profiles: array<int, array{type: string, value: string}>,
+     *   contact_profiles_encoded: ?string,
+     *   two_factor_methods: array<int, array<string, mixed>>,
+     *   two_factor_methods_encoded: ?string,
+     *   set_avatar: bool,
+     *   avatar_path: string|null,
+     *   cover_image: string|null
+     * }
+     */
+    private function normalizePreferenceUpdatePayload(array $payload): array
+    {
+        $contactProfiles = $this->authPayloadCodec->normalizeContactProfiles((array) ($payload['contact_profiles'] ?? []));
+        $twoFactorMethods = TwoFactorMethodNormalizer::normalizeStored((array) ($payload['two_factor_methods'] ?? []));
+
+        return [
+            'username' => trim((string) ($payload['username'] ?? '')),
+            'display_name' => trim((string) ($payload['display_name'] ?? '')),
+            'email' => trim((string) ($payload['email'] ?? '')),
+            'bio' => trim((string) ($payload['bio'] ?? '')),
+            'theme' => trim((string) ($payload['theme'] ?? 'default')),
+            // Empty string is valid and means "inherit from site/server default".
+            'timezone' => trim((string) ($payload['timezone'] ?? '')),
+            'password' => $payload['password'] ?? null,
+            'contact_profiles' => $contactProfiles,
+            'contact_profiles_encoded' => $this->authPayloadCodec->encodeContactProfiles($contactProfiles),
+            'two_factor_methods' => $twoFactorMethods,
+            'two_factor_methods_encoded' => $this->authPayloadCodec->encodeTwoFactorMethods($twoFactorMethods),
+            'set_avatar' => (bool) ($payload['set_avatar'] ?? false),
+            'avatar_path' => $payload['avatar_path'] ?? null,
+            'cover_image' => is_string($payload['cover_image'] ?? null)
+                ? trim((string) $payload['cover_image'])
+                : null,
+        ];
+    }
+
+    /**
+     * Filters a raw 2FA method list down to only interactive (challengeable) methods.
+     *
+     * Validates each method's status, secret/credential completeness, and type before
+     * including it. Appends a fallback email entry when the account email is provided
+     * and no explicit email method has been configured.
+     *
+     * @param array<int, array<string, mixed>> $methods Raw 2FA method rows from the user preferences row.
+     * @param string $fallbackEmail Account email address used when an email method omits its own address.
+     * @return array<int, array<string, mixed>> Interactive method rows with normalized keys and labels.
+     */
+    private function interactiveTwoFactorMethods(array $methods, string $fallbackEmail = ''): array
+    {
+        $interactive = [];
+        $fallbackEmail = strtolower(trim($fallbackEmail));
+        if ($fallbackEmail === '' || filter_var($fallbackEmail, FILTER_VALIDATE_EMAIL) === false) {
+            $fallbackEmail = '';
+        }
+
+        foreach ($methods as $method) {
+            if (!is_array($method)) {
+                continue;
+            }
+
+            $type = TwoFactorMethodRules::normalizeType((string) ($method['type'] ?? ''));
+            $status = TwoFactorMethodRules::normalizeStatus((string) ($method['status'] ?? ''), $type);
+            if ($type === 'totp') {
+                if ($status !== 'confirmed') {
+                    continue;
+                }
+
+                $secret = Totp::normalizeSecret((string) ($method['secret'] ?? ''));
+                if (!Totp::isValidSecret($secret)) {
+                    continue;
+                }
+
+                $interactive[] = [
+                    'type' => 'totp',
+                    'key' => TwoFactorMethodKey::forTotpSecret($secret),
+                    'label' => TwoFactorMethodRules::normalizeLabel((string) ($method['label'] ?? ''), 'totp'),
+                ];
+                continue;
+            }
+
+            if ($type === 'recovery') {
+                if ($status !== 'confirmed') {
+                    continue;
+                }
+
+                $recoveryHash = trim((string) ($method['recovery_hash'] ?? ''));
+                if (!RecoveryPhrase::isValidHash($recoveryHash)) {
+                    continue;
+                }
+
+                $interactive[] = [
+                    'type' => 'recovery',
+                    'key' => TwoFactorMethodKey::forRecoveryHash($recoveryHash),
+                    'label' => (bool) ($method['reusable'] ?? false)
+                        ? 'Recovery Phrase (Reusable)'
+                        : 'Recovery Phrase',
+                ];
+                continue;
+            }
+
+            if ($type === 'webauthn') {
+                if ($status !== 'confirmed') {
+                    continue;
+                }
+
+                $credentialId = trim((string) ($method['credential_id'] ?? ''));
+                $credentialPublicKey = trim((string) ($method['credential_public_key'] ?? ''));
+                if ($credentialId === '' || $credentialPublicKey === '') {
+                    continue;
+                }
+
+                $requireUv = (bool) ($method['require_uv'] ?? false);
+
+                $interactive[] = [
+                    'type' => 'webauthn',
+                    'key' => TwoFactorMethodKey::forWebauthnCredentialId($credentialId),
+                    'label' => TwoFactorMethodRules::normalizeLabel((string) ($method['label'] ?? ''), 'webauthn'),
+                    'credential_id' => $credentialId,
+                    'require_uv' => $requireUv,
+                ];
+                continue;
+            }
+
+            if ($type === 'email') {
+                $email = strtolower(trim((string) ($method['email'] ?? '')));
+                if ($email === '' && $fallbackEmail !== '') {
+                    $email = $fallbackEmail;
+                }
+
+                if ($email === '' || filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
+                    continue;
+                }
+
+                $interactive[] = [
+                    'type' => 'email',
+                    'key' => TwoFactorMethodKey::forEmailAddress($email),
+                    'label' => TwoFactorMethodRules::normalizeLabel((string) ($method['label'] ?? ''), 'email'),
+                    'email' => $email,
+                ];
+            }
+        }
+
+        return $interactive;
+    }
+
+    /**
+     * Verifies one submitted TOTP code against all confirmed TOTP methods for a user.
+     *
+     * Iterates all TOTP rows and returns true on the first match; the 1-step clock
+     * tolerance accounts for slight submission lag without opening large replay windows.
+     *
+     * @param array<int, array<string, mixed>> $methods 2FA method rows from the user preferences row.
+     * @param string $submittedCode Six-digit TOTP code submitted via the login form.
+     * @param string $issuer TOTP issuer label used when verifying the code window.
+     * @return bool True when any confirmed TOTP method verifies the submitted code.
+     */
+    private function verifyTotpCode(array $methods, string $submittedCode, string $issuer = 'Raven CMS'): bool
+    {
+        $submittedCode = Totp::normalizeCode($submittedCode);
+        if (!Totp::isValidCode($submittedCode)) {
+            return false;
+        }
+
+        foreach ($methods as $method) {
+            if (!is_array($method)) {
+                continue;
+            }
+
+            $type = TwoFactorMethodRules::normalizeType((string) ($method['type'] ?? ''));
+            $status = TwoFactorMethodRules::normalizeStatus((string) ($method['status'] ?? ''), $type);
+            $secret = Totp::normalizeSecret((string) ($method['secret'] ?? ''));
+            if ($type !== 'totp' || $status !== 'confirmed' || !Totp::isValidSecret($secret)) {
+                continue;
+            }
+
+            if (Totp::verifyCode($secret, $submittedCode, 1, $issuer)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Matches one submitted recovery phrase against all confirmed recovery methods.
+     *
+     * When a specific method key is provided (not a pool key), only that single method
+     * is checked. Returns the method index and reusable flag on match so the caller can
+     * decide whether to remove the entry after use.
+     *
+     * @param array<int, array<string, mixed>> $methods 2FA method rows from the user preferences row.
+     * @param string $submittedPhrase Recovery phrase submitted via the login form.
+     * @param string $selectedMethodKey Specific method key to check, or recovery pool key to check all.
+     * @return array{index: int, reusable: bool}|null Match result, or null when no recovery method matched.
+     */
+    private function matchRecoveryMethod(array $methods, string $submittedPhrase, string $selectedMethodKey = ''): ?array
+    {
+        $normalizedSubmittedPhrase = RecoveryPhrase::normalize($submittedPhrase);
+        if (!RecoveryPhrase::isValid($normalizedSubmittedPhrase, 12)) {
+            return null;
+        }
+
+        $selectedMethodKey = trim($selectedMethodKey);
+
+        foreach ($methods as $index => $method) {
+            if (!is_array($method)) {
+                continue;
+            }
+
+            $type = TwoFactorMethodRules::normalizeType((string) ($method['type'] ?? ''));
+            $status = TwoFactorMethodRules::normalizeStatus((string) ($method['status'] ?? ''), $type);
+            if ($type !== 'recovery' || $status !== 'confirmed') {
+                continue;
+            }
+
+            $recoveryHash = trim((string) ($method['recovery_hash'] ?? ''));
+            if (!RecoveryPhrase::isValidHash($recoveryHash)) {
+                continue;
+            }
+
+            // Skip methods whose derived key does not match the selected key (unless using pool key).
+            if (
+                $selectedMethodKey !== ''
+                && !TwoFactorMethodKey::isRecoveryPool($selectedMethodKey)
+                && $selectedMethodKey !== TwoFactorMethodKey::forRecoveryHash($recoveryHash)
+            ) {
+                continue;
+            }
+
+            if (!RecoveryPhrase::verify($normalizedSubmittedPhrase, $recoveryHash, 12)) {
+                continue;
+            }
+
+            return [
+                'index' => (int) $index,
+                'reusable' => (bool) ($method['reusable'] ?? false),
+            ];
+        }
+
+        return null;
+    }
+
+    /**
+     * Returns an updated method list with the WebAuthn signature counter incremented.
+     *
+     * WebAuthn authenticators increment their signature counter on each assertion;
+     * storing the new value detects authenticator cloning on future assertions.
+     *
+     * @param array<int, array<string, mixed>> $methods Current 2FA method rows.
+     * @param string $credentialId WebAuthn credential id whose counter to update.
+     * @param int    $signatureCounter New signature counter value from the assertion response.
+     * @return array{methods: array<int, array<string, mixed>>, updated: bool}
+     */
+    private function withUpdatedWebauthnSignatureCounter(array $methods, string $credentialId, int $signatureCounter): array
+    {
+        if ($credentialId === '' || $signatureCounter < 0) {
+            return [
+                'methods' => array_values($methods),
+                'updated' => false,
+            ];
+        }
+
+        $updated = false;
+        foreach ($methods as $index => $method) {
+            if (!is_array($method)) {
+                continue;
+            }
+
+            if (
+                strtolower(trim((string) ($method['type'] ?? ''))) === 'webauthn'
+                && trim((string) ($method['credential_id'] ?? '')) === $credentialId
+            ) {
+                $methods[$index]['signature_counter'] = $signatureCounter;
+                $updated = true;
+                break;
+            }
+        }
+
+        return [
+            'methods' => array_values($methods),
+            'updated' => $updated,
+        ];
+    }
+
+    /**
+     * Validates preference update fields and returns an error list.
+     *
+     * @param string  $email         Proposed new email address.
+     * @param ?string $password      Proposed new password, or null to keep the existing one.
+     * @param bool    $usernameTaken Whether another user already holds the proposed username.
+     * @param bool    $emailTaken    Whether another user already holds the proposed email.
+     * @return array<int, string> Validation error messages; empty on success.
+     */
+    private function validatePreferenceUpdate(
+        string $email,
+        ?string $password,
+        bool $usernameTaken,
+        bool $emailTaken
+    ): array {
+        $errors = [];
+        if ($email === '') {
+            $errors[] = 'Email is required.';
+        }
+
+        if ($password !== null && $password !== '' && strlen($password) < 8) {
+            $errors[] = 'Password must be at least 8 characters.';
+        }
+
+        if ($usernameTaken) {
+            $errors[] = 'Username is already in use.';
+        }
+
+        if ($emailTaken) {
+            $errors[] = 'Email is already in use.';
+        }
+
+        return $errors;
     }
 
     /**

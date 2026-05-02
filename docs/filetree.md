@@ -157,19 +157,36 @@ This file is the fast system map for Raven CMS. Use it to quickly understand the
 ### private/lib/
 
 - `private/lib/Auth/`
-  - All auth and permission machinery for both core and extensions.
-  - Includes `AuthService` (delight-im wrapper + auth/session/read facade), login/2FA flow services, group role policy, and user/session helpers. Existing-account auth-user writes now route through `lib/Scribe/AuthProfileScribe.php`.
-  - Thin auth micro-services `AuthAccessGateService` and `AuthIdentityLookupService` were folded into `AuthService`; permission-gate checks now call `PanelAccess` directly and identity lookup helpers remain private to `AuthService`.
-  - `AuthGroupMembershipService` and `PermissionMaskService` remain as intentional cache-bearing boundaries for membership queries and permission-mask composition.
-  - Shared 2FA method primitives now also live here: `TwoFactorMethodKey`, `TwoFactorMethodNormalizer`, and `TwoFactorMethodRules`.
-  - Panel ACL primitives now also live at the auth root: `PanelAccess` (permission bit constants), `AccessCatalog`, `PermissionDefinitionCatalog`, and `SessionGuard`.
-  - Legacy compatibility aliases remain for extension-safe imports: `PanelAccessCatalog` -> `AccessCatalog`, `PanelPermissionDefinitionCatalog` -> `PermissionDefinitionCatalog`, and `PanelSessionGuard` -> `SessionGuard`.
+  - Route-agnostic auth machinery shared by both public and panel entrypoints.
+  - `AuthService` — central auth facade: Delight Auth wrapper, login/logout, 2FA session lifecycle, permission-mask queries, and user preference reads/writes. Several former single-caller wrapper classes (`LoginChallengeState`, `LoginThrottleService`, `UserSecurityProfileService`) have been folded directly into `AuthService` to eliminate pass-through layers. Auth-user profile writes route through `lib/Scribe/AuthProfileScribe.php`; throttle bucket writes route through `lib/Scribe/AuthThrottleScribe.php`.
+  - `AuthGroupMembershipService` — request-local cache for group membership queries; intentional cache-bearing boundary kept separate from `AuthService`.
+  - `AuthPayloadCodec` — JSON encode/decode for user contact-profile and 2FA-method columns, including TOTP secret encryption at rest. Contact-profile normalization is handled internally (no injected normalizer).
+  - `LoginAttemptWorkflowService` — shared password-auth workflow for panel and public login entrypoints; delegates throttle reads/writes to `AuthService`.
+  - `LoginAttemptPolicy` — throttle config reads (`maxAttempts`, `windowSeconds`, `lockSeconds`) and client IP normalization; used by both `LoginAttemptWorkflowService` and `Public\AuthController` registration throttling.
+  - `LoginChallengeFlow` — 2FA method selection, preferred-method resolution, and flow orchestration helpers.
+  - `LoginChallengeWorkflowService` — shared 2FA challenge submit/verify workflow for panel and public challenge screens.
+  - `LoginEmailChallenge` — email-code challenge issue and verification; owns its own session storage for pending email challenges.
+  - `LoginEmailDelivery` — dispatches email-code challenge emails.
+  - `LoginIdentifierResolver` — username/email identifier mode detection and normalization.
+  - `LoginUiStateService` — session-backed login UI state (selected method key, 2FA state).
+  - `LoginWebAuthnChallengeService` — WebAuthn challenge generation and assertion verification.
+  - `PasswordChangePolicy` — password-change validation rules.
   - `Auth/Public/` — public-route-only auth helpers.
-  - Login-time 2FA orchestration now hangs off `LoginChallengeFlow`, `LoginChallengeState`, `LoginEmailChallenge`, `LoginEmailDelivery`, `LoginWebAuthnChallengeService`, and `TwoFactorPreferences` instead of the older panel-prefixed/service-fragment names.
+  - Shared 2FA method primitives: `TwoFactorMethodKey`, `TwoFactorMethodNormalizer`, `TwoFactorMethodRules` — static utility classes for method key derivation, stored-payload normalization, and type/status rule enforcement.
   - `SessionFlash.php` — session-backed flash message store; used by both panel and public routes.
   - `SessionCookie.php` — session cookie configuration policy; applied at bootstrap.
   - `SessionToken.php` — default CSRF token storage implementation used by `Security/Csrf`.
-  - Note: `sys/Auth/` may be re-introduced later as a lean internal-only auth package; for now everything lives here.
+- `private/lib/Permission/`
+  - Panel permission constants, bitmask computation, and group role policy. Kept separate from `lib/Auth/` because panel and public routes have distinct permission sets and `lib/Auth/` must remain route-agnostic.
+  - `PanelAccess` — panel permission bit constants (`PANEL_LOGIN`, `MANAGE_CONTENT`, etc.) and static capability helpers (`canLoginPanel`, `canManageUsers`, etc.).
+  - `AccessCatalog` — maps route keys to permission bit arrays; provides seed data for stock group permission defaults.
+  - `PermissionDefinitionCatalog` — builds permission definition rows for the group-edit UI from stock and extension sources.
+  - `PermissionMaskService` — computes the combined permission bitmask for a user from their group memberships; request-local cache keyed by user id.
+  - `GroupRolePolicy` — stock group role slug normalization and permission-mask constraint enforcement; lives here (not `lib/Auth/`) because it is tightly coupled to `PanelAccess` constants.
+- `private/lib/Panel/`
+  - Panel-specific session and preference helpers that must remain at lib level (not in `sys/Controller/Panel/`) because `lib/Extension/Panel/PanelRouteRegistrar` also imports them, and lib must not depend on sys.
+  - `SessionGuard` — panel login gate: requires panel login, syncs panel identity in session, detects guest login entry requests.
+  - `TwoFactorPreferences` — panel 2FA preferences form helpers: method type options, submitted-method normalization, TOTP setup payload, recovery phrase generation, WebAuthn credential exclusion list.
 - `private/lib/Parser/`
   - Canonical read-only parsing and normalization helpers for routing, config, metadata, and filesystem-backed records.
   - Content-type parsers are split into `*RouteParser` / `*DataParser` pairs: `*RouteParser` classes hold config-backed routing policy as static methods (taking `Config` and/or `InputSanitizer`); `*DataParser` classes hold repository-backed reads as instance methods with optional repository injection.
@@ -197,7 +214,7 @@ This file is the fast system map for Raven CMS. Use it to quickly understand the
   - `GroupScribe` owns group mutation rules: stock-role save policy, custom group id allocation, image filename writes, and guarded non-stock delete behavior. `GroupRead` keeps the read/list/public-route queries; `GroupWrite` owns the write paths.
   - `UserScribe` owns auth/app user writes: create/update/delete persistence, user-string generation, uniqueness checks, and transactional user-group membership replacement. `UserRead` is the sole SQL surface for user reads, panel list queries, routing data, and group-membership catalog queries; `UserWrite` owns all mutation paths.
   - `AuthProfileScribe` owns auth-user profile/security writes for existing accounts: current-user preference updates, password changes, avatar/cover references, and stored 2FA payload persistence. `AuthService` keeps the login/session/read facade above it.
-  - `AuthThrottleScribe` owns auth-throttle bucket writes for the `auth_failures` table: bucket upserts, explicit clears, and stale-row pruning. `LoginThrottleService` keeps the read-side bucket lookup and lockout policy above it.
+  - `AuthThrottleScribe` owns auth-throttle bucket writes for the `auth_failures` table: bucket upserts, explicit clears, and stale-row pruning. `AuthService` owns the read-side bucket lookup and lockout policy above it.
   - `StateWrite` owns filesystem writes for `private/dat/ext/.state.php`: extension-state normalization, serialization, state-directory creation, and schema-marker invalidation when enablement changes. `StateRead` keeps the read-side state loading helpers above it.
   - `UserMediaScribe` owns user avatar/cover filesystem writes: deterministic filename generation, sanitized upload storage, and stored-file cleanup for panel-managed account media. `UserController` and `PreferencesController` keep URL/template reads on `Media/Panel/UserMediaPathService` while routing avatar/cover mutations through the canonical scribe seam.
   - `InviteScribe` owns invite-token generation plus insert/consume/delete writes for the `auth_invites` table; it now takes `InviteWrite` (which exposes `generateNormalizedToken`/`formatDisplayToken` as delegates to `InviteRead`).

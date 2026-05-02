@@ -12,7 +12,7 @@ declare(strict_types=1);
 namespace Raven\Lib\Scribe;
 
 use PDO;
-use Raven\Lib\Auth\GroupRolePolicy;
+use Raven\Lib\Permission\GroupRolePolicy;
 use Raven\Lib\Database\TableNameResolver;
 use RuntimeException;
 

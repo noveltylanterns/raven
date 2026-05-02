@@ -2,24 +2,35 @@
 
 /**
  * RAVEN CMS
- * ~/private/lib/Auth/SessionGuard.php
- * Shared panel login gate and session-identity synchronizer.
+ * ~/private/lib/Panel/SessionGuard.php
+ * Panel login gate and session-identity synchronizer.
  * Docs: https://raven.lanterns.io
  */
 
 declare(strict_types=1);
 
-namespace Raven\Lib\Auth;
+namespace Raven\Lib\Panel;
 
+use Raven\Lib\Auth\AuthService;
 use Raven\Lib\Transport\Redirect;
 
 /**
- * Shared panel-login guard and session identity synchronization helper.
+ * Panel login gate and session identity synchronization helper.
+ * Used by Panel\SharedController and lib/Extension/Panel/PanelRouteRegistrar;
+ * lives in lib/Panel/ so both can import it without crossing the lib→sys boundary.
  */
 final class SessionGuard
 {
     /**
-     * @param callable(): void $renderPublicNotFound
+     * Enforces panel login, panel-access permission, and 2FA verification, then syncs session identity.
+     * Redirects to the login or 2FA URL, or renders a public 404, based on the request state.
+     *
+     * @param AuthService    $auth                    Shared auth service.
+     * @param bool           $isGuestLoginEntryRequest True when the request path is a login/2fa entry page (should redirect rather than 404).
+     * @param string         $loginUrl                Absolute URL of the panel login page.
+     * @param string         $twoFactorUrl            Absolute URL of the panel 2FA challenge page.
+     * @param callable(): void $renderPublicNotFound  Callback that renders the public 404 and exits.
+     * @return void
      */
     public function requirePanelLogin(
         AuthService $auth,
@@ -66,7 +77,12 @@ final class SessionGuard
     }
 
     /**
-     * @param array<string, mixed> $server
+     * Returns true when the request path is a guest-accessible panel login entry point.
+     * Used to decide whether to redirect (guest entry) or 404 (non-entry) when access is denied.
+     *
+     * @param array<string, mixed> $server     $_SERVER superglobal.
+     * @param string               $panelPath  Configured panel path prefix (e.g. '/panel').
+     * @return bool True when the request is for the panel root, /login, or /login/2fa.
      */
     public function isGuestLoginEntryRequest(array $server, string $panelPath): bool
     {
@@ -97,6 +113,13 @@ final class SessionGuard
         return in_array($requestPath, $allowedPaths, true);
     }
 
+    /**
+     * Writes or clears the panel identity and capability flags in the session.
+     * Called after every successful panel login gate check to keep session data current.
+     *
+     * @param AuthService $auth Shared auth service.
+     * @return void
+     */
     public function syncPanelIdentityInSession(AuthService $auth): void
     {
         $userId = $auth->userId();
@@ -134,7 +157,9 @@ final class SessionGuard
     }
 
     /**
-     * @param mixed $raw
+     * Normalizes panel identity data from the session cache.
+     *
+     * @param mixed $raw Raw value of $_SESSION['rvn-panel-identity'].
      * @return array{display_name: string, username: string, email: string}
      */
     public function panelIdentityFromSession(mixed $raw): array

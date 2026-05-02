@@ -2,17 +2,17 @@
 
 /**
  * RAVEN CMS
- * ~/private/lib/Auth/AccessCatalog.php
- * Stock panel permission-route/group catalog definitions.
+ * ~/private/lib/Permission/AccessCatalog.php
+ * Stock panel permission-route and group catalog definitions.
  * Docs: https://raven.lanterns.io
  */
 
 declare(strict_types=1);
 
-namespace Raven\Lib\Auth;
+namespace Raven\Lib\Permission;
 
 /**
- * Holds stock panel permission-route/group catalog definitions.
+ * Stock panel permission-route map and group seed definitions.
  */
 final class AccessCatalog
 {
@@ -25,6 +25,8 @@ final class AccessCatalog
     private static ?array $allStockPanelBitsCache = null;
 
     /**
+     * Returns the full stock panel route permission map, keyed by route key.
+     *
      * @return array<string, array{label: string, view: int, create?: int, edit?: int, delete?: int, uninstall?: int}>
      */
     public static function stockPanelRoutePermissions(): array
@@ -128,6 +130,9 @@ final class AccessCatalog
     }
 
     /**
+     * Returns the stock permission row for one route key, or null when not found.
+     *
+     * @param string $routeKey Lowercase panel route key (e.g. 'page', 'user').
      * @return array{label: string, view: int, create?: int, edit?: int, delete?: int, uninstall?: int}|null
      */
     public static function stockPanelRoutePermission(string $routeKey): ?array
@@ -138,6 +143,8 @@ final class AccessCatalog
     }
 
     /**
+     * Returns a flat list of every individual stock panel route-level permission bit.
+     *
      * @return array<int, int>
      */
     public static function allStockPanelBits(): array
@@ -161,6 +168,8 @@ final class AccessCatalog
     }
 
     /**
+     * Returns page-route permission bits.
+     *
      * @return array<int, int>
      */
     public static function contentPanelBits(): array
@@ -169,6 +178,8 @@ final class AccessCatalog
     }
 
     /**
+     * Returns taxonomy-route permission bits (channel, category, tag, redirect, routing).
+     *
      * @return array<int, int>
      */
     public static function taxonomyPanelBits(): array
@@ -177,6 +188,8 @@ final class AccessCatalog
     }
 
     /**
+     * Returns user-route permission bits.
+     *
      * @return array<int, int>
      */
     public static function usersPanelBits(): array
@@ -185,6 +198,8 @@ final class AccessCatalog
     }
 
     /**
+     * Returns group-route permission bits.
+     *
      * @return array<int, int>
      */
     public static function groupsPanelBits(): array
@@ -193,6 +208,8 @@ final class AccessCatalog
     }
 
     /**
+     * Returns system-route permission bits (configuration, themes, extensions, plus MANAGE_CONFIGURATION).
+     *
      * @return array<int, int>
      */
     public static function systemPanelBits(): array
@@ -204,11 +221,13 @@ final class AccessCatalog
     }
 
     /**
+     * Returns the stock group seed rows used during schema installation.
+     *
      * @return array<int, array{name: string, slug: string, permissions: int, is_stock: int}>
      */
     public static function stockGroups(): array
     {
-        $allStockPanelBitsMask = self::maskFromBits(self::allStockPanelBits());
+        $allStockPanelBitsMask = PanelAccess::maskFromBits(self::allStockPanelBits());
 
         return [
             [
@@ -254,6 +273,9 @@ final class AccessCatalog
     }
 
     /**
+     * Returns the permission bits for a single route key.
+     *
+     * @param string $route Lowercase panel route key.
      * @return array<int, int>
      */
     private static function routeBits(string $route): array
@@ -275,7 +297,9 @@ final class AccessCatalog
     }
 
     /**
-     * @param array<int, string> $routes
+     * Returns the merged permission bits for a list of route keys.
+     *
+     * @param array<int, string> $routes Lowercase panel route keys.
      * @return array<int, int>
      */
     private static function routesBits(array $routes): array
@@ -286,18 +310,5 @@ final class AccessCatalog
         }
 
         return $bits;
-    }
-
-    /**
-     * @param array<int, int> $bits
-     */
-    private static function maskFromBits(array $bits): int
-    {
-        $mask = 0;
-        foreach ($bits as $bit) {
-            $mask |= (int) $bit;
-        }
-
-        return $mask;
     }
 }

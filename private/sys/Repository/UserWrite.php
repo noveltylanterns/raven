@@ -12,7 +12,6 @@ namespace Raven\Core\Repository;
 
 use PDO;
 use Raven\Lib\Auth\AuthPayloadCodec;
-use Raven\Lib\Auth\ContactProfileNormalizer;
 use Raven\Lib\Database\TableNameResolver;
 use Raven\Lib\Scribe\UserScribe;
 
@@ -44,7 +43,7 @@ final class UserWrite
         $this->rvnDb = $rvnDb;
         $this->driver = $driver;
         $this->prefix = preg_replace('/[^a-zA-Z0-9_]/', '', $prefix) ?? '';
-        $this->authPayloadCodec = new AuthPayloadCodec(new ContactProfileNormalizer());
+        $this->authPayloadCodec = new AuthPayloadCodec();
         $this->userScribe = new UserScribe();
     }
 

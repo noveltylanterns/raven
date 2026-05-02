@@ -20,7 +20,7 @@
 /** @var string|null $flashSuccess */
 /** @var string|null $flashError */
 
-use Raven\Lib\Auth\PanelAccess;
+use Raven\Lib\Permission\PanelAccess;
 use Raven\Lib\View\Panel\Footer;
 use Raven\Lib\View\Panel\Header;
 use Raven\Lib\View\Panel\ListWrapper;

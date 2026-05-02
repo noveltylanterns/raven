@@ -25,21 +25,23 @@ Build a single fast CLI command that auto-generates all reference appendix files
 Pure PHP — Reflection API + lightweight PHPDoc regex, no extra composer deps. Run at release time.
 - [ ] Store generator as `build/docgen.(php or sh?)`
 Targets (generator owns these files — do not hand-edit them):
-- [ ] `docs/appendix/libraries.md` — reflect on all lib/* classes & functions; pull `@param`/`@return`/first docline per function; group by service key in `context['rvn']`
-- [ ] `docs/appendix/core.md` — reflect on all sys/* classes & functions; pull `@param`/`@return`/first docline per function; group by service key in `context['rvn']` if applicable.
-- [ ] `docs/appendix/config.md` — parse `private/dat/config.php.dist` key tree + reflect on `Controller/Panel/ConfigController` for descriptions and defaults
-- [ ] `docs/appendix/database.md` — reflect on `SchemaBuilder`/`AuthSchemaBuilder` method names + annotations to enumerate tables and columns; include column purposes and the full chain of variables/routes/forms that map to each column
 - [ ] `docs/appendix/bootstrap.md` - reflect on where bootstrap is injected into the templates, how to manually generate compiled css from bootstrap sass files, and a quick rundown of all the basic bootstrap css variables & how to declare them in a custom sass file so the end user can work cleanly with the stock variables instead of creating new css classes.
-- [ ] `docs/cli.md` — shell each `private/bin/rvn-*` with `--help` and format output as markdown; replaces current hand-written content
-- [ ] `docs/extensions/` folder — per-extension docs for bundled stock extensions (contact, signups, database, etc.)
+- [ ] `docs/appendix/cli/{command group, ie: cat, chan, conf, cron, etc}.md` — shell each `private/bin/rvn-*` with `--help` and format output as markdown; replaces current hand-written content
+- [ ] `docs/appendix/config.md` — parse `private/dat/config.php.dist` key tree + reflect on `Controller/Panel/ConfigController` for descriptions and defaults
+- [ ] `docs/appendix/core/{class group, ie: controller, repository, runtime, etc}.md` — reflect on all sys/* classes & functions; pull `@param`/`@return`/first docline per function; group by service key in `context['rvn']` if applicable.
+- [ ] `docs/appendix/database.md` — reflect on `SchemaBuilder`/`AuthSchemaBuilder` method names + annotations to enumerate tables and columns; include column purposes and the full chain of variables/routes/forms that map to each column
+- [ ] `docs/appendix/extensions/{extension slug}.md` — per-extension docs for bundled stock extensions (contact, signups, database, etc.)
+- [ ] `docs/appendix/libraries/{class group, ie: auth, format, parser, scribe, etc}.md` — reflect on all lib/* classes & functions; pull `@param`/`@return`/first docline per function; group by service key in `context['rvn']`
+- [ ] `docs/appendix/templates/{public|panel}.md` - reflect on all base tpl/* templates that form the foundation of our template fallback chain, and the routes they are used on.
 - [ ] Wire `docgen` into maintenance checklist once generator is built
 
 ### Hand-Authored Docs & Cleanup
+A lot of these I will have to write myself, but generate examples I can work with as a starting point:
 - [ ] `docs/intro.md` — project overview, philosophy, and quick-start
 - [ ] `docs/filetree.md` - This one should be mostly up to date already. Doublecheck & move to `docs/appendix/`
 - [ ] `docs/appendix/architecture.md` - Finer details of why Raven is structured the way that it is, and what this structure enables.
 - [ ] `docs/appendix/api.md` — index linking all developer-facing surfaces (Extensions, Libraries, CLI, Theming); summary paragraph per surface; grows to link more appendix pages over time
-- [ ] Narrative docs (`pages.md`, `routing.md`, `configuration.md`, etc.) — AI-authored drafts exist but are unverified Codex output; needs full accuracy sweep and rewrite pass against actual codebase
+- [ ] Narrative docs (`pages.md`, `routing.md`, `configuration.md`, etc.) — AI-authored drafts exist but are unverified Codex/Claude output; needs full accuracy sweep and rewrite pass against actual codebase
 - [ ] `docs/screenshots/` folder — UI screenshots for operator-facing docs
 - [ ] Do a proper human proofreading sweep once narrative docs are rewritten; replace this section with final authoring task list
 

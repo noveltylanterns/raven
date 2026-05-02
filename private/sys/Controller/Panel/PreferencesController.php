@@ -15,7 +15,7 @@ use lbuchs\WebAuthn\WebAuthn as VendorWebAuthn;
 use lbuchs\WebAuthn\WebAuthnException;
 use Raven\Core\Config;
 use Raven\Lib\Auth\LoginIdentifierResolver;
-use Raven\Lib\Auth\TwoFactorPreferences;
+use Raven\Lib\Panel\TwoFactorPreferences;
 use Raven\Lib\Auth\PasswordChangePolicy;
 use Raven\Lib\Media\Panel\AvatarValidationPolicy;
 use Raven\Lib\Media\Panel\AvatarValidator;

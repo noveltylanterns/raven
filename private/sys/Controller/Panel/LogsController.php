@@ -13,7 +13,7 @@ namespace Raven\Core\Controller\Panel;
 
 use Closure;
 use Raven\Core\Logger;
-use Raven\Lib\Auth\PanelAccess;
+use Raven\Lib\Permission\PanelAccess;
 use Raven\Lib\Format\Csv;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\Transport\Redirect;

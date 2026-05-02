@@ -1,13 +1,20 @@
 <?php
 
+/**
+ * RAVEN CMS
+ * ~/private/lib/Permission/GroupRolePolicy.php
+ * Group role slug validation and stock-role permission constraint helpers.
+ * Docs: https://raven.lanterns.io
+ */
+
 declare(strict_types=1);
 
-namespace Raven\Lib\Auth;
+namespace Raven\Lib\Permission;
 
-use Raven\Lib\Auth\PanelAccess;
+use Raven\Lib\Permission\PanelAccess;
 
 /**
- * Shared group-role slug and stock-role permission policy helpers.
+ * Group role slug normalizer and stock-role permission constraint policy.
  */
 final class GroupRolePolicy
 {
@@ -20,6 +27,12 @@ final class GroupRolePolicy
         'banned',
     ];
 
+    /**
+     * Returns a URL-safe lowercase slug from the raw input value.
+     *
+     * @param string $value Raw group name or slug input.
+     * @return string Normalized slug (max 160 chars, alphanumeric and hyphens only).
+     */
     public function normalizeSlug(string $value): string
     {
         $value = strtolower(trim($value));
@@ -34,33 +47,69 @@ final class GroupRolePolicy
         return substr($value, 0, 160);
     }
 
+    /**
+     * Returns true when the slug matches one of the reserved stock role slugs.
+     *
+     * @param string $slug Normalized group slug to check.
+     * @return bool True when the slug is a stock role (admin, user, guest, validating, banned).
+     */
     public function isStockRoleSlug(string $slug): bool
     {
         return in_array(strtolower(trim($slug)), self::STOCK_SLUGS, true);
     }
 
+    /**
+     * Returns true when the role slug implies route-disabled access (guest, validating, or banned).
+     *
+     * @param string $slug Normalized group slug to check.
+     * @return bool True when the slug should have route access disabled.
+     */
     public function isRouteDisabledRoleSlug(string $slug): bool
     {
         $normalized = strtolower(trim($slug));
         return $this->isGuestLikeRoleSlug($normalized) || $normalized === 'banned';
     }
 
+    /**
+     * Returns true when the slug is a guest-like role (guest or validating).
+     *
+     * @param string $slug Normalized group slug to check.
+     * @return bool True for 'guest' or 'validating'.
+     */
     public function isGuestLikeRoleSlug(string $slug): bool
     {
         $normalized = strtolower(trim($slug));
         return $normalized === 'guest' || $normalized === 'validating';
     }
 
+    /**
+     * Returns true when the slug is the banned role.
+     *
+     * @param string $slug Normalized group slug to check.
+     * @return bool True for 'banned'.
+     */
     public function isBannedRoleSlug(string $slug): bool
     {
         return strtolower(trim($slug)) === 'banned';
     }
 
+    /**
+     * Returns true when the slug is the standard user role.
+     *
+     * @param string $slug Normalized group slug to check.
+     * @return bool True for 'user'.
+     */
     public function isUserRoleSlug(string $slug): bool
     {
         return strtolower(trim($slug)) === 'user';
     }
 
+    /**
+     * Returns true when the slug is the admin role.
+     *
+     * @param string $slug Normalized group slug to check.
+     * @return bool True for 'admin'.
+     */
     public function isAdminRoleSlug(string $slug): bool
     {
         return strtolower(trim($slug)) === 'admin';
@@ -68,8 +117,8 @@ final class GroupRolePolicy
 
     /**
      * Returns enforced route and permissions values for a stock role slug.
-     * Stock roles have fixed constraints (e.g. guest/validating cannot have route access;
-     * admin always receives the full permission mask).
+     * Stock roles have fixed constraints: guest/validating cannot have route access;
+     * admin always receives the full permission mask.
      *
      * @param string $roleSlug     The group slug to evaluate.
      * @param int    $routeEnabled Caller-supplied route value (0 or 1).
@@ -112,6 +161,13 @@ final class GroupRolePolicy
         ];
     }
 
+    /**
+     * Strips route-level panel bits from a mask when PANEL_LOGIN is not present.
+     * Prevents a group from holding route-level bits without dashboard access.
+     *
+     * @param int $mask Raw permission mask to normalize.
+     * @return int Corrected mask with invalid bit combinations removed.
+     */
     public function normalizeMaskForPanelAccess(int $mask): int
     {
         $resolvedMask = $mask;

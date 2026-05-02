@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Raven\Lib\Extension\Panel;
 
-use Raven\Lib\Auth\PanelAccess;
+use Raven\Lib\Permission\PanelAccess;
 use Raven\Lib\Extension\Resolver;
 use Raven\Lib\Extension\StateRead;
 use Raven\Lib\Security\InputSanitizer;

@@ -2,22 +2,24 @@
 
 /**
  * RAVEN CMS
- * ~/private/lib/Auth/PermissionDefinitionCatalog.php
- * Builds permission-definition rows from stock and extension sources.
+ * ~/private/lib/Permission/PermissionDefinitionCatalog.php
+ * Builds panel permission-definition rows from stock and extension sources.
  * Docs: https://raven.lanterns.io
  */
 
 declare(strict_types=1);
 
-namespace Raven\Lib\Auth;
+namespace Raven\Lib\Permission;
 
 /**
- * Builds panel permission-definition rows from stock and extension sources.
+ * Builds panel permission-definition rows from stock and extension sources for group edit UI.
  */
 final class PermissionDefinitionCatalog
 {
     /**
-     * @param callable(): array<string, array<string, mixed>> $extensionPermissionMapProvider
+     * Returns the full list of panel permission definitions, combining stock bits and extension-provided bits.
+     *
+     * @param callable(): array<string, array<string, mixed>> $extensionPermissionMapProvider Returns the extension permission map (keyed by extension directory).
      * @return array<int, array{
      *   bit: int,
      *   label: string,
@@ -83,7 +85,10 @@ final class PermissionDefinitionCatalog
     }
 
     /**
-     * @param callable(): array<string, array<string, mixed>> $extensionPermissionMapProvider
+     * Returns a combined bitmask of all extension-provided permission bits.
+     *
+     * @param callable(): array<string, array<string, mixed>> $extensionPermissionMapProvider Returns the extension permission map.
+     * @return int Combined bitmask of all extension bits ORed together.
      */
     public function extensionBitsMask(callable $extensionPermissionMapProvider): int
     {
@@ -104,8 +109,10 @@ final class PermissionDefinitionCatalog
     }
 
     /**
-     * @param callable(): array<string, array<string, mixed>> $extensionPermissionMapProvider
-     * @return array<string, array<string, mixed>>
+     * Safely calls the extension permission map provider and returns the result array.
+     *
+     * @param callable(): array<string, array<string, mixed>> $extensionPermissionMapProvider Provider callable.
+     * @return array<string, array<string, mixed>> Extension permission map, or empty array on failure.
      */
     private function extensionPermissionMap(callable $extensionPermissionMapProvider): array
     {

@@ -2,6 +2,14 @@
 
 *The machine is supposed to be logging patches & mods to this file. Sometimes it does, sometimes it doesn't. It might be useful for historical architectural context to your Agent at one point.*
 
+### May 2, 2026 — Auth library architecture correction: permissions domain, panel domain, and class consolidation
+
+- Completed auth library architecture correction across four phases:
+  - **Phase A** — Moved all panel-permission classes out of `lib/Auth/` into new `lib/Permission/` domain (`Raven\Lib\Permission`): `PanelAccess`, `AccessCatalog`, `PermissionDefinitionCatalog`, `PermissionMaskService`, `GroupRolePolicy`. Updated all callers. Deleted the three now-unused `lib/Auth/Panel/` compatibility alias files (`PanelAccessCatalog`, `PanelPermissionDefinitionCatalog`, `PanelSessionGuard`).
+  - **Phase B** — Moved panel-only session/preferences classes out of `lib/Auth/` into new `lib/Panel/` domain (`Raven\Lib\Panel`): `SessionGuard`, `TwoFactorPreferences`. These must live at lib level (not `sys/`) because `lib/Extension/Panel/PanelRouteRegistrar` imports them and lib cannot depend on sys.
+  - **Phase C** — Folded four single-caller wrapper classes to eliminate pass-through layers: (1) `LoginChallengeState` into `AuthService` (2FA session constants and ops inlined; email-challenge storage moved to `LoginEmailChallenge` which now owns its own session keys); (2) `UserSecurityProfileService` into `AuthService` (7 methods as private helpers); (3) `LoginThrottleService` into `AuthService` (`AuthThrottleScribe` held directly, throttle logic inlined with `throttle*` private helpers); (4) `ContactProfileNormalizer` into `AuthPayloadCodec` (normalize logic private, constructor arg removed, 3 callers updated: `AuthService`, `UserRead`, `UserWrite`).
+  - **Phase D** (partial) — Updated `docs/filetree.md` to document new `lib/Permission/` and `lib/Panel/` domains and accurately reflect the consolidated `lib/Auth/` class inventory. Verified no stale `Raven\Lib\Auth\` imports remain for any moved or deleted class. Full smoke set (`auth-workflow`, `panel-permissions`, `router-inventory`, `cli`) — all PASS.
+
 ### May 2, 2026 — Public runtime initializer, nav session cache guard, runtime builder relocation, and naming cleanup
 
 - Started the Auth Library Refactor execution plan from `build/todo.md` by completing Phase 1: moved `TwoFactorMethodKey`, `TwoFactorMethodNormalizer`, and `TwoFactorMethodRules` from `private/lib/Security/` to `private/lib/Auth/`, updated all auth/login/panel 2FA imports to the new namespace, and confirmed no remaining references to the retired security paths.

@@ -2,21 +2,21 @@
 
 /**
  * RAVEN CMS
- * ~/private/lib/Auth/PanelAccess.php
- * Permission bitmask helper and stock permission catalogs.
+ * ~/private/lib/Permission/PanelAccess.php
+ * Panel permission bitmask constants and stock permission helpers.
  * Docs: https://raven.lanterns.io
  */
 
 declare(strict_types=1);
 
-namespace Raven\Lib\Auth;
+namespace Raven\Lib\Permission;
 
 require_once __DIR__ . '/AccessCatalog.php';
 
-use Raven\Lib\Auth\AccessCatalog;
+use Raven\Lib\Permission\AccessCatalog;
 
 /**
- * Permission bitmask helpers and stock group definitions.
+ * Panel permission bitmask constants and stock capability check helpers.
  */
 final class PanelAccess
 {
@@ -128,6 +128,9 @@ final class PanelAccess
 
     /**
      * Checks dashboard-access permission from combined mask.
+     *
+     * @param int $mask Combined permission bitmask for the user.
+     * @return bool True when the mask includes the PANEL_LOGIN bit.
      */
     public static function canLoginPanel(int $mask): bool
     {
@@ -135,7 +138,10 @@ final class PanelAccess
     }
 
     /**
-     * Checks user-management capability.
+     * Checks user-management capability from combined mask.
+     *
+     * @param int $mask Combined permission bitmask for the user.
+     * @return bool True when MANAGE_USERS or any users route bit is set.
      */
     public static function canManageUsers(int $mask): bool
     {
@@ -144,7 +150,10 @@ final class PanelAccess
     }
 
     /**
-     * Checks group-management capability.
+     * Checks group-management capability from combined mask.
+     *
+     * @param int $mask Combined permission bitmask for the user.
+     * @return bool True when MANAGE_GROUPS or any groups route bit is set.
      */
     public static function canManageGroups(int $mask): bool
     {
@@ -153,7 +162,10 @@ final class PanelAccess
     }
 
     /**
-     * Checks content-management capability.
+     * Checks content-management capability from combined mask.
+     *
+     * @param int $mask Combined permission bitmask for the user.
+     * @return bool True when MANAGE_CONTENT or any content route bit is set.
      */
     public static function canManageContent(int $mask): bool
     {
@@ -162,7 +174,10 @@ final class PanelAccess
     }
 
     /**
-     * Checks system-configuration capability.
+     * Checks system-configuration capability from combined mask.
+     *
+     * @param int $mask Combined permission bitmask for the user.
+     * @return bool True when MANAGE_CONFIGURATION or any system route bit is set.
      */
     public static function canManageConfiguration(int $mask): bool
     {
@@ -171,7 +186,10 @@ final class PanelAccess
     }
 
     /**
-     * Checks taxonomy-management capability.
+     * Checks taxonomy-management capability from combined mask.
+     *
+     * @param int $mask Combined permission bitmask for the user.
+     * @return bool True when MANAGE_TAXONOMY or any taxonomy route bit is set.
      */
     public static function canManageTaxonomy(int $mask): bool
     {
@@ -180,7 +198,10 @@ final class PanelAccess
     }
 
     /**
-     * Checks public-site-view capability.
+     * Checks public-site-view capability from combined mask.
+     *
+     * @param int $mask Combined permission bitmask for the user.
+     * @return bool True when VIEW_PUBLIC_SITE bit is set.
      */
     public static function canViewPublicSite(int $mask): bool
     {
@@ -188,7 +209,10 @@ final class PanelAccess
     }
 
     /**
-     * Checks private-site-view capability.
+     * Checks private-site-view capability from combined mask.
+     *
+     * @param int $mask Combined permission bitmask for the user.
+     * @return bool True when VIEW_PRIVATE_SITE bit is set.
      */
     public static function canViewPrivateSite(int $mask): bool
     {
@@ -196,7 +220,10 @@ final class PanelAccess
     }
 
     /**
-     * Checks disabled-site-view capability.
+     * Checks disabled-site-view capability from combined mask.
+     *
+     * @param int $mask Combined permission bitmask for the user.
+     * @return bool True when VIEW_DISABLED_SITE bit is set.
      */
     public static function canViewDisabledSite(int $mask): bool
     {
@@ -204,7 +231,11 @@ final class PanelAccess
     }
 
     /**
-     * Returns true when one exact panel bit is enabled.
+     * Returns true when one exact panel permission bit is present in the mask.
+     *
+     * @param int $mask Combined permission bitmask for the user.
+     * @param int $bit  The single bit to test.
+     * @return bool True when $bit is fully set in $mask.
      */
     public static function hasPanelPermissionBit(int $mask, int $bit): bool
     {
@@ -216,9 +247,11 @@ final class PanelAccess
     }
 
     /**
-     * Returns true when any bit in list is enabled.
+     * Returns true when any bit in the supplied list is present in the mask.
      *
-     * @param array<int, int> $bits
+     * @param int         $mask Combined permission bitmask for the user.
+     * @param array<int, int> $bits List of bits to test (any match returns true).
+     * @return bool True when at least one bit from $bits is set in $mask.
      */
     public static function hasAnyPanelPermissionBit(int $mask, array $bits): bool
     {
@@ -232,7 +265,7 @@ final class PanelAccess
     }
 
     /**
-     * Returns one normalized panel route permission map.
+     * Returns the full stock panel route permission map keyed by route key.
      *
      * @return array<string, array{label: string, view: int, create?: int, edit?: int, delete?: int, uninstall?: int}>
      */
@@ -242,8 +275,9 @@ final class PanelAccess
     }
 
     /**
-     * Returns stock panel route permission row by route key.
+     * Returns the stock permission row for one route key, or null when not found.
      *
+     * @param string $routeKey Lowercase panel route key (e.g. 'page', 'user').
      * @return array{label: string, view: int, create?: int, edit?: int, delete?: int, uninstall?: int}|null
      */
     public static function stockPanelRoutePermission(string $routeKey): ?array
@@ -252,9 +286,9 @@ final class PanelAccess
     }
 
     /**
-     * Returns all stock panel permission bits.
+     * Returns all individual stock panel route-level permission bits.
      *
-     * @return array<int, int>
+     * @return array<int, int> Flat list of every stock bit value.
      */
     public static function allStockPanelBits(): array
     {
@@ -312,9 +346,10 @@ final class PanelAccess
     }
 
     /**
-     * Returns bitmask value for one list of bits.
+     * Combines a list of bits into a single bitmask value.
      *
-     * @param array<int, int> $bits
+     * @param array<int, int> $bits List of individual bit values to OR together.
+     * @return int Combined bitmask.
      */
     public static function maskFromBits(array $bits): int
     {
@@ -327,7 +362,9 @@ final class PanelAccess
     }
 
     /**
-     * Returns mask containing all stock route-level panel bits.
+     * Returns a combined bitmask covering all stock route-level panel bits.
+     *
+     * @return int Bitmask of every stock route permission bit ORed together.
      */
     public static function allStockPanelBitsMask(): int
     {

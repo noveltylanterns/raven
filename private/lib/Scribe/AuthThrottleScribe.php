@@ -16,7 +16,7 @@ use PDO;
 /**
  * Owns write-side persistence for identifier+IP auth-throttle buckets.
  *
- * LoginThrottleService keeps the read-side bucket lookup and throttle policy,
+ * AuthService owns the read-side bucket lookup and throttle policy,
  * while this class centralizes the mutation SQL for bucket upserts, deletes,
  * and stale-row pruning.
  */
