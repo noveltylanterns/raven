@@ -2,14 +2,14 @@
 
 /**
  * RAVEN CMS
- * ~/private/sys/Router/Public/ExtensionRouter.php
- * Public extension-route registration.
+ * ~/private/lib/Extension/Public/PublicRouteRegistrar.php
+ * Reusable public extension-route registration primitives.
  * Docs: https://raven.lanterns.io
  */
 
 declare(strict_types=1);
 
-namespace Raven\Core\Router\Public;
+namespace Raven\Lib\Extension\Public;
 
 use Raven\Core\Router\RouteHandler;
 use Raven\Lib\Extension\Resolver;
@@ -17,23 +17,17 @@ use Raven\Lib\Security\InputSanitizer;
 
 /**
  * Registers extension-provided public routes for enabled module extensions.
+ *
+ * Lives in lib/ alongside its panel counterpart (PanelRouteRegistrar) so the
+ * extension route-loading contract stays out of the sys/Router scope routers.
  */
-final class ExtensionRouter
+final class PublicRouteRegistrar
 {
     /**
-     * Registers extension public routes from one shared dependency payload.
+     * Registers all enabled module extension public routes onto the shared router.
      *
-     * @param RouteHandler $router Mutable router receiving extension routes.
-     * @param PublicRouteDeps $deps Shared public route dependency payload.
-     * @return void
-     */
-    public static function registerWithDeps(RouteHandler $router, PublicRouteDeps $deps): void
-    {
-        self::register($router, $deps->rvn, $deps->publicRequestContext, $deps->input);
-    }
-
-    /**
-     * Registers all enabled module extension public routes.
+     * Only module-type extensions (non-system, type === 'module') with a
+     * routes_public.php provider file are processed; all others are skipped.
      *
      * @param RouteHandler $router Mutable router receiving extension routes.
      * @param array<string, mixed> $rvn Shared runtime container.
@@ -55,6 +49,8 @@ final class ExtensionRouter
         foreach ($enabledPublicExtensionManifests as $extensionName => $manifest) {
             $type = strtolower(trim((string) ($manifest['type'] ?? 'plugin')));
             $isSystemType = $type === 'system' || !empty($manifest['system_extension']);
+
+            // Only module-type extensions expose public routes; system/plugin/helper types do not.
             if ($isSystemType || $type !== 'module') {
                 continue;
             }

@@ -14,6 +14,7 @@ namespace Raven\Core\Router\Public;
 use Raven\Core\Router\RouteRequest;
 use Raven\Core\Router\RouteResponse;
 use Raven\Core\Router\RouteHandler;
+use Raven\Lib\Extension\Public\PublicRouteRegistrar;
 
 /**
  * Owns public-route registration order and dispatch lifecycle.
@@ -39,7 +40,7 @@ final class PublicRouter
     public function register(PublicRouteDeps $deps): void
     {
         AuthRouter::registerWithDeps($this->router, $deps);
-        ExtensionRouter::registerWithDeps($this->router, $deps);
+        PublicRouteRegistrar::register($this->router, $deps->rvn, $deps->publicRequestContext, $deps->input);
         CategoryRouter::registerWithDeps($this->router, $deps);
         ChannelRouter::registerWithDeps($this->router, $deps);
         FeedRouter::registerWithDeps($this->router, $deps);
