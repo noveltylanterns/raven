@@ -2,16 +2,16 @@
 
 /**
  * RAVEN CMS
- * ~/private/sys/Factory/Public/RuntimeContract.php
+ * ~/private/sys/Runtime/Public/RuntimeContract.php
  * Required public runtime factory-key contract for entry orchestration.
  * Docs: https://raven.lanterns.io
  */
 
 declare(strict_types=1);
 
-namespace Raven\Core\Factory\Public;
+namespace Raven\Core\Runtime\Public;
 
-use Raven\Core\Factory\RuntimePayloadAssert;
+use Raven\Core\Runtime\RuntimeAssert;
 
 /**
  * Declares and validates the minimum callable payload expected by public entry orchestration.
@@ -52,6 +52,6 @@ final class RuntimeContract
      */
     public static function assert(array $runtime): void
     {
-        RuntimePayloadAssert::assertRequiredCallables($runtime, self::REQUIRED_FACTORY_KEYS, 'public');
+        RuntimeAssert::assertRequiredCallables($runtime, self::REQUIRED_FACTORY_KEYS, 'public');
     }
 }

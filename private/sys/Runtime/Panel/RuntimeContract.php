@@ -2,16 +2,16 @@
 
 /**
  * RAVEN CMS
- * ~/private/sys/Factory/Panel/RuntimeContract.php
+ * ~/private/sys/Runtime/Panel/RuntimeContract.php
  * Required panel runtime factory-key contract for entry orchestration.
  * Docs: https://raven.lanterns.io
  */
 
 declare(strict_types=1);
 
-namespace Raven\Core\Factory\Panel;
+namespace Raven\Core\Runtime\Panel;
 
-use Raven\Core\Factory\RuntimePayloadAssert;
+use Raven\Core\Runtime\RuntimeAssert;
 
 /**
  * Declares and validates the minimum callable payload expected by panel entry orchestration.
@@ -68,6 +68,6 @@ final class RuntimeContract
      */
     public static function assert(array $runtime): void
     {
-        RuntimePayloadAssert::assertRequiredCallables($runtime, self::REQUIRED_FACTORY_KEYS, 'panel');
+        RuntimeAssert::assertRequiredCallables($runtime, self::REQUIRED_FACTORY_KEYS, 'panel');
     }
 }

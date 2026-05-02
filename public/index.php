@@ -11,12 +11,12 @@ declare(strict_types=1);
 
 use Raven\Core\Debug\OutputProfilerPolicy;
 use Raven\Core\Debug\OutputProfiler;
-use Raven\Core\Factory\Public\RuntimeContract as PublicRuntimeContract;
-use Raven\Core\Factory\RuntimePayloadAssert;
+use Raven\Core\Runtime\Public\RuntimeContract as PublicRuntimeContract;
+use Raven\Core\Runtime\RuntimeAssert;
 use Raven\Core\Router\RouteRequest;
 use Raven\Core\Router\Public\PublicRouter;
 use Raven\Lib\Transport\Request as HttpRequest;
-use Raven\Core\Factory\Public\PublicRuntimeBuilder;
+use Raven\Core\Runtime\Public\RuntimeBuilder;
 use Raven\Core\Router\Public\PublicRouteDeps;
 use Raven\Core\Router\Public\PublicRoutePolicy;
 use Raven\Lib\Scheduler\Cron;
@@ -74,7 +74,7 @@ if ($configuredPanelPath !== '' && ($requestPath === $configuredPanelPrefix || s
 require_once $root . '/private/Raven.php';
 /** @var array<string, mixed> $rvn */
 $rvn = \Raven\Raven::boot();
-$rvn = PublicRuntimeBuilder::build($rvn);
+$rvn = RuntimeBuilder::build($rvn);
 PublicRuntimeContract::assert($rvn);
 
 $requestMethod = strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET'));
@@ -128,7 +128,7 @@ OutputProfiler::arm(
  * Resolves one required public runtime factory from the built payload.
  */
 $requirePublicFactory = static function (string $key) use ($rvn): callable {
-    return RuntimePayloadAssert::requireCallable($rvn, $key, 'public');
+    return RuntimeAssert::requireCallable($rvn, $key, 'public');
 };
 
 /** @var callable(): object $publicPageController */

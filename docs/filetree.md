@@ -127,21 +127,21 @@ This file is the fast system map for Raven CMS. Use it to quickly understand the
   - Write classes: `PageWrite`, `ChannelWrite`, `UserWrite`, `GroupWrite`, `CategoryWrite`, `TagWrite`, `SetWrite`, `RedirectWrite`, `MediaWrite`, `InviteWrite`. Each `*Write` takes the corresponding `*Read` as a constructor arg for validation lookups.
   - Repositories are the shared storage layer only: panel/public helper services should not be loaded into repo constructors. `UserRead` and `GroupRead` now keep their same-domain row shaping inline instead of instantiating the old route-scope auth helpers `UserPanelHydrator` and `GroupPublicRouteService`, and repository method names are being moved away from panel/public wording where the underlying data access is generic. `ChannelRead` now owns `explicitTaxonomySetCounts()` (bulk channel-to-set membership tallies by kind) and `countExplicitTaxonomySetAssignments()` (single-set count) that were previously duplicated in `ChannelDataParser`.
   - Bridge shims (`*Repository` files, e.g. `PageRepository extends PageRead`) remain for extension backward-compatibility. Do not add new core dependencies on bridge classes; use `*Read`/`*Write` directly.
-- `private/sys/Factory/`
-  - Runtime payload factory contracts, assertion helpers, and scope-level runtime builders.
-  - `Factory/RuntimePayloadAssert.php` provides shared callable-key assertions for runtime payload arrays.
-  - `Factory/Public/RuntimeContract.php` and `Factory/Panel/RuntimeContract.php` declare the required callable factory keys expected by public/panel entry orchestration.
-  - `public/index.php` and `panel/index.php` now assert these scope contracts and resolve controller/runtime closures through `RuntimePayloadAssert::requireCallable(...)` instead of per-key fallback chains.
-  - `Factory/Panel/PanelRuntimeBuilder.php` is the top-level panel bootstrap orchestrator: resolves auth handles, wires shared editor services and memoized catalog factories, and delegates to the sub-factory family below before returning the enriched `$rvn` container to `panel/index.php`.
-  - `Factory/Public/PublicRuntimeBuilder.php` is the top-level public bootstrap orchestrator: resolves auth handles, wires memoized catalog/extension-service factories, and delegates to the sub-factory family below before returning the enriched `$rvn` container to `public/index.php`.
-  - `Factory/Panel/RepoFactories.php` owns the memoized panel repository/parser factory map.
-  - `Factory/Panel/DomainFactories.php` owns the memoized panel domain aggregate closures (`panel_domain_*`).
-  - `Factory/Public/RuntimeInitializer.php` registers the `initialize_public_runtime` closure: warms domain aggregates, primes the extension services cache once for the request, and populates `public_site_data`. Called conditionally from `public/index.php` — auth-helper paths bypass it, mirroring `initialize_panel_runtime` in the panel.
-  - `Factory/Public/RepoFactories.php` owns the memoized public repository/parser factory map.
-  - `Factory/Public/DomainFactories.php` owns the memoized public domain aggregate closures (`public_domain_*`).
-  - `Factory/Public/ControllerFactories.php` owns public request-context/controller closure registration (`public_request_context`, `public_*_controller`, and `public_extension_services`).
-  - `Factory/Panel/ControllerFactories.php` owns panel controller closure registration (`panel_permission_map_provider`, `auth_controller`, `panel_request_context`, `panel_dashboard_controller`, `panel_page_*`, `panel_channel_*`, `panel_category_*`, `panel_redirect_*`, `panel_tag_*`, `panel_user_*`, `panel_group_*`, `panel_preferences_controller`, `panel_logs_controller`, `panel_routing_controller`, `panel_update_controller`, `panel_config_controller`, `panel_theme_controller`, `panel_extension_controller`).
-  - `Factory/Panel/RuntimeInitializer.php` owns `initialize_panel_runtime` and `panel_site_data` closure registration.
+- `private/sys/Runtime/`
+  - Runtime payload contracts, assertion helpers, and scope-level runtime builders.
+  - `Runtime/RuntimeAssert.php` provides shared callable-key assertions for runtime payload arrays.
+  - `Runtime/Public/RuntimeContract.php` and `Runtime/Panel/RuntimeContract.php` declare the required callable factory keys expected by public/panel entry orchestration.
+  - `public/index.php` and `panel/index.php` assert these scope contracts and resolve controller/runtime closures through `RuntimeAssert::requireCallable(...)` instead of per-key fallback chains.
+  - `Runtime/Panel/RuntimeBuilder.php` is the top-level panel bootstrap orchestrator: resolves auth handles, wires shared editor services and memoized catalog factories, and delegates to the sub-factory family below before returning the enriched `$rvn` container to `panel/index.php`.
+  - `Runtime/Public/RuntimeBuilder.php` is the top-level public bootstrap orchestrator: resolves auth handles, wires memoized catalog/extension-service factories, and delegates to the sub-factory family below before returning the enriched `$rvn` container to `public/index.php`.
+  - `Runtime/Panel/RepoFactories.php` owns the memoized panel repository/parser factory map.
+  - `Runtime/Panel/DomainFactories.php` owns the memoized panel domain aggregate closures (`panel_domain_*`).
+  - `Runtime/Public/RuntimeInitializer.php` registers the `initialize_public_runtime` closure: warms domain aggregates, primes the extension services cache once for the request, and populates `public_site_data`. Called conditionally from `public/index.php` — auth-helper paths bypass it, mirroring `initialize_panel_runtime` in the panel.
+  - `Runtime/Public/RepoFactories.php` owns the memoized public repository/parser factory map.
+  - `Runtime/Public/DomainFactories.php` owns the memoized public domain aggregate closures (`public_domain_*`).
+  - `Runtime/Public/ControllerFactories.php` owns public request-context/controller closure registration (`public_request_context`, `public_*_controller`, and `public_extension_services`).
+  - `Runtime/Panel/ControllerFactories.php` owns panel controller closure registration (`panel_permission_map_provider`, `auth_controller`, `panel_request_context`, `panel_dashboard_controller`, `panel_page_*`, `panel_channel_*`, `panel_category_*`, `panel_redirect_*`, `panel_tag_*`, `panel_user_*`, `panel_group_*`, `panel_preferences_controller`, `panel_logs_controller`, `panel_routing_controller`, `panel_update_controller`, `panel_config_controller`, `panel_theme_controller`, `panel_extension_controller`).
+  - `Runtime/Panel/RuntimeInitializer.php` owns `initialize_panel_runtime` and `panel_site_data` closure registration.
 - `private/sys/Router/`
   - Raven-owned request-dispatch primitives, runtime builders, and route registrars. Not for extension use.
   - `RouteHandler.php` — `Raven\Core\Router\RouteHandler`, the core dispatcher: registers routes via `add()`, compiles `{param}` patterns to named-capture regex, and resolves requests via `dispatch()`.
@@ -150,7 +150,7 @@ This file is the fast system map for Raven CMS. Use it to quickly understand the
   - `Router/Public/` — `PublicRouter` (scope-owned public orchestration over an isolated internal `RouteHandler` instance), controller-aligned public routers, shared deps payload `PublicRouteDeps`, shared route policy `PublicRoutePolicy`, and shared slug-prefix primitive `PrefixRouter` used by `CategoryRouter` and `TagRouter`. Extension-provided public route loading is delegated to `lib/Extension/Public/PublicRouteRegistrar`.
   - `Router/Panel/` — `PanelRouter` (scope-owned panel orchestration over an isolated internal `RouteHandler` instance), controller-aligned panel routers including `SetRouter`, `ThemeRouter`, `ExtensionRouter`, and the split family routers for auth/dashboard/page/channel/category/tag/redirect/user/group/preferences/logs/routing/update/config.
   - `sys/Debug/RouteProfiler.php` now owns generic routing inventory composition. Panel-specific routing-screen shaping and edit-link policy live in `Controller/Panel/RoutingController.php`.
-  - Note: entry orchestration now lives directly in `public/index.php` and `panel/index.php`; `sys/Factory/` owns scope-level runtime builders and sub-factory families, `sys/Router/` owns shared routing primitives and route registrars, and `sys/Controller/` owns route-specific sub-controllers and shared request-context helpers.
+  - Note: entry orchestration now lives directly in `public/index.php` and `panel/index.php`; `sys/Runtime/` owns scope-level runtime builders and sub-factory families, `sys/Router/` owns shared routing primitives and route registrars, and `sys/Controller/` owns route-specific sub-controllers and shared request-context helpers.
 
 ### private/lib/
 

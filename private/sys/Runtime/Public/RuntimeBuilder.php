@@ -2,21 +2,21 @@
 
 /**
  * RAVEN CMS
- * ~/private/sys/Factory/Public/PublicRuntimeBuilder.php
+ * ~/private/sys/Runtime/Public/RuntimeBuilder.php
  * Public runtime assembly on top of the shared core bootstrap.
  * Docs: https://raven.lanterns.io
  */
 
 declare(strict_types=1);
 
-namespace Raven\Core\Factory\Public;
+namespace Raven\Core\Runtime\Public;
 
 use Closure;
 use PDO;
-use Raven\Core\Factory\Public\ControllerFactories;
-use Raven\Core\Factory\Public\DomainFactories;
-use Raven\Core\Factory\Public\RepoFactories;
-use Raven\Core\Factory\Public\RuntimeInitializer;
+use Raven\Core\Runtime\Public\ControllerFactories;
+use Raven\Core\Runtime\Public\DomainFactories;
+use Raven\Core\Runtime\Public\RepoFactories;
+use Raven\Core\Runtime\Public\RuntimeInitializer;
 use Raven\Core\Renderer;
 use Raven\Lib\Auth\AuthService;
 use Raven\Lib\Extension\ExtensionEditorCatalogService;
@@ -31,7 +31,7 @@ use RuntimeException;
  * requests. Route-family-specific policy belongs in public routing registrars
  * and sub-controllers, not in this per-scope runtime builder.
  */
-final class PublicRuntimeBuilder
+final class RuntimeBuilder
 {
     /**
      * Enriches the shared core container with public-runtime factories.

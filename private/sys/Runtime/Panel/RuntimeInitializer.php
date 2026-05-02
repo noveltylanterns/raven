@@ -2,14 +2,14 @@
 
 /**
  * RAVEN CMS
- * ~/private/sys/Factory/Panel/RuntimeInitializer.php
+ * ~/private/sys/Runtime/Panel/RuntimeInitializer.php
  * Panel runtime initialization closure wiring extracted from panel runtime builder.
  * Docs: https://raven.lanterns.io
  */
 
 declare(strict_types=1);
 
-namespace Raven\Core\Factory\Panel;
+namespace Raven\Core\Runtime\Panel;
 
 use Closure;
 

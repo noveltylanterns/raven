@@ -2,14 +2,14 @@
 
 /**
  * RAVEN CMS
- * ~/private/sys/Factory/Panel/RepoFactories.php
+ * ~/private/sys/Runtime/Panel/RepoFactories.php
  * Panel repository and parser factory wiring extracted from panel runtime builder.
  * Docs: https://raven.lanterns.io
  */
 
 declare(strict_types=1);
 
-namespace Raven\Core\Factory\Panel;
+namespace Raven\Core\Runtime\Panel;
 
 use Closure;
 use Raven\Core\Repository\CategoryRead;

@@ -18,7 +18,7 @@ use Raven\Core\Repository\ChannelRead;
 use Raven\Core\Repository\GroupRead;
 use Raven\Core\Repository\PageRead;
 use Raven\Core\Repository\UserRead;
-use Raven\Core\Factory\Public\PublicRuntimeBuilder;
+use Raven\Core\Runtime\Public\RuntimeBuilder;
 use Raven\Lib\Parser\ChannelDataParser;
 use Raven\Lib\Parser\TaxonomyRepoParser;
 
@@ -510,7 +510,7 @@ final class PublicRouteProfilerRunner
         require_once $this->root . '/private/Raven.php';
         $rvn = \Raven\Raven::boot();
 
-        return PublicRuntimeBuilder::build($rvn);
+        return RuntimeBuilder::build($rvn);
     }
 
     private function seedRequestGlobals(string $uri): void

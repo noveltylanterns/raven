@@ -12,10 +12,10 @@ declare(strict_types=1);
 error_reporting(E_ALL & ~E_WARNING & ~E_NOTICE & ~E_DEPRECATED);
 ini_set('display_errors', '0');
 
-use Raven\Core\Factory\Panel\PanelRuntimeBuilder;
+use Raven\Core\Runtime\Panel\RuntimeBuilder as PanelRuntimeBuilder;
 use Raven\Core\Router\Panel\PanelRouteDeps;
 use Raven\Core\Router\Panel\PanelRouter;
-use Raven\Core\Factory\Public\PublicRuntimeBuilder;
+use Raven\Core\Runtime\Public\RuntimeBuilder as PublicRuntimeBuilder;
 use Raven\Core\Router\Public\PublicRouteDeps;
 use Raven\Core\Router\Public\PublicRoutePolicy;
 use Raven\Core\Router\Public\PublicRouter;

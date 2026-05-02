@@ -2,14 +2,14 @@
 
 /**
  * RAVEN CMS
- * ~/private/sys/Factory/Panel/DomainFactories.php
+ * ~/private/sys/Runtime/Panel/DomainFactories.php
  * Panel domain-aggregate factory wiring extracted from panel runtime builder.
  * Docs: https://raven.lanterns.io
  */
 
 declare(strict_types=1);
 
-namespace Raven\Core\Factory\Panel;
+namespace Raven\Core\Runtime\Panel;
 
 use Closure;
 

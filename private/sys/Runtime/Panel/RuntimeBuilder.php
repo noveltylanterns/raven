@@ -2,21 +2,21 @@
 
 /**
  * RAVEN CMS
- * ~/private/sys/Factory/Panel/PanelRuntimeBuilder.php
+ * ~/private/sys/Runtime/Panel/RuntimeBuilder.php
  * Panel runtime assembly on top of the shared core bootstrap.
  * Docs: https://raven.lanterns.io
  */
 
 declare(strict_types=1);
 
-namespace Raven\Core\Factory\Panel;
+namespace Raven\Core\Runtime\Panel;
 
 use Closure;
 use PDO;
-use Raven\Core\Factory\Panel\ControllerFactories;
-use Raven\Core\Factory\Panel\DomainFactories;
-use Raven\Core\Factory\Panel\RepoFactories;
-use Raven\Core\Factory\Panel\RuntimeInitializer;
+use Raven\Core\Runtime\Panel\ControllerFactories;
+use Raven\Core\Runtime\Panel\DomainFactories;
+use Raven\Core\Runtime\Panel\RepoFactories;
+use Raven\Core\Runtime\Panel\RuntimeInitializer;
 use Raven\Core\Logger;
 use Raven\Core\Renderer;
 use Raven\Lib\Auth\AuthService;
@@ -41,7 +41,7 @@ use RuntimeException;
  * requests. Route-family behavior should keep moving into panel routing
  * registrars and the split panel sub-controllers.
  */
-final class PanelRuntimeBuilder
+final class RuntimeBuilder
 {
     /**
      * Enriches the shared core container with panel-runtime factories.

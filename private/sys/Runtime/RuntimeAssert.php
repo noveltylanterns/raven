@@ -2,21 +2,21 @@
 
 /**
  * RAVEN CMS
- * ~/private/sys/Factory/RuntimePayloadAssert.php
+ * ~/private/sys/Runtime/RuntimeAssert.php
  * Shared runtime-payload callable-contract assertions for scope builders.
  * Docs: https://raven.lanterns.io
  */
 
 declare(strict_types=1);
 
-namespace Raven\Core\Factory;
+namespace Raven\Core\Runtime;
 
 use RuntimeException;
 
 /**
  * Validates required callable factories on runtime payload arrays.
  */
-final class RuntimePayloadAssert
+final class RuntimeAssert
 {
     /**
      * Asserts one runtime key exists and resolves to a callable factory.

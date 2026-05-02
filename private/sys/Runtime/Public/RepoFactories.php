@@ -2,14 +2,14 @@
 
 /**
  * RAVEN CMS
- * ~/private/sys/Factory/Public/RepoFactories.php
+ * ~/private/sys/Runtime/Public/RepoFactories.php
  * Public repository and parser factory wiring extracted from public runtime builder.
  * Docs: https://raven.lanterns.io
  */
 
 declare(strict_types=1);
 
-namespace Raven\Core\Factory\Public;
+namespace Raven\Core\Runtime\Public;
 
 use Closure;
 use Raven\Core\Repository\ChannelRead;

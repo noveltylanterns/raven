@@ -2,14 +2,14 @@
 
 /**
  * RAVEN CMS
- * ~/private/sys/Factory/Public/RuntimeInitializer.php
+ * ~/private/sys/Runtime/Public/RuntimeInitializer.php
  * Public runtime initialization closure wiring.
  * Docs: https://raven.lanterns.io
  */
 
 declare(strict_types=1);
 
-namespace Raven\Core\Factory\Public;
+namespace Raven\Core\Runtime\Public;
 
 use Closure;
 

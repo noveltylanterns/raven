@@ -12,12 +12,12 @@ declare(strict_types=1);
 use Raven\Core\Debug\OutputProfilerPolicy;
 use Raven\Core\Debug\OutputProfiler;
 use Raven\Core\Controller\Panel\SharedController;
-use Raven\Core\Factory\Panel\RuntimeContract as PanelRuntimeContract;
-use Raven\Core\Factory\RuntimePayloadAssert;
+use Raven\Core\Runtime\Panel\RuntimeContract as PanelRuntimeContract;
+use Raven\Core\Runtime\RuntimeAssert;
 use Raven\Core\Router\RouteRequest;
 use Raven\Core\Router\Panel\PanelRouter;
 use Raven\Lib\Transport\Request as HttpRequest;
-use Raven\Core\Factory\Panel\PanelRuntimeBuilder;
+use Raven\Core\Runtime\Panel\RuntimeBuilder;
 use Raven\Core\Router\Panel\PanelRouteDeps;
 use Raven\Lib\Parser\ConfigParser;
 use Raven\Lib\Parser\PanelParser;
@@ -28,14 +28,14 @@ $root = dirname(__DIR__);
 require_once $root . '/private/Raven.php';
 /** @var array<string, mixed> $rvn */
 $rvn = \Raven\Raven::boot();
-$rvn = PanelRuntimeBuilder::build($rvn);
+$rvn = RuntimeBuilder::build($rvn);
 PanelRuntimeContract::assert($rvn);
 
 /**
  * Resolves one required panel runtime factory from the built payload.
  */
 $requirePanelFactory = static function (string $key) use ($rvn): callable {
-    return RuntimePayloadAssert::requireCallable($rvn, $key, 'panel');
+    return RuntimeAssert::requireCallable($rvn, $key, 'panel');
 };
 
 /** @var callable(): object $authController */
