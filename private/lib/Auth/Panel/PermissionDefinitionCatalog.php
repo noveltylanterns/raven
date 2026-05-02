@@ -2,14 +2,16 @@
 
 /**
  * RAVEN CMS
- * ~/private/lib/Permission/PermissionDefinitionCatalog.php
+ * ~/private/lib/Auth/Panel/PermissionDefinitionCatalog.php
  * Builds panel permission-definition rows from stock and extension sources.
  * Docs: https://raven.lanterns.io
  */
 
 declare(strict_types=1);
 
-namespace Raven\Lib\Permission;
+namespace Raven\Lib\Auth\Panel;
+
+use Raven\Lib\Auth\Public\Mask as PublicMask;
 
 /**
  * Builds panel permission-definition rows from stock and extension sources for group edit UI.
@@ -20,25 +22,18 @@ final class PermissionDefinitionCatalog
      * Returns the full list of panel permission definitions, combining stock bits and extension-provided bits.
      *
      * @param callable(): array<string, array<string, mixed>> $extensionPermissionMapProvider Returns the extension permission map (keyed by extension directory).
-     * @return array<int, array{
-     *   bit: int,
-     *   label: string,
-     *   section?: string,
-     *   group?: string,
-     *   action?: string,
-     *   extension?: string
-     * }>
+     * @return array<int, array{bit: int, label: string, section?: string, group?: string, action?: string, extension?: string}>
      */
     public function definitions(callable $extensionPermissionMapProvider): array
     {
         $definitions = [
-            ['bit' => PanelAccess::VIEW_PUBLIC_SITE, 'label' => 'View Public Site', 'section' => 'public', 'group' => 'Site', 'action' => 'view_public'],
-            ['bit' => PanelAccess::VIEW_PRIVATE_SITE, 'label' => 'View Private Site', 'section' => 'public', 'group' => 'Site', 'action' => 'view_private'],
-            ['bit' => PanelAccess::VIEW_DISABLED_SITE, 'label' => 'View Disabled Site', 'section' => 'public', 'group' => 'Site', 'action' => 'view_disabled'],
-            ['bit' => PanelAccess::PANEL_LOGIN, 'label' => 'Access Dashboard', 'section' => 'panel', 'group' => 'Panel', 'action' => 'login'],
+            ['bit' => PublicMask::VIEW_PUBLIC_SITE, 'label' => 'View Public Site', 'section' => 'public', 'group' => 'Site', 'action' => 'view_public'],
+            ['bit' => PublicMask::VIEW_PRIVATE_SITE, 'label' => 'View Private Site', 'section' => 'public', 'group' => 'Site', 'action' => 'view_private'],
+            ['bit' => PublicMask::VIEW_DISABLED_SITE, 'label' => 'View Disabled Site', 'section' => 'public', 'group' => 'Site', 'action' => 'view_disabled'],
+            ['bit' => Mask::PANEL_LOGIN, 'label' => 'Access Dashboard', 'section' => 'panel', 'group' => 'Panel', 'action' => 'login'],
         ];
 
-        foreach (PanelAccess::stockPanelRoutePermissions() as $routeKey => $routeDefinition) {
+        foreach (Mask::stockPanelRoutePermissions() as $routeKey => $routeDefinition) {
             $groupLabel = (string) ($routeDefinition['label'] ?? ucfirst((string) $routeKey));
             foreach (['view', 'create', 'edit', 'delete', 'uninstall'] as $action) {
                 $bit = (int) ($routeDefinition[$action] ?? 0);

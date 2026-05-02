@@ -11,7 +11,8 @@ declare(strict_types=1);
 
 namespace Raven\Lib\Auth;
 
-use Raven\Lib\Auth\TwoFactorMethodNormalizer;
+use Raven\Lib\Auth\Login2fa;
+use Raven\Lib\Format\Json;
 use Raven\Lib\Security\TotpCipher;
 
 /**
@@ -23,6 +24,8 @@ use Raven\Lib\Security\TotpCipher;
  */
 final class AuthPayloadCodec
 {
+    private const MAX_CONTACT_PROFILES = 20;
+
     private TotpCipher $totpSecretCipher;
 
     /**
@@ -49,13 +52,7 @@ final class AuthPayloadCodec
             return [];
         }
 
-        try {
-            /** @var mixed $decoded */
-            $decoded = json_decode($raw, true, 32, JSON_THROW_ON_ERROR);
-        } catch (\Throwable) {
-            return [];
-        }
-
+        $decoded = Json::decodeAssocString($raw, 32);
         if (!is_array($decoded)) {
             return [];
         }
@@ -77,11 +74,7 @@ final class AuthPayloadCodec
             return null;
         }
 
-        try {
-            return json_encode($profiles, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
-        } catch (\Throwable) {
-            return null;
-        }
+        return Json::encode($profiles, JSON_UNESCAPED_SLASHES);
     }
 
     /**
@@ -95,71 +88,6 @@ final class AuthPayloadCodec
      */
     public function normalizeContactProfiles(array $profiles): array
     {
-        return $this->normalizeContactProfileItems($profiles, 20);
-    }
-
-    /**
-     * Decodes a raw JSON 2FA-methods column value into a typed array.
-     *
-     * Decrypts TOTP secrets and normalizes method structure on decode.
-     * Returns an empty array on any decode or normalization error.
-     *
-     * @param mixed $raw Raw column value from the database.
-     * @return array<int, array<string, mixed>>
-     */
-    public function decodeTwoFactorMethods(mixed $raw): array
-    {
-        if (!is_string($raw) || trim($raw) === '') {
-            return [];
-        }
-
-        try {
-            /** @var mixed $decoded */
-            $decoded = json_decode($raw, true, 64, JSON_THROW_ON_ERROR);
-        } catch (\Throwable) {
-            return [];
-        }
-
-        if (!is_array($decoded)) {
-            return [];
-        }
-
-        return TwoFactorMethodNormalizer::normalizeStored($this->decryptTotpSecrets($decoded));
-    }
-
-    /**
-     * Encodes a normalized 2FA-methods array to a JSON string for persistence.
-     *
-     * Encrypts TOTP secrets before encoding. Returns null when the array is empty.
-     *
-     * @param array<int, array<string, mixed>> $methods Normalized 2FA method rows.
-     * @return string|null JSON string, or null when methods is empty.
-     */
-    public function encodeTwoFactorMethods(array $methods): ?string
-    {
-        if ($methods === []) {
-            return null;
-        }
-
-        try {
-            return json_encode($this->encryptTotpSecrets($methods), JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
-        } catch (\Throwable) {
-            return null;
-        }
-    }
-
-    /**
-     * Normalizes and deduplicates a raw contact-profiles list, enforcing the item cap.
-     *
-     * Internal entry point used by normalizeContactProfiles and decodeContactProfiles.
-     *
-     * @param array<int, mixed> $profiles Raw profile entries.
-     * @param int $maxItems  Maximum number of profiles to keep; extra entries are dropped.
-     * @return array<int, array{type: string, value: string}>
-     */
-    private function normalizeContactProfileItems(array $profiles, int $maxItems = 20): array
-    {
-        $maxItems = max(1, $maxItems);
         $normalized = [];
 
         foreach ($profiles as $profile) {
@@ -198,7 +126,7 @@ final class AuthPayloadCodec
                 'value' => $value,
             ];
 
-            if (count($normalized) >= $maxItems) {
+            if (count($normalized) >= self::MAX_CONTACT_PROFILES) {
                 break;
             }
         }
@@ -223,78 +151,43 @@ final class AuthPayloadCodec
     }
 
     /**
-     * Encrypts plaintext TOTP secrets in a method list before persistence.
+     * Decodes a raw JSON 2FA-methods column value into a typed array.
      *
-     * Skips secrets that are already encrypted or empty to make this safe to call
-     * on both fresh and previously persisted method arrays.
+     * Decrypts TOTP secrets and normalizes method structure on decode.
+     * Returns an empty array on any decode or normalization error.
      *
-     * @param array<int, array<string, mixed>> $methods 2FA method rows.
-     * @return array<int, array<string, mixed>> Method rows with TOTP secrets encrypted.
+     * @param mixed $raw Raw column value from the database.
+     * @return array<int, array<string, mixed>>
      */
-    private function encryptTotpSecrets(array $methods): array
+    public function decodeTwoFactorMethods(mixed $raw): array
     {
-        foreach ($methods as $index => $method) {
-            if (!is_array($method)) {
-                continue;
-            }
-
-            $type = strtolower(trim((string) ($method['type'] ?? '')));
-            if ($type !== 'totp') {
-                continue;
-            }
-
-            $secret = trim((string) ($method['secret'] ?? ''));
-            if ($secret === '') {
-                continue;
-            }
-
-            if ($this->totpSecretCipher->isEncrypted($secret)) {
-                continue;
-            }
-
-            $encrypted = $this->totpSecretCipher->encryptSecret($secret);
-            if (!is_string($encrypted) || $encrypted === '') {
-                continue;
-            }
-
-            $method['secret'] = $encrypted;
-            $methods[$index] = $method;
+        if (!is_string($raw) || trim($raw) === '') {
+            return [];
         }
 
-        return $methods;
+        $decoded = Json::decodeAssocString($raw, 64);
+        if (!is_array($decoded)) {
+            return [];
+        }
+
+        return Login2fa::normalizeStored($this->totpSecretCipher->decryptMethodSecrets($decoded));
     }
 
     /**
-     * Decrypts encrypted TOTP secrets in a method list after reading from DB.
+     * Encodes a normalized 2FA-methods array to a JSON string for persistence.
      *
-     * Sets secret to empty string when decryption fails to ensure downstream
-     * TOTP validation rejects invalid credentials safely.
+     * Encrypts TOTP secrets before encoding. Returns null when the array is empty.
      *
-     * @param array<int, mixed> $methods Raw decoded method rows from JSON.
-     * @return array<int, mixed> Method rows with TOTP secrets decrypted.
+     * @param array<int, array<string, mixed>> $methods Normalized 2FA method rows.
+     * @return string|null JSON string, or null when methods is empty.
      */
-    private function decryptTotpSecrets(array $methods): array
+    public function encodeTwoFactorMethods(array $methods): ?string
     {
-        foreach ($methods as $index => $method) {
-            if (!is_array($method)) {
-                continue;
-            }
-
-            $type = strtolower(trim((string) ($method['type'] ?? '')));
-            if ($type !== 'totp') {
-                continue;
-            }
-
-            $secret = trim((string) ($method['secret'] ?? ''));
-            if ($secret === '') {
-                continue;
-            }
-
-            $decrypted = $this->totpSecretCipher->decryptSecret($secret);
-            $method['secret'] = is_string($decrypted) ? $decrypted : '';
-            $methods[$index] = $method;
+        if ($methods === []) {
+            return null;
         }
 
-        return $methods;
+        return Json::encode($this->totpSecretCipher->encryptMethodSecrets($methods), JSON_UNESCAPED_SLASHES);
     }
+
 }

@@ -38,10 +38,8 @@ use Raven\Core\Controller\Panel\UserEditController;
 use Raven\Core\Controller\Panel\UserInviteController;
 use Raven\Core\Controller\Panel\UserListController;
 use Raven\Lib\Auth\AuthService;
-use Raven\Lib\Auth\LoginIdentifierResolver;
-use Raven\Lib\Permission\PermissionDefinitionCatalog;
-use Raven\Lib\Panel\TwoFactorPreferences;
-use Raven\Lib\Auth\PasswordChangePolicy;
+use Raven\Lib\Auth\LoginIdentifier;
+use Raven\Lib\Auth\Panel\PermissionDefinitionCatalog;
 use Raven\Lib\Auth\SessionFlash;
 use Raven\Lib\Extension\Panel\ExtensionCatalogService;
 use Raven\Lib\Media\Panel\TaxonomyImageService;
@@ -51,8 +49,10 @@ use Raven\Lib\Parser\GroupRouteParser;
 use Raven\Lib\Parser\UserProfileParser;
 use Raven\Lib\Scribe\MediaScribe;
 use Raven\Lib\Scribe\UserMediaScribe;
+use Raven\Lib\Security\PasswordValidator;
 use Raven\Lib\Transport\Upload;
 use Raven\Lib\View\Error as ViewError;
+use Raven\Lib\View\Form2fa;
 use Raven\Lib\Media\Panel\MediaConfigService;
 use Raven\Lib\View\Public\ThemeCatalog;
 
@@ -537,7 +537,7 @@ final class ControllerFactories
                 $userDomain['invite_read'],
                 new SessionFlash('_raven_flash_list'),
                 new GroupRouteParser($rvn['config'], $rvn['input']),
-                new LoginIdentifierResolver()
+                new LoginIdentifier()
             );
 
             return $userListController;
@@ -564,13 +564,13 @@ final class ControllerFactories
                 $userDomain['user_read'],
                 $userDomain['user_write'],
                 new GroupRouteParser($rvn['config'], $rvn['input']),
-                new LoginIdentifierResolver(),
+                new LoginIdentifier(),
                 $rvn['panel_editor_tabs'](),
                 $rvn['panel_editor'](),
                 $rvn['panel_editor_blocks'](),
                 new MediaConfigService($rvn['config']),
                 new UserProfileParser($rvn['input']),
-                new TwoFactorPreferences($rvn['input']),
+                new Form2fa($rvn['input']),
                 new UserMediaScribe((string) $rvn['root']),
                 new UserMediaPathService()
             );
@@ -676,16 +676,16 @@ final class ControllerFactories
                 $rvn['config'],
                 $rvn['input'],
                 (string) $rvn['root'],
-                new LoginIdentifierResolver(),
+                new LoginIdentifier(),
                 $rvn['panel_editor_tabs'](),
                 $rvn['panel_editor'](),
                 $rvn['panel_editor_blocks'](),
                 new MediaConfigService($rvn['config']),
                 new UserProfileParser($rvn['input']),
-                new TwoFactorPreferences($rvn['input']),
+                new Form2fa($rvn['input']),
                 new UserMediaScribe((string) $rvn['root']),
                 new UserMediaPathService(),
-                new PasswordChangePolicy()
+                new PasswordValidator()
             );
 
             return $preferencesController;

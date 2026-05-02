@@ -13,6 +13,7 @@ namespace Raven\Core\Controller\Public;
 
 use Raven\Core\Config;
 use Raven\Lib\Auth\AuthService;
+use Raven\Lib\Auth\Public\SessionGuard;
 use Raven\Lib\Transport\Response;
 use Raven\Lib\Transport\Request;
 use Raven\Lib\Auth\SessionFlash;
@@ -41,6 +42,7 @@ final class SharedController
     private Csrf $csrf;
     private SessionFlash $flash;
     private ThemeBrace $themeBrace;
+    private SessionGuard $sessionGuard;
     private bool $captchaScriptIncluded = false;
     private ?Request $requestContextResolver = null;
     private ?FeedParser $feedParser = null;
@@ -74,6 +76,7 @@ final class SharedController
         $this->themeCatalogService = $themeCatalogService;
         $this->flash = new SessionFlash('_raven_public_flash');
         $this->themeBrace = new ThemeBrace(dirname(__DIR__, 4) . '/.tmp/template_tag_cache');
+        $this->sessionGuard = new SessionGuard();
     }
 
     /**
@@ -248,36 +251,17 @@ final class SharedController
      */
     public function enforceSiteAvailability(): bool
     {
-        $mode = strtolower(trim((string) $this->config->get('site.visibility', 'public')));
-        if (!in_array($mode, ['public', 'private', 'disabled'], true)) {
-            $mode = 'public';
-        }
-
         $error = new ViewError($this->config, dirname(__DIR__, 4));
-        $isLoggedIn = $this->auth->isLoggedIn();
-
-        if ($mode === 'disabled') {
-            if ($isLoggedIn && $this->auth->canViewDisabledSite()) {
-                return true;
+        return $this->sessionGuard->enforceSiteAvailability(
+            $this->auth,
+            (string) $this->config->get('site.visibility', 'public'),
+            static function () use ($error): void {
+                $error->renderDisabled();
+            },
+            static function () use ($error): void {
+                $error->renderDenied();
             }
-            $error->renderDisabled();
-            return false;
-        }
-
-        if ($mode === 'private') {
-            if ($isLoggedIn && $this->auth->canViewPrivateSite()) {
-                return true;
-            }
-            $error->renderDenied();
-            return false;
-        }
-
-        if (!$this->auth->canViewPublicSite()) {
-            $error->renderDenied();
-            return false;
-        }
-
-        return true;
+        );
     }
 
     /**

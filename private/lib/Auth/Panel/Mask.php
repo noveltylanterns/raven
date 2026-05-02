@@ -2,23 +2,21 @@
 
 /**
  * RAVEN CMS
- * ~/private/lib/Permission/PanelAccess.php
- * Panel permission bitmask constants and stock permission helpers.
+ * ~/private/lib/Auth/Panel/Mask.php
+ * Canonical panel permission bitmask constants, route maps, and capability helpers.
  * Docs: https://raven.lanterns.io
  */
 
 declare(strict_types=1);
 
-namespace Raven\Lib\Permission;
-
-require_once __DIR__ . '/AccessCatalog.php';
-
-use Raven\Lib\Permission\AccessCatalog;
+namespace Raven\Lib\Auth\Panel;
 
 /**
- * Panel permission bitmask constants and stock capability check helpers.
+ * Canonical panel permission constants and mask helpers.
+ *
+ * This class is the long-term home for panel permission rules and stock route maps.
  */
-final class PanelAccess
+final class Mask
 {
     /** Allows access to public-site mode frontend routes/content. */
     public const VIEW_PUBLIC_SITE = 128;
@@ -117,13 +115,63 @@ final class PanelAccess
     public const EXTENSION_PERMISSION_START = 18014398509481984;
 
     /**
+     * @var array<string, array{label: string, view: int, create?: int, edit?: int, delete?: int, uninstall?: int}>|null
+     */
+    private static ?array $stockPanelRoutePermissionsCache = null;
+
+    /** @var array<int, int>|null */
+    private static ?array $allStockPanelBitsCache = null;
+
+    /**
      * Returns required stock groups.
      *
      * @return array<int, array{name: string, slug: string, permissions: int, is_stock: int}>
      */
     public static function stockGroups(): array
     {
-        return AccessCatalog::stockGroups();
+        $allStockPanelBitsMask = self::maskFromBits(self::allStockPanelBits());
+
+        return [
+            [
+                'name' => 'Admin',
+                'slug' => 'admin',
+                'permissions' => self::PANEL_LOGIN
+                    | self::VIEW_PUBLIC_SITE
+                    | self::VIEW_PRIVATE_SITE
+                    | self::VIEW_DISABLED_SITE
+                    | self::MANAGE_CONTENT
+                    | self::MANAGE_TAXONOMY
+                    | self::MANAGE_USERS
+                    | self::MANAGE_GROUPS
+                    | self::MANAGE_CONFIGURATION
+                    | $allStockPanelBitsMask,
+                'is_stock' => 1,
+            ],
+            [
+                'name' => 'Guest',
+                'slug' => 'guest',
+                'permissions' => self::VIEW_PUBLIC_SITE,
+                'is_stock' => 1,
+            ],
+            [
+                'name' => 'Validating',
+                'slug' => 'validating',
+                'permissions' => self::VIEW_PUBLIC_SITE,
+                'is_stock' => 1,
+            ],
+            [
+                'name' => 'User',
+                'slug' => 'user',
+                'permissions' => self::VIEW_PUBLIC_SITE | self::VIEW_PRIVATE_SITE,
+                'is_stock' => 1,
+            ],
+            [
+                'name' => 'Banned',
+                'slug' => 'banned',
+                'permissions' => 0,
+                'is_stock' => 1,
+            ],
+        ];
     }
 
     /**
@@ -249,7 +297,7 @@ final class PanelAccess
     /**
      * Returns true when any bit in the supplied list is present in the mask.
      *
-     * @param int         $mask Combined permission bitmask for the user.
+     * @param int $mask Combined permission bitmask for the user.
      * @param array<int, int> $bits List of bits to test (any match returns true).
      * @return bool True when at least one bit from $bits is set in $mask.
      */
@@ -271,7 +319,101 @@ final class PanelAccess
      */
     public static function stockPanelRoutePermissions(): array
     {
-        return AccessCatalog::stockPanelRoutePermissions();
+        if (is_array(self::$stockPanelRoutePermissionsCache)) {
+            return self::$stockPanelRoutePermissionsCache;
+        }
+
+        self::$stockPanelRoutePermissionsCache = [
+            'page' => [
+                'label' => 'Pages',
+                'view' => self::PAGES_VIEW,
+                'create' => self::PAGES_CREATE,
+                'edit' => self::PAGES_EDIT,
+                'delete' => self::PAGES_DELETE,
+            ],
+            'channel' => [
+                'label' => 'Channels',
+                'view' => self::CHANNELS_VIEW,
+                'create' => self::CHANNELS_CREATE,
+                'edit' => self::CHANNELS_EDIT,
+                'delete' => self::CHANNELS_DELETE,
+            ],
+            'category' => [
+                'label' => 'Categories',
+                'view' => self::CATEGORIES_VIEW,
+                'create' => self::CATEGORIES_CREATE,
+                'edit' => self::CATEGORIES_EDIT,
+                'delete' => self::CATEGORIES_DELETE,
+            ],
+            'tag' => [
+                'label' => 'Tags',
+                'view' => self::TAGS_VIEW,
+                'create' => self::TAGS_CREATE,
+                'edit' => self::TAGS_EDIT,
+                'delete' => self::TAGS_DELETE,
+            ],
+            'redirect' => [
+                'label' => 'Redirects',
+                'view' => self::REDIRECTS_VIEW,
+                'create' => self::REDIRECTS_CREATE,
+                'edit' => self::REDIRECTS_EDIT,
+                'delete' => self::REDIRECTS_DELETE,
+            ],
+            'user' => [
+                'label' => 'Users',
+                'view' => self::USERS_VIEW,
+                'create' => self::USERS_CREATE,
+                'edit' => self::USERS_EDIT,
+                'delete' => self::USERS_DELETE,
+            ],
+            'group' => [
+                'label' => 'Groups',
+                'view' => self::GROUPS_VIEW,
+                'create' => self::GROUPS_CREATE,
+                'edit' => self::GROUPS_EDIT,
+                'delete' => self::GROUPS_DELETE,
+            ],
+            'routing' => [
+                'label' => 'Routing',
+                'view' => self::ROUTING_VIEW,
+                'create' => self::ROUTING_CREATE,
+                'edit' => self::ROUTING_EDIT,
+                'delete' => self::ROUTING_DELETE,
+            ],
+            'themes' => [
+                'label' => 'Themes',
+                'view' => self::THEMES_VIEW,
+                'create' => self::THEMES_CREATE,
+                'edit' => self::THEMES_EDIT,
+                'uninstall' => self::THEMES_UNINSTALL,
+            ],
+            'extensions' => [
+                'label' => 'Extensions',
+                'view' => self::EXTENSIONS_VIEW,
+                'create' => self::EXTENSIONS_CREATE,
+                'edit' => self::EXTENSIONS_EDIT,
+                'uninstall' => self::EXTENSIONS_UNINSTALL,
+            ],
+            'configuration' => [
+                'label' => 'Configuration',
+                'view' => self::CONFIGURATION_VIEW,
+                'create' => self::CONFIGURATION_CREATE,
+                'edit' => self::CONFIGURATION_EDIT,
+                'delete' => self::CONFIGURATION_DELETE,
+            ],
+            'logs' => [
+                'label' => 'Event Log',
+                // View and clear (delete) reuse Configuration bits because logs are system-level diagnostics.
+                'view' => self::CONFIGURATION_VIEW,
+                'delete' => self::CONFIGURATION_DELETE,
+            ],
+            'update' => [
+                'label' => 'Update Raven',
+                'view' => self::MANAGE_CONFIGURATION,
+            ],
+        ];
+
+        return self::$stockPanelRoutePermissionsCache;
     }
 
     /**
@@ -282,7 +424,9 @@ final class PanelAccess
      */
     public static function stockPanelRoutePermission(string $routeKey): ?array
     {
-        return AccessCatalog::stockPanelRoutePermission($routeKey);
+        $definitions = self::stockPanelRoutePermissions();
+        $normalized = strtolower(trim($routeKey));
+        return $definitions[$normalized] ?? null;
     }
 
     /**
@@ -292,7 +436,22 @@ final class PanelAccess
      */
     public static function allStockPanelBits(): array
     {
-        return AccessCatalog::allStockPanelBits();
+        if (is_array(self::$allStockPanelBitsCache)) {
+            return self::$allStockPanelBitsCache;
+        }
+
+        $bits = [];
+        foreach (self::stockPanelRoutePermissions() as $permissionRow) {
+            foreach (['view', 'create', 'edit', 'delete', 'uninstall'] as $action) {
+                $bit = (int) ($permissionRow[$action] ?? 0);
+                if ($bit > 0) {
+                    $bits[] = $bit;
+                }
+            }
+        }
+
+        self::$allStockPanelBitsCache = $bits;
+        return self::$allStockPanelBitsCache;
     }
 
     /**
@@ -302,7 +461,7 @@ final class PanelAccess
      */
     public static function contentPanelBits(): array
     {
-        return AccessCatalog::contentPanelBits();
+        return self::routeBits('page');
     }
 
     /**
@@ -312,7 +471,7 @@ final class PanelAccess
      */
     public static function taxonomyPanelBits(): array
     {
-        return AccessCatalog::taxonomyPanelBits();
+        return self::routesBits(['channel', 'category', 'tag', 'redirect', 'routing']);
     }
 
     /**
@@ -322,7 +481,7 @@ final class PanelAccess
      */
     public static function usersPanelBits(): array
     {
-        return AccessCatalog::usersPanelBits();
+        return self::routeBits('user');
     }
 
     /**
@@ -332,7 +491,7 @@ final class PanelAccess
      */
     public static function groupsPanelBits(): array
     {
-        return AccessCatalog::groupsPanelBits();
+        return self::routeBits('group');
     }
 
     /**
@@ -342,7 +501,10 @@ final class PanelAccess
      */
     public static function systemPanelBits(): array
     {
-        return AccessCatalog::systemPanelBits();
+        return array_merge(
+            [self::MANAGE_CONFIGURATION],
+            self::routesBits(['configuration', 'themes', 'extensions'])
+        );
     }
 
     /**
@@ -369,5 +531,45 @@ final class PanelAccess
     public static function allStockPanelBitsMask(): int
     {
         return self::maskFromBits(self::allStockPanelBits());
+    }
+
+    /**
+     * Returns the permission bits for a single route key.
+     *
+     * @param string $route Lowercase panel route key.
+     * @return array<int, int>
+     */
+    private static function routeBits(string $route): array
+    {
+        $row = self::stockPanelRoutePermission($route);
+        if ($row === null) {
+            return [];
+        }
+
+        $bits = [];
+        foreach (['view', 'create', 'edit', 'delete', 'uninstall'] as $action) {
+            $bit = (int) ($row[$action] ?? 0);
+            if ($bit > 0) {
+                $bits[] = $bit;
+            }
+        }
+
+        return $bits;
+    }
+
+    /**
+     * Returns the merged permission bits for a list of route keys.
+     *
+     * @param array<int, string> $routes Lowercase panel route keys.
+     * @return array<int, int>
+     */
+    private static function routesBits(array $routes): array
+    {
+        $bits = [];
+        foreach ($routes as $route) {
+            $bits = array_merge($bits, self::routeBits($route));
+        }
+
+        return $bits;
     }
 }

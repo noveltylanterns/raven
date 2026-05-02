@@ -15,9 +15,8 @@ use Raven\Core\Config;
 use Raven\Core\Repository\GroupRead;
 use Raven\Core\Repository\UserRead;
 use Raven\Core\Repository\UserWrite;
-use Raven\Lib\Auth\LoginIdentifierResolver;
-use Raven\Lib\Permission\PanelAccess;
-use Raven\Lib\Panel\TwoFactorPreferences;
+use Raven\Lib\Auth\LoginIdentifier;
+use Raven\Lib\Auth\Panel\Mask as PanelAccess;
 use Raven\Lib\Media\Panel\AvatarValidationPolicy;
 use Raven\Lib\Media\Panel\AvatarValidator;
 use Raven\Lib\Media\Panel\UserMediaPathService;
@@ -26,6 +25,7 @@ use Raven\Lib\Parser\UserProfileParser;
 use Raven\Lib\Scribe\UserMediaScribe;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\Transport\Redirect;
+use Raven\Lib\View\Form2fa;
 use Raven\Lib\View\Panel\EditorWrapper;
 use Raven\Lib\View\Panel\EditorBlocks;
 use Raven\Lib\View\Panel\EditorTabs;
@@ -47,13 +47,13 @@ final class UserEditController
     private UserRead $userRead;
     private UserWrite $userWrite;
     private GroupRouteParser $groupParser;
-    private LoginIdentifierResolver $loginIdentifierResolver;
+    private LoginIdentifier $loginIdentifierResolver;
     private EditorTabs $editorTabs;
     private EditorWrapper $editor;
     private EditorBlocks $editorBlocks;
     private MediaConfigService $panelMediaConfigService;
     private UserProfileParser $profileContactService;
-    private TwoFactorPreferences $twoFactorPreferences;
+    private Form2fa $form2fa;
     private UserMediaScribe $userMediaScribe;
     private UserMediaPathService $userMediaPathService;
 
@@ -66,13 +66,13 @@ final class UserEditController
      * @param UserRead $userRead User repository read side for user find and author lookups.
      * @param UserWrite $userWrite User repository write side for panel user saves and deletes.
      * @param GroupRouteParser $groupParser Shared group/profile routing-policy parser.
-     * @param LoginIdentifierResolver $loginIdentifierResolver Shared login-identifier normalization helper.
+     * @param LoginIdentifier $loginIdentifierResolver Shared login-identifier normalization helper.
      * @param EditorTabs $editorTabs Shared editor-tab normalization helper.
      * @param EditorWrapper $editor Shared panel editor utility methods (theme normalization).
      * @param EditorBlocks $editorBlocks Shared repeater-block view helper for modular panel rows.
      * @param MediaConfigService $panelMediaConfigService Shared media-limit helper.
      * @param UserProfileParser $profileContactService Shared profile-contact normalizer.
-     * @param TwoFactorPreferences $twoFactorPreferences Shared 2FA list normalizer.
+     * @param Form2fa $form2fa Shared 2FA list normalizer.
      * @param UserMediaScribe $userMediaScribe Shared user-media write helper.
      * @param UserMediaPathService $userMediaPathService Shared user-media path resolver.
      * @return void
@@ -86,13 +86,13 @@ final class UserEditController
         UserRead $userRead,
         UserWrite $userWrite,
         GroupRouteParser $groupParser,
-        LoginIdentifierResolver $loginIdentifierResolver,
+        LoginIdentifier $loginIdentifierResolver,
         EditorTabs $editorTabs,
         EditorWrapper $editor,
         EditorBlocks $editorBlocks,
         MediaConfigService $panelMediaConfigService,
         UserProfileParser $profileContactService,
-        TwoFactorPreferences $twoFactorPreferences,
+        Form2fa $form2fa,
         UserMediaScribe $userMediaScribe,
         UserMediaPathService $userMediaPathService
     ) {
@@ -110,7 +110,7 @@ final class UserEditController
         $this->editorBlocks = $editorBlocks;
         $this->panelMediaConfigService = $panelMediaConfigService;
         $this->profileContactService = $profileContactService;
-        $this->twoFactorPreferences = $twoFactorPreferences;
+        $this->form2fa = $form2fa;
         $this->userMediaScribe = $userMediaScribe;
         $this->userMediaPathService = $userMediaPathService;
     }
@@ -817,7 +817,7 @@ final class UserEditController
      */
     private function twoFactorTypeOptions(): array
     {
-        return $this->twoFactorPreferences->typeOptions();
+        return $this->form2fa->typeOptions();
     }
 
     /**
@@ -828,7 +828,7 @@ final class UserEditController
      */
     private function normalizeSubmittedTwoFactorExistingIndices(mixed $rawMethods): array
     {
-        return $this->twoFactorPreferences->normalizeSubmittedExistingIndices($rawMethods);
+        return $this->form2fa->normalizeSubmittedExistingIndices($rawMethods);
     }
 
     /**

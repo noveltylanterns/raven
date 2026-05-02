@@ -22,7 +22,7 @@ use Raven\Core\Repository\TagRead;
 use Raven\Core\Repository\TagWrite;
 use Raven\Lib\Archive\Install as ArchiveInstall;
 use Raven\Lib\Archive\Package as ArchivePackage;
-use Raven\Lib\Permission\PanelAccess;
+use Raven\Lib\Auth\Panel\Mask as PanelAccess;
 use Raven\Lib\Extension\Registry;
 use Raven\Lib\Extension\Scaffold;
 use Raven\Lib\Extension\Resolver;

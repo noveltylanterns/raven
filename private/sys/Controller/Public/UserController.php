@@ -12,7 +12,7 @@ declare(strict_types=1);
 namespace Raven\Core\Controller\Public;
 
 use Raven\Core\Repository\UserRead;
-use Raven\Lib\Auth\LoginIdentifierResolver;
+use Raven\Lib\Auth\LoginIdentifier;
 use Raven\Lib\Parser\UserProfileParser;
 use Raven\Lib\View\Public\TemplateDecorator;
 
@@ -23,7 +23,7 @@ final class UserController
 {
     private SharedController $context;
     private UserRead $userRead;
-    private LoginIdentifierResolver $loginIdentifierResolver;
+    private LoginIdentifier $loginIdentifierResolver;
     private UserProfileParser $profileContactService;
     private TemplateDecorator $templateDecorator;
 
@@ -38,7 +38,7 @@ final class UserController
     ) {
         $this->context = $context;
         $this->userRead = $userRepo;
-        $this->loginIdentifierResolver = new LoginIdentifierResolver();
+        $this->loginIdentifierResolver = new LoginIdentifier();
         $this->profileContactService = new UserProfileParser($context->input());
         $this->templateDecorator = new TemplateDecorator(
             $context->config(),

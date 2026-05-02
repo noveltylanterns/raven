@@ -1,5 +1,12 @@
 <?php
 
+/**
+ * RAVEN CMS
+ * ~/private/lib/Auth/Membership.php
+ * Shared user-group membership read/write helpers with request-local caching.
+ * Docs: https://raven.lanterns.io
+ */
+
 declare(strict_types=1);
 
 namespace Raven\Lib\Auth;
@@ -10,7 +17,7 @@ use Raven\Lib\Database\TableNameResolver;
 /**
  * Shared user-group membership queries/mutations for auth permission flows.
  */
-final class AuthGroupMembershipService
+final class Membership
 {
     private PDO $rvnDb;
     private string $driver;
@@ -21,6 +28,11 @@ final class AuthGroupMembershipService
      */
     private array $groupsForUserCache = [];
 
+    /**
+     * @param PDO $rvnDb Application database connection.
+     * @param string $driver PDO driver name ('sqlite', 'mysql', or 'pgsql').
+     * @param string $prefix Table-name prefix for the application schema.
+     */
     public function __construct(PDO $rvnDb, string $driver, string $prefix)
     {
         $this->rvnDb = $rvnDb;
@@ -29,7 +41,10 @@ final class AuthGroupMembershipService
     }
 
     /**
-     * @return array<int, array{id: int, name: string, slug: string, permissions: int, is_stock: int}>
+     * Returns all group memberships for a user, with request-local caching.
+     *
+     * @param int $userId User id whose group memberships should be fetched.
+     * @return array<int, array{id: int, name: string, slug: string, permissions: int, is_stock: int}> Group rows.
      */
     public function groupsForUser(int $userId): array
     {
@@ -73,6 +88,13 @@ final class AuthGroupMembershipService
         return $result;
     }
 
+    /**
+     * Adds a user to a named group if the group exists and the membership is not already present.
+     *
+     * @param int $userId User id to assign.
+     * @param string $groupName Display name of the target group.
+     * @return void
+     */
     public function assignUserToGroupByName(int $userId, string $groupName): void
     {
         $groupsTable = $this->table('groups');
@@ -115,11 +137,22 @@ final class AuthGroupMembershipService
         $this->invalidateUser($userId);
     }
 
+    /**
+     * Clears all request-local group membership cache entries.
+     *
+     * @return void
+     */
     public function clearCaches(): void
     {
         $this->groupsForUserCache = [];
     }
 
+    /**
+     * Removes one user's group membership from the request-local cache.
+     *
+     * @param int $userId User id whose cached memberships should be discarded.
+     * @return void
+     */
     public function invalidateUser(int $userId): void
     {
         if ($userId <= 0) {

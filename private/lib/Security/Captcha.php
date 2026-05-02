@@ -1,5 +1,12 @@
 <?php
 
+/**
+ * RAVEN CMS
+ * ~/private/lib/Security/Captcha.php
+ * Shared captcha provider config, server-side verification, and public widget markup helpers.
+ * Docs: https://raven.lanterns.io
+ */
+
 declare(strict_types=1);
 
 namespace Raven\Lib\Security;
@@ -14,12 +21,21 @@ final class Captcha
     private Config $config;
     private InputSanitizer $input;
 
+    /**
+     * @param Config $config Runtime config for captcha provider settings.
+     * @param InputSanitizer $input Input sanitizer used to normalize config reads.
+     */
     public function __construct(Config $config, InputSanitizer $input)
     {
         $this->config = $config;
         $this->input = $input;
     }
 
+    /**
+     * Returns the active captcha provider slug from config.
+     *
+     * @return string Provider slug ('none', 'hcaptcha', 'recaptcha2', or 'recaptcha3').
+     */
     public function provider(): string
     {
         $provider = strtolower($this->input->text((string) $this->config->get('captcha.provider', 'none'), 20));
@@ -30,6 +46,12 @@ final class Captcha
         return $provider;
     }
 
+    /**
+     * Returns the public/site key for a given provider.
+     *
+     * @param string $provider Provider slug as returned by `provider()`.
+     * @return string Public site key, or empty string when not configured.
+     */
     public function siteKey(string $provider): string
     {
         return match ($provider) {
@@ -40,6 +62,12 @@ final class Captcha
         };
     }
 
+    /**
+     * Returns the secret/server key for a given provider.
+     *
+     * @param string $provider Provider slug as returned by `provider()`.
+     * @return string Secret server key, or empty string when not configured.
+     */
     public function secretKey(string $provider): string
     {
         return match ($provider) {
@@ -50,13 +78,24 @@ final class Captcha
         };
     }
 
+    /**
+     * Returns the POST field name that carries the captcha token for a given provider.
+     *
+     * @param string $provider Provider slug as returned by `provider()`.
+     * @return string POST field name.
+     */
     public function responseField(string $provider): string
     {
         return $provider === 'hcaptcha' ? 'h-captcha-response' : 'g-recaptcha-response';
     }
 
     /**
-     * @param array<string, mixed> $post
+     * Validates a captcha submission and returns a user-facing error message on failure.
+     *
+     * Returns null immediately when the provider is 'none'.
+     *
+     * @param array<string, mixed> $post Submitted POST data.
+     * @param string|null $remoteIp Client IP address forwarded to the captcha verification endpoint.
      * @return string|null One user-facing validation error, or null when captcha passes.
      */
     public function validateSubmission(array $post, ?string $remoteIp): ?string
@@ -86,7 +125,13 @@ final class Captcha
     }
 
     /**
-     * @return array{markup: string, script_included: bool}
+     * Builds the HTML widget markup and optional JS script tag for embedding a captcha on a public form.
+     *
+     * The `script_included` flag tracks whether the provider script has already been emitted on
+     * the page so callers can avoid duplicate script tags across multiple widget instances.
+     *
+     * @param bool $scriptIncluded Whether the provider JS script has already been emitted on this page.
+     * @return array{markup: string, script_included: bool} Widget HTML and updated script-included flag.
      */
     public function publicMarkup(bool $scriptIncluded): array
     {

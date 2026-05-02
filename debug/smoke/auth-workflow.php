@@ -596,8 +596,8 @@ $payload = [
     'user_id' => (int) ($auth->userId() ?? 0),
     'pending_two_factor_user_id' => (int) ($auth->pendingTwoFactorUserId() ?? 0),
     'two_factor_verified' => $auth->isTwoFactorVerifiedForUser(),
-    'panel_post_login_redirect' => \Raven\Lib\Auth\LoginUiStateService::forPanel()->postLoginRedirect(),
-    'public_post_login_redirect' => \Raven\Lib\Auth\LoginUiStateService::forPublic()->postLoginRedirect(),
+    'panel_post_login_redirect' => \Raven\Lib\Auth\LoginUiState::forPanel()->postLoginRedirect(),
+    'public_post_login_redirect' => \Raven\Lib\Auth\LoginUiState::forPublic()->postLoginRedirect(),
 ];
 
 echo json_encode($payload, JSON_UNESCAPED_SLASHES);

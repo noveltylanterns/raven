@@ -18,6 +18,14 @@ use Raven\Core\Config;
  */
 final class SessionCookie
 {
+    /**
+     * Starts a PHP session if one is not already active, applying Raven cookie policy.
+     *
+     * @param Config $config Runtime config for session cookie settings.
+     * @param string $root Absolute project root path; used to resolve the session save directory.
+     * @param array<string, mixed> $server Server environment array (typically $_SERVER).
+     * @return void
+     */
     public function startIfNeeded(Config $config, string $root, array $server): void
     {
         if (session_status() === PHP_SESSION_ACTIVE) {
@@ -53,6 +61,14 @@ final class SessionCookie
         session_start();
     }
 
+    /**
+     * Resolves the session cookie name from config, applying prefix if valid.
+     *
+     * Falls back to `session` when the stored name fails the safe-character check.
+     *
+     * @param Config $config Runtime config for session.cookie.name and session.cookie.prefix.
+     * @return string Validated session cookie name with optional prefix applied.
+     */
     public function resolveSessionName(Config $config): string
     {
         $sessionName = trim((string) $config->get('session.cookie.name', 'session'));
@@ -69,6 +85,16 @@ final class SessionCookie
         return $sessionName;
     }
 
+    /**
+     * Resolves the session cookie domain from config, validated against the current request host.
+     *
+     * Returns an empty string when no domain is configured or when the configured domain does not
+     * match the request host, so the browser applies its default domain-scoping behaviour.
+     *
+     * @param Config $config Runtime config for session.cookie.domain.
+     * @param array<string, mixed> $server Server environment array (typically $_SERVER).
+     * @return string Validated cookie domain, or empty string to let the browser decide.
+     */
     public function resolveCookieDomain(Config $config, array $server): string
     {
         $cookieDomain = strtolower(trim((string) $config->get('session.cookie.domain', '')));

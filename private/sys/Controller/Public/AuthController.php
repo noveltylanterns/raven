@@ -16,13 +16,11 @@ use Raven\Core\Repository\GroupRead;
 use Raven\Core\Repository\InviteRead;
 use Raven\Core\Repository\InviteWrite;
 use Raven\Core\Repository\UserWrite;
-use Raven\Lib\Auth\LoginAttemptPolicy;
-use Raven\Lib\Auth\LoginAttemptWorkflowService;
-use Raven\Lib\Auth\LoginChallengeFlow;
-use Raven\Lib\Auth\LoginChallengeWorkflowService;
-use Raven\Lib\Auth\LoginEmailDelivery;
-use Raven\Lib\Auth\LoginIdentifierResolver;
-use Raven\Lib\Auth\LoginUiStateService;
+use Raven\Lib\Auth\LoginAttempt;
+use Raven\Lib\Auth\LoginChallenge;
+use Raven\Lib\Auth\LoginEmail;
+use Raven\Lib\Auth\LoginIdentifier;
+use Raven\Lib\Auth\LoginUiState;
 use Raven\Lib\Transport\Redirect;
 
 /**
@@ -37,11 +35,10 @@ final class AuthController
     private Closure $inviteWriteResolver;
     private ?InviteRead $inviteRead = null;
     private ?InviteWrite $inviteWrite = null;
-    private LoginIdentifierResolver $identifierResolver;
-    private ?LoginUiStateService $loginUiState = null;
-    private ?LoginAttemptPolicy $loginAttemptPolicy = null;
-    private ?LoginAttemptWorkflowService $loginAttemptWorkflowService = null;
-    private ?LoginChallengeWorkflowService $loginChallengeWorkflowService = null;
+    private LoginIdentifier $identifierResolver;
+    private ?LoginUiState $loginUiState = null;
+    private ?LoginAttempt $loginAttempt = null;
+    private ?LoginChallenge $loginChallengeWorkflow = null;
 
     /**
      * @param SharedController $context Shared public request context.
@@ -63,7 +60,7 @@ final class AuthController
         $this->userRepo = $userRepo;
         $this->inviteReadResolver = Closure::fromCallable($inviteReadResolver);
         $this->inviteWriteResolver = Closure::fromCallable($inviteWriteResolver);
-        $this->identifierResolver = new LoginIdentifierResolver();
+        $this->identifierResolver = new LoginIdentifier();
     }
 
     /**
@@ -114,7 +111,7 @@ final class AuthController
             Redirect::redirect($this->loginPathWithRedirect($requestedRedirect));
         }
 
-        $result = $this->loginAttemptWorkflowService()->attempt(
+        $result = $this->loginAttempt()->attempt(
             $this->context->auth(),
             $post,
             $_SERVER,
@@ -150,7 +147,7 @@ final class AuthController
             $this->storePublicPostLoginRedirect($redirectPath);
         }
 
-        $viewState = $this->loginChallengeWorkflowService()->buildViewState($this->context->auth(), $this->loginUiState());
+        $viewState = $this->loginChallengeWorkflow()->buildViewState($this->context->auth(), $this->loginUiState());
         if (!(bool) ($viewState['ok'] ?? false)) {
             $this->context->auth()->logout();
             $this->clearPublicPostLoginRedirect();
@@ -189,7 +186,7 @@ final class AuthController
             Redirect::redirect($this->loginTwoFactorPathWithRedirect($requestedRedirect));
         }
 
-        $result = $this->loginChallengeWorkflowService()->verifyCodeChallenge($this->context->auth(), $this->loginUiState(), $post);
+        $result = $this->loginChallengeWorkflow()->verifyCodeChallenge($this->context->auth(), $this->loginUiState(), $post);
         if (($result['status'] ?? '') === 'expired') {
             $this->context->auth()->logout();
             $this->clearPublicPostLoginRedirect();
@@ -233,7 +230,7 @@ final class AuthController
             Redirect::redirect($this->loginTwoFactorPathWithRedirect($requestedRedirect));
         }
 
-        $result = $this->loginChallengeWorkflowService()->selectMethod($this->context->auth(), $this->loginUiState(), $post);
+        $result = $this->loginChallengeWorkflow()->selectMethod($this->context->auth(), $this->loginUiState(), $post);
         if (($result['status'] ?? '') === 'expired') {
             $this->context->auth()->logout();
             $this->clearPublicPostLoginRedirect();
@@ -261,7 +258,7 @@ final class AuthController
             return;
         }
 
-        $result = $this->loginChallengeWorkflowService()->webauthnOptions($this->context->auth(), $this->loginUiState(), $_SERVER);
+        $result = $this->loginChallengeWorkflow()->webauthnOptions($this->context->auth(), $this->loginUiState(), $_SERVER);
         if (!(bool) ($result['ok'] ?? false)) {
             $this->context->jsonResponse(
                 ['ok' => false, 'message' => (string) ($result['message'] ?? 'Failed to initialize WebAuthn challenge.')],
@@ -289,7 +286,7 @@ final class AuthController
             return;
         }
 
-        $result = $this->loginChallengeWorkflowService()->verifyWebauthn(
+        $result = $this->loginChallengeWorkflow()->verifyWebauthn(
             $this->context->auth(),
             $this->loginUiState(),
             $post,
@@ -522,72 +519,52 @@ final class AuthController
     /**
      * Returns the shared login UI state storage for public auth flows.
      *
-     * @return LoginUiStateService Shared public login UI state.
+     * @return LoginUiState Shared public login UI state.
      */
-    private function loginUiState(): LoginUiStateService
+    private function loginUiState(): LoginUiState
     {
-        if (!$this->loginUiState instanceof LoginUiStateService) {
-            $this->loginUiState = LoginUiStateService::forPublic();
+        if (!$this->loginUiState instanceof LoginUiState) {
+            $this->loginUiState = LoginUiState::forPublic();
         }
 
         return $this->loginUiState;
     }
 
     /**
-     * Returns the shared login attempt policy for public auth and registration.
+     * Returns the shared public login attempt workflow.
      *
-     * @return LoginAttemptPolicy Shared login attempt policy.
+     * @return LoginAttempt Shared login attempt workflow.
      */
-    private function loginAttemptPolicy(): LoginAttemptPolicy
+    private function loginAttempt(): LoginAttempt
     {
-        if (!$this->loginAttemptPolicy instanceof LoginAttemptPolicy) {
-            $this->loginAttemptPolicy = new LoginAttemptPolicy(
+        if (!$this->loginAttempt instanceof LoginAttempt) {
+            $this->loginAttempt = new LoginAttempt(
                 $this->context->config(),
+                $this->context->input(),
+                $this->identifierResolver,
                 $this->context->requestContextResolver()
             );
         }
 
-        return $this->loginAttemptPolicy;
+        return $this->loginAttempt;
     }
 
     /**
-     * Returns the shared public login attempt workflow service.
+     * Returns the shared public login challenge workflow.
      *
-     * @return LoginAttemptWorkflowService Shared login attempt workflow.
+     * @return LoginChallenge Shared login challenge workflow.
      */
-    private function loginAttemptWorkflowService(): LoginAttemptWorkflowService
+    private function loginChallengeWorkflow(): LoginChallenge
     {
-        if (!$this->loginAttemptWorkflowService instanceof LoginAttemptWorkflowService) {
-            $this->loginAttemptWorkflowService = new LoginAttemptWorkflowService(
+        if (!$this->loginChallengeWorkflow instanceof LoginChallenge) {
+            $this->loginChallengeWorkflow = new LoginChallenge(
                 $this->context->config(),
                 $this->context->input(),
-                $this->identifierResolver,
-                $this->loginAttemptPolicy(),
-                new LoginChallengeFlow()
+                new LoginEmail()
             );
         }
 
-        return $this->loginAttemptWorkflowService;
-    }
-
-    /**
-     * Returns the shared public login challenge workflow service.
-     *
-     * @return LoginChallengeWorkflowService Shared login challenge workflow.
-     */
-    private function loginChallengeWorkflowService(): LoginChallengeWorkflowService
-    {
-        if (!$this->loginChallengeWorkflowService instanceof LoginChallengeWorkflowService) {
-            $this->loginChallengeWorkflowService = new LoginChallengeWorkflowService(
-                $this->context->config(),
-                $this->context->input(),
-                new LoginChallengeFlow(),
-                new \Raven\Lib\Auth\LoginWebAuthnChallengeService(),
-                new LoginEmailDelivery()
-            );
-        }
-
-        return $this->loginChallengeWorkflowService;
+        return $this->loginChallengeWorkflow;
     }
 
     /**
@@ -806,11 +783,10 @@ final class AuthController
      */
     private function isRegistrationTemporarilyLocked(): bool
     {
-        $policy = $this->loginAttemptPolicy();
         return $this->context->auth()->isLoginTemporarilyLocked(
             $this->registrationThrottleIdentifier(),
-            $policy->clientIpAddress($_SERVER),
-            $policy->windowSeconds()
+            $this->loginAttemptClientIpAddress(),
+            $this->loginAttemptWindowSeconds()
         );
     }
 
@@ -821,13 +797,12 @@ final class AuthController
      */
     private function recordRegistrationFailure(): void
     {
-        $policy = $this->loginAttemptPolicy();
         $this->context->auth()->recordFailedLoginAttempt(
             $this->registrationThrottleIdentifier(),
-            $policy->clientIpAddress($_SERVER),
-            $policy->maxAttempts(),
-            $policy->windowSeconds(),
-            $policy->lockSeconds()
+            $this->loginAttemptClientIpAddress(),
+            $this->loginAttemptMaxAttempts(),
+            $this->loginAttemptWindowSeconds(),
+            $this->loginAttemptLockSeconds()
         );
     }
 
@@ -838,10 +813,53 @@ final class AuthController
      */
     private function clearRegistrationFailures(): void
     {
-        $policy = $this->loginAttemptPolicy();
         $this->context->auth()->clearFailedLoginAttempts(
             $this->registrationThrottleIdentifier(),
-            $policy->clientIpAddress($_SERVER)
+            $this->loginAttemptClientIpAddress()
         );
+    }
+
+    /**
+     * Returns one normalized client IP string for registration throttle tracking.
+     *
+     * @return string Normalized client IP or `unknown` fallback.
+     */
+    private function loginAttemptClientIpAddress(): string
+    {
+        $normalized = $this->context->requestContextResolver()->normalizeClientIp((string) ($_SERVER['REMOTE_ADDR'] ?? ''));
+        return $normalized ?? 'unknown';
+    }
+
+    /**
+     * Returns the configured registration/login brute-force attempt threshold.
+     *
+     * @return int Maximum failed attempts before lockout.
+     */
+    private function loginAttemptMaxAttempts(): int
+    {
+        $configured = (int) $this->context->config()->get('session.brute.max', 5);
+        return max(1, $configured);
+    }
+
+    /**
+     * Returns the configured registration/login brute-force failure window.
+     *
+     * @return int Failure-window length in seconds.
+     */
+    private function loginAttemptWindowSeconds(): int
+    {
+        $configured = (int) $this->context->config()->get('session.brute.window', 600);
+        return max(1, $configured);
+    }
+
+    /**
+     * Returns the configured registration/login lockout duration.
+     *
+     * @return int Lockout duration in seconds.
+     */
+    private function loginAttemptLockSeconds(): int
+    {
+        $configured = (int) $this->context->config()->get('session.brute.lock', 900);
+        return max(1, $configured);
     }
 }

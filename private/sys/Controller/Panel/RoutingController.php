@@ -18,8 +18,8 @@ use Raven\Core\Repository\PageRead;
 use Raven\Core\Repository\RedirectRead;
 use Raven\Core\Repository\UserRead;
 use Raven\Core\Debug\RouteProfiler;
-use Raven\Lib\Auth\LoginIdentifierResolver;
-use Raven\Lib\Permission\PanelAccess;
+use Raven\Lib\Auth\LoginIdentifier;
+use Raven\Lib\Auth\Panel\Mask as PanelAccess;
 use Raven\Lib\Format\Csv;
 use Raven\Lib\Parser\CategoryRouteParser;
 use Raven\Lib\Parser\ChannelRouteParser;
@@ -51,7 +51,7 @@ final class RoutingController
     /** @var Closure(): TaxonomyRepoParser */
     private Closure $taxonomyLookupRepoResolver;
     private ?TaxonomyRepoParser $taxonomyLookupRepo = null;
-    private LoginIdentifierResolver $identifierResolver;
+    private LoginIdentifier $identifierResolver;
     private ?RouteProfiler $routeProfiler = null;
     private ?Csv $csvHandler = null;
     private ?FeedParser $feedParser = null;
@@ -93,7 +93,7 @@ final class RoutingController
         $this->redirectRepo = $redirectRepo;
         $this->userRepo = $userRepo;
         $this->taxonomyLookupRepoResolver = Closure::fromCallable($taxonomyLookupRepoResolver);
-        $this->identifierResolver = new LoginIdentifierResolver();
+        $this->identifierResolver = new LoginIdentifier();
         $this->themeCatalogService = $themeCatalogService;
     }
 

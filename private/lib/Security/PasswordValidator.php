@@ -1,16 +1,30 @@
 <?php
 
+/**
+ * RAVEN CMS
+ * ~/private/lib/Security/PasswordValidator.php
+ * Shared password-change validation helper for account settings flows.
+ * Docs: https://raven.lanterns.io
+ */
+
 declare(strict_types=1);
 
-namespace Raven\Lib\Auth;
+namespace Raven\Lib\Security;
 
 /**
- * Shared password-change validation policy for panel/public account flows.
+ * Shared password-change validation helper for panel/public account flows.
  */
-final class PasswordChangePolicy
+final class PasswordValidator
 {
     /**
-     * @return array<int, string>
+     * Validates a new-password-change submission and returns a list of user-facing error strings.
+     *
+     * Returns an empty array when both fields are empty (no change requested) or when all rules pass.
+     *
+     * @param string $newPassword Submitted new password value.
+     * @param string $confirmNewPassword Submitted confirmation value.
+     * @param int $minimumLength Minimum required password character length.
+     * @return array<int, string> Validation errors; empty array on success.
      */
     public function validateNewPasswordChange(
         string $newPassword,

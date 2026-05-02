@@ -2,21 +2,21 @@
 
 /**
  * RAVEN CMS
- * ~/private/lib/Permission/GroupRolePolicy.php
+ * ~/private/lib/Auth/Panel/RolePolicy.php
  * Group role slug validation and stock-role permission constraint helpers.
  * Docs: https://raven.lanterns.io
  */
 
 declare(strict_types=1);
 
-namespace Raven\Lib\Permission;
+namespace Raven\Lib\Auth\Panel;
 
-use Raven\Lib\Permission\PanelAccess;
+use Raven\Lib\Auth\Public\Mask as PublicMask;
 
 /**
  * Group role slug normalizer and stock-role permission constraint policy.
  */
-final class GroupRolePolicy
+final class RolePolicy
 {
     /** @var array<int, string> */
     private const STOCK_SLUGS = [
@@ -117,12 +117,10 @@ final class GroupRolePolicy
 
     /**
      * Returns enforced route and permissions values for a stock role slug.
-     * Stock roles have fixed constraints: guest/validating cannot have route access;
-     * admin always receives the full permission mask.
      *
-     * @param string $roleSlug     The group slug to evaluate.
-     * @param int    $routeEnabled Caller-supplied route value (0 or 1).
-     * @param int    $mask         Caller-supplied permissions bitmask.
+     * @param string $roleSlug The group slug to evaluate.
+     * @param int $routeEnabled Caller-supplied route value (0 or 1).
+     * @param int $mask Caller-supplied permissions bitmask.
      * @return array{route: int, permissions: int}
      */
     public function normalizeStockRoleSettings(string $roleSlug, int $routeEnabled, int $mask): array
@@ -136,22 +134,22 @@ final class GroupRolePolicy
             $resolvedMask = 0;
         } elseif ($this->isGuestLikeRoleSlug($normalizedSlug)) {
             $resolvedRoute = 0;
-            $resolvedMask &= PanelAccess::VIEW_PUBLIC_SITE;
+            $resolvedMask &= PublicMask::VIEW_PUBLIC_SITE;
         } elseif ($this->isUserRoleSlug($normalizedSlug)) {
-            $resolvedMask &= (PanelAccess::VIEW_PUBLIC_SITE | PanelAccess::VIEW_PRIVATE_SITE);
+            $resolvedMask &= (PublicMask::VIEW_PUBLIC_SITE | PublicMask::VIEW_PRIVATE_SITE);
         } elseif ($this->isAdminRoleSlug($normalizedSlug)) {
             // Admin group always gets the full permission mask.
             $resolvedMask = (
-                PanelAccess::VIEW_PUBLIC_SITE
-                | PanelAccess::VIEW_PRIVATE_SITE
-                | PanelAccess::VIEW_DISABLED_SITE
-                | PanelAccess::PANEL_LOGIN
-                | PanelAccess::MANAGE_CONTENT
-                | PanelAccess::MANAGE_TAXONOMY
-                | PanelAccess::MANAGE_USERS
-                | PanelAccess::MANAGE_GROUPS
-                | PanelAccess::MANAGE_CONFIGURATION
-                | PanelAccess::allStockPanelBitsMask()
+                PublicMask::VIEW_PUBLIC_SITE
+                | PublicMask::VIEW_PRIVATE_SITE
+                | PublicMask::VIEW_DISABLED_SITE
+                | Mask::PANEL_LOGIN
+                | Mask::MANAGE_CONTENT
+                | Mask::MANAGE_TAXONOMY
+                | Mask::MANAGE_USERS
+                | Mask::MANAGE_GROUPS
+                | Mask::MANAGE_CONFIGURATION
+                | Mask::allStockPanelBitsMask()
             );
         }
 
@@ -163,7 +161,6 @@ final class GroupRolePolicy
 
     /**
      * Strips route-level panel bits from a mask when PANEL_LOGIN is not present.
-     * Prevents a group from holding route-level bits without dashboard access.
      *
      * @param int $mask Raw permission mask to normalize.
      * @return int Corrected mask with invalid bit combinations removed.
@@ -171,9 +168,9 @@ final class GroupRolePolicy
     public function normalizeMaskForPanelAccess(int $mask): int
     {
         $resolvedMask = $mask;
-        if (($resolvedMask & PanelAccess::PANEL_LOGIN) !== PanelAccess::PANEL_LOGIN) {
-            $resolvedMask &= ~PanelAccess::allStockPanelBitsMask();
-            $resolvedMask &= ~PanelAccess::VIEW_DISABLED_SITE;
+        if (($resolvedMask & Mask::PANEL_LOGIN) !== Mask::PANEL_LOGIN) {
+            $resolvedMask &= ~Mask::allStockPanelBitsMask();
+            $resolvedMask &= ~PublicMask::VIEW_DISABLED_SITE;
         }
 
         return $resolvedMask;

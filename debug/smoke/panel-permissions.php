@@ -41,7 +41,7 @@ use Raven\Core\Config;
 use Raven\Core\Repository\GroupRead;
 use Raven\Core\Repository\GroupWrite;
 use Raven\Core\Repository\UserWrite;
-use Raven\Lib\Permission\PanelAccess;
+use Raven\Lib\Auth\Panel\Mask as PanelAccess;
 use Raven\Lib\Extension\Panel\ExtensionCatalogService;
 use Raven\Lib\Extension\Panel\ExtensionPermissionCatalogService;
 use Raven\Lib\Extension\Scaffold;

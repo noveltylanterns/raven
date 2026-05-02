@@ -159,34 +159,27 @@ This file is the fast system map for Raven CMS. Use it to quickly understand the
 - `private/lib/Auth/`
   - Route-agnostic auth machinery shared by both public and panel entrypoints.
   - `AuthService` — central auth facade: Delight Auth wrapper, login/logout, 2FA session lifecycle, permission-mask queries, and user preference reads/writes. Several former single-caller wrapper classes (`LoginChallengeState`, `LoginThrottleService`, `UserSecurityProfileService`) have been folded directly into `AuthService` to eliminate pass-through layers. Auth-user profile writes route through `lib/Scribe/AuthProfileScribe.php`; throttle bucket writes route through `lib/Scribe/AuthThrottleScribe.php`.
-  - `AuthGroupMembershipService` — request-local cache for group membership queries; intentional cache-bearing boundary kept separate from `AuthService`.
+  - `Membership` — request-local cache for group membership queries; intentional cache-bearing boundary kept separate from `AuthService`.
   - `AuthPayloadCodec` — JSON encode/decode for user contact-profile and 2FA-method columns, including TOTP secret encryption at rest. Contact-profile normalization is handled internally (no injected normalizer).
-  - `LoginAttemptWorkflowService` — shared password-auth workflow for panel and public login entrypoints; delegates throttle reads/writes to `AuthService`.
-  - `LoginAttemptPolicy` — throttle config reads (`maxAttempts`, `windowSeconds`, `lockSeconds`) and client IP normalization; used by both `LoginAttemptWorkflowService` and `Public\AuthController` registration throttling.
-  - `LoginChallengeFlow` — 2FA method selection, preferred-method resolution, and flow orchestration helpers.
-  - `LoginChallengeWorkflowService` — shared 2FA challenge submit/verify workflow for panel and public challenge screens.
-  - `LoginEmailChallenge` — email-code challenge issue and verification; owns its own session storage for pending email challenges.
-  - `LoginEmailDelivery` — dispatches email-code challenge emails.
-  - `LoginIdentifierResolver` — username/email identifier mode detection and normalization.
-  - `LoginUiStateService` — session-backed login UI state (selected method key, 2FA state).
-  - `LoginWebAuthnChallengeService` — WebAuthn challenge generation and assertion verification.
-  - `PasswordChangePolicy` — password-change validation rules.
-  - `Auth/Public/` — public-route-only auth helpers.
-  - Shared 2FA method primitives: `TwoFactorMethodKey`, `TwoFactorMethodNormalizer`, `TwoFactorMethodRules` — static utility classes for method key derivation, stored-payload normalization, and type/status rule enforcement.
+  - `LoginAttempt` — shared password-auth workflow for panel and public login entrypoints; owns throttle config reads (`maxAttempts`, `windowSeconds`, `lockSeconds`) and client IP normalization via `Request`, then delegates throttle reads/writes to `AuthService`.
+  - `LoginChallenge` — 2FA challenge orchestration: method selection/preference resolution, email/TOTP/WebAuthn challenge submit/verify, and WebAuthn options generation. Merges the former `LoginChallengeFlow`, `LoginChallengeWorkflowService`, and `LoginWebAuthnChallengeService`; all flow/WebAuthn context helpers are private; public API is the five workflow methods plus static `preferredMethodKeyForChallenge()`.
+  - `LoginEmail` — email-code challenge session storage (issue/verify/store/clear) and delivery (send/mask). Merges the former `LoginEmailChallenge` and `LoginEmailDelivery`; stays lib-level because `LoginChallenge` (a lib class) is the sole caller.
+  - `LoginIdentifier` — username/email identifier mode detection and raw-value normalization; renamed from `LoginIdentifierResolver`.
+  - `LoginUiState` — session-backed login UI state (selected method key, 2FA state, WebAuthn failure, post-login redirect, email input); renamed from `LoginUiStateService`.
+  - `Login2fa` — consolidated static 2FA utility surface for method key derivation, type/status/label rules, and stored-method normalization used by auth/challenge flows.
+  - `Auth/Panel/Mask.php` — canonical panel permission constants, stock route maps/group seeds, and panel capability bitmask helpers.
+  - `Auth/Panel/RolePolicy.php` — canonical group-role slug and stock-role permission constraint policy.
+  - `Auth/Panel/PermissionDefinitionCatalog.php` — canonical group-edit permission-definition builder from stock and extension permission sources.
+  - `Auth/Panel/PermissionMaskService.php` — per-request combined permission-mask cache/computation for authenticated users from group memberships.
+  - `Auth/Panel/Service.php` — panel authorization orchestration for permission checks, group membership reads/writes, and mask-cached capability gating.
+  - `Auth/Panel/SessionGuard.php` — panel login gate: requires panel login, enforces 2FA status, and syncs panel identity/capability session values.
+  - `Auth/Public/Mask.php` — canonical public site-visibility permission bits and access-check helpers.
+  - `Auth/Public/PermissionMaskService.php` — per-request guest-group permission-mask lookup/cache for anonymous public-route checks.
+  - `Auth/Public/Service.php` — public-route authorization orchestration for visibility gates backed by guest and authenticated masks.
+  - `Auth/Public/SessionGuard.php` — public-site visibility gate helper (`public`/`private`/`disabled`) with shared denied/disabled response callbacks.
   - `SessionFlash.php` — session-backed flash message store; used by both panel and public routes.
   - `SessionCookie.php` — session cookie configuration policy; applied at bootstrap.
   - `SessionToken.php` — default CSRF token storage implementation used by `Security/Csrf`.
-- `private/lib/Permission/`
-  - Panel permission constants, bitmask computation, and group role policy. Kept separate from `lib/Auth/` because panel and public routes have distinct permission sets and `lib/Auth/` must remain route-agnostic.
-  - `PanelAccess` — panel permission bit constants (`PANEL_LOGIN`, `MANAGE_CONTENT`, etc.) and static capability helpers (`canLoginPanel`, `canManageUsers`, etc.).
-  - `AccessCatalog` — maps route keys to permission bit arrays; provides seed data for stock group permission defaults.
-  - `PermissionDefinitionCatalog` — builds permission definition rows for the group-edit UI from stock and extension sources.
-  - `PermissionMaskService` — computes the combined permission bitmask for a user from their group memberships; request-local cache keyed by user id.
-  - `GroupRolePolicy` — stock group role slug normalization and permission-mask constraint enforcement; lives here (not `lib/Auth/`) because it is tightly coupled to `PanelAccess` constants.
-- `private/lib/Panel/`
-  - Panel-specific session and preference helpers that must remain at lib level (not in `sys/Controller/Panel/`) because `lib/Extension/Panel/PanelRouteRegistrar` also imports them, and lib must not depend on sys.
-  - `SessionGuard` — panel login gate: requires panel login, syncs panel identity in session, detects guest login entry requests.
-  - `TwoFactorPreferences` — panel 2FA preferences form helpers: method type options, submitted-method normalization, TOTP setup payload, recovery phrase generation, WebAuthn credential exclusion list.
 - `private/lib/Parser/`
   - Canonical read-only parsing and normalization helpers for routing, config, metadata, and filesystem-backed records.
   - Content-type parsers are split into `*RouteParser` / `*DataParser` pairs: `*RouteParser` classes hold config-backed routing policy as static methods (taking `Config` and/or `InputSanitizer`); `*DataParser` classes hold repository-backed reads as instance methods with optional repository injection.
@@ -228,7 +221,8 @@ This file is the fast system map for Raven CMS. Use it to quickly understand the
   - `Extract` — shared archive extraction forwarder for ZIP, TAR-family, 7Z, and single-file compression formats; also handles selective file/folder extraction plus manifest reads across wrapped package layouts.
   - `Compress` — shared archive compression forwarder for ZIP, TAR-family, 7Z, and single-file compression formats; also handles selective file/folder archive updates where the format supports named entries.
 - `private/lib/Format/`
-  - Canonical reusable format handlers such as `Zip`, `Tar`, `Szip`, `Gz`, `Bz2`, `Xz`, `Zst`, `Git`, and `Csv`; stock extension exports/imports and panel CSV downloads now route through `Csv`.
+  - Canonical reusable format handlers such as `Zip`, `Tar`, `Szip`, `Gz`, `Bz2`, `Xz`, `Zst`, `Git`, `Csv`, and `Json`; stock extension exports/imports and panel CSV downloads now route through `Csv`.
+  - `Json.php` — shared JSON encode/decode helpers for strings and files, including atomic file writes for JSON payload persistence.
 - `private/lib/Database/`
   - Reusable database primitives for core and extensions.
   - `ProfiledPDO` and `ProfiledPDOStatement` wrap PDO for query-level profiling; `QueryProfilerInterface` is the shared contract.
@@ -254,14 +248,15 @@ This file is the fast system map for Raven CMS. Use it to quickly understand the
   - `TaxonomyImagePathResolver` lives at the `Media/` root as the neutral taxonomy/group image-path primitive shared by repositories, repo parsers, scribes, and panel helpers.
   - `Media/Panel/` — panel-route-specific media classes: `AvatarValidator` (avatar upload constraints), `AvatarUploadService` (low-level avatar/cover upload sanitizer), `MediaManager` (page media lifecycle orchestration), `MediaUploadPolicy`, `ImageVariantProcessor`, `MediaConfigService` (panel media-limit and upload-policy config helper), `TaxonomyImageService` (read-side taxonomy image config/path helper), `UserMediaPathService` (read-side avatar/cover URL/template helper), and related path/gallery helpers.
 - `private/lib/Security/`
-  - Security primitives available to core and extensions: CSRF (`Csrf`, `CsrfToken`), input sanitization (`InputSanitizer`), user-string generation (`UserString`), 2FA crypto/auth primitives (`Totp`, `TotpCipher`, `WebAuthn`, `RecoveryPhrase`), and captcha (`Captcha`).
+  - Security primitives available to core and extensions: CSRF (`Csrf`, `CsrfToken`), input sanitization (`InputSanitizer`), user-string generation (`UserString`), password-change validation (`PasswordValidator`), 2FA crypto/auth primitives (`Totp`, `TotpCipher`, `WebAuthn`, `RecoveryPhrase`), and captcha (`Captcha`). `TotpCipher` now owns both single-secret and method-list TOTP secret encryption/decryption helpers.
 - `private/lib/Extra/`
   - Global helper functions and small shared utility catalogs.
   - `Helpers.php` — defines `e()` (HTML-escape) plus a legacy `request_path()` wrapper that now forwards to `Raven\Lib\Transport\Request::path()`.
 - `private/lib/View/`
   - Theme discovery, inheritance, content rendering, and template utilities.
   - `Theme.php` — shared public-theme discovery, option, and inheritance helpers used by panel theme management, CLI theme commands, and public-theme rendering.
-  - `Error`, `Pagination`, `FormCountries`, and `Qr` now live directly under `View/` as the remaining shared cross-route view helpers.
+  - `Error`, `Pagination`, `FormCountries`, `Form2fa`, and `Qr` now live directly under `View/` as the remaining shared cross-route view helpers.
+  - `Form2fa.php` — shared 2FA account-form helper set: method-type options, submitted-method normalization, TOTP setup payload generation, recovery phrase generation, and WebAuthn credential exclusion/user-identity normalization.
   - `Pagination.php` — reusable pagination value object and helper; available to both panel and public controllers.
   - `Qr.php` — shared QR-code SVG data-URI renderer used by panel 2FA setup and shared view payload builders.
   - `View/Panel/` — panel-only view/theme helpers: `Header` (canonical panel header-card renderer), `Toolbar` (shared mirrored action-row wrapper for panel buttons/forms), `Footer` (standard panel footer plus route-asset collector for body-end CSS/JS), `EditorWrapper` (shared body-text editor and theme-normalization utilities), `EditorBlocks` (shared repeater-row wrapper class variants for modular editor blocks), `EditorTabs` (shared tab normalization and tab-preserving URL helpers), `EditorAuthor`, `ListWrapper`, `PanelPost`, `EditorBlocksPage` (panel editor block-definition merge plus submitted-block normalization), and `ListFilter`.

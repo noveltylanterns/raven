@@ -12,7 +12,7 @@ declare(strict_types=1);
 namespace Raven\Lib\Scribe;
 
 use PDO;
-use Raven\Lib\Permission\GroupRolePolicy;
+use Raven\Lib\Auth\Panel\RolePolicy;
 use Raven\Lib\Database\TableNameResolver;
 use RuntimeException;
 
@@ -31,7 +31,7 @@ final class GroupScribe
     private PDO $db;
     private string $driver;
     private string $prefix;
-    private GroupRolePolicy $rolePolicy;
+    private RolePolicy $rolePolicy;
 
     /**
      * Prepares the group scribe for group writes.
@@ -45,7 +45,7 @@ final class GroupScribe
         $this->db = $db;
         $this->driver = $driver;
         $this->prefix = preg_replace('/[^a-zA-Z0-9_]/', '', $prefix) ?? '';
-        $this->rolePolicy = new GroupRolePolicy();
+        $this->rolePolicy = new RolePolicy();
     }
 
     /**

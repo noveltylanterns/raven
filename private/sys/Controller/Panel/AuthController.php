@@ -14,10 +14,11 @@ namespace Raven\Core\Controller\Panel;
 use Raven\Core\Config;
 use Raven\Core\Renderer;
 use Raven\Lib\Auth\AuthService;
-use Raven\Lib\Auth\LoginAttemptWorkflowService;
-use Raven\Lib\Auth\LoginChallengeWorkflowService;
-use Raven\Lib\Auth\LoginIdentifierResolver;
-use Raven\Lib\Auth\LoginUiStateService;
+use Raven\Lib\Auth\LoginAttempt;
+use Raven\Lib\Auth\LoginChallenge;
+use Raven\Lib\Auth\LoginEmail;
+use Raven\Lib\Auth\LoginIdentifier;
+use Raven\Lib\Auth\LoginUiState;
 use Raven\Lib\Transport\Response;
 use Raven\Lib\Auth\SessionFlash;
 use Raven\Lib\Parser\PanelParser;
@@ -38,10 +39,10 @@ final class AuthController
     private InputSanitizer $input;
     private Csrf $csrf;
     private SessionFlash $flash;
-    private LoginIdentifierResolver $identifierResolver;
-    private ?LoginUiStateService $loginUiState = null;
-    private ?LoginAttemptWorkflowService $loginAttemptWorkflowService = null;
-    private ?LoginChallengeWorkflowService $loginChallengeWorkflowService = null;
+    private LoginIdentifier $identifierResolver;
+    private ?LoginUiState $loginUiState = null;
+    private ?LoginAttempt $loginAttempt = null;
+    private ?LoginChallenge $loginChallengeWorkflow = null;
 
     public function __construct(
         Renderer $view,
@@ -56,7 +57,7 @@ final class AuthController
         $this->input = $input;
         $this->csrf = $csrf;
         $this->flash = new SessionFlash('_raven_flash');
-        $this->identifierResolver = new LoginIdentifierResolver();
+        $this->identifierResolver = new LoginIdentifier();
     }
 
     /**
@@ -104,7 +105,7 @@ final class AuthController
             Redirect::redirect($this->panelUrl('/login'));
         }
 
-        $result = $this->loginAttemptWorkflowService()->attempt(
+        $result = $this->loginAttempt()->attempt(
             $this->auth,
             $post,
             $_SERVER,
@@ -140,7 +141,7 @@ final class AuthController
             Redirect::redirect($this->panelUrl('/login'));
         }
 
-        $viewState = $this->loginChallengeWorkflowService()->buildViewState($this->auth, $this->loginUiState());
+        $viewState = $this->loginChallengeWorkflow()->buildViewState($this->auth, $this->loginUiState());
         if (!(bool) ($viewState['ok'] ?? false)) {
             $this->logoutPanelSession();
             Redirect::redirect($this->panelUrl('/login'));
@@ -172,7 +173,7 @@ final class AuthController
             Redirect::redirect($this->panelUrl('/login/2fa'));
         }
 
-        $result = $this->loginChallengeWorkflowService()->verifyCodeChallenge($this->auth, $this->loginUiState(), $post);
+        $result = $this->loginChallengeWorkflow()->verifyCodeChallenge($this->auth, $this->loginUiState(), $post);
         if (($result['status'] ?? '') === 'expired') {
             $this->logoutPanelSession();
             $this->flash('error', (string) ($result['message'] ?? 'Your login session expired. Please log in again.'));
@@ -202,7 +203,7 @@ final class AuthController
             Redirect::redirect($this->panelUrl('/login/2fa'));
         }
 
-        $result = $this->loginChallengeWorkflowService()->selectMethod($this->auth, $this->loginUiState(), $post);
+        $result = $this->loginChallengeWorkflow()->selectMethod($this->auth, $this->loginUiState(), $post);
         if (($result['status'] ?? '') === 'expired') {
             $this->logoutPanelSession();
             $this->flash('error', (string) ($result['message'] ?? 'Your login session expired. Please log in again.'));
@@ -226,7 +227,7 @@ final class AuthController
             return;
         }
 
-        $result = $this->loginChallengeWorkflowService()->webauthnOptions($this->auth, $this->loginUiState(), $_SERVER);
+        $result = $this->loginChallengeWorkflow()->webauthnOptions($this->auth, $this->loginUiState(), $_SERVER);
         if (!(bool) ($result['ok'] ?? false)) {
             $this->jsonResponse(
                 ['ok' => false, 'message' => (string) ($result['message'] ?? 'Failed to initialize WebAuthn challenge.')],
@@ -251,7 +252,7 @@ final class AuthController
             return;
         }
 
-        $result = $this->loginChallengeWorkflowService()->verifyWebauthn(
+        $result = $this->loginChallengeWorkflow()->verifyWebauthn(
             $this->auth,
             $this->loginUiState(),
             $post,
@@ -417,43 +418,40 @@ final class AuthController
         return $this->identifierResolver->modeFromConfig($this->config);
     }
 
-    private function loginUiState(): LoginUiStateService
+    private function loginUiState(): LoginUiState
     {
-        if (!$this->loginUiState instanceof LoginUiStateService) {
-            $this->loginUiState = LoginUiStateService::forPanel();
+        if (!$this->loginUiState instanceof LoginUiState) {
+            $this->loginUiState = LoginUiState::forPanel();
         }
 
         return $this->loginUiState;
     }
 
-    private function loginAttemptWorkflowService(): LoginAttemptWorkflowService
+    private function loginAttempt(): LoginAttempt
     {
-        if (!$this->loginAttemptWorkflowService instanceof LoginAttemptWorkflowService) {
-            $this->loginAttemptWorkflowService = new LoginAttemptWorkflowService(
+        if (!$this->loginAttempt instanceof LoginAttempt) {
+            $this->loginAttempt = new LoginAttempt(
                 $this->config,
                 $this->input,
                 $this->identifierResolver,
-                new \Raven\Lib\Auth\LoginAttemptPolicy($this->config, new \Raven\Lib\Transport\Request()),
-                new \Raven\Lib\Auth\LoginChallengeFlow()
+                new \Raven\Lib\Transport\Request()
             );
         }
 
-        return $this->loginAttemptWorkflowService;
+        return $this->loginAttempt;
     }
 
-    private function loginChallengeWorkflowService(): LoginChallengeWorkflowService
+    private function loginChallengeWorkflow(): LoginChallenge
     {
-        if (!$this->loginChallengeWorkflowService instanceof LoginChallengeWorkflowService) {
-            $this->loginChallengeWorkflowService = new LoginChallengeWorkflowService(
+        if (!$this->loginChallengeWorkflow instanceof LoginChallenge) {
+            $this->loginChallengeWorkflow = new LoginChallenge(
                 $this->config,
                 $this->input,
-                new \Raven\Lib\Auth\LoginChallengeFlow(),
-                new \Raven\Lib\Auth\LoginWebAuthnChallengeService(),
-                new \Raven\Lib\Auth\LoginEmailDelivery()
+                new LoginEmail()
             );
         }
 
-        return $this->loginChallengeWorkflowService;
+        return $this->loginChallengeWorkflow;
     }
 
     /**

@@ -22,7 +22,7 @@ use Raven\Core\Repository\PageWrite;
 use Raven\Core\Repository\SetRead;
 use Raven\Core\Repository\TagRead;
 use Raven\Core\Repository\UserRead;
-use Raven\Lib\Auth\LoginIdentifierResolver;
+use Raven\Lib\Auth\LoginIdentifier;
 use Raven\Lib\Extension\ExtensionEditorCatalogService;
 use Raven\Lib\Extension\Panel\ExtensionCatalogService;
 use Raven\Lib\Extension\StateRead;
@@ -83,7 +83,7 @@ final class PageEditController
     private ?Upload $uploadFileSetNormalizer = null;
     private ?PanelPost $panelPostNormalizer = null;
     private ?EditorAuthor $pageAuthorOptionBuilder = null;
-    private ?LoginIdentifierResolver $identifierResolver = null;
+    private ?LoginIdentifier $identifierResolver = null;
     private UserRead $userRepo;
     private ChannelRead $channelRead;
     private EditorTabs $editorTabs;
@@ -918,12 +918,12 @@ final class PageEditController
     /**
      * Returns the login identifier resolver on first use.
      *
-     * @return LoginIdentifierResolver Resolver for username/email normalization in author options.
+     * @return LoginIdentifier Resolver for username/email normalization in author options.
      */
-    private function identifierResolver(): LoginIdentifierResolver
+    private function identifierResolver(): LoginIdentifier
     {
-        if (!$this->identifierResolver instanceof LoginIdentifierResolver) {
-            $this->identifierResolver = new LoginIdentifierResolver();
+        if (!$this->identifierResolver instanceof LoginIdentifier) {
+            $this->identifierResolver = new LoginIdentifier();
         }
 
         return $this->identifierResolver;

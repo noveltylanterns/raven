@@ -120,7 +120,7 @@ Group assignment notes:
 - Public content controller:
   - `private/sys/Controller/Public/PageController.php`
 - Shared login workflow:
-  - `private/lib/Auth/LoginAttemptWorkflowService.php`
+  - `private/lib/Auth/LoginAttempt.php`
   - `private/lib/Auth/LoginChallengeWorkflowService.php`
   - `private/lib/Auth/LoginUiStateService.php`
 - Persistence:

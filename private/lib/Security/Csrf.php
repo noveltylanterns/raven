@@ -1,5 +1,12 @@
 <?php
 
+/**
+ * RAVEN CMS
+ * ~/private/lib/Security/Csrf.php
+ * Generic CSRF token generation, rotation, field rendering, and validation helper.
+ * Docs: https://raven.lanterns.io
+ */
+
 declare(strict_types=1);
 
 namespace Raven\Lib\Security;
@@ -15,6 +22,11 @@ final class Csrf
     private int $tokenBytes;
     private CsrfToken $store;
 
+    /**
+     * @param CsrfToken|null $store Token persistence store; defaults to session-backed SessionToken.
+     * @param string $tokenKey Session/store key used to persist the CSRF token.
+     * @param int $tokenBytes Byte length of generated tokens; clamped to [16, 128].
+     */
     public function __construct(
         ?CsrfToken $store = null,
         string $tokenKey = '_raven_csrf',
@@ -25,6 +37,11 @@ final class Csrf
         $this->tokenBytes = max(16, min(128, $tokenBytes));
     }
 
+    /**
+     * Returns the current CSRF token, generating and persisting a new one if none exists.
+     *
+     * @return string Hex-encoded CSRF token.
+     */
     public function token(): string
     {
         $token = $this->store->get($this->tokenKey);
@@ -37,12 +54,25 @@ final class Csrf
         return $token;
     }
 
+    /**
+     * Invalidates the current token and returns a freshly generated replacement.
+     *
+     * Use this after a successful form submission to prevent token reuse.
+     *
+     * @return string New hex-encoded CSRF token.
+     */
     public function rotate(): string
     {
         $this->store->remove($this->tokenKey);
         return $this->token();
     }
 
+    /**
+     * Renders an HTML hidden input element carrying the current CSRF token.
+     *
+     * @param string $fieldName Name attribute for the hidden input element.
+     * @return string HTML hidden input tag.
+     */
     public function field(string $fieldName = '_csrf'): string
     {
         $name = htmlspecialchars($fieldName, ENT_QUOTES, 'UTF-8');
@@ -50,6 +80,12 @@ final class Csrf
         return '<input type="hidden" name="' . $name . '" value="' . $token . '">';
     }
 
+    /**
+     * Validates a submitted CSRF token using a constant-time comparison.
+     *
+     * @param string|null $submitted Token value from the submitted form.
+     * @return bool True when the submitted token matches the stored token.
+     */
     public function validate(?string $submitted): bool
     {
         if (!is_string($submitted) || $submitted === '') {

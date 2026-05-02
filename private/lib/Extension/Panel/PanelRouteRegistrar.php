@@ -11,8 +11,8 @@ declare(strict_types=1);
 
 namespace Raven\Lib\Extension\Panel;
 
-use Raven\Lib\Permission\PanelAccess;
-use Raven\Lib\Panel\SessionGuard;
+use Raven\Lib\Auth\Panel\Mask as PanelAccess;
+use Raven\Lib\Auth\Panel\SessionGuard;
 use Raven\Lib\Extension\Resolver;
 use Raven\Lib\Parser\PanelParser;
 use Raven\Core\Router\RouteHandler;

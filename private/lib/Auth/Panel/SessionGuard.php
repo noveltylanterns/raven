@@ -2,22 +2,21 @@
 
 /**
  * RAVEN CMS
- * ~/private/lib/Panel/SessionGuard.php
+ * ~/private/lib/Auth/Panel/SessionGuard.php
  * Panel login gate and session-identity synchronizer.
  * Docs: https://raven.lanterns.io
  */
 
 declare(strict_types=1);
 
-namespace Raven\Lib\Panel;
+namespace Raven\Lib\Auth\Panel;
 
 use Raven\Lib\Auth\AuthService;
 use Raven\Lib\Transport\Redirect;
 
 /**
  * Panel login gate and session identity synchronization helper.
- * Used by Panel\SharedController and lib/Extension/Panel/PanelRouteRegistrar;
- * lives in lib/Panel/ so both can import it without crossing the lib→sys boundary.
+ * Used by Panel\SharedController and lib/Extension/Panel/PanelRouteRegistrar.
  */
 final class SessionGuard
 {

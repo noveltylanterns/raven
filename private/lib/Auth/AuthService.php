@@ -12,15 +12,13 @@ declare(strict_types=1);
 namespace Raven\Lib\Auth;
 
 use PDO;
-use Raven\Lib\Auth\AuthGroupMembershipService;
 use Raven\Lib\Auth\AuthPayloadCodec;
-use Raven\Lib\Auth\LoginEmailChallenge;
-use Raven\Lib\Auth\TwoFactorMethodKey;
-use Raven\Lib\Auth\TwoFactorMethodNormalizer;
-use Raven\Lib\Auth\TwoFactorMethodRules;
+use Raven\Lib\Auth\LoginEmail;
+use Raven\Lib\Auth\Login2fa;
+use Raven\Lib\Auth\Membership;
+use Raven\Lib\Auth\Panel\Service as PanelAuthService;
+use Raven\Lib\Auth\Public\Service as PublicAuthService;
 use Raven\Lib\Database\TableNameResolver;
-use Raven\Lib\Permission\PanelAccess;
-use Raven\Lib\Permission\PermissionMaskService;
 use Raven\Lib\Scribe\AuthProfileScribe;
 use Raven\Lib\Scribe\AuthThrottleScribe;
 use Raven\Lib\Security\RecoveryPhrase;
@@ -49,9 +47,9 @@ final class AuthService
     private mixed $auth;
     private AuthThrottleScribe $authThrottleScribe;
     private AuthPayloadCodec $authPayloadCodec;
-    private PermissionMaskService $permissionMaskService;
-    private AuthGroupMembershipService $groupMembership;
-    private LoginEmailChallenge $loginEmailChallenge;
+    private PanelAuthService $panelAuthService;
+    private PublicAuthService $publicAuthService;
+    private LoginEmail $loginEmail;
     private AuthProfileScribe $authProfileScribe;
 
     /** Session key for the pending-challenge user id (set after password auth, before 2FA). */
@@ -88,9 +86,21 @@ final class AuthService
         $this->prefix = preg_replace('/[^a-zA-Z0-9_]/', '', $prefix) ?? '';
         $this->authThrottleScribe = new AuthThrottleScribe($rvnDb, $driver, $this->prefix);
         $this->authPayloadCodec = new AuthPayloadCodec();
-        $this->permissionMaskService = new PermissionMaskService($rvnDb, $driver, $prefix);
-        $this->groupMembership = new AuthGroupMembershipService($rvnDb, $driver, $prefix);
-        $this->loginEmailChallenge = new LoginEmailChallenge();
+        $panelPermissionMaskService = new Panel\PermissionMaskService();
+        $publicPermissionMaskService = new Public\PermissionMaskService($rvnDb, $this->prefix);
+        $groupMembership = new Membership($rvnDb, $driver, $prefix);
+        $this->panelAuthService = new PanelAuthService(
+            $panelPermissionMaskService,
+            $groupMembership,
+            fn (): ?int => $this->userId()
+        );
+        $this->publicAuthService = new PublicAuthService(
+            $publicPermissionMaskService,
+            $this->panelAuthService,
+            fn (): ?int => $this->userId(),
+            fn (): bool => $this->isLoggedIn()
+        );
+        $this->loginEmail = new LoginEmail();
         $this->authProfileScribe = new AuthProfileScribe($authDb, $driver, $this->prefix);
 
         $this->bootstrapDelightAuth();
@@ -290,7 +300,7 @@ final class AuthService
             $_SESSION[self::SESSION_2FA_PENDING_METHODS],
             $_SESSION[self::SESSION_2FA_VERIFIED_USER_ID]
         );
-        $this->loginEmailChallenge->clearAllEmailChallenges();
+        $this->loginEmail->clearAllEmailChallenges();
         $this->clearPermissionCaches();
     }
 
@@ -349,7 +359,7 @@ final class AuthService
 
         $_SESSION[self::SESSION_2FA_PENDING_USER_ID] = $userId;
         $_SESSION[self::SESSION_2FA_PENDING_METHODS] = $methods;
-        $this->loginEmailChallenge->clearAllEmailChallenges();
+        $this->loginEmail->clearAllEmailChallenges();
         unset($_SESSION[self::SESSION_2FA_VERIFIED_USER_ID]);
     }
 
@@ -371,7 +381,7 @@ final class AuthService
             $_SESSION[self::SESSION_2FA_PENDING_USER_ID],
             $_SESSION[self::SESSION_2FA_PENDING_METHODS]
         );
-        $this->loginEmailChallenge->clearAllEmailChallenges();
+        $this->loginEmail->clearAllEmailChallenges();
         $_SESSION[self::SESSION_2FA_VERIFIED_USER_ID] = $userId;
     }
 
@@ -408,7 +418,7 @@ final class AuthService
             $_SESSION[self::SESSION_2FA_PENDING_USER_ID],
             $_SESSION[self::SESSION_2FA_PENDING_METHODS]
         );
-        $this->loginEmailChallenge->clearAllEmailChallenges();
+        $this->loginEmail->clearAllEmailChallenges();
     }
 
     /**
@@ -442,7 +452,7 @@ final class AuthService
      */
     public function issuePendingEmailCodeChallenge(string $selectedMethodKey, string $submittedEmail = ''): array
     {
-        return $this->loginEmailChallenge->issueChallenge(
+        return $this->loginEmail->issueChallenge(
             $this->pendingTwoFactorUserId(),
             $this->pendingTwoFactorMethods(),
             $selectedMethodKey,
@@ -453,7 +463,7 @@ final class AuthService
 
     public function clearPendingEmailCodeChallenge(string $selectedMethodKey = ''): void
     {
-        $this->loginEmailChallenge->clearEmailCodeChallenge($selectedMethodKey);
+        $this->loginEmail->clearEmailCodeChallenge($selectedMethodKey);
     }
 
     /**
@@ -526,7 +536,7 @@ final class AuthService
         string $selectedMethodKey = '',
         string $submittedEmail = ''
     ): bool {
-        return $this->loginEmailChallenge->verifySubmittedCode(
+        return $this->loginEmail->verifySubmittedCode(
             $this->pendingTwoFactorUserId(),
             $selectedMethodKey,
             $submittedCode,
@@ -543,7 +553,7 @@ final class AuthService
             return ['ok' => false, 'errors' => ['Invalid user id.']];
         }
 
-        $normalized = TwoFactorMethodNormalizer::normalizeStored($methods);
+        $normalized = Login2fa::normalizeStored($methods);
         $encoded = $this->authPayloadCodec->encodeTwoFactorMethods($normalized);
         $this->authProfileScribe->updateTwoFactorMethods($userId, $encoded);
 
@@ -739,13 +749,7 @@ final class AuthService
      */
     public function canAccessPanel(?int $userId = null): bool
     {
-        $userId ??= $this->userId();
-        if ($userId === null) {
-            return false;
-        }
-
-        $mask = $this->permissionMaskForUser($userId);
-        return PanelAccess::canLoginPanel($mask);
+        return $this->panelAuthService->canAccessPanel($userId);
     }
 
     /**
@@ -753,25 +757,7 @@ final class AuthService
      */
     public function hasPanelPermissionBit(int $bit, ?int $userId = null): bool
     {
-        if ($bit <= 0) {
-            return false;
-        }
-
-        $userId ??= $this->userId();
-        if ($userId === null) {
-            return false;
-        }
-
-        $mask = $this->permissionMaskForUser($userId);
-        if (!PanelAccess::canLoginPanel($mask)) {
-            return false;
-        }
-
-        if ($this->isAdmin($userId)) {
-            return true;
-        }
-
-        return PanelAccess::hasPanelPermissionBit($mask, $bit);
+        return $this->panelAuthService->hasPanelPermissionBit($bit, $userId);
     }
 
     /**
@@ -785,12 +771,7 @@ final class AuthService
      */
     public function panelPermissionMask(?int $userId = null): int
     {
-        $userId ??= $this->userId();
-        if ($userId === null) {
-            return 0;
-        }
-
-        return $this->permissionMaskForUser($userId);
+        return $this->panelAuthService->panelPermissionMask($userId);
     }
 
     /**
@@ -800,21 +781,7 @@ final class AuthService
      */
     public function hasAnyPanelPermissionBit(array $bits, ?int $userId = null): bool
     {
-        $userId ??= $this->userId();
-        if ($userId === null) {
-            return false;
-        }
-
-        $mask = $this->permissionMaskForUser($userId);
-        if (!PanelAccess::canLoginPanel($mask)) {
-            return false;
-        }
-
-        if ($this->isAdmin($userId)) {
-            return true;
-        }
-
-        return PanelAccess::hasAnyPanelPermissionBit($mask, $bits);
+        return $this->panelAuthService->hasAnyPanelPermissionBit($bits, $userId);
     }
 
     /**
@@ -822,12 +789,7 @@ final class AuthService
      */
     public function canManageUsers(?int $userId = null): bool
     {
-        $userId ??= $this->userId();
-        if ($userId === null) {
-            return false;
-        }
-
-        return PanelAccess::canManageUsers($this->permissionMaskForUser($userId));
+        return $this->panelAuthService->canManageUsers($userId);
     }
 
     /**
@@ -835,12 +797,7 @@ final class AuthService
      */
     public function canManageGroups(?int $userId = null): bool
     {
-        $userId ??= $this->userId();
-        if ($userId === null) {
-            return false;
-        }
-
-        return PanelAccess::canManageGroups($this->permissionMaskForUser($userId));
+        return $this->panelAuthService->canManageGroups($userId);
     }
 
     /**
@@ -848,12 +805,7 @@ final class AuthService
      */
     public function canManageContent(?int $userId = null): bool
     {
-        $userId ??= $this->userId();
-        if ($userId === null) {
-            return false;
-        }
-
-        return PanelAccess::canManageContent($this->permissionMaskForUser($userId));
+        return $this->panelAuthService->canManageContent($userId);
     }
 
     /**
@@ -863,12 +815,7 @@ final class AuthService
      */
     public function canManageConfiguration(?int $userId = null): bool
     {
-        $userId ??= $this->userId();
-        if ($userId === null) {
-            return false;
-        }
-
-        return PanelAccess::canManageConfiguration($this->permissionMaskForUser($userId));
+        return $this->panelAuthService->canManageConfiguration($userId);
     }
 
     /**
@@ -876,12 +823,7 @@ final class AuthService
      */
     public function canManageTaxonomy(?int $userId = null): bool
     {
-        $userId ??= $this->userId();
-        if ($userId === null) {
-            return false;
-        }
-
-        return PanelAccess::canManageTaxonomy($this->permissionMaskForUser($userId));
+        return $this->panelAuthService->canManageTaxonomy($userId);
     }
 
     /**
@@ -889,20 +831,7 @@ final class AuthService
      */
     public function canViewPublicSite(?int $userId = null): bool
     {
-        if ($userId !== null) {
-            return PanelAccess::canViewPublicSite($this->permissionMaskForUser($userId));
-        }
-
-        if ($this->isLoggedIn()) {
-            $resolvedUserId = $this->userId();
-            if ($resolvedUserId === null) {
-                return false;
-            }
-
-            return PanelAccess::canViewPublicSite($this->permissionMaskForUser($resolvedUserId));
-        }
-
-        return PanelAccess::canViewPublicSite($this->permissionMaskForGuest());
+        return $this->publicAuthService->canViewPublicSite($userId);
     }
 
     /**
@@ -910,12 +839,7 @@ final class AuthService
      */
     public function canViewPrivateSite(?int $userId = null): bool
     {
-        $userId ??= $this->userId();
-        if ($userId === null) {
-            return false;
-        }
-
-        return PanelAccess::canViewPrivateSite($this->permissionMaskForUser($userId));
+        return $this->publicAuthService->canViewPrivateSite($userId);
     }
 
     /**
@@ -923,13 +847,7 @@ final class AuthService
      */
     public function canViewDisabledSite(?int $userId = null): bool
     {
-        $userId ??= $this->userId();
-        if ($userId === null) {
-            return false;
-        }
-
-        $mask = $this->permissionMaskForUser($userId);
-        return PanelAccess::canLoginPanel($mask) && PanelAccess::canViewDisabledSite($mask);
+        return $this->publicAuthService->canViewDisabledSite($userId);
     }
 
     /**
@@ -937,19 +855,7 @@ final class AuthService
      */
     public function isAdmin(?int $userId = null): bool
     {
-        $userId ??= $this->userId();
-        if ($userId === null) {
-            return false;
-        }
-
-        foreach ($this->groupsForUser($userId) as $group) {
-            // ID 1 is the canonical admin group (slug 'admin').
-            if ((int) ($group['id'] ?? 0) === 1) {
-                return true;
-            }
-        }
-
-        return false;
+        return $this->panelAuthService->isAdmin($userId);
     }
 
     /**
@@ -959,7 +865,7 @@ final class AuthService
      */
     public function groupsForUser(int $userId): array
     {
-        return $this->groupMembership->groupsForUser($userId);
+        return $this->panelAuthService->groupsForUser($userId);
     }
 
     /**
@@ -967,24 +873,7 @@ final class AuthService
      */
     public function assignUserToGroupByName(int $userId, string $groupName): void
     {
-        $this->groupMembership->assignUserToGroupByName($userId, $groupName);
-        $this->invalidateUserPermissionCaches($userId);
-    }
-
-    /**
-     * Combines all user group masks into one integer mask.
-     */
-    private function permissionMaskForUser(int $userId): int
-    {
-        return $this->permissionMaskService->maskForUser($userId, $this->groupsForUser($userId));
-    }
-
-    /**
-     * Returns Guest-group permission mask for anonymous public visitors.
-     */
-    private function permissionMaskForGuest(): int
-    {
-        return $this->permissionMaskService->maskForGuest();
+        $this->panelAuthService->assignUserToGroupByName($userId, $groupName);
     }
 
     /**
@@ -992,27 +881,14 @@ final class AuthService
      */
     private function clearPermissionCaches(): void
     {
-        $this->groupMembership->clearCaches();
-        $this->permissionMaskService->clearCaches();
+        $this->panelAuthService->clearCaches();
+        $this->publicAuthService->clearCaches();
         $this->userPreferencesCache = [];
     }
 
     private function hasInteractiveTwoFactorMethod(int $userId): bool
     {
         return $this->interactiveTwoFactorMethodsForUser($userId) !== [];
-    }
-
-    /**
-     * Clears request-local permission/group caches for one user id.
-     */
-    private function invalidateUserPermissionCaches(int $userId): void
-    {
-        if ($userId <= 0) {
-            return;
-        }
-
-        $this->groupMembership->invalidateUser($userId);
-        $this->permissionMaskService->invalidateUser($userId);
     }
 
     /**
@@ -1212,7 +1088,7 @@ final class AuthService
     private function normalizePreferenceUpdatePayload(array $payload): array
     {
         $contactProfiles = $this->authPayloadCodec->normalizeContactProfiles((array) ($payload['contact_profiles'] ?? []));
-        $twoFactorMethods = TwoFactorMethodNormalizer::normalizeStored((array) ($payload['two_factor_methods'] ?? []));
+        $twoFactorMethods = Login2fa::normalizeStored((array) ($payload['two_factor_methods'] ?? []));
 
         return [
             'username' => trim((string) ($payload['username'] ?? '')),
@@ -1259,8 +1135,8 @@ final class AuthService
                 continue;
             }
 
-            $type = TwoFactorMethodRules::normalizeType((string) ($method['type'] ?? ''));
-            $status = TwoFactorMethodRules::normalizeStatus((string) ($method['status'] ?? ''), $type);
+            $type = Login2fa::normalizeType((string) ($method['type'] ?? ''));
+            $status = Login2fa::normalizeStatus((string) ($method['status'] ?? ''), $type);
             if ($type === 'totp') {
                 if ($status !== 'confirmed') {
                     continue;
@@ -1273,8 +1149,8 @@ final class AuthService
 
                 $interactive[] = [
                     'type' => 'totp',
-                    'key' => TwoFactorMethodKey::forTotpSecret($secret),
-                    'label' => TwoFactorMethodRules::normalizeLabel((string) ($method['label'] ?? ''), 'totp'),
+                    'key' => Login2fa::forTotpSecret($secret),
+                    'label' => Login2fa::normalizeLabel((string) ($method['label'] ?? ''), 'totp'),
                 ];
                 continue;
             }
@@ -1291,7 +1167,7 @@ final class AuthService
 
                 $interactive[] = [
                     'type' => 'recovery',
-                    'key' => TwoFactorMethodKey::forRecoveryHash($recoveryHash),
+                    'key' => Login2fa::forRecoveryHash($recoveryHash),
                     'label' => (bool) ($method['reusable'] ?? false)
                         ? 'Recovery Phrase (Reusable)'
                         : 'Recovery Phrase',
@@ -1314,8 +1190,8 @@ final class AuthService
 
                 $interactive[] = [
                     'type' => 'webauthn',
-                    'key' => TwoFactorMethodKey::forWebauthnCredentialId($credentialId),
-                    'label' => TwoFactorMethodRules::normalizeLabel((string) ($method['label'] ?? ''), 'webauthn'),
+                    'key' => Login2fa::forWebauthnCredentialId($credentialId),
+                    'label' => Login2fa::normalizeLabel((string) ($method['label'] ?? ''), 'webauthn'),
                     'credential_id' => $credentialId,
                     'require_uv' => $requireUv,
                 ];
@@ -1334,8 +1210,8 @@ final class AuthService
 
                 $interactive[] = [
                     'type' => 'email',
-                    'key' => TwoFactorMethodKey::forEmailAddress($email),
-                    'label' => TwoFactorMethodRules::normalizeLabel((string) ($method['label'] ?? ''), 'email'),
+                    'key' => Login2fa::forEmailAddress($email),
+                    'label' => Login2fa::normalizeLabel((string) ($method['label'] ?? ''), 'email'),
                     'email' => $email,
                 ];
             }
@@ -1367,8 +1243,8 @@ final class AuthService
                 continue;
             }
 
-            $type = TwoFactorMethodRules::normalizeType((string) ($method['type'] ?? ''));
-            $status = TwoFactorMethodRules::normalizeStatus((string) ($method['status'] ?? ''), $type);
+            $type = Login2fa::normalizeType((string) ($method['type'] ?? ''));
+            $status = Login2fa::normalizeStatus((string) ($method['status'] ?? ''), $type);
             $secret = Totp::normalizeSecret((string) ($method['secret'] ?? ''));
             if ($type !== 'totp' || $status !== 'confirmed' || !Totp::isValidSecret($secret)) {
                 continue;
@@ -1408,8 +1284,8 @@ final class AuthService
                 continue;
             }
 
-            $type = TwoFactorMethodRules::normalizeType((string) ($method['type'] ?? ''));
-            $status = TwoFactorMethodRules::normalizeStatus((string) ($method['status'] ?? ''), $type);
+            $type = Login2fa::normalizeType((string) ($method['type'] ?? ''));
+            $status = Login2fa::normalizeStatus((string) ($method['status'] ?? ''), $type);
             if ($type !== 'recovery' || $status !== 'confirmed') {
                 continue;
             }
@@ -1422,8 +1298,8 @@ final class AuthService
             // Skip methods whose derived key does not match the selected key (unless using pool key).
             if (
                 $selectedMethodKey !== ''
-                && !TwoFactorMethodKey::isRecoveryPool($selectedMethodKey)
-                && $selectedMethodKey !== TwoFactorMethodKey::forRecoveryHash($recoveryHash)
+                && !Login2fa::isRecoveryPool($selectedMethodKey)
+                && $selectedMethodKey !== Login2fa::forRecoveryHash($recoveryHash)
             ) {
                 continue;
             }

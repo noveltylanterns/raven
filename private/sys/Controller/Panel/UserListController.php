@@ -16,7 +16,7 @@ use Raven\Core\Config;
 use Raven\Core\Repository\GroupRead;
 use Raven\Core\Repository\InviteRead;
 use Raven\Core\Repository\UserRead;
-use Raven\Lib\Auth\LoginIdentifierResolver;
+use Raven\Lib\Auth\LoginIdentifier;
 use Raven\Lib\Auth\SessionFlash;
 use Raven\Lib\Parser\GroupRouteParser;
 use Raven\Lib\Security\InputSanitizer;
@@ -40,7 +40,7 @@ final class UserListController
     private ?InviteRead $inviteRead = null;
     private SessionFlash $flashList;
     private GroupRouteParser $groupParser;
-    private LoginIdentifierResolver $loginIdentifierResolver;
+    private LoginIdentifier $loginIdentifierResolver;
 
     /**
      * @param SharedController $context Shared panel request context.
@@ -51,7 +51,7 @@ final class UserListController
      * @param callable(): InviteRead $inviteReadResolver Lazy invite read resolver for token listings.
      * @param SessionFlash $flashList List-style flash store for pulling generated token batches.
      * @param GroupRouteParser $groupParser Shared group/profile routing-policy parser.
-     * @param LoginIdentifierResolver $loginIdentifierResolver Shared login-identifier normalization helper.
+     * @param LoginIdentifier $loginIdentifierResolver Shared login-identifier normalization helper.
      * @return void
      */
     public function __construct(
@@ -63,7 +63,7 @@ final class UserListController
         callable $inviteReadResolver,
         SessionFlash $flashList,
         GroupRouteParser $groupParser,
-        LoginIdentifierResolver $loginIdentifierResolver
+        LoginIdentifier $loginIdentifierResolver
     ) {
         $this->context = $context;
         $this->config = $config;

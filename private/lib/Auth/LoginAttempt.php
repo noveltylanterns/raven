@@ -1,42 +1,63 @@
 <?php
 
+/**
+ * RAVEN CMS
+ * ~/private/lib/Auth/LoginAttempt.php
+ * Shared password-auth login workflow with throttle policy reads for panel/public routes.
+ * Docs: https://raven.lanterns.io
+ */
+
 declare(strict_types=1);
 
 namespace Raven\Lib\Auth;
 
 use Raven\Core\Config;
-use Raven\Lib\Auth\AuthService;
+use Raven\Lib\Auth\LoginChallenge;
+use Raven\Lib\Auth\LoginIdentifier;
+use Raven\Lib\Auth\LoginUiState;
 use Raven\Lib\Security\InputSanitizer;
+use Raven\Lib\Transport\Request;
 
 /**
  * Shared password-auth workflow for panel and public login entrypoints.
  */
-final class LoginAttemptWorkflowService
+final class LoginAttempt
 {
+    private const DEFAULT_MAX_ATTEMPTS = 5;
+    private const DEFAULT_WINDOW_SECONDS = 600;
+    private const DEFAULT_LOCK_SECONDS = 900;
+
     private Config $config;
     private InputSanitizer $input;
-    private LoginIdentifierResolver $identifierResolver;
-    private LoginAttemptPolicy $loginAttemptPolicy;
-    private LoginChallengeFlow $twoFactorFlowService;
+    private LoginIdentifier $identifierResolver;
+    private Request $requestContextResolver;
 
+    /**
+     * @param Config          $config                 Shared configuration service for login-throttle values and auth mode.
+     * @param InputSanitizer  $input                  Shared payload sanitizer for login form fields.
+     * @param LoginIdentifier $identifierResolver     Shared helper that resolves login identifier mode and normalization.
+     * @param Request         $requestContextResolver Shared request-context helper for normalized client IP extraction.
+     */
     public function __construct(
         Config $config,
         InputSanitizer $input,
-        LoginIdentifierResolver $identifierResolver,
-        LoginAttemptPolicy $loginAttemptPolicy,
-        LoginChallengeFlow $twoFactorFlowService
+        LoginIdentifier $identifierResolver,
+        Request $requestContextResolver
     ) {
         $this->config = $config;
         $this->input = $input;
         $this->identifierResolver = $identifierResolver;
-        $this->loginAttemptPolicy = $loginAttemptPolicy;
-        $this->twoFactorFlowService = $twoFactorFlowService;
+        $this->requestContextResolver = $requestContextResolver;
     }
 
     /**
-     * @param array<string, mixed> $post
-     * @param array<string, mixed> $server
-     * @param callable(AuthService, int): array{ok: bool, message?: string}|null $accessGuard
+     * Runs one full password-auth login attempt including lock checks and optional panel-access guard.
+     *
+     * @param AuthService  $auth        Shared authentication service used for credential verification and lock bookkeeping.
+     * @param array<string, mixed> $post Submitted login payload containing identifier/email/username and password fields.
+     * @param array<string, mixed> $server Request server context used for client IP normalization in throttle tracking.
+     * @param LoginUiState $uiState     Login UI state storage used for 2FA method selection and cleanup paths.
+     * @param callable(AuthService, int): array{ok: bool, message?: string}|null $accessGuard Optional post-auth access gate for route families like panel login.
      * @return array{
      *   status: string,
      *   message: string,
@@ -48,7 +69,7 @@ final class LoginAttemptWorkflowService
         AuthService $auth,
         array $post,
         array $server,
-        LoginUiStateService $uiState,
+        LoginUiState $uiState,
         ?callable $accessGuard = null
     ): array {
         $loginMode = $this->identifierResolver->modeFromConfig($this->config);
@@ -147,7 +168,7 @@ final class LoginAttemptWorkflowService
             $auth->beginTwoFactorChallenge($userId, $interactiveMethods);
             $uiState->clearTwoFactorState();
             $uiState->storeSelectedMethodKey(
-                (string) ($this->twoFactorFlowService->preferredMethodKeyForChallenge($interactiveMethods) ?? '')
+                (string) (LoginChallenge::preferredMethodKeyForChallenge($interactiveMethods) ?? '')
             );
 
             return [
@@ -170,39 +191,99 @@ final class LoginAttemptWorkflowService
     }
 
     /**
-     * @param array<string, mixed> $server
+     * Returns whether the identifier is currently locked by login-throttle policy.
+     *
+     * @param AuthService $auth Shared authentication service.
+     * @param string $identifier Normalized login identifier.
+     * @param array<string, mixed> $server Request server context.
+     * @return bool True when the identifier/IP pair is currently locked.
      */
     private function isTemporarilyLocked(AuthService $auth, string $identifier, array $server): bool
     {
         return $auth->isLoginTemporarilyLocked(
             $identifier,
-            $this->loginAttemptPolicy->clientIpAddress($server),
-            $this->loginAttemptPolicy->windowSeconds()
+            $this->clientIpAddress($server),
+            $this->windowSeconds()
         );
     }
 
     /**
-     * @param array<string, mixed> $server
+     * Records one failed login attempt under current throttle policy settings.
+     *
+     * @param AuthService $auth Shared authentication service.
+     * @param string $identifier Normalized login identifier.
+     * @param array<string, mixed> $server Request server context.
+     * @return void
      */
     private function recordFailure(AuthService $auth, string $identifier, array $server): void
     {
         $auth->recordFailedLoginAttempt(
             $identifier,
-            $this->loginAttemptPolicy->clientIpAddress($server),
-            $this->loginAttemptPolicy->maxAttempts(),
-            $this->loginAttemptPolicy->windowSeconds(),
-            $this->loginAttemptPolicy->lockSeconds()
+            $this->clientIpAddress($server),
+            $this->maxAttempts(),
+            $this->windowSeconds(),
+            $this->lockSeconds()
         );
     }
 
     /**
-     * @param array<string, mixed> $server
+     * Clears failure history for the identifier after successful authentication.
+     *
+     * @param AuthService $auth Shared authentication service.
+     * @param string $identifier Normalized login identifier.
+     * @param array<string, mixed> $server Request server context.
+     * @return void
      */
     private function clearFailures(AuthService $auth, string $identifier, array $server): void
     {
         $auth->clearFailedLoginAttempts(
             $identifier,
-            $this->loginAttemptPolicy->clientIpAddress($server)
+            $this->clientIpAddress($server)
         );
+    }
+
+    /**
+     * Resolves and normalizes one client IP string from server context.
+     *
+     * @param array<string, mixed> $server Request server context.
+     * @return string Normalized client IP or `unknown` fallback.
+     */
+    private function clientIpAddress(array $server): string
+    {
+        $normalized = $this->requestContextResolver->normalizeClientIp((string) ($server['REMOTE_ADDR'] ?? ''));
+        return $normalized ?? 'unknown';
+    }
+
+    /**
+     * Returns the configured lock threshold for failed login attempts.
+     *
+     * @return int Maximum failed attempts before lockout starts.
+     */
+    private function maxAttempts(): int
+    {
+        $configured = (int) $this->config->get('session.brute.max', self::DEFAULT_MAX_ATTEMPTS);
+        return max(1, $configured);
+    }
+
+    /**
+     * Returns the configured active failure-window length.
+     *
+     * @return int Active failure-window length in seconds.
+     */
+    private function windowSeconds(): int
+    {
+        $configured = (int) $this->config->get('session.brute.window', self::DEFAULT_WINDOW_SECONDS);
+        return max(1, $configured);
+    }
+
+    /**
+     * Returns the configured lockout duration applied after threshold breaches.
+     *
+     * @return int Lockout duration in seconds.
+     */
+    private function lockSeconds(): int
+    {
+        $configured = (int) $this->config->get('session.brute.lock', self::DEFAULT_LOCK_SECONDS);
+        return max(1, $configured);
     }
 }

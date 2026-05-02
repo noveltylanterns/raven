@@ -11,7 +11,7 @@ declare(strict_types=1);
 namespace Raven\Core\Repository;
 
 use PDO;
-use Raven\Lib\Permission\GroupRolePolicy;
+use Raven\Lib\Auth\Panel\RolePolicy;
 use Raven\Lib\Database\TableNameResolver;
 
 /**
@@ -28,7 +28,7 @@ class GroupRead
     private PDO $db;
     private string $driver;
     private string $prefix;
-    private GroupRolePolicy $rolePolicy;
+    private RolePolicy $rolePolicy;
 
     /**
      * @param PDO    $db     Active database connection.
@@ -40,7 +40,7 @@ class GroupRead
         $this->db = $db;
         $this->driver = $driver;
         $this->prefix = preg_replace('/[^a-zA-Z0-9_]/', '', $prefix) ?? '';
-        $this->rolePolicy = new GroupRolePolicy();
+        $this->rolePolicy = new RolePolicy();
     }
 
     /**

@@ -14,14 +14,14 @@ namespace Raven\Core\Controller\Panel;
 use lbuchs\WebAuthn\WebAuthn as VendorWebAuthn;
 use lbuchs\WebAuthn\WebAuthnException;
 use Raven\Core\Config;
-use Raven\Lib\Auth\LoginIdentifierResolver;
-use Raven\Lib\Panel\TwoFactorPreferences;
-use Raven\Lib\Auth\PasswordChangePolicy;
+use Raven\Lib\Auth\LoginIdentifier;
 use Raven\Lib\Media\Panel\AvatarValidationPolicy;
 use Raven\Lib\Media\Panel\AvatarValidator;
 use Raven\Lib\Media\Panel\UserMediaPathService;
 use Raven\Lib\Scribe\UserMediaScribe;
+use Raven\Lib\Security\PasswordValidator;
 use Raven\Lib\View\Qr;
+use Raven\Lib\View\Form2fa;
 use Raven\Lib\View\Panel\EditorWrapper;
 use Raven\Lib\View\Panel\EditorBlocks;
 use Raven\Lib\View\Panel\EditorTabs;
@@ -44,32 +44,32 @@ final class PreferencesController
     private Config $config;
     private InputSanitizer $input;
     private string $root;
-    private LoginIdentifierResolver $loginIdentifierResolver;
+    private LoginIdentifier $loginIdentifierResolver;
     private EditorTabs $editorTabs;
     private EditorWrapper $editor;
     private EditorBlocks $editorBlocks;
     private MediaConfigService $panelMediaConfigService;
     private UserProfileParser $profileContactService;
-    private TwoFactorPreferences $twoFactorPreferences;
+    private Form2fa $form2fa;
     private UserMediaScribe $userMediaScribe;
     private UserMediaPathService $userMediaPathService;
-    private PasswordChangePolicy $passwordChangePolicy;
+    private PasswordValidator $passwordValidator;
 
     /**
      * @param SharedController $context Shared panel request context.
      * @param Config $config Runtime configuration reader.
      * @param InputSanitizer $input Shared request input sanitizer.
      * @param string $root Project root path for user-media storage helpers.
-     * @param LoginIdentifierResolver $loginIdentifierResolver Shared login-identifier normalization helper.
+     * @param LoginIdentifier $loginIdentifierResolver Shared login-identifier normalization helper.
      * @param EditorTabs $editorTabs Shared editor-tab normalization helper.
      * @param EditorWrapper $editor Shared panel editor utility methods (theme normalization).
      * @param EditorBlocks $editorBlocks Shared repeater-block view helper for modular panel rows.
      * @param MediaConfigService $panelMediaConfigService Shared media-limit helper.
      * @param UserProfileParser $profileContactService Shared profile-contact normalizer.
-     * @param TwoFactorPreferences $twoFactorPreferences Shared 2FA helper set.
+     * @param Form2fa $form2fa Shared 2FA helper set.
      * @param UserMediaScribe $userMediaScribe Shared user-media write helper.
      * @param UserMediaPathService $userMediaPathService Shared user-media path resolver.
-     * @param PasswordChangePolicy $passwordChangePolicy Shared password validation policy.
+     * @param PasswordValidator $passwordValidator Shared password validation policy.
      * @return void
      */
     public function __construct(
@@ -77,16 +77,16 @@ final class PreferencesController
         Config $config,
         InputSanitizer $input,
         string $root,
-        LoginIdentifierResolver $loginIdentifierResolver,
+        LoginIdentifier $loginIdentifierResolver,
         EditorTabs $editorTabs,
         EditorWrapper $editor,
         EditorBlocks $editorBlocks,
         MediaConfigService $panelMediaConfigService,
         UserProfileParser $profileContactService,
-        TwoFactorPreferences $twoFactorPreferences,
+        Form2fa $form2fa,
         UserMediaScribe $userMediaScribe,
         UserMediaPathService $userMediaPathService,
-        PasswordChangePolicy $passwordChangePolicy
+        PasswordValidator $passwordValidator
     ) {
         $this->context = $context;
         $this->config = $config;
@@ -98,10 +98,10 @@ final class PreferencesController
         $this->editorBlocks = $editorBlocks;
         $this->panelMediaConfigService = $panelMediaConfigService;
         $this->profileContactService = $profileContactService;
-        $this->twoFactorPreferences = $twoFactorPreferences;
+        $this->form2fa = $form2fa;
         $this->userMediaScribe = $userMediaScribe;
         $this->userMediaPathService = $userMediaPathService;
-        $this->passwordChangePolicy = $passwordChangePolicy;
+        $this->passwordValidator = $passwordValidator;
     }
 
     /**
@@ -251,7 +251,7 @@ final class PreferencesController
 
         $errors = array_merge(
             $errors,
-            $this->passwordChangePolicy->validateNewPasswordChange($newPassword, $confirmNewPassword, 8)
+            $this->passwordValidator->validateNewPasswordChange($newPassword, $confirmNewPassword, 8)
         );
 
         $avatarSet = false;
@@ -410,7 +410,7 @@ final class PreferencesController
             return;
         }
 
-        $payload = $this->twoFactorPreferences->buildTotpSetupPayload(
+        $payload = $this->form2fa->buildTotpSetupPayload(
             $post['secret'] ?? '',
             (string) ($preferences['email'] ?? ''),
             $this->totpIssuer()
@@ -454,7 +454,7 @@ final class PreferencesController
             return;
         }
 
-        $recoveryCode = $this->twoFactorPreferences->generateRecoveryPhrase(12);
+        $recoveryCode = $this->form2fa->generateRecoveryPhrase(12);
         if (!is_string($recoveryCode)) {
             $this->jsonResponse(['ok' => false, 'message' => 'Unable to generate a recovery phrase.'], 500);
             return;
@@ -493,7 +493,7 @@ final class PreferencesController
             return;
         }
 
-        $excludeCredentialIds = $this->twoFactorPreferences->collectWebauthnExcludeCredentialIds(
+        $excludeCredentialIds = $this->form2fa->collectWebauthnExcludeCredentialIds(
             (array) ($preferences['two_factor'] ?? []),
             $post['exclude_credential_ids'] ?? null,
             20
@@ -508,7 +508,7 @@ final class PreferencesController
             return;
         }
 
-        $userIdentity = $this->twoFactorPreferences->resolveWebauthnUserIdentity($preferences, $userId);
+        $userIdentity = $this->form2fa->resolveWebauthnUserIdentity($preferences, $userId);
         $username = (string) ($userIdentity['username'] ?? ('user-' . $userId));
         $displayName = (string) ($userIdentity['display_name'] ?? $username);
 
@@ -671,7 +671,7 @@ final class PreferencesController
      */
     private function normalizeSubmittedTwoFactorMethods(mixed $rawMethods, string $fallbackEmail): array
     {
-        return $this->twoFactorPreferences->normalizeSubmittedMethods(
+        return $this->form2fa->normalizeSubmittedMethods(
             $rawMethods,
             $fallbackEmail,
             $this->totpIssuer()
@@ -687,7 +687,7 @@ final class PreferencesController
      */
     private function prepareTwoFactorMethodsForView(array $methods, string $fallbackEmail): array
     {
-        return $this->twoFactorPreferences->prepareMethodsForView(
+        return $this->form2fa->prepareMethodsForView(
             $methods,
             $fallbackEmail,
             $this->totpIssuer()
@@ -701,7 +701,7 @@ final class PreferencesController
      */
     private function twoFactorTypeOptions(): array
     {
-        return $this->twoFactorPreferences->typeOptions();
+        return $this->form2fa->typeOptions();
     }
 
     /**
@@ -769,7 +769,7 @@ final class PreferencesController
      */
     private function totpIssuer(): string
     {
-        return $this->twoFactorPreferences->resolveTotpIssuer(
+        return $this->form2fa->resolveTotpIssuer(
             (string) $this->config->get('site.name', 'Raven CMS')
         );
     }
