@@ -121,10 +121,6 @@ Items below are the remaining classified legacy/compatibility lanes after the cu
 
 ---
 
-- Auth compatibility aliases retained after Phase 5 class-name normalization:
-	- `Raven\Lib\Auth\PanelAccessCatalog` -> alias of `Raven\Lib\Auth\AccessCatalog` (`private/lib/Auth/PanelAccessCatalog.php`).
-	- `Raven\Lib\Auth\PanelPermissionDefinitionCatalog` -> alias of `Raven\Lib\Auth\PermissionDefinitionCatalog` (`private/lib/Auth/PanelPermissionDefinitionCatalog.php`).
-	- `Raven\Lib\Auth\PanelSessionGuard` -> alias of `Raven\Lib\Auth\SessionGuard` (`private/lib/Auth/PanelSessionGuard.php`).
-	- Removal criteria: remove aliases after one documented release cycle once extension ecosystem guidance has been updated and no known external imports depend on `Panel*` names.
+- None currently logged.
 
 ---
