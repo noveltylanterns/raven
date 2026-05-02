@@ -34,10 +34,10 @@ final class PublicRouter
     /**
      * Registers the full public route map in canonical registration order.
      *
-     * @param PublicRouteDeps $deps Shared public route dependency payload.
+     * @param PublicPayload $deps Shared public route dependency payload.
      * @return void
      */
-    public function register(PublicRouteDeps $deps): void
+    public function register(PublicPayload $deps): void
     {
         AuthRouter::registerWithDeps($this->router, $deps);
         PublicRouteRegistrar::register($this->router, $deps->rvn, $deps->publicRequestContext, $deps->input);

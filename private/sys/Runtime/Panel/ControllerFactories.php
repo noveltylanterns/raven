@@ -260,11 +260,11 @@ final class ControllerFactories
                 $taxonomyDomain['taxonomy_lookup'],
                 $contentDomain['user_read'],
                 $contentDomain['channel_read'],
-                $rvn['panel_editor_tabs'],
-                $rvn['panel_editor'],
-                $rvn['panel_editor_blocks'],
-                $rvn['panel_editor_mce'],
-                $rvn['panel_editor_mde'],
+                $rvn['panel_editor_tabs'](),
+                $rvn['panel_editor'](),
+                $rvn['panel_editor_blocks'](),
+                $rvn['panel_editor_mce'](),
+                $rvn['panel_editor_mde'](),
                 $extensionStateStoreFactory(),
                 $extensionCatalogFactory(),
                 $extensionEditorCatalogFactory(),
@@ -321,8 +321,8 @@ final class ControllerFactories
                 new TaxonomyImageService($rvn['config']),
                 new MediaScribe($rvn['db'], $rvn['driver'], $rvn['prefix'], $rvn['config'], (string) $rvn['root']),
                 new FeedRouteParser($rvn['config'], $rvn['input']),
-                $rvn['panel_editor_tabs'],
-                $rvn['panel_editor'],
+                $rvn['panel_editor_tabs'](),
+                $rvn['panel_editor'](),
                 new Upload()
             );
 
@@ -376,7 +376,7 @@ final class ControllerFactories
                 new TaxonomyImageService($rvn['config']),
                 new MediaScribe($rvn['db'], $rvn['driver'], $rvn['prefix'], $rvn['config'], (string) $rvn['root']),
                 $taxonomyDomain['channel_read'],
-                $rvn['panel_editor_tabs'],
+                $rvn['panel_editor_tabs'](),
                 new Upload()
             );
 
@@ -474,7 +474,7 @@ final class ControllerFactories
                 new TaxonomyImageService($rvn['config']),
                 new MediaScribe($rvn['db'], $rvn['driver'], $rvn['prefix'], $rvn['config'], (string) $rvn['root']),
                 $taxonomyDomain['channel_read'],
-                $rvn['panel_editor_tabs'],
+                $rvn['panel_editor_tabs'](),
                 new Upload()
             );
 
@@ -567,9 +567,9 @@ final class ControllerFactories
                 new GroupRouteParser($rvn['config'], $rvn['input']),
                 new PanelInvitePolicyService($rvn['input']),
                 new LoginIdentifierResolver(),
-                $rvn['panel_editor_tabs'],
-                $rvn['panel_editor'],
-                $rvn['panel_editor_blocks'],
+                $rvn['panel_editor_tabs'](),
+                $rvn['panel_editor'](),
+                $rvn['panel_editor_blocks'](),
                 new PanelMediaConfigService($rvn['config']),
                 new UserProfileParser($rvn['input']),
                 new PanelTwoFactorPreferencesService($rvn['input']),
@@ -620,8 +620,8 @@ final class ControllerFactories
                 $groupDomain['group_write'],
                 $groupDomain['group_read'],
                 new GroupRouteParser($rvn['config'], $rvn['input']),
-                $rvn['panel_editor_tabs'],
-                $rvn['panel_editor'],
+                $rvn['panel_editor_tabs'](),
+                $rvn['panel_editor'](),
                 new TaxonomyImageService($rvn['config']),
                 new MediaScribe($rvn['db'], $rvn['driver'], $rvn['prefix'], $rvn['config'], (string) $rvn['root']),
                 new PanelPermissionDefinitionCatalog(),
@@ -656,9 +656,9 @@ final class ControllerFactories
                 $rvn['input'],
                 (string) $rvn['root'],
                 new LoginIdentifierResolver(),
-                $rvn['panel_editor_tabs'],
-                $rvn['panel_editor'],
-                $rvn['panel_editor_blocks'],
+                $rvn['panel_editor_tabs'](),
+                $rvn['panel_editor'](),
+                $rvn['panel_editor_blocks'](),
                 new PanelMediaConfigService($rvn['config']),
                 new UserProfileParser($rvn['input']),
                 new PanelTwoFactorPreferencesService($rvn['input']),
@@ -765,9 +765,9 @@ final class ControllerFactories
                 $systemDomain['channel'],
                 $systemDomain['category_set'],
                 $systemDomain['tag_set'],
-                $rvn['panel_editor_tabs'],
-                $rvn['panel_editor'],
-                $rvn['panel_editor_blocks'],
+                $rvn['panel_editor_tabs'](),
+                $rvn['panel_editor'](),
+                $rvn['panel_editor_blocks'](),
                 $themeCatalogFactory()
             );
 

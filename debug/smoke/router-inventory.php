@@ -13,11 +13,11 @@ error_reporting(E_ALL & ~E_WARNING & ~E_NOTICE & ~E_DEPRECATED);
 ini_set('display_errors', '0');
 
 use Raven\Core\Runtime\Panel\RuntimeBuilder as PanelRuntimeBuilder;
-use Raven\Core\Router\Panel\PanelRouteDeps;
+use Raven\Core\Router\Panel\PanelPayload;
 use Raven\Core\Router\Panel\PanelRouter;
 use Raven\Core\Runtime\Public\RuntimeBuilder as PublicRuntimeBuilder;
-use Raven\Core\Router\Public\PublicRouteDeps;
-use Raven\Core\Router\Public\PublicRoutePolicy;
+use Raven\Core\Router\Public\PublicPayload;
+use Raven\Core\Router\Public\PublicPolicy;
 use Raven\Core\Router\Public\PublicRouter;
 use Raven\Lib\Parser\ConfigParser;
 use Raven\Lib\View\Error as ViewError;
@@ -123,8 +123,8 @@ final class RouterInventorySmokeRunner
             throw new RuntimeException('Missing public input service for route inventory.');
         }
 
-        $routeConfig = PublicRoutePolicy::build($rvn['config'], $input);
-        $routeDeps = new PublicRouteDeps(
+        $routeConfig = PublicPolicy::build($rvn['config'], $input);
+        $routeDeps = new PublicPayload(
             $rvn,
             $publicAuthController,
             $publicPageController,
@@ -206,7 +206,7 @@ final class RouterInventorySmokeRunner
             throw new RuntimeException('Missing panel input service for route inventory.');
         }
 
-        $routeDeps = new PanelRouteDeps(
+        $routeDeps = new PanelPayload(
             $rvn,
             $authController,
             $panelDashboardController,

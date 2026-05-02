@@ -2,7 +2,7 @@
 
 /**
  * RAVEN CMS
- * ~/private/sys/Router/Panel/PanelRouteDeps.php
+ * ~/private/sys/Router/Panel/PanelPayload.php
  * Shared dependency payload for panel route-family registrars.
  * Docs: https://raven.lanterns.io
  */
@@ -17,7 +17,7 @@ use Raven\Lib\Security\InputSanitizer;
 /**
  * Canonical panel route-registrar dependency payload.
  */
-final class PanelRouteDeps
+final class PanelPayload
 {
     /** @var array<string, mixed> */
     public readonly array $rvn;

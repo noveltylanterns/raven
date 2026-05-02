@@ -18,7 +18,7 @@ use Raven\Core\Router\RouteRequest;
 use Raven\Core\Router\Panel\PanelRouter;
 use Raven\Lib\Transport\Request as HttpRequest;
 use Raven\Core\Runtime\Panel\RuntimeBuilder;
-use Raven\Core\Router\Panel\PanelRouteDeps;
+use Raven\Core\Router\Panel\PanelPayload;
 use Raven\Lib\Parser\ConfigParser;
 use Raven\Lib\Parser\PanelParser;
 use Raven\Lib\Scheduler\Cron;
@@ -179,7 +179,7 @@ $renderPublicNotFound = static function () use ($rvn, $root): void {
 };
 
 $router = new PanelRouter();
-$routeDeps = new PanelRouteDeps(
+$routeDeps = new PanelPayload(
     $rvn,
     $authController,
     $panelDashboardController,

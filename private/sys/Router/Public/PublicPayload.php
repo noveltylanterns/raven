@@ -2,7 +2,7 @@
 
 /**
  * RAVEN CMS
- * ~/private/sys/Router/Public/PublicRouteDeps.php
+ * ~/private/sys/Router/Public/PublicPayload.php
  * Shared dependency payload for public route-family registrars.
  * Docs: https://raven.lanterns.io
  */
@@ -17,7 +17,7 @@ use Raven\Lib\Security\InputSanitizer;
 /**
  * Canonical public route-registrar dependency payload.
  */
-final class PublicRouteDeps
+final class PublicPayload
 {
     /** @var array<string, mixed> */
     public readonly array $rvn;

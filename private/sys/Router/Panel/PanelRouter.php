@@ -34,10 +34,10 @@ final class PanelRouter
     /**
      * Registers the full panel route map in canonical registration order.
      *
-     * @param PanelRouteDeps $deps Shared panel route dependency payload.
+     * @param PanelPayload $deps Shared panel route dependency payload.
      * @return void
      */
-    public function register(PanelRouteDeps $deps): void
+    public function register(PanelPayload $deps): void
     {
         AuthRouter::registerWithDeps($this->router, $deps);
         DashboardRouter::registerWithDeps($this->router, $deps);

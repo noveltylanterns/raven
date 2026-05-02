@@ -2,7 +2,7 @@
 
 /**
  * RAVEN CMS
- * ~/private/sys/Router/Public/PublicRoutePolicy.php
+ * ~/private/sys/Router/Public/PublicPolicy.php
  * Public route-prefix and reserved-path policy assembly.
  * Docs: https://raven.lanterns.io
  */
@@ -21,7 +21,7 @@ use Raven\Lib\Security\InputSanitizer;
 /**
  * Builds normalized public-routing policy values from runtime config.
  */
-final class PublicRoutePolicy
+final class PublicPolicy
 {
     /**
      * Builds public route policy values used by the public route registrars.

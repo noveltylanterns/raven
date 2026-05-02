@@ -22,10 +22,10 @@ final class RoutingRouter
      * Registers routing-diagnostics routes from one shared dependency payload.
      *
      * @param RouteHandler $router Mutable router receiving routing routes.
-     * @param PanelRouteDeps $deps Shared panel route dependency payload.
+     * @param PanelPayload $deps Shared panel route dependency payload.
      * @return void
      */
-    public static function registerWithDeps(RouteHandler $router, PanelRouteDeps $deps): void
+    public static function registerWithDeps(RouteHandler $router, PanelPayload $deps): void
     {
         self::register($router, $deps->panelRoutingController);
     }

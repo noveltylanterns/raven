@@ -77,16 +77,6 @@ final class RuntimeBuilder
         $categoryEnabled = ConfigParser::bool($rvn['config']->get('category.enabled', true), true);
         $tagEnabled = ConfigParser::bool($rvn['config']->get('tag.enabled', true), true);
 
-        // Shared panel editor services — created once here and reused across every
-        // controller factory so that extensions can also access panel_editor_tabs.
-        $rvn['panel_editor_tabs'] = new EditorTabs($rvn['input']);
-        $rvn['panel_editor'] = new Editor();
-        $rvn['panel_editor_blocks'] = new EditorBlocks();
-        // TinyMCE and EasyMDE helpers are registered here for extension access but
-        // only injected into PageEditController, which is the sole controller that
-        // serves the rich page body editor.
-        $rvn['panel_editor_mce'] = new EditorMCE();
-        $rvn['panel_editor_mde'] = new EditorMDE();
 
         /**
          * Resolves the lazy auth DB handle only for panel factories that truly need it.
@@ -143,6 +133,20 @@ final class RuntimeBuilder
                 return $value;
             };
         };
+
+        // Editor helpers are lazy factories so non-edit routes (dashboard, logs, config,
+        // user list, etc.) pay zero construction cost. Each $memoize wrapper ensures the
+        // object is created at most once per request regardless of how many edit routes
+        // share the same controller instance.
+        $rvn['panel_editor_tabs'] = $memoize(static function () use ($rvn): EditorTabs {
+            return new EditorTabs($rvn['input']);
+        });
+        $rvn['panel_editor'] = $memoize(static fn (): Editor => new Editor());
+        $rvn['panel_editor_blocks'] = $memoize(static fn (): EditorBlocks => new EditorBlocks());
+        // MCE and MDE are page-editor-only; kept here so extensions accessing $rvn
+        // can also pull them lazily if needed.
+        $rvn['panel_editor_mce'] = $memoize(static fn (): EditorMCE => new EditorMCE());
+        $rvn['panel_editor_mde'] = $memoize(static fn (): EditorMDE => new EditorMDE());
 
         /** @var array<string, Closure> $repoFactories */
         $repoFactories = RepoFactories::build($rvn, $memoize, $resolveAuthDb, $categoryEnabled, $tagEnabled);

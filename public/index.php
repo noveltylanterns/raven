@@ -17,8 +17,8 @@ use Raven\Core\Router\RouteRequest;
 use Raven\Core\Router\Public\PublicRouter;
 use Raven\Lib\Transport\Request as HttpRequest;
 use Raven\Core\Runtime\Public\RuntimeBuilder;
-use Raven\Core\Router\Public\PublicRouteDeps;
-use Raven\Core\Router\Public\PublicRoutePolicy;
+use Raven\Core\Router\Public\PublicPayload;
+use Raven\Core\Router\Public\PublicPolicy;
 use Raven\Lib\Scheduler\Cron;
 
 $root = dirname(__DIR__);
@@ -160,8 +160,8 @@ if ($shouldInitializePublicRuntime) {
 }
 
 $input = $rvn['input'];
-$routeConfig = PublicRoutePolicy::build($rvn['config'], $input);
-$routeDeps = new PublicRouteDeps(
+$routeConfig = PublicPolicy::build($rvn['config'], $input);
+$routeDeps = new PublicPayload(
     $rvn,
     $publicAuthController,
     $publicPageController,

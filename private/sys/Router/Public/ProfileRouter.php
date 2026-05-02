@@ -23,10 +23,10 @@ final class ProfileRouter
      * Registers profile routes from one shared dependency payload.
      *
      * @param RouteHandler $router Mutable router receiving profile routes.
-     * @param PublicRouteDeps $deps Shared public route dependency payload.
+     * @param PublicPayload $deps Shared public route dependency payload.
      * @return void
      */
-    public static function registerWithDeps(RouteHandler $router, PublicRouteDeps $deps): void
+    public static function registerWithDeps(RouteHandler $router, PublicPayload $deps): void
     {
         self::register(
             $router,
