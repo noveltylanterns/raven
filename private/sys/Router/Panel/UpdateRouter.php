@@ -1,0 +1,52 @@
+<?php
+
+/**
+ * RAVEN CMS
+ * ~/private/sys/Router/Panel/UpdateRouter.php
+ * Panel updater-route registration.
+ * Docs: https://raven.lanterns.io
+ */
+
+declare(strict_types=1);
+
+namespace Raven\Core\Router\Panel;
+
+use Raven\Core\Router\RouteHandler;
+
+/**
+ * Registers updater routes for the panel runtime.
+ */
+final class UpdateRouter
+{
+    /**
+     * Registers updater routes from one shared dependency payload.
+     *
+     * @param RouteHandler $router Mutable router receiving updater routes.
+     * @param PanelRouteDeps $deps Shared panel route dependency payload.
+     * @return void
+     */
+    public static function registerWithDeps(RouteHandler $router, PanelRouteDeps $deps): void
+    {
+        self::register($router, $deps->panelUpdateController);
+    }
+
+    /**
+     * Registers the panel updater route family.
+     *
+     * @param RouteHandler $router Mutable router receiving updater routes.
+     * @param callable(): object $panelUpdateController Lazy updater controller factory.
+     * @return void
+     */
+    public static function register(
+        RouteHandler $router,
+        callable $panelUpdateController
+    ): void {
+        $router->add('GET', '/update', static function () use ($panelUpdateController): void {
+            $panelUpdateController()->update();
+        });
+
+        $router->add('POST', '/update/action', static function () use ($panelUpdateController): void {
+            $panelUpdateController()->updateAction($_POST);
+        });
+    }
+}

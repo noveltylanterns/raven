@@ -19,6 +19,7 @@ use Raven\Core\Controller\Panel\ChannelEditController;
 use Raven\Core\Controller\Panel\ChannelListController;
 use Raven\Core\Controller\Panel\ConfigController;
 use Raven\Core\Controller\Panel\DashboardController;
+use Raven\Core\Controller\Panel\ExtensionController;
 use Raven\Core\Controller\Panel\GroupEditController;
 use Raven\Core\Controller\Panel\GroupListController;
 use Raven\Core\Controller\Panel\LogsController;
@@ -29,9 +30,9 @@ use Raven\Core\Controller\Panel\RedirectEditController;
 use Raven\Core\Controller\Panel\RedirectListController;
 use Raven\Core\Controller\Panel\RoutingController;
 use Raven\Core\Controller\Panel\SharedController;
-use Raven\Core\Controller\Panel\SystemController;
 use Raven\Core\Controller\Panel\TagEditController;
 use Raven\Core\Controller\Panel\TagListController;
+use Raven\Core\Controller\Panel\ThemeController;
 use Raven\Core\Controller\Panel\UpdateController;
 use Raven\Core\Controller\Panel\UserEditController;
 use Raven\Core\Controller\Panel\UserListController;
@@ -493,7 +494,7 @@ final class ControllerFactories
      * @param callable(): ExtensionCatalogService $extensionCatalogFactory Extension catalog service factory.
      * @return void
      */
-    public static function registerUserSystemControllers(
+    public static function registerUserAdminControllers(
         array &$rvn,
         Closure $panelUserDomain,
         Closure $panelSystemDomain,
@@ -511,7 +512,8 @@ final class ControllerFactories
         $routingController = null;
         $updateController = null;
         $configController = null;
-        $systemController = null;
+        $themeController = null;
+        $extensionController = null;
 
         /**
          * Builds the user list controller on first use.
@@ -773,36 +775,54 @@ final class ControllerFactories
         };
 
         /**
-         * Builds the split system controller on first use.
-         * Owns themes and extensions.
+         * Builds the split theme controller on first use.
+         * Owns `/themes*` only.
          */
-        $rvn['panel_system_controller'] = static function () use (
-            &$systemController,
-            &$rvn,
-            $extensionStateStoreFactory,
-            $extensionCatalogFactory,
-            $themeCatalogFactory
-        ): SystemController {
-            if ($systemController instanceof SystemController) {
-                return $systemController;
+        $rvn['panel_theme_controller'] = static function () use (&$themeController, &$rvn, $themeCatalogFactory): ThemeController {
+            if ($themeController instanceof ThemeController) {
+                return $themeController;
             }
 
             /** @var callable(): SharedController $requestContextFactory */
             $requestContextFactory = $rvn['panel_request_context'];
-            $systemController = new SystemController(
+            $themeController = new ThemeController(
+                $requestContextFactory(),
+                $rvn['config'],
+                $rvn['input'],
+                (string) $rvn['root'],
+                $themeCatalogFactory()
+            );
+            return $themeController;
+        };
+
+        /**
+         * Builds the split extension controller on first use.
+         * Owns `/extensions*` only.
+         */
+        $rvn['panel_extension_controller'] = static function () use (
+            &$extensionController,
+            &$rvn,
+            $extensionStateStoreFactory,
+            $extensionCatalogFactory
+        ): ExtensionController {
+            if ($extensionController instanceof ExtensionController) {
+                return $extensionController;
+            }
+
+            /** @var callable(): SharedController $requestContextFactory */
+            $requestContextFactory = $rvn['panel_request_context'];
+            $extensionController = new ExtensionController(
                 $requestContextFactory(),
                 $rvn['config'],
                 $rvn['input'],
                 (string) $rvn['root'],
                 $extensionStateStoreFactory(),
                 $extensionCatalogFactory(),
-                $themeCatalogFactory(),
                 is_callable($rvn['extension_services_for'] ?? null)
                     ? $rvn['extension_services_for']
                     : static fn (?string $extensionDirectory = null): array => []
             );
-
-            return $systemController;
+            return $extensionController;
         };
     }
 

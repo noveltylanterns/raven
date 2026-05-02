@@ -10,7 +10,7 @@
 declare(strict_types=1);
 
 use Raven\Ext\Repo\RepoService;
-use Raven\Core\Routing\Router;
+use Raven\Core\Router\RouteHandler;
 
 /**
  * Registers Repositories module public routes.
@@ -24,7 +24,7 @@ use Raven\Core\Routing\Router;
  *   renderPublicExtension?: callable(string, array<string, mixed>, string|null): void
  * } $context
  */
-return static function (Router $router, array $context): void {
+return static function (RouteHandler $router, array $context): void {
     /** @var array<string, mixed> $rvn */
     $rvn = (array) ($context['rvn'] ?? []);
     $renderPublicExtension = $context['renderPublicExtension'] ?? null;

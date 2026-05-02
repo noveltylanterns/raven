@@ -9,7 +9,7 @@
 
 declare(strict_types=1);
 
-use Raven\Core\Routing\Router;
+use Raven\Core\Router\RouteHandler;
 use Raven\Ext\ContactFormRepository;
 use Raven\Ext\ContactSubmissionRepository;
 use Raven\Lib\Format\Csv;
@@ -28,7 +28,7 @@ use Raven\Lib\View\Panel\EditorBlocks;
  *   extensionDirectory?: string
  * } $context
  */
-return static function (Router $router, array $context): void {
+return static function (RouteHandler $router, array $context): void {
     /** @var array<string, mixed> $rvn */
     $rvn = (array) ($context['rvn'] ?? []);
 

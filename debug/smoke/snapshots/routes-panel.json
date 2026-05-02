@@ -1,6 +1,6 @@
 {
     "schema": 1,
-    "generated_at": "2026-04-30T07:57:33+00:00",
+    "generated_at": "2026-05-02T12:19:53+00:00",
     "scope": "panel",
     "routes": [
         {
@@ -10,13 +10,13 @@
             "regex": "#^/login$#",
             "handler": {
                 "type": "closure",
-                "file": "private/sys/Routing/Panel/AuthRouter.php",
+                "file": "private/sys/Router/Panel/AuthRouter.php",
                 "line": 42,
                 "static_uses": [
                     "authController"
                 ]
             },
-            "signature": "cd2c367cd21782669d973eb6ee096344d3def973"
+            "signature": "9554d127c8d556787dc9bcea61965b3e7ad92a31"
         },
         {
             "scope": "panel",
@@ -25,13 +25,13 @@
             "regex": "#^/login$#",
             "handler": {
                 "type": "closure",
-                "file": "private/sys/Routing/Panel/AuthRouter.php",
+                "file": "private/sys/Router/Panel/AuthRouter.php",
                 "line": 46,
                 "static_uses": [
                     "authController"
                 ]
             },
-            "signature": "24c20f474c96b0a2270d5366bf11b501c912c00e"
+            "signature": "9e167a97788081d55585392d4c2a69280446054f"
         },
         {
             "scope": "panel",
@@ -40,13 +40,13 @@
             "regex": "#^/login/2fa$#",
             "handler": {
                 "type": "closure",
-                "file": "private/sys/Routing/Panel/AuthRouter.php",
+                "file": "private/sys/Router/Panel/AuthRouter.php",
                 "line": 50,
                 "static_uses": [
                     "authController"
                 ]
             },
-            "signature": "adb81ba83eace1a3887470a3aa10eb8b861224c7"
+            "signature": "3f87b01c772b7fff7567e5047300680338569665"
         },
         {
             "scope": "panel",
@@ -55,13 +55,13 @@
             "regex": "#^/login/2fa$#",
             "handler": {
                 "type": "closure",
-                "file": "private/sys/Routing/Panel/AuthRouter.php",
+                "file": "private/sys/Router/Panel/AuthRouter.php",
                 "line": 54,
                 "static_uses": [
                     "authController"
                 ]
             },
-            "signature": "2cf396dff1d8837b567a0aba67ad785112232bc2"
+            "signature": "627c6ff87eddffb2721755339516fce7f9239210"
         },
         {
             "scope": "panel",
@@ -70,13 +70,13 @@
             "regex": "#^/login/2fa/select$#",
             "handler": {
                 "type": "closure",
-                "file": "private/sys/Routing/Panel/AuthRouter.php",
+                "file": "private/sys/Router/Panel/AuthRouter.php",
                 "line": 58,
                 "static_uses": [
                     "authController"
                 ]
             },
-            "signature": "6e9c9f3382736305810cd7f0b5e15bd350c983d3"
+            "signature": "b0288593359ef33deaaf738de1d7ab91702e1e01"
         },
         {
             "scope": "panel",
@@ -85,13 +85,13 @@
             "regex": "#^/login/2fa/webauthn/options$#",
             "handler": {
                 "type": "closure",
-                "file": "private/sys/Routing/Panel/AuthRouter.php",
+                "file": "private/sys/Router/Panel/AuthRouter.php",
                 "line": 62,
                 "static_uses": [
                     "authController"
                 ]
             },
-            "signature": "3252464f263a91e7cb3c6e58e76eaeb1177eda76"
+            "signature": "ef8e2e303e7321a606ff7d61dc90f1f0e6422446"
         },
         {
             "scope": "panel",
@@ -100,13 +100,13 @@
             "regex": "#^/login/2fa/webauthn/verify$#",
             "handler": {
                 "type": "closure",
-                "file": "private/sys/Routing/Panel/AuthRouter.php",
+                "file": "private/sys/Router/Panel/AuthRouter.php",
                 "line": 66,
                 "static_uses": [
                     "authController"
                 ]
             },
-            "signature": "b5bdf337509b97e28263004d7631a92cda019165"
+            "signature": "b59098f1e0e95671cbc37bf6284e5fbccf3e92ed"
         },
         {
             "scope": "panel",
@@ -115,13 +115,13 @@
             "regex": "#^/logout$#",
             "handler": {
                 "type": "closure",
-                "file": "private/sys/Routing/Panel/AuthRouter.php",
+                "file": "private/sys/Router/Panel/AuthRouter.php",
                 "line": 70,
                 "static_uses": [
                     "authController"
                 ]
             },
-            "signature": "4e7beab7efc72b43d036cbb64e5f1ded84fda812"
+            "signature": "d8a8d0285ac43b955561a83f520b9d7b3addba42"
         },
         {
             "scope": "panel",
@@ -130,13 +130,13 @@
             "regex": "#^/$#",
             "handler": {
                 "type": "closure",
-                "file": "private/sys/Routing/Panel/DashboardRouter.php",
+                "file": "private/sys/Router/Panel/DashboardRouter.php",
                 "line": 42,
                 "static_uses": [
                     "panelDashboardController"
                 ]
             },
-            "signature": "220f815520af4c8c0f39191942bce9ef5c4947b8"
+            "signature": "18e0d3a10e75769d01a8ad9feb8f325762ee660f"
         },
         {
             "scope": "panel",
@@ -145,13 +145,13 @@
             "regex": "#^/page$#",
             "handler": {
                 "type": "closure",
-                "file": "private/sys/Routing/Panel/ContentRouter.php",
+                "file": "private/sys/Router/Panel/PageRouter.php",
                 "line": 58,
                 "static_uses": [
                     "panelPageListController"
                 ]
             },
-            "signature": "b630bb49b16e31783203ccfbc9d15e7530c7c3d2"
+            "signature": "184726328cf14baa4550eb02d3d1ca10a7a5a997"
         },
         {
             "scope": "panel",
@@ -160,13 +160,13 @@
             "regex": "#^/page/edit$#",
             "handler": {
                 "type": "closure",
-                "file": "private/sys/Routing/Panel/ContentRouter.php",
+                "file": "private/sys/Router/Panel/PageRouter.php",
                 "line": 62,
                 "static_uses": [
                     "panelPageEditController"
                 ]
             },
-            "signature": "f649f6199f79a80fd47054583d82c9005c3acaec"
+            "signature": "291e7e6aeb93606de876c3e26b840e683ced8ee2"
         },
         {
             "scope": "panel",
@@ -175,7 +175,7 @@
             "regex": "#^/page/edit/(?P<id>[^/]+)$#",
             "handler": {
                 "type": "closure",
-                "file": "private/sys/Routing/Panel/ContentRouter.php",
+                "file": "private/sys/Router/Panel/PageRouter.php",
                 "line": 66,
                 "static_uses": [
                     "input",
@@ -183,7 +183,7 @@
                     "renderNotFound"
                 ]
             },
-            "signature": "b9c556a231c5844aba9de1545f4a45e4ede3b2b6"
+            "signature": "8b091e6c2dfbc59f6c5b25d5666fe163a43be5db"
         },
         {
             "scope": "panel",
@@ -192,13 +192,13 @@
             "regex": "#^/page/save$#",
             "handler": {
                 "type": "closure",
-                "file": "private/sys/Routing/Panel/ContentRouter.php",
+                "file": "private/sys/Router/Panel/PageRouter.php",
                 "line": 75,
                 "static_uses": [
                     "panelPageEditController"
                 ]
             },
-            "signature": "7e615a3c0e1a13253349821dacedc3158f04ad28"
+            "signature": "4d841e23afe18c0b20baed2058b3e013a0cdba68"
         },
         {
             "scope": "panel",
@@ -207,13 +207,13 @@
             "regex": "#^/page/gallery/upload$#",
             "handler": {
                 "type": "closure",
-                "file": "private/sys/Routing/Panel/ContentRouter.php",
+                "file": "private/sys/Router/Panel/PageRouter.php",
                 "line": 79,
                 "static_uses": [
                     "panelPageEditController"
                 ]
             },
-            "signature": "8ed670ef4149be2779d57ba7aff584a49ccf4b36"
+            "signature": "d86de50cb2f78c14849bfbe7c1053a6c32ab47f2"
         },
         {
             "scope": "panel",
@@ -222,13 +222,13 @@
             "regex": "#^/page/gallery/delete$#",
             "handler": {
                 "type": "closure",
-                "file": "private/sys/Routing/Panel/ContentRouter.php",
+                "file": "private/sys/Router/Panel/PageRouter.php",
                 "line": 83,
                 "static_uses": [
                     "panelPageEditController"
                 ]
             },
-            "signature": "33546f5481e3d71dc99fa6b565dce3e09dd8af82"
+            "signature": "9f833fd336dfac4d69e5ab45df35fa01a684a197"
         },
         {
             "scope": "panel",
@@ -237,13 +237,13 @@
             "regex": "#^/page/delete$#",
             "handler": {
                 "type": "closure",
-                "file": "private/sys/Routing/Panel/ContentRouter.php",
+                "file": "private/sys/Router/Panel/PageRouter.php",
                 "line": 87,
                 "static_uses": [
                     "panelPageEditController"
                 ]
             },
-            "signature": "3f5918f1a645c65fad6f51d50c09365207e8262d"
+            "signature": "515e5e3a2dd2dbc16b8e448608a18f0514f3b037"
         },
         {
             "scope": "panel",
@@ -252,13 +252,13 @@
             "regex": "#^/channel$#",
             "handler": {
                 "type": "closure",
-                "file": "private/sys/Routing/Panel/ChannelRouter.php",
+                "file": "private/sys/Router/Panel/ChannelRouter.php",
                 "line": 58,
                 "static_uses": [
                     "panelChannelListController"
                 ]
             },
-            "signature": "347b77ad73e61411b825859def9369786cc77636"
+            "signature": "75f6dbb438b3295ccf3dfc20adfc7c7f22924aae"
         },
         {
             "scope": "panel",
@@ -267,13 +267,13 @@
             "regex": "#^/channel/edit$#",
             "handler": {
                 "type": "closure",
-                "file": "private/sys/Routing/Panel/ChannelRouter.php",
+                "file": "private/sys/Router/Panel/ChannelRouter.php",
                 "line": 62,
                 "static_uses": [
                     "panelChannelEditController"
                 ]
             },
-            "signature": "dca599d68e5c07a90d8604478bdd215077abb41e"
+            "signature": "12835e6500fce5537f075f8df0ffb5a499a370e0"
         },
         {
             "scope": "panel",
@@ -282,7 +282,7 @@
             "regex": "#^/channel/edit/(?P<id>[^/]+)$#",
             "handler": {
                 "type": "closure",
-                "file": "private/sys/Routing/Panel/ChannelRouter.php",
+                "file": "private/sys/Router/Panel/ChannelRouter.php",
                 "line": 66,
                 "static_uses": [
                     "input",
@@ -290,7 +290,7 @@
                     "renderNotFound"
                 ]
             },
-            "signature": "c982103cf3d1de2ac622e3013cbd4bc859d10cc5"
+            "signature": "3beec62d0e0bfa465ccf94dbc9f737abf52362bc"
         },
         {
             "scope": "panel",
@@ -299,13 +299,13 @@
             "regex": "#^/channel/save$#",
             "handler": {
                 "type": "closure",
-                "file": "private/sys/Routing/Panel/ChannelRouter.php",
+                "file": "private/sys/Router/Panel/ChannelRouter.php",
                 "line": 75,
                 "static_uses": [
                     "panelChannelEditController"
                 ]
             },
-            "signature": "8743b976355fb30f5c57e411d0d0e48db56c75a8"
+            "signature": "0630a722e2317ce170b40d622860645e6a23dafb"
         },
         {
             "scope": "panel",
@@ -314,13 +314,13 @@
             "regex": "#^/channel/delete$#",
             "handler": {
                 "type": "closure",
-                "file": "private/sys/Routing/Panel/ChannelRouter.php",
+                "file": "private/sys/Router/Panel/ChannelRouter.php",
                 "line": 79,
                 "static_uses": [
                     "panelChannelEditController"
                 ]
             },
-            "signature": "0a57974c51490e059b1b8428befe98c9c515aae0"
+            "signature": "984f0645c2eec09d5dc17f235f221b692b2a1ac6"
         },
         {
             "scope": "panel",
@@ -329,13 +329,13 @@
             "regex": "#^/category$#",
             "handler": {
                 "type": "closure",
-                "file": "private/sys/Routing/Panel/TaxonomyCrudRouter.php",
-                "line": 77,
+                "file": "private/sys/Router/Panel/CategoryRouter.php",
+                "line": 37,
                 "static_uses": [
-                    "onList"
+                    "deps"
                 ]
             },
-            "signature": "ee4f022cce86de5de6c2b473a445b859f38db034"
+            "signature": "5fa02d8de4c71bc077b96246572110030b2015ae"
         },
         {
             "scope": "panel",
@@ -344,13 +344,13 @@
             "regex": "#^/category/edit$#",
             "handler": {
                 "type": "closure",
-                "file": "private/sys/Routing/Panel/TaxonomyCrudRouter.php",
-                "line": 81,
+                "file": "private/sys/Router/Panel/CategoryRouter.php",
+                "line": 41,
                 "static_uses": [
-                    "onEditNew"
+                    "deps"
                 ]
             },
-            "signature": "5238e1ee6408111136b7a01c9bd59a12757d6a4b"
+            "signature": "bb45c0893d1b9c83f06e3970360c6716d5731244"
         },
         {
             "scope": "panel",
@@ -359,15 +359,13 @@
             "regex": "#^/category/edit/(?P<id>[^/]+)$#",
             "handler": {
                 "type": "closure",
-                "file": "private/sys/Routing/Panel/TaxonomyCrudRouter.php",
-                "line": 85,
+                "file": "private/sys/Router/Panel/CategoryRouter.php",
+                "line": 45,
                 "static_uses": [
-                    "input",
-                    "onEditById",
-                    "renderNotFound"
+                    "deps"
                 ]
             },
-            "signature": "68349057ac405ef046f3a1119e3ad1b2bed06a93"
+            "signature": "34dbfce6486b79e7bae16af2adc19b79a63e689f"
         },
         {
             "scope": "panel",
@@ -376,13 +374,13 @@
             "regex": "#^/category/save$#",
             "handler": {
                 "type": "closure",
-                "file": "private/sys/Routing/Panel/TaxonomyCrudRouter.php",
-                "line": 93,
+                "file": "private/sys/Router/Panel/CategoryRouter.php",
+                "line": 54,
                 "static_uses": [
-                    "onSave"
+                    "deps"
                 ]
             },
-            "signature": "c352528bbcdf5c91858f567ff545016148d33398"
+            "signature": "2931ee82707bb9b7047ae63857ecca907e6a5972"
         },
         {
             "scope": "panel",
@@ -391,13 +389,13 @@
             "regex": "#^/category/delete$#",
             "handler": {
                 "type": "closure",
-                "file": "private/sys/Routing/Panel/TaxonomyCrudRouter.php",
-                "line": 97,
+                "file": "private/sys/Router/Panel/CategoryRouter.php",
+                "line": 58,
                 "static_uses": [
-                    "onDelete"
+                    "deps"
                 ]
             },
-            "signature": "fda562766cdf5f3386e55d67f676b69e6f9515bd"
+            "signature": "08b2d9361772bbc1102b950ebb0b6540e1ba0a9e"
         },
         {
             "scope": "panel",
@@ -406,13 +404,13 @@
             "regex": "#^/category/set$#",
             "handler": {
                 "type": "closure",
-                "file": "private/sys/Routing/Panel/TaxonomyCrudRouter.php",
-                "line": 101,
+                "file": "private/sys/Router/Panel/SetRouter.php",
+                "line": 54,
                 "static_uses": [
                     "onSetList"
                 ]
             },
-            "signature": "0b7181409b9a22d457bba4c50b62ebb11945f5aa"
+            "signature": "0cd60ebcb99143dbd534b54733792380c6d86a7c"
         },
         {
             "scope": "panel",
@@ -421,13 +419,13 @@
             "regex": "#^/category/set/edit$#",
             "handler": {
                 "type": "closure",
-                "file": "private/sys/Routing/Panel/TaxonomyCrudRouter.php",
-                "line": 105,
+                "file": "private/sys/Router/Panel/SetRouter.php",
+                "line": 58,
                 "static_uses": [
                     "onSetEditNew"
                 ]
             },
-            "signature": "1449e94c15f74799715a4d0e4184d71b900779ff"
+            "signature": "060363049f2626bef621e8873af7fef3624878a8"
         },
         {
             "scope": "panel",
@@ -436,15 +434,15 @@
             "regex": "#^/category/set/edit/(?P<id>[^/]+)$#",
             "handler": {
                 "type": "closure",
-                "file": "private/sys/Routing/Panel/TaxonomyCrudRouter.php",
-                "line": 110,
+                "file": "private/sys/Router/Panel/SetRouter.php",
+                "line": 63,
                 "static_uses": [
                     "input",
                     "onSetEditById",
                     "renderNotFound"
                 ]
             },
-            "signature": "34aa8be7bafab00a2945665cfddfd0b94874a0bc"
+            "signature": "d2d15f33cc63d2da4b34501f7b0630b9b226b7f6"
         },
         {
             "scope": "panel",
@@ -453,13 +451,13 @@
             "regex": "#^/category/set/save$#",
             "handler": {
                 "type": "closure",
-                "file": "private/sys/Routing/Panel/TaxonomyCrudRouter.php",
-                "line": 118,
+                "file": "private/sys/Router/Panel/SetRouter.php",
+                "line": 72,
                 "static_uses": [
                     "onSetSave"
                 ]
             },
-            "signature": "5cad19991b943d4168d80d6c361cd54b3c45a581"
+            "signature": "da08520348aac3d93258c196ceb0c55a9167affa"
         },
         {
             "scope": "panel",
@@ -468,13 +466,13 @@
             "regex": "#^/category/set/delete$#",
             "handler": {
                 "type": "closure",
-                "file": "private/sys/Routing/Panel/TaxonomyCrudRouter.php",
-                "line": 122,
+                "file": "private/sys/Router/Panel/SetRouter.php",
+                "line": 76,
                 "static_uses": [
                     "onSetDelete"
                 ]
             },
-            "signature": "e99f36b2f5963b0ecaddff3b12cc42ded5039a63"
+            "signature": "b9a5cd39cb30429c90de29d26544c5b92ba1b860"
         },
         {
             "scope": "panel",
@@ -483,13 +481,13 @@
             "regex": "#^/tag$#",
             "handler": {
                 "type": "closure",
-                "file": "private/sys/Routing/Panel/TaxonomyCrudRouter.php",
-                "line": 77,
+                "file": "private/sys/Router/Panel/TagRouter.php",
+                "line": 37,
                 "static_uses": [
-                    "onList"
+                    "deps"
                 ]
             },
-            "signature": "9789408f29d0330a13c53524eca5771dd86f7faf"
+            "signature": "7ec024167e11d8707af562940d72803bd6dac390"
         },
         {
             "scope": "panel",
@@ -498,13 +496,13 @@
             "regex": "#^/tag/edit$#",
             "handler": {
                 "type": "closure",
-                "file": "private/sys/Routing/Panel/TaxonomyCrudRouter.php",
-                "line": 81,
+                "file": "private/sys/Router/Panel/TagRouter.php",
+                "line": 41,
                 "static_uses": [
-                    "onEditNew"
+                    "deps"
                 ]
             },
-            "signature": "8cfc837aad06582c16ec3d7091da07f0cb7e9451"
+            "signature": "8707d5f91d292a8c60b2a8d318ed799f75ce1518"
         },
         {
             "scope": "panel",
@@ -513,15 +511,13 @@
             "regex": "#^/tag/edit/(?P<id>[^/]+)$#",
             "handler": {
                 "type": "closure",
-                "file": "private/sys/Routing/Panel/TaxonomyCrudRouter.php",
-                "line": 85,
+                "file": "private/sys/Router/Panel/TagRouter.php",
+                "line": 45,
                 "static_uses": [
-                    "input",
-                    "onEditById",
-                    "renderNotFound"
+                    "deps"
                 ]
             },
-            "signature": "badcb095ef2ad295173c4d1c93d3dd88aa5bea25"
+            "signature": "cbad5e0526ddbfd32306363d25602b7bcc665d10"
         },
         {
             "scope": "panel",
@@ -530,13 +526,13 @@
             "regex": "#^/tag/save$#",
             "handler": {
                 "type": "closure",
-                "file": "private/sys/Routing/Panel/TaxonomyCrudRouter.php",
-                "line": 93,
+                "file": "private/sys/Router/Panel/TagRouter.php",
+                "line": 54,
                 "static_uses": [
-                    "onSave"
+                    "deps"
                 ]
             },
-            "signature": "6dba982c52ade589fb4f2954ea06012c026eda5c"
+            "signature": "e3be9d5ce64a50ca5b8dcda18e46b9b2279ed41b"
         },
         {
             "scope": "panel",
@@ -545,13 +541,13 @@
             "regex": "#^/tag/delete$#",
             "handler": {
                 "type": "closure",
-                "file": "private/sys/Routing/Panel/TaxonomyCrudRouter.php",
-                "line": 97,
+                "file": "private/sys/Router/Panel/TagRouter.php",
+                "line": 58,
                 "static_uses": [
-                    "onDelete"
+                    "deps"
                 ]
             },
-            "signature": "7c76836bf041d3564790e0828162c6f1376c409d"
+            "signature": "f7385f4d385af3701bec33829ccbaa574a7900b2"
         },
         {
             "scope": "panel",
@@ -560,13 +556,13 @@
             "regex": "#^/tag/set$#",
             "handler": {
                 "type": "closure",
-                "file": "private/sys/Routing/Panel/TaxonomyCrudRouter.php",
-                "line": 101,
+                "file": "private/sys/Router/Panel/SetRouter.php",
+                "line": 54,
                 "static_uses": [
                     "onSetList"
                 ]
             },
-            "signature": "272034f90b5f22dbd127b07f13a1b47c27359eb5"
+            "signature": "35db01d44a9c5e07c466fbec4834e9fc8be7574c"
         },
         {
             "scope": "panel",
@@ -575,13 +571,13 @@
             "regex": "#^/tag/set/edit$#",
             "handler": {
                 "type": "closure",
-                "file": "private/sys/Routing/Panel/TaxonomyCrudRouter.php",
-                "line": 105,
+                "file": "private/sys/Router/Panel/SetRouter.php",
+                "line": 58,
                 "static_uses": [
                     "onSetEditNew"
                 ]
             },
-            "signature": "52220e02c9f07b4b1af6a563a0b8109de01fa53f"
+            "signature": "84a4e742dec047e5c1456787822c09ada9e90dae"
         },
         {
             "scope": "panel",
@@ -590,15 +586,15 @@
             "regex": "#^/tag/set/edit/(?P<id>[^/]+)$#",
             "handler": {
                 "type": "closure",
-                "file": "private/sys/Routing/Panel/TaxonomyCrudRouter.php",
-                "line": 110,
+                "file": "private/sys/Router/Panel/SetRouter.php",
+                "line": 63,
                 "static_uses": [
                     "input",
                     "onSetEditById",
                     "renderNotFound"
                 ]
             },
-            "signature": "c0aeb6f75d39a3efbc63d14f61f53bf238f00581"
+            "signature": "0b154ab10189f91055aa4216aad1f327dbde736a"
         },
         {
             "scope": "panel",
@@ -607,13 +603,13 @@
             "regex": "#^/tag/set/save$#",
             "handler": {
                 "type": "closure",
-                "file": "private/sys/Routing/Panel/TaxonomyCrudRouter.php",
-                "line": 118,
+                "file": "private/sys/Router/Panel/SetRouter.php",
+                "line": 72,
                 "static_uses": [
                     "onSetSave"
                 ]
             },
-            "signature": "fe7c17486d3b03389c8a6d0735d5018e82dd7b8f"
+            "signature": "9fb5635715893d4c536ea8dfca8ee374bf1c758c"
         },
         {
             "scope": "panel",
@@ -622,13 +618,13 @@
             "regex": "#^/tag/set/delete$#",
             "handler": {
                 "type": "closure",
-                "file": "private/sys/Routing/Panel/TaxonomyCrudRouter.php",
-                "line": 122,
+                "file": "private/sys/Router/Panel/SetRouter.php",
+                "line": 76,
                 "static_uses": [
                     "onSetDelete"
                 ]
             },
-            "signature": "0608b7cab5440f10c7f669ac22e3013f6fe4a811"
+            "signature": "237803d0fa2caec9dc9034e26182beeb835c56f2"
         },
         {
             "scope": "panel",
@@ -637,13 +633,13 @@
             "regex": "#^/redirect$#",
             "handler": {
                 "type": "closure",
-                "file": "private/sys/Routing/Panel/RedirectRouter.php",
+                "file": "private/sys/Router/Panel/RedirectRouter.php",
                 "line": 58,
                 "static_uses": [
                     "panelRedirectListController"
                 ]
             },
-            "signature": "7d4bebda96e40b35596ebdb9fbb6a6cec3c74cfb"
+            "signature": "62bfdc41e1c982d4fc0f78ae1fe9f59f284f6834"
         },
         {
             "scope": "panel",
@@ -652,13 +648,13 @@
             "regex": "#^/redirect/edit$#",
             "handler": {
                 "type": "closure",
-                "file": "private/sys/Routing/Panel/RedirectRouter.php",
+                "file": "private/sys/Router/Panel/RedirectRouter.php",
                 "line": 62,
                 "static_uses": [
                     "panelRedirectEditController"
                 ]
             },
-            "signature": "612f28825d0392c16da0d78f120232857c1df351"
+            "signature": "e7155c3792c983dc155c4a7638a9662253b03733"
         },
         {
             "scope": "panel",
@@ -667,7 +663,7 @@
             "regex": "#^/redirect/edit/(?P<id>[^/]+)$#",
             "handler": {
                 "type": "closure",
-                "file": "private/sys/Routing/Panel/RedirectRouter.php",
+                "file": "private/sys/Router/Panel/RedirectRouter.php",
                 "line": 66,
                 "static_uses": [
                     "input",
@@ -675,7 +671,7 @@
                     "renderNotFound"
                 ]
             },
-            "signature": "7237240ff664854012312ef96e7594c9acba19c3"
+            "signature": "0281d1ef39b7e4409ba4b0779c77755286f0d5b8"
         },
         {
             "scope": "panel",
@@ -684,13 +680,13 @@
             "regex": "#^/redirect/save$#",
             "handler": {
                 "type": "closure",
-                "file": "private/sys/Routing/Panel/RedirectRouter.php",
+                "file": "private/sys/Router/Panel/RedirectRouter.php",
                 "line": 75,
                 "static_uses": [
                     "panelRedirectEditController"
                 ]
             },
-            "signature": "161eb374c4f3d7e1162516ecb18b8651aa2aab8f"
+            "signature": "a52309c4abb9714965f08dfe65f73dd1d2510b02"
         },
         {
             "scope": "panel",
@@ -699,13 +695,13 @@
             "regex": "#^/redirect/delete$#",
             "handler": {
                 "type": "closure",
-                "file": "private/sys/Routing/Panel/RedirectRouter.php",
+                "file": "private/sys/Router/Panel/RedirectRouter.php",
                 "line": 79,
                 "static_uses": [
                     "panelRedirectEditController"
                 ]
             },
-            "signature": "419896f01cc8fa601a1e5fb92daedfe84a915d2b"
+            "signature": "9cde884438400c85f8b10a5a322c9903a1770df9"
         },
         {
             "scope": "panel",
@@ -714,13 +710,13 @@
             "regex": "#^/user$#",
             "handler": {
                 "type": "closure",
-                "file": "private/sys/Routing/Panel/UserRouter.php",
+                "file": "private/sys/Router/Panel/UserRouter.php",
                 "line": 58,
                 "static_uses": [
                     "panelUserListController"
                 ]
             },
-            "signature": "6124f79ab7a7f4cae92c6239e7c9d4572162d59b"
+            "signature": "91de4787a68e5208e9887a5d83155e311dbd6e0c"
         },
         {
             "scope": "panel",
@@ -729,13 +725,13 @@
             "regex": "#^/user/edit$#",
             "handler": {
                 "type": "closure",
-                "file": "private/sys/Routing/Panel/UserRouter.php",
+                "file": "private/sys/Router/Panel/UserRouter.php",
                 "line": 62,
                 "static_uses": [
                     "panelUserEditController"
                 ]
             },
-            "signature": "13eb0565114b6072710da8f53a7fc352d096cad3"
+            "signature": "4d611b9615192c5647f7799de5d28df39dcd5dc2"
         },
         {
             "scope": "panel",
@@ -744,7 +740,7 @@
             "regex": "#^/user/edit/(?P<id>[^/]+)$#",
             "handler": {
                 "type": "closure",
-                "file": "private/sys/Routing/Panel/UserRouter.php",
+                "file": "private/sys/Router/Panel/UserRouter.php",
                 "line": 66,
                 "static_uses": [
                     "input",
@@ -752,7 +748,7 @@
                     "renderNotFound"
                 ]
             },
-            "signature": "d7a384c77229ec893bd403c6b3666eb9479c9f3d"
+            "signature": "1701f1b39c0191aaf6a3ae4a814817506717acc5"
         },
         {
             "scope": "panel",
@@ -761,13 +757,13 @@
             "regex": "#^/user/save$#",
             "handler": {
                 "type": "closure",
-                "file": "private/sys/Routing/Panel/UserRouter.php",
+                "file": "private/sys/Router/Panel/UserRouter.php",
                 "line": 75,
                 "static_uses": [
                     "panelUserEditController"
                 ]
             },
-            "signature": "bc75e5025b920e20c2e94824160223856955518a"
+            "signature": "55850aa61b4c690ac5859de9d05cdaa6c0562db8"
         },
         {
             "scope": "panel",
@@ -776,13 +772,13 @@
             "regex": "#^/user/delete$#",
             "handler": {
                 "type": "closure",
-                "file": "private/sys/Routing/Panel/UserRouter.php",
+                "file": "private/sys/Router/Panel/UserRouter.php",
                 "line": 79,
                 "static_uses": [
                     "panelUserEditController"
                 ]
             },
-            "signature": "fd4100ccee0a98dddf14ced86a6dabdcf48ec5a8"
+            "signature": "932c6500fc1f93f7172dd3660e17251e616b15e1"
         },
         {
             "scope": "panel",
@@ -791,13 +787,13 @@
             "regex": "#^/user/invites$#",
             "handler": {
                 "type": "closure",
-                "file": "private/sys/Routing/Panel/UserRouter.php",
+                "file": "private/sys/Router/Panel/UserRouter.php",
                 "line": 83,
                 "static_uses": [
                     "panelUserListController"
                 ]
             },
-            "signature": "3d9e95bbf96369e061b0b0bd306beb339133b083"
+            "signature": "c5e576ff764657c2f610455a15b600e7816f0696"
         },
         {
             "scope": "panel",
@@ -806,13 +802,13 @@
             "regex": "#^/user/invites/create$#",
             "handler": {
                 "type": "closure",
-                "file": "private/sys/Routing/Panel/UserRouter.php",
+                "file": "private/sys/Router/Panel/UserRouter.php",
                 "line": 87,
                 "static_uses": [
                     "panelUserEditController"
                 ]
             },
-            "signature": "524b57f74f16a8e3fb50ce3960868bbfedcbe303"
+            "signature": "39370f8fda6f8d0c0afe15b04b0289acc601a113"
         },
         {
             "scope": "panel",
@@ -821,13 +817,13 @@
             "regex": "#^/user/invites/generate$#",
             "handler": {
                 "type": "closure",
-                "file": "private/sys/Routing/Panel/UserRouter.php",
+                "file": "private/sys/Router/Panel/UserRouter.php",
                 "line": 91,
                 "static_uses": [
                     "panelUserEditController"
                 ]
             },
-            "signature": "c4a7fb1a2f5dcbec6c5f8c16bcfd7ea3a4710ba7"
+            "signature": "f7ccd7452a775dc1b674cf11347a3fbee290c309"
         },
         {
             "scope": "panel",
@@ -836,13 +832,13 @@
             "regex": "#^/user/invites/delete$#",
             "handler": {
                 "type": "closure",
-                "file": "private/sys/Routing/Panel/UserRouter.php",
+                "file": "private/sys/Router/Panel/UserRouter.php",
                 "line": 95,
                 "static_uses": [
                     "panelUserEditController"
                 ]
             },
-            "signature": "2031a17f1d670f1bca24ee17a712912626773822"
+            "signature": "37cdb0100a6d27be0ae2e0ca9cc743454a317aed"
         },
         {
             "scope": "panel",
@@ -851,13 +847,13 @@
             "regex": "#^/group$#",
             "handler": {
                 "type": "closure",
-                "file": "private/sys/Routing/Panel/GroupRouter.php",
+                "file": "private/sys/Router/Panel/GroupRouter.php",
                 "line": 58,
                 "static_uses": [
                     "panelGroupListController"
                 ]
             },
-            "signature": "0166440c89c2ccb2d57b350212c15ff0ffe2174e"
+            "signature": "4718d0f531f76bee201754aedac59b40faed8800"
         },
         {
             "scope": "panel",
@@ -866,13 +862,13 @@
             "regex": "#^/group/edit$#",
             "handler": {
                 "type": "closure",
-                "file": "private/sys/Routing/Panel/GroupRouter.php",
+                "file": "private/sys/Router/Panel/GroupRouter.php",
                 "line": 62,
                 "static_uses": [
                     "panelGroupEditController"
                 ]
             },
-            "signature": "8c356a36afe4cda8024ca404b10387828d1c0c90"
+            "signature": "274eb0e655a213739173842c5f88684a79d37638"
         },
         {
             "scope": "panel",
@@ -881,7 +877,7 @@
             "regex": "#^/group/edit/(?P<id>[^/]+)$#",
             "handler": {
                 "type": "closure",
-                "file": "private/sys/Routing/Panel/GroupRouter.php",
+                "file": "private/sys/Router/Panel/GroupRouter.php",
                 "line": 66,
                 "static_uses": [
                     "input",
@@ -889,7 +885,7 @@
                     "renderNotFound"
                 ]
             },
-            "signature": "f0bcb55a436ce3aa4818b19712e17b0aa6ebab78"
+            "signature": "38738606e7c6be96796b55eff9e6ad7e8f15d2ef"
         },
         {
             "scope": "panel",
@@ -898,13 +894,13 @@
             "regex": "#^/group/save$#",
             "handler": {
                 "type": "closure",
-                "file": "private/sys/Routing/Panel/GroupRouter.php",
+                "file": "private/sys/Router/Panel/GroupRouter.php",
                 "line": 75,
                 "static_uses": [
                     "panelGroupEditController"
                 ]
             },
-            "signature": "882cea2d7ff4be05c26f90df51844485c4e2eb36"
+            "signature": "9f07ecc8f51218b0eccdc2b51e72ec09d74cf76b"
         },
         {
             "scope": "panel",
@@ -913,13 +909,13 @@
             "regex": "#^/group/delete$#",
             "handler": {
                 "type": "closure",
-                "file": "private/sys/Routing/Panel/GroupRouter.php",
+                "file": "private/sys/Router/Panel/GroupRouter.php",
                 "line": 79,
                 "static_uses": [
                     "panelGroupEditController"
                 ]
             },
-            "signature": "549ef3f5f06c8792ed5406f68088344eb22c22c2"
+            "signature": "8f56e2e13337d0613cfb48419cc97d338bb95b32"
         },
         {
             "scope": "panel",
@@ -928,13 +924,13 @@
             "regex": "#^/logs$#",
             "handler": {
                 "type": "closure",
-                "file": "private/sys/Routing/Panel/LogRouter.php",
+                "file": "private/sys/Router/Panel/LogRouter.php",
                 "line": 44,
                 "static_uses": [
                     "panelLogsController"
                 ]
             },
-            "signature": "11718e0d3546f2d16da167a8ab277369f832435a"
+            "signature": "7e24158808dae1c553025c2480278ef6cc74242d"
         },
         {
             "scope": "panel",
@@ -943,13 +939,13 @@
             "regex": "#^/logs/export$#",
             "handler": {
                 "type": "closure",
-                "file": "private/sys/Routing/Panel/LogRouter.php",
+                "file": "private/sys/Router/Panel/LogRouter.php",
                 "line": 48,
                 "static_uses": [
                     "panelLogsController"
                 ]
             },
-            "signature": "c147bb81dbd19b2e5462cf88c3c995d2a8d5b9e4"
+            "signature": "097f503d7560482f577f1cc6eb1687dd460b99b3"
         },
         {
             "scope": "panel",
@@ -958,13 +954,13 @@
             "regex": "#^/logs/clear$#",
             "handler": {
                 "type": "closure",
-                "file": "private/sys/Routing/Panel/LogRouter.php",
+                "file": "private/sys/Router/Panel/LogRouter.php",
                 "line": 52,
                 "static_uses": [
                     "panelLogsController"
                 ]
             },
-            "signature": "920d65304698142666dd7f13f46a0d79631c2856"
+            "signature": "c8fb95c05180f8c3de5744611d248db3cb356da3"
         },
         {
             "scope": "panel",
@@ -973,13 +969,13 @@
             "regex": "#^/routing$#",
             "handler": {
                 "type": "closure",
-                "file": "private/sys/Routing/Panel/RoutingRouter.php",
+                "file": "private/sys/Router/Panel/RoutingRouter.php",
                 "line": 44,
                 "static_uses": [
                     "panelRoutingController"
                 ]
             },
-            "signature": "4febc2d9c8c680398301f6b655ab07a0da306dca"
+            "signature": "cff42ae7aff07ec39f5d4ff71766a5f5dd881ec2"
         },
         {
             "scope": "panel",
@@ -988,13 +984,13 @@
             "regex": "#^/routing/export$#",
             "handler": {
                 "type": "closure",
-                "file": "private/sys/Routing/Panel/RoutingRouter.php",
+                "file": "private/sys/Router/Panel/RoutingRouter.php",
                 "line": 48,
                 "static_uses": [
                     "panelRoutingController"
                 ]
             },
-            "signature": "7c3917cd2f279f3889c102354db80193d0e7bf38"
+            "signature": "6b4a8db2cd0ee5d6a9d8f313eff8b96f3075b60b"
         },
         {
             "scope": "panel",
@@ -1003,13 +999,13 @@
             "regex": "#^/update$#",
             "handler": {
                 "type": "closure",
-                "file": "private/sys/Routing/Panel/UpdateRouter.php",
+                "file": "private/sys/Router/Panel/UpdateRouter.php",
                 "line": 44,
                 "static_uses": [
                     "panelUpdateController"
                 ]
             },
-            "signature": "b0600ecd43c55ee2b8aff0544a9566aad09d1fd4"
+            "signature": "3cc9e44ec6619a704f3815b50b26f89a19de8312"
         },
         {
             "scope": "panel",
@@ -1018,13 +1014,13 @@
             "regex": "#^/update/action$#",
             "handler": {
                 "type": "closure",
-                "file": "private/sys/Routing/Panel/UpdateRouter.php",
+                "file": "private/sys/Router/Panel/UpdateRouter.php",
                 "line": 48,
                 "static_uses": [
                     "panelUpdateController"
                 ]
             },
-            "signature": "209c01102ddd583124e106b2e706cc6c074405e7"
+            "signature": "0aacd477a12c8b70fecb403fb081a2517b91ac34"
         },
         {
             "scope": "panel",
@@ -1033,13 +1029,13 @@
             "regex": "#^/preferences$#",
             "handler": {
                 "type": "closure",
-                "file": "private/sys/Routing/Panel/PreferencesRouter.php",
+                "file": "private/sys/Router/Panel/PreferencesRouter.php",
                 "line": 42,
                 "static_uses": [
                     "panelPreferencesController"
                 ]
             },
-            "signature": "ab859d6d6581a0f8a9177e4e2244d7ca2d97f729"
+            "signature": "3e9b5cdefa18ee4919e46dd2f1e36b3b81a32442"
         },
         {
             "scope": "panel",
@@ -1048,13 +1044,13 @@
             "regex": "#^/preferences/save$#",
             "handler": {
                 "type": "closure",
-                "file": "private/sys/Routing/Panel/PreferencesRouter.php",
+                "file": "private/sys/Router/Panel/PreferencesRouter.php",
                 "line": 46,
                 "static_uses": [
                     "panelPreferencesController"
                 ]
             },
-            "signature": "d42bdb744f4cf9e67f60ff3b1fa6ce99d2ece5dc"
+            "signature": "1ed6631c5a940fecf7ff121411584f520ff1ba4d"
         },
         {
             "scope": "panel",
@@ -1063,13 +1059,13 @@
             "regex": "#^/preferences/2fa/totp/setup$#",
             "handler": {
                 "type": "closure",
-                "file": "private/sys/Routing/Panel/PreferencesRouter.php",
+                "file": "private/sys/Router/Panel/PreferencesRouter.php",
                 "line": 50,
                 "static_uses": [
                     "panelPreferencesController"
                 ]
             },
-            "signature": "32e61533a1b02114ff5b42ed511258f6a1b04c80"
+            "signature": "d6788931a1979511b278e8f515dea39962c6f0d6"
         },
         {
             "scope": "panel",
@@ -1078,13 +1074,13 @@
             "regex": "#^/preferences/2fa/recovery/generate$#",
             "handler": {
                 "type": "closure",
-                "file": "private/sys/Routing/Panel/PreferencesRouter.php",
+                "file": "private/sys/Router/Panel/PreferencesRouter.php",
                 "line": 54,
                 "static_uses": [
                     "panelPreferencesController"
                 ]
             },
-            "signature": "9c8d787215b51ab9b755f9b5a281dbfda2f531bb"
+            "signature": "de39bfcbffd3e73a73f47c72ac5685592f36fcfc"
         },
         {
             "scope": "panel",
@@ -1093,13 +1089,13 @@
             "regex": "#^/preferences/2fa/webauthn/options$#",
             "handler": {
                 "type": "closure",
-                "file": "private/sys/Routing/Panel/PreferencesRouter.php",
+                "file": "private/sys/Router/Panel/PreferencesRouter.php",
                 "line": 58,
                 "static_uses": [
                     "panelPreferencesController"
                 ]
             },
-            "signature": "0a6b86b2f906305bfe3f7e1e7cc303f98b78cda6"
+            "signature": "22ed9db3655167a50fac9a3ce02f61b596f5ebd3"
         },
         {
             "scope": "panel",
@@ -1108,13 +1104,13 @@
             "regex": "#^/preferences/2fa/webauthn/register$#",
             "handler": {
                 "type": "closure",
-                "file": "private/sys/Routing/Panel/PreferencesRouter.php",
+                "file": "private/sys/Router/Panel/PreferencesRouter.php",
                 "line": 62,
                 "static_uses": [
                     "panelPreferencesController"
                 ]
             },
-            "signature": "ff2d9e7ed08a504608cd65d84144fd5751705484"
+            "signature": "4cdd9c4564f3e9701ad9579e79e2107483cf2e78"
         },
         {
             "scope": "panel",
@@ -1123,13 +1119,13 @@
             "regex": "#^/configuration$#",
             "handler": {
                 "type": "closure",
-                "file": "private/sys/Routing/Panel/ConfigRouter.php",
+                "file": "private/sys/Router/Panel/ConfigRouter.php",
                 "line": 42,
                 "static_uses": [
                     "panelConfigController"
                 ]
             },
-            "signature": "7fe773e412b55db48a7231256c9b7ba33c5e3cd8"
+            "signature": "1f5922aa8268258c9c9b78dbee55ebca92f37c5a"
         },
         {
             "scope": "panel",
@@ -1138,13 +1134,13 @@
             "regex": "#^/configuration/save$#",
             "handler": {
                 "type": "closure",
-                "file": "private/sys/Routing/Panel/ConfigRouter.php",
+                "file": "private/sys/Router/Panel/ConfigRouter.php",
                 "line": 46,
                 "static_uses": [
                     "panelConfigController"
                 ]
             },
-            "signature": "904c67be0d97af1deb0a673f0433455e167cd52e"
+            "signature": "b6a3a43e1f2ee189e07a6c2dbab874fe5983478b"
         },
         {
             "scope": "panel",
@@ -1153,13 +1149,13 @@
             "regex": "#^/themes$#",
             "handler": {
                 "type": "closure",
-                "file": "private/sys/Routing/Panel/SystemRouter.php",
+                "file": "private/sys/Router/Panel/ThemeRouter.php",
                 "line": 42,
                 "static_uses": [
-                    "panelSystemController"
+                    "panelThemeController"
                 ]
             },
-            "signature": "92be182ab66e9eacd43322dea18fc5d4ef813499"
+            "signature": "49c38f502c95d46b41f7a1318326e8ffa7da0def"
         },
         {
             "scope": "panel",
@@ -1168,13 +1164,13 @@
             "regex": "#^/themes/enable$#",
             "handler": {
                 "type": "closure",
-                "file": "private/sys/Routing/Panel/SystemRouter.php",
+                "file": "private/sys/Router/Panel/ThemeRouter.php",
                 "line": 46,
                 "static_uses": [
-                    "panelSystemController"
+                    "panelThemeController"
                 ]
             },
-            "signature": "a583418276bf04820976fff20b576006a7579762"
+            "signature": "358f1e527f479178edc6dc741b63fb896ef3f93c"
         },
         {
             "scope": "panel",
@@ -1183,13 +1179,13 @@
             "regex": "#^/themes/create$#",
             "handler": {
                 "type": "closure",
-                "file": "private/sys/Routing/Panel/SystemRouter.php",
+                "file": "private/sys/Router/Panel/ThemeRouter.php",
                 "line": 50,
                 "static_uses": [
-                    "panelSystemController"
+                    "panelThemeController"
                 ]
             },
-            "signature": "5c7a7a0bae628c6f365aff5e9c801fa1f32c2287"
+            "signature": "2ef4646430b8407822859cf049266d19272805e8"
         },
         {
             "scope": "panel",
@@ -1198,13 +1194,13 @@
             "regex": "#^/themes/upload$#",
             "handler": {
                 "type": "closure",
-                "file": "private/sys/Routing/Panel/SystemRouter.php",
+                "file": "private/sys/Router/Panel/ThemeRouter.php",
                 "line": 54,
                 "static_uses": [
-                    "panelSystemController"
+                    "panelThemeController"
                 ]
             },
-            "signature": "19f311730d9af82447e1cac32251a52f05e864e5"
+            "signature": "4c6601aaae9f58c5d10e9e13cd33af92ab0ed83e"
         },
         {
             "scope": "panel",
@@ -1213,13 +1209,13 @@
             "regex": "#^/themes/export$#",
             "handler": {
                 "type": "closure",
-                "file": "private/sys/Routing/Panel/SystemRouter.php",
+                "file": "private/sys/Router/Panel/ThemeRouter.php",
                 "line": 58,
                 "static_uses": [
-                    "panelSystemController"
+                    "panelThemeController"
                 ]
             },
-            "signature": "2290024a7f27ff7c17d7c77ba6e76c117d3dff8e"
+            "signature": "75ff60bb0cc35b08eb1c6bf40011ab4cfd2193e0"
         },
         {
             "scope": "panel",
@@ -1228,13 +1224,13 @@
             "regex": "#^/themes/uninstall$#",
             "handler": {
                 "type": "closure",
-                "file": "private/sys/Routing/Panel/SystemRouter.php",
+                "file": "private/sys/Router/Panel/ThemeRouter.php",
                 "line": 62,
                 "static_uses": [
-                    "panelSystemController"
+                    "panelThemeController"
                 ]
             },
-            "signature": "aa26a79d7aba9c57938c96d2f384b310024fd742"
+            "signature": "fb6bcc3d6808f42b049d6fae25f8033ba1288669"
         },
         {
             "scope": "panel",
@@ -1243,13 +1239,13 @@
             "regex": "#^/extensions$#",
             "handler": {
                 "type": "closure",
-                "file": "private/sys/Routing/Panel/SystemRouter.php",
-                "line": 66,
+                "file": "private/sys/Router/Panel/ExtensionManagerRouter.php",
+                "line": 42,
                 "static_uses": [
-                    "panelSystemController"
+                    "panelExtensionController"
                 ]
             },
-            "signature": "1ce9f44fff15080a46c7538dd242b105b166e568"
+            "signature": "61baad940bd0af0cc0dd5eaf9602eebd8f107f84"
         },
         {
             "scope": "panel",
@@ -1258,13 +1254,13 @@
             "regex": "#^/extensions/toggle$#",
             "handler": {
                 "type": "closure",
-                "file": "private/sys/Routing/Panel/SystemRouter.php",
-                "line": 70,
+                "file": "private/sys/Router/Panel/ExtensionManagerRouter.php",
+                "line": 46,
                 "static_uses": [
-                    "panelSystemController"
+                    "panelExtensionController"
                 ]
             },
-            "signature": "b37de45950ee49b92ae9b50d00858f7f6cde914c"
+            "signature": "deee19afad1bf8aeaaf79450450bb2f391b016e2"
         },
         {
             "scope": "panel",
@@ -1273,13 +1269,13 @@
             "regex": "#^/extensions/upload$#",
             "handler": {
                 "type": "closure",
-                "file": "private/sys/Routing/Panel/SystemRouter.php",
-                "line": 74,
+                "file": "private/sys/Router/Panel/ExtensionManagerRouter.php",
+                "line": 50,
                 "static_uses": [
-                    "panelSystemController"
+                    "panelExtensionController"
                 ]
             },
-            "signature": "f61174c5a785fdb1398a3c5954aca9624ed4c227"
+            "signature": "251bfba00df6fb788578e27bee77832568101ed7"
         },
         {
             "scope": "panel",
@@ -1288,13 +1284,13 @@
             "regex": "#^/extensions/export$#",
             "handler": {
                 "type": "closure",
-                "file": "private/sys/Routing/Panel/SystemRouter.php",
-                "line": 78,
+                "file": "private/sys/Router/Panel/ExtensionManagerRouter.php",
+                "line": 54,
                 "static_uses": [
-                    "panelSystemController"
+                    "panelExtensionController"
                 ]
             },
-            "signature": "0106966a49b60a8d2685d531d77145e493b14160"
+            "signature": "72b4569fa7ac4cf462a757e946a0daefbc4a0384"
         },
         {
             "scope": "panel",
@@ -1303,13 +1299,13 @@
             "regex": "#^/extensions/create$#",
             "handler": {
                 "type": "closure",
-                "file": "private/sys/Routing/Panel/SystemRouter.php",
-                "line": 82,
+                "file": "private/sys/Router/Panel/ExtensionManagerRouter.php",
+                "line": 58,
                 "static_uses": [
-                    "panelSystemController"
+                    "panelExtensionController"
                 ]
             },
-            "signature": "431a19db8d04ef02b7689fd6b30086794d4e0c83"
+            "signature": "b06c19a80dfafa0353c21f5ba956b61acfeb6b80"
         },
         {
             "scope": "panel",
@@ -1318,13 +1314,13 @@
             "regex": "#^/extensions/uninstall$#",
             "handler": {
                 "type": "closure",
-                "file": "private/sys/Routing/Panel/SystemRouter.php",
-                "line": 86,
+                "file": "private/sys/Router/Panel/ExtensionManagerRouter.php",
+                "line": 62,
                 "static_uses": [
-                    "panelSystemController"
+                    "panelExtensionController"
                 ]
             },
-            "signature": "f49f5f9357310b4ebbf142bf6ce69924f6af9279"
+            "signature": "0aa95c78ea6c7a71824aee664761c49d18160a42"
         },
         {
             "scope": "panel",
@@ -1333,13 +1329,13 @@
             "regex": "#^/extensions/permission$#",
             "handler": {
                 "type": "closure",
-                "file": "private/sys/Routing/Panel/SystemRouter.php",
-                "line": 90,
+                "file": "private/sys/Router/Panel/ExtensionManagerRouter.php",
+                "line": 66,
                 "static_uses": [
-                    "panelSystemController"
+                    "panelExtensionController"
                 ]
             },
-            "signature": "d0755b3d11d7d1fba0f2ba58e140f9e527085372"
+            "signature": "d2bf671bda8906746388e8efcb0e35250926c3cc"
         },
         {
             "scope": "panel",

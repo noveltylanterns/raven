@@ -12,8 +12,8 @@ declare(strict_types=1);
 namespace Raven\Core\Controller\Public;
 
 use Raven\Core\Repository\PageRead;
-use Raven\Core\Routing\Public\ChannelPageRouter;
 use Raven\Lib\Parser\ChannelRouteParser;
+use Raven\Lib\Parser\PageRouteParser;
 use Raven\Lib\Parser\TagRepoParser;
 use Raven\Lib\View\Public\TemplateDecorator;
 use Raven\Lib\View\Public\ThemeCatalog;
@@ -28,7 +28,6 @@ final class TagController
     private PageRead $pageRead;
     private TagRepoParser $tagLookupRepo;
     private TemplateDecorator $templateDecorator;
-    private ChannelPageRouter $publicChannelPageRouteService;
     private ThemeCatalog $themeCatalogService;
     private ?ThemeTemplate $themeTemplate = null;
 
@@ -53,7 +52,6 @@ final class TagController
             $context->input(),
             dirname(__DIR__, 4)
         );
-        $this->publicChannelPageRouteService = new ChannelPageRouter($context->input());
         $this->themeCatalogService = $themeCatalogService;
     }
 
@@ -136,7 +134,7 @@ final class TagController
 
             $channelSlug = $this->context->input()->slug((string) ($page['channel_slug'] ?? ''));
             if ($channelSlug === null || $channelSlug === '') {
-                $rootSegment = $this->publicChannelPageRouteService->canonicalSegment(
+                $rootSegment = PageRouteParser::buildRouteSegment($this->context->input(), 
                     $slug,
                     $pageId,
                     (string) ($page['created'] ?? ''),
@@ -152,7 +150,7 @@ final class TagController
                 . rawurlencode($channelSlug)
                 . '/'
                 . rawurlencode(
-                    $this->publicChannelPageRouteService->canonicalSegment(
+                    PageRouteParser::buildRouteSegment($this->context->input(), 
                         $slug,
                         $pageId,
                         (string) ($page['created'] ?? ''),

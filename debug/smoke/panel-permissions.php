@@ -300,7 +300,7 @@ PHP;
 
 declare(strict_types=1);
 
-use Raven\Core\Routing\Router;
+use Raven\Core\Router\RouteHandler;
 
 /**
  * Registers the debug plugin route only when legacy bootstrap aliases are visible.
@@ -311,7 +311,7 @@ use Raven\Core\Routing\Router;
  *   currentUserTheme: callable(): string
  * } \$context
  */
-return static function (Router \$router, array \$context): void {
+return static function (RouteHandler \$router, array \$context): void {
     /** @var array<string, mixed> \$rvn */
     \$rvn = (array) (\$context['rvn'] ?? []);
 

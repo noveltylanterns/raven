@@ -9,16 +9,16 @@
 
 declare(strict_types=1);
 
-use Raven\Core\Debug\OutputProfilerConfigResolver;
-use Raven\Core\Debug\OutputProfilerResponseHook;
+use Raven\Core\Debug\OutputProfilerConfig;
+use Raven\Core\Debug\OutputProfiler;
 use Raven\Core\Factory\Public\RuntimeContract as PublicRuntimeContract;
 use Raven\Core\Factory\RuntimePayloadAssert;
-use Raven\Core\Routing\Request;
-use Raven\Core\Routing\Public\PublicRouter;
+use Raven\Core\Router\RouteRequest;
+use Raven\Core\Router\Public\PublicRouter;
 use Raven\Lib\Transport\Request as HttpRequest;
-use Raven\Core\Routing\Public\PublicRuntimeBuilder;
-use Raven\Core\Routing\Public\RouteDeps;
-use Raven\Core\Routing\Public\RouteConfig;
+use Raven\Core\Router\Public\PublicRuntimeBuilder;
+use Raven\Core\Router\Public\PublicRouteDeps;
+use Raven\Core\Router\Public\PublicRoutePolicy;
 use Raven\Lib\Scheduler\Cron;
 
 $root = dirname(__DIR__);
@@ -78,7 +78,7 @@ $rvn = PublicRuntimeBuilder::build($rvn);
 PublicRuntimeContract::assert($rvn);
 
 $requestMethod = strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET'));
-$profilerSettings = OutputProfilerConfigResolver::fromConfig($rvn['config']);
+$profilerSettings = OutputProfilerConfig::fromConfig($rvn['config']);
 $isPublicAuthHelperPath = static function (string $path) use ($requestPath): bool {
     $normalized = trim($path !== '' ? $path : $requestPath);
     $normalized = (string) parse_url($normalized, PHP_URL_PATH);
@@ -109,7 +109,7 @@ $canRenderPublicProfiler = static function () use ($rvn, $isPublicAuthHelperPath
     return $rvn['auth']->isTwoFactorVerifiedForUser($userId);
 };
 
-OutputProfilerResponseHook::arm(
+OutputProfiler::arm(
     [
         'show_benchmarks' => (bool) ($profilerSettings['show_benchmarks'] ?? true),
         'show_queries' => (bool) ($profilerSettings['show_queries'] ?? true),
@@ -151,8 +151,8 @@ $publicTagController = $requirePublicFactory('public_tag_controller');
 $publicRequestContext = $requirePublicFactory('public_request_context');
 
 $input = $rvn['input'];
-$routeConfig = RouteConfig::build($rvn['config'], $input);
-$routeDeps = new RouteDeps(
+$routeConfig = PublicRoutePolicy::build($rvn['config'], $input);
+$routeDeps = new PublicRouteDeps(
     $rvn,
     $publicAuthController,
     $publicPageController,
@@ -188,7 +188,7 @@ if (!$bypassAvailability && !$publicRequestContext()->enforceSiteAvailability())
     exit;
 }
 
-$dispatchResult = $router->dispatch(new Request($method, $path));
+$dispatchResult = $router->dispatch(new RouteRequest($method, $path));
 if (!$dispatchResult->isHandled()) {
     $publicRequestContext()->notFound();
 }

@@ -40,8 +40,8 @@ spl_autoload_register(static function (string $class) use ($root): void {
 use Raven\Core\Config;
 use Raven\Core\Repository\ChannelRead;
 use Raven\Core\Repository\PageRead;
-use Raven\Core\Routing\Public\ChannelPageRouter;
 use Raven\Lib\Parser\ChannelRouteParser;
+use Raven\Lib\Parser\PageRouteParser;
 use Raven\Lib\Scribe\ConfigScribe;
 use Raven\Lib\Security\InputSanitizer;
 
@@ -85,42 +85,41 @@ final class RoutingSmokeRunner
 
         $config = new Config($configPath);
         $input = new InputSanitizer();
-        $routeService = new ChannelPageRouter($input);
         $channels = new ChannelRead($db, 'sqlite', '', $channelDirectory);
         $pages = new PageRead($db, 'sqlite', '', $channels, false, false);
 
-        $rootSlug = $this->resolvePublicPath($config, $routeService, $channels, $pages, 'hello-world', null);
+        $rootSlug = $this->resolvePublicPath($config, $input, $channels, $pages, 'hello-world', null);
         $this->assert((int) ($rootSlug['page']['id'] ?? 0) === 7, 'Global slug mode should resolve root slug page.');
         $this->assert((string) ($rootSlug['canonical_path'] ?? '') === '/hello-world', 'Global slug mode canonical root path mismatch.');
         $this->events[] = 'root_slug=ok';
 
         ConfigScribe::persistValue($configPath, $config->all(), 'content.separator', '_');
         $config = new Config($configPath);
-        $rootUnderscore = $this->resolvePublicPath($config, $routeService, $channels, $pages, 'hello_world', null);
+        $rootUnderscore = $this->resolvePublicPath($config, $input, $channels, $pages, 'hello_world', null);
         $this->assert((int) ($rootUnderscore['page']['id'] ?? 0) === 7, 'Underscore separator should resolve root slug page.');
         $this->assert((string) ($rootUnderscore['canonical_path'] ?? '') === '/hello_world', 'Underscore separator canonical root path mismatch.');
         $this->events[] = 'root_slug_separator=ok';
 
         ConfigScribe::persistValue($configPath, $config->all(), 'content.separator', '-');
         $config = new Config($configPath);
-        $inheritSlug = $this->resolvePublicPath($config, $routeService, $channels, $pages, 'smoke-post', 'news');
+        $inheritSlug = $this->resolvePublicPath($config, $input, $channels, $pages, 'smoke-post', 'news');
         $this->assert((int) ($inheritSlug['page']['id'] ?? 0) === 42, 'Inherited channel slug mode should resolve channel page by slug.');
         $this->assert((string) ($inheritSlug['canonical_path'] ?? '') === '/news/smoke-post', 'Inherited channel slug canonical path mismatch.');
         $this->events[] = 'channel_inherit_slug=ok';
 
         ConfigScribe::persistValue($configPath, $config->all(), 'content.mode', 'id');
         $config = new Config($configPath);
-        $rootId = $this->resolvePublicPath($config, $routeService, $channels, $pages, '7', null);
+        $rootId = $this->resolvePublicPath($config, $input, $channels, $pages, '7', null);
         $this->assert((int) ($rootId['page']['id'] ?? 0) === 7, 'Global id mode should resolve root page by id.');
         $this->assert((string) ($rootId['canonical_path'] ?? '') === '/7', 'Global id mode canonical root path mismatch.');
         $this->events[] = 'root_id=ok';
 
-        $inheritId = $this->resolvePublicPath($config, $routeService, $channels, $pages, '42', 'news');
+        $inheritId = $this->resolvePublicPath($config, $input, $channels, $pages, '42', 'news');
         $this->assert((int) ($inheritId['page']['id'] ?? 0) === 42, 'Inherited channel id mode should resolve channel page by id.');
         $this->assert((string) ($inheritId['canonical_path'] ?? '') === '/news/42', 'Inherited channel id canonical path mismatch.');
         $this->events[] = 'channel_inherit_id=ok';
 
-        $explicitMonthId = $this->resolvePublicPath($config, $routeService, $channels, $pages, '2026-03-84', 'blog');
+        $explicitMonthId = $this->resolvePublicPath($config, $input, $channels, $pages, '2026-03-84', 'blog');
         $this->assert((int) ($explicitMonthId['page']['id'] ?? 0) === 84, 'Explicit month_id channel mode should resolve by id.');
         $this->assert((string) ($explicitMonthId['canonical_path'] ?? '') === '/blog/2026-03-84', 'Explicit month_id canonical path mismatch.');
         $this->events[] = 'channel_explicit_month_id=ok';
@@ -235,7 +234,7 @@ PHP;
      */
     private function resolvePublicPath(
         Config $config,
-        ChannelPageRouter $routeService,
+        InputSanitizer $input,
         ChannelRead $channels,
         PageRead $pages,
         string $requestedSegment,
@@ -253,14 +252,15 @@ PHP;
 
             $routeMode = ChannelRouteParser::effectiveChannelRouteMode($config, (string) ($channel['route_mode'] ?? 'inherit'));
             $wordSeparator = ChannelRouteParser::resolveChannelSeparator($config, (string) ($channel['route_separator'] ?? 'inherit'));
-            $lookupTarget = $routeService->resolveLookupTarget($requestedSegment, $routeMode, $wordSeparator);
+            $lookupTarget = PageRouteParser::resolveLookupTarget($input, $requestedSegment, $routeMode, $wordSeparator);
             $this->assert(is_array($lookupTarget), 'Failed to parse channel route segment "' . $requestedSegment . '".');
             if ((string) ($lookupTarget['type'] ?? '') === 'slug') {
                 $lookupSlug = (string) ($lookupTarget['slug'] ?? '');
             }
         } else {
             $routeMode = ChannelRouteParser::globalPageRouteMode($config);
-            $lookupTarget = $routeService->resolveLookupTarget(
+            $lookupTarget = PageRouteParser::resolveLookupTarget(
+                $input,
                 $requestedSegment,
                 $routeMode,
                 (string) $config->get('content.separator', $config->get('content.route_separator', '-'))
@@ -278,7 +278,8 @@ PHP;
         }
         $this->assert(is_array($page), 'Repository lookup failed for "' . $requestedSegment . '".');
 
-        $canonicalSegment = $routeService->canonicalSegment(
+        $canonicalSegment = PageRouteParser::buildRouteSegment(
+            $input,
             (string) ($page['slug'] ?? ''),
             (int) ($page['id'] ?? 0),
             (string) ($page['created'] ?? ($page['created_at'] ?? '')),

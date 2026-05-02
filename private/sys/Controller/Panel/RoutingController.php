@@ -17,7 +17,7 @@ use Raven\Core\Repository\ChannelRead;
 use Raven\Core\Repository\PageRead;
 use Raven\Core\Repository\RedirectRead;
 use Raven\Core\Repository\UserRead;
-use Raven\Core\Routing\Panel\RoutingInventoryBuilder;
+use Raven\Core\Debug\RouteProfiler;
 use Raven\Lib\Auth\LoginIdentifierResolver;
 use Raven\Lib\Auth\Panel\PanelAccess;
 use Raven\Lib\Format\Csv;
@@ -52,7 +52,7 @@ final class RoutingController
     private Closure $taxonomyLookupRepoResolver;
     private ?TaxonomyRepoParser $taxonomyLookupRepo = null;
     private LoginIdentifierResolver $identifierResolver;
-    private ?RoutingInventoryBuilder $routingInventoryBuilder = null;
+    private ?RouteProfiler $routeProfiler = null;
     private ?Csv $csvHandler = null;
     private ?FeedRouteParser $feedParser = null;
     private ?GroupRouteParser $groupParser = null;
@@ -311,7 +311,7 @@ final class RoutingController
         $routingUsers = is_array($routingAuthData['user_rows'] ?? null) ? $routingAuthData['user_rows'] : [];
         $taxonomyRoutingOptionSets = $this->routingInventoryTaxonomyOptionSets($categoryPrefix, $tagPrefix);
 
-        return $this->routingInventoryBuilder()->buildRows([
+        return $this->routeProfiler()->buildRows([
             'reserved_prefixes' => $this->reservedPublicPrefixes(),
             'channel_index_template_exists' => $this->channelIndexTemplateExistsForRouting(),
             'feed_enabled' => $this->feedParser()->feedEnabled(),
@@ -323,14 +323,6 @@ final class RoutingController
             'profile_routes_enabled' => $profileRoutesEnabled,
             'group_prefix' => $groupPrefix,
             'group_routes_enabled' => $groupRoutesEnabled,
-            'can_edit_configuration' => $this->context->auth()->canManageConfiguration(),
-            'can_edit_pages' => $this->context->auth()->hasPanelPermissionBit(PanelAccess::PAGES_EDIT),
-            'can_edit_channels' => $this->context->auth()->hasPanelPermissionBit(PanelAccess::CHANNELS_EDIT),
-            'can_edit_categories' => $this->context->auth()->hasPanelPermissionBit(PanelAccess::CATEGORIES_EDIT),
-            'can_edit_tags' => $this->context->auth()->hasPanelPermissionBit(PanelAccess::TAGS_EDIT),
-            'can_edit_redirects' => $this->context->auth()->hasPanelPermissionBit(PanelAccess::REDIRECTS_EDIT),
-            'can_edit_users' => $this->context->auth()->hasPanelPermissionBit(PanelAccess::USERS_EDIT),
-            'can_edit_groups' => $this->context->auth()->hasPanelPermissionBit(PanelAccess::GROUPS_EDIT),
             'routing_groups' => $routingGroups,
             'routing_users' => $routingUsers,
             'channel_routing_options' => is_array($taxonomyRoutingOptionSets['channel_options'] ?? null)
@@ -362,10 +354,72 @@ final class RoutingController
                 $channelPageUrlSeparator
             ),
             'channel_landing_map_builder' => fn (array $pagesForRouting): array => $this->channelLandingMapFromPagesForRouting($pagesForRouting),
-            'panel_url' => fn (string $suffix): string => $this->context->panelUrl($suffix),
+            'build_edit_url' => fn (string $typeKey, array $meta): string => $this->routingEditUrl($typeKey, $meta),
             'build_user_route_segment' => fn (array $user): ?string => $this->publicProfileRouteSegmentForUser($user),
             'slugify_group_name' => fn (string $name): string => $this->slugifyGroupName($name),
         ]);
+    }
+
+    /**
+     * Builds one panel edit URL for a routing row type when the current user can edit that source.
+     *
+     * @param string $typeKey Routing row type key.
+     * @param array<string, mixed> $meta Optional source metadata emitted by RouteProfiler.
+     * @return string Panel edit URL or empty string when no editable target is available.
+     */
+    private function routingEditUrl(string $typeKey, array $meta): string
+    {
+        $normalizedType = strtolower(trim($typeKey));
+        $sourceId = max(0, (int) ($meta['id'] ?? 0));
+
+        return match ($normalizedType) {
+            'feed' => $this->routingFeedEditUrl($meta),
+            'channel' => $sourceId > 0 && $this->context->auth()->hasPanelPermissionBit(PanelAccess::CHANNELS_EDIT)
+                ? $this->context->panelUrl('/channel/edit/' . $sourceId)
+                : '',
+            'page' => $sourceId > 0 && $this->context->auth()->hasPanelPermissionBit(PanelAccess::PAGES_EDIT)
+                ? $this->context->panelUrl('/page/edit/' . $sourceId)
+                : '',
+            'category' => $sourceId > 0 && $this->context->auth()->hasPanelPermissionBit(PanelAccess::CATEGORIES_EDIT)
+                ? $this->context->panelUrl('/category/edit/' . $sourceId)
+                : '',
+            'tag' => $sourceId > 0 && $this->context->auth()->hasPanelPermissionBit(PanelAccess::TAGS_EDIT)
+                ? $this->context->panelUrl('/tag/edit/' . $sourceId)
+                : '',
+            'group' => $sourceId > 0 && $this->context->auth()->hasPanelPermissionBit(PanelAccess::GROUPS_EDIT)
+                ? $this->context->panelUrl('/group/edit/' . $sourceId)
+                : '',
+            'user' => $sourceId > 0 && $this->context->auth()->hasPanelPermissionBit(PanelAccess::USERS_EDIT)
+                ? $this->context->panelUrl('/user/edit/' . $sourceId)
+                : '',
+            'redirect' => $sourceId > 0 && $this->context->auth()->hasPanelPermissionBit(PanelAccess::REDIRECTS_EDIT)
+                ? $this->context->panelUrl('/redirect/edit/' . $sourceId)
+                : '',
+            default => '',
+        };
+    }
+
+    /**
+     * Builds one panel edit URL for a feed routing row.
+     *
+     * @param array<string, mixed> $meta Optional source metadata emitted by RouteProfiler.
+     * @return string Panel edit URL or empty string when feed source is not editable by current user.
+     */
+    private function routingFeedEditUrl(array $meta): string
+    {
+        $kind = strtolower(trim((string) ($meta['kind'] ?? '')));
+        if ($kind === 'global') {
+            return $this->context->auth()->canManageConfiguration()
+                ? $this->context->panelUrl('/configuration?tab=content')
+                : '';
+        }
+
+        $channelId = max(0, (int) ($meta['channel_id'] ?? 0));
+        if ($kind === 'channel' && $channelId > 0 && $this->context->auth()->hasPanelPermissionBit(PanelAccess::CHANNELS_EDIT)) {
+            return $this->context->panelUrl('/channel/edit/' . $channelId);
+        }
+
+        return '';
     }
 
     /**
@@ -517,13 +571,13 @@ final class RoutingController
     /**
      * Returns the routing-inventory builder on first use.
      */
-    private function routingInventoryBuilder(): RoutingInventoryBuilder
+    private function routeProfiler(): RouteProfiler
     {
-        if (!$this->routingInventoryBuilder instanceof RoutingInventoryBuilder) {
-            $this->routingInventoryBuilder = new RoutingInventoryBuilder($this->input);
+        if (!$this->routeProfiler instanceof RouteProfiler) {
+            $this->routeProfiler = new RouteProfiler($this->input);
         }
 
-        return $this->routingInventoryBuilder;
+        return $this->routeProfiler;
     }
 
     /**

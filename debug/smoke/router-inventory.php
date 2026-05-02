@@ -12,34 +12,13 @@ declare(strict_types=1);
 error_reporting(E_ALL & ~E_WARNING & ~E_NOTICE & ~E_DEPRECATED);
 ini_set('display_errors', '0');
 
-use Raven\Core\Routing\Panel\AuthRouter as PanelAuthRouter;
-use Raven\Core\Routing\Panel\ChannelRouter as PanelChannelRouter;
-use Raven\Core\Routing\Panel\ConfigRouter as PanelConfigRouter;
-use Raven\Core\Routing\Panel\ContentRouter as PanelContentRouter;
-use Raven\Core\Routing\Panel\DashboardRouter as PanelDashboardRouter;
-use Raven\Core\Routing\Panel\ExtensionRouter as PanelExtensionRouter;
-use Raven\Core\Routing\Panel\GroupRouter as PanelGroupRouter;
-use Raven\Core\Routing\Panel\LogRouter as PanelLogRouter;
-use Raven\Core\Routing\Panel\PanelRuntimeBuilder;
-use Raven\Core\Routing\Panel\PreferencesRouter as PanelPreferencesRouter;
-use Raven\Core\Routing\Panel\TaxonomyCrudRouter as PanelTaxonomyCrudRouter;
-use Raven\Core\Routing\Panel\RedirectRouter as PanelRedirectRouter;
-use Raven\Core\Routing\Panel\RoutingRouter as PanelRoutingRouter;
-use Raven\Core\Routing\Panel\SystemRouter as PanelSystemRouter;
-use Raven\Core\Routing\Panel\UpdateRouter as PanelUpdateRouter;
-use Raven\Core\Routing\Panel\UserRouter as PanelUserRouter;
-use Raven\Core\Routing\Public\AuthRouter as PublicAuthRouter;
-use Raven\Core\Routing\Public\ChannelRouter as PublicChannelRouter;
-use Raven\Core\Routing\Public\ContentRouter as PublicContentRouter;
-use Raven\Core\Routing\Public\ExtensionRouter as PublicExtensionRouter;
-use Raven\Core\Routing\Public\FeedRouter as PublicFeedRouter;
-use Raven\Core\Routing\Public\FormRouter as PublicFormRouter;
-use Raven\Core\Routing\Public\GroupRouter as PublicGroupRouter;
-use Raven\Core\Routing\Public\PrefixedSlugPageRouter as PublicPrefixedSlugPageRouter;
-use Raven\Core\Routing\Public\ProfileRouter as PublicProfileRouter;
-use Raven\Core\Routing\Public\PublicRuntimeBuilder;
-use Raven\Core\Routing\Public\RouteConfig;
-use Raven\Core\Routing\Router;
+use Raven\Core\Router\Panel\PanelRuntimeBuilder;
+use Raven\Core\Router\Panel\PanelRouteDeps;
+use Raven\Core\Router\Panel\PanelRouter;
+use Raven\Core\Router\Public\PublicRuntimeBuilder;
+use Raven\Core\Router\Public\PublicRouteDeps;
+use Raven\Core\Router\Public\PublicRoutePolicy;
+use Raven\Core\Router\Public\PublicRouter;
 use Raven\Lib\Parser\ConfigParser;
 use Raven\Lib\View\Error as ViewError;
 
@@ -144,35 +123,23 @@ final class RouterInventorySmokeRunner
             throw new RuntimeException('Missing public input service for route inventory.');
         }
 
-        $routeConfig = RouteConfig::build($rvn['config'], $input);
-        $router = new Router();
-
-        PublicAuthRouter::register($router, $publicAuthController);
-        PublicFormRouter::register($router, $publicPageController, $publicRequestContext, $input);
-        PublicExtensionRouter::register($router, $rvn, $publicRequestContext, $input);
-        PublicPrefixedSlugPageRouter::register(
-            $router,
-            'category_prefix',
-            $routeConfig,
-            fn(string $slug) => $publicCategoryController()->category($slug, 1),
-            fn(string $slug, int $page) => $publicCategoryController()->category($slug, $page),
+        $routeConfig = PublicRoutePolicy::build($rvn['config'], $input);
+        $routeDeps = new PublicRouteDeps(
+            $rvn,
+            $publicAuthController,
+            $publicPageController,
+            $publicUserController,
+            $publicCategoryController,
+            $publicChannelController,
+            $publicGroupController,
+            $publicFeedController,
+            $publicTagController,
             $publicRequestContext,
-            $input
+            $input,
+            $routeConfig
         );
-        PublicChannelRouter::register($router, $publicChannelController, $publicRequestContext, $input, $routeConfig);
-        PublicFeedRouter::register($router, $publicFeedController, $publicRequestContext, $input, $routeConfig);
-        PublicProfileRouter::register($router, $publicUserController, $publicRequestContext, $input, $routeConfig);
-        PublicGroupRouter::register($router, $publicGroupController, $publicRequestContext, $input, $routeConfig);
-        PublicPrefixedSlugPageRouter::register(
-            $router,
-            'tag_prefix',
-            $routeConfig,
-            fn(string $slug) => $publicTagController()->tag($slug, 1),
-            fn(string $slug, int $page) => $publicTagController()->tag($slug, $page),
-            $publicRequestContext,
-            $input
-        );
-        PublicContentRouter::register($router, $publicPageController, $publicRequestContext, $input, $routeConfig);
+        $router = new PublicRouter();
+        $router->register($routeDeps);
 
         return $this->exportRoutes($router, 'public');
     }
@@ -209,16 +176,11 @@ final class RouterInventorySmokeRunner
         $panelLogsController = $this->requireFactory($rvn, 'panel_logs_controller');
         $panelRoutingController = $this->requireFactory($rvn, 'panel_routing_controller');
         $panelUpdateController = $this->requireFactory($rvn, 'panel_update_controller');
-        $panelSystemController = $this->requireFactory($rvn, 'panel_system_controller');
+        $panelThemeController = $this->requireFactory($rvn, 'panel_theme_controller');
+        $panelExtensionController = $this->requireFactory($rvn, 'panel_extension_controller');
+        $panelPermissionMapProvider = $this->requireFactory($rvn, 'panel_permission_map_provider');
         $panelRequestContext = $this->requireFactory($rvn, 'panel_request_context');
         $initializePanelRuntime = $this->requireFactory($rvn, 'initialize_panel_runtime');
-
-        $panelPermissionMapProvider = $rvn['panel_permission_map_provider'] ?? null;
-        if (!is_callable($panelPermissionMapProvider)) {
-            $panelPermissionMapProvider = static function (array $directoryFilter = []): array {
-                return [];
-            };
-        }
 
         $categoryEnabled = ConfigParser::bool($rvn['config']->get('category.enabled', true), true);
         $tagEnabled = ConfigParser::bool($rvn['config']->get('tag.enabled', true), true);
@@ -244,64 +206,43 @@ final class RouterInventorySmokeRunner
             throw new RuntimeException('Missing panel input service for route inventory.');
         }
 
-        $router = new Router();
-        PanelAuthRouter::register($router, $authController);
-        PanelDashboardRouter::register($router, $panelDashboardController);
-        PanelContentRouter::register($router, $panelPageListController, $panelPageEditController, $input, $renderNotFound);
-        PanelChannelRouter::register($router, $panelChannelListController, $panelChannelEditController, $input, $renderNotFound);
-        PanelTaxonomyCrudRouter::register(
-            $router,
-            'category',
-            fn() => $panelCategoryListController()->categoryList(),
-            fn() => $panelCategoryListController()->categorySetList(),
-            fn() => $panelCategoryEditController()->categoryEdit(null),
-            fn(int $id) => $panelCategoryEditController()->categoryEdit($id),
-            fn() => $panelCategoryEditController()->categorySave($_POST, $_FILES),
-            fn() => $panelCategoryEditController()->categoryDelete($_POST),
-            fn() => $panelCategoryEditController()->categorySetEdit(null),
-            fn(int $id) => $panelCategoryEditController()->categorySetEdit($id),
-            fn() => $panelCategoryEditController()->categorySetSave($_POST),
-            fn() => $panelCategoryEditController()->categorySetDelete($_POST),
+        $routeDeps = new PanelRouteDeps(
+            $rvn,
+            $authController,
+            $panelDashboardController,
+            $panelChannelListController,
+            $panelChannelEditController,
+            $panelCategoryListController,
+            $panelCategoryEditController,
+            $panelTagListController,
+            $panelTagEditController,
+            $panelRedirectListController,
+            $panelRedirectEditController,
+            $panelUserListController,
+            $panelUserEditController,
+            $panelGroupListController,
+            $panelGroupEditController,
+            $panelPageListController,
+            $panelPageEditController,
+            $panelPreferencesController,
+            $panelConfigController,
+            $panelLogsController,
+            $panelRoutingController,
+            $panelUpdateController,
+            $panelThemeController,
+            $panelExtensionController,
             $input,
             $categoryEnabled,
-            $renderNotFound
-        );
-        PanelTaxonomyCrudRouter::register(
-            $router,
-            'tag',
-            fn() => $panelTagListController()->tagList(),
-            fn() => $panelTagListController()->tagSetList(),
-            fn() => $panelTagEditController()->tagEdit(null),
-            fn(int $id) => $panelTagEditController()->tagEdit($id),
-            fn() => $panelTagEditController()->tagSave($_POST, $_FILES),
-            fn() => $panelTagEditController()->tagDelete($_POST),
-            fn() => $panelTagEditController()->tagSetEdit(null),
-            fn(int $id) => $panelTagEditController()->tagSetEdit($id),
-            fn() => $panelTagEditController()->tagSetSave($_POST),
-            fn() => $panelTagEditController()->tagSetDelete($_POST),
-            $input,
             $tagEnabled,
-            $renderNotFound
-        );
-        PanelRedirectRouter::register($router, $panelRedirectListController, $panelRedirectEditController, $input, $renderNotFound);
-        PanelUserRouter::register($router, $panelUserListController, $panelUserEditController, $input, $renderNotFound);
-        PanelGroupRouter::register($router, $panelGroupListController, $panelGroupEditController, $input, $renderNotFound);
-        PanelLogRouter::register($router, $panelLogsController);
-        PanelRoutingRouter::register($router, $panelRoutingController);
-        PanelUpdateRouter::register($router, $panelUpdateController);
-        PanelPreferencesRouter::register($router, $panelPreferencesController);
-        PanelConfigRouter::register($router, $panelConfigController);
-        PanelSystemRouter::register($router, $panelSystemController);
-
-        PanelExtensionRouter::register(
-            $router,
-            $rvn,
+            $renderNotFound,
             $enabledExtensions,
             $enabledExtensionManifests,
             is_array($extensionPermissionCatalog) ? $extensionPermissionCatalog : [],
             $internalPath,
             $renderPublicNotFound
         );
+        $router = new PanelRouter();
+        $router->register($routeDeps);
 
         return $this->exportRoutes($router, 'panel');
     }
@@ -309,12 +250,20 @@ final class RouterInventorySmokeRunner
     /**
      * Exports one router's routes with deterministic order and handler metadata.
      *
-     * @param Router $router Router containing registered route entries.
+     * @param object $scopeRouter Scope router containing one internal RouteHandler instance.
      * @param string $scope Route scope label (`public` or `panel`).
      * @return array<int, array<string, mixed>> Ordered route rows for snapshot serialization.
      */
-    private function exportRoutes(Router $router, string $scope): array
+    private function exportRoutes(object $scopeRouter, string $scope): array
     {
+        $scopeReflection = new ReflectionClass($scopeRouter);
+        $routerProperty = $scopeReflection->getProperty('router');
+        $routerProperty->setAccessible(true);
+        $router = $routerProperty->getValue($scopeRouter);
+        if (!is_object($router)) {
+            return [];
+        }
+
         $reflection = new ReflectionClass($router);
         $routesProperty = $reflection->getProperty('routes');
         $routesProperty->setAccessible(true);

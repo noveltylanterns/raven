@@ -16,12 +16,12 @@ use Raven\Core\Repository\MediaRead;
 use Raven\Core\Repository\PageRead;
 use Raven\Core\Repository\RedirectRead;
 use Raven\Core\Repository\UserRead;
-use Raven\Core\Routing\Public\ChannelPageRouter;
 use Raven\Lib\Extension\ExtensionEditorCatalogService;
 use Raven\Lib\Extension\Public\EmbeddedFormRuntimeInterface;
 use Raven\Lib\Extension\Public\EmbeddedFormRuntimeService;
 use Raven\Lib\Extension\Public\EmbeddedShortcodeRuntimeInterface;
 use Raven\Lib\Parser\ChannelRouteParser;
+use Raven\Lib\Parser\PageRouteParser;
 use Raven\Lib\Parser\PageBlockParser;
 use Raven\Lib\Parser\UserProfileParser;
 use Raven\Lib\Transport\Redirect;
@@ -63,7 +63,6 @@ final class ChannelController
     private ExtensionEditorCatalogService $extensionEditorCatalogService;
     private ?EmbeddedFormRuntimeService $embeddedFormRuntimeService = null;
     private ?UserProfileParser $profileContactService = null;
-    private ?ChannelPageRouter $publicChannelPageRouteService = null;
 
     /**
      * @param SharedController $context Shared public request context.
@@ -142,7 +141,7 @@ final class ChannelController
         }
 
         $channelRouteMode = ChannelRouteParser::globalPageRouteMode($this->context->config());
-        $lookupTarget = $this->publicChannelPageRouteService()->resolveLookupTarget(
+        $lookupTarget = PageRouteParser::resolveLookupTarget($this->context->input(), 
             $requestedSlug,
             $channelRouteMode,
             (string) $this->context->config()->get('content.separator', '-')
@@ -173,7 +172,7 @@ final class ChannelController
             return;
         }
 
-        $canonicalSegment = $this->publicChannelPageRouteService()->canonicalSegment(
+        $canonicalSegment = PageRouteParser::buildRouteSegment($this->context->input(), 
             (string) ($page['slug'] ?? ''),
             (int) ($page['id'] ?? 0),
             (string) ($page['created'] ?? ''),
@@ -411,21 +410,6 @@ final class ChannelController
         $services = ($this->extensionServicesProvider)();
         return is_array($services) ? $services : [];
     }
-
-    /**
-     * Returns the shared public channel/page routing helper.
-     *
-     * @return ChannelPageRouter Shared public channel/page routing helper.
-     */
-    private function publicChannelPageRouteService(): ChannelPageRouter
-    {
-        if (!$this->publicChannelPageRouteService instanceof ChannelPageRouter) {
-            $this->publicChannelPageRouteService = new ChannelPageRouter($this->context->input());
-        }
-
-        return $this->publicChannelPageRouteService;
-    }
-
     /**
      * Returns the shared public theme-template service.
      *

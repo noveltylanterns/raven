@@ -388,7 +388,7 @@ PHP;
 
 declare(strict_types=1);
 
-use Raven\Core\Routing\Router;
+use Raven\Core\Router\RouteHandler;
 
 /**
  * Registers __NAME_DOC__ routes into the panel router.
@@ -400,7 +400,7 @@ use Raven\Core\Routing\Router;
  *   currentUserTheme: callable(): string
  * } $context
  */
-return static function (Router $router, array $context): void {
+return static function (RouteHandler $router, array $context): void {
     /** @var array<string, mixed> $rvn */
     $rvn = (array) ($context['rvn'] ?? []);
 
@@ -557,7 +557,7 @@ PHP;
 
 declare(strict_types=1);
 
-use Raven\Core\Routing\Router;
+use Raven\Core\Router\RouteHandler;
 
 /**
  * Registers extension routes into the public router.
@@ -569,7 +569,7 @@ use Raven\Core\Routing\Router;
  *   extensionDirectory: string
  * } $context
  */
-return static function (Router $router, array $context): void {
+return static function (RouteHandler $router, array $context): void {
     // Add public extension routes here. Keep routes extension-owned and avoid core edits.
     // Generated public view stub is available at: /tpl/public_index.php
     // Example:

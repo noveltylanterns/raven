@@ -22,10 +22,10 @@ use Raven\Lib\Extension\Public\EmbeddedFormRuntimeService;
 use Raven\Lib\Extension\Public\EmbeddedShortcodeRuntimeInterface;
 use Raven\Lib\Extension\ExtensionEditorCatalogService;
 use Raven\Lib\Parser\ChannelRouteParser;
+use Raven\Lib\Parser\PageRouteParser;
 use Raven\Lib\Parser\PageBlockParser;
 use Raven\Lib\Parser\UserProfileParser;
 use Raven\Lib\Transport\Redirect;
-use Raven\Core\Routing\Public\ChannelPageRouter;
 use Raven\Lib\View\Public\MetaService;
 use Raven\Lib\View\Public\PageBlocks;
 use Raven\Lib\View\Public\PageMarkdown;
@@ -60,7 +60,6 @@ final class PageController
     private ExtensionEditorCatalogService $extensionEditorCatalogService;
     private ?EmbeddedFormRuntimeService $embeddedFormRuntimeService = null;
     private ?UserProfileParser $profileContactService = null;
-    private ?ChannelPageRouter $publicChannelPageRouteService = null;
 
     /**
      * @param SharedController $context Shared public request context.
@@ -146,12 +145,12 @@ final class PageController
             }
 
             $channelRouteMode = ChannelRouteParser::effectiveChannelRouteMode($this->context->config(), (string) ($channel['route_mode'] ?? 'inherit'));
-            $channelWordSeparator = $this->publicChannelPageRouteService()->resolveWordSeparator(
+            $channelWordSeparator = ChannelRouteParser::resolveSeparator(
                 (string) ($channel['route_separator'] ?? 'inherit'),
                 (string) $this->context->config()->get('content.separator', '-')
             );
 
-            $lookupTarget = $this->publicChannelPageRouteService()->resolveLookupTarget(
+            $lookupTarget = PageRouteParser::resolveLookupTarget($this->context->input(), 
                 $requestedSlug,
                 $channelRouteMode,
                 $channelWordSeparator
@@ -170,7 +169,7 @@ final class PageController
             }
         } else {
             $channelRouteMode = ChannelRouteParser::globalPageRouteMode($this->context->config());
-            $lookupTarget = $this->publicChannelPageRouteService()->resolveLookupTarget(
+            $lookupTarget = PageRouteParser::resolveLookupTarget($this->context->input(), 
                 $requestedSlug,
                 $channelRouteMode,
                 (string) $this->context->config()->get('content.separator', '-')
@@ -206,7 +205,7 @@ final class PageController
             return;
         }
 
-        $canonicalSegment = $this->publicChannelPageRouteService()->canonicalSegment(
+        $canonicalSegment = PageRouteParser::buildRouteSegment($this->context->input(), 
             (string) ($page['slug'] ?? ''),
             (int) ($page['id'] ?? 0),
             (string) ($page['created'] ?? ''),
@@ -499,21 +498,6 @@ final class PageController
         $services = ($this->extensionServicesProvider)();
         return is_array($services) ? $services : [];
     }
-
-    /**
-     * Returns the shared public channel/page routing helper.
-     *
-     * @return ChannelPageRouter Shared public channel/page routing helper.
-     */
-    private function publicChannelPageRouteService(): ChannelPageRouter
-    {
-        if (!$this->publicChannelPageRouteService instanceof ChannelPageRouter) {
-            $this->publicChannelPageRouteService = new ChannelPageRouter($this->context->input());
-        }
-
-        return $this->publicChannelPageRouteService;
-    }
-
     /**
      * Returns the shared public theme-template service.
      *

@@ -9,7 +9,7 @@
 
 declare(strict_types=1);
 
-use Raven\Core\Routing\Router;
+use Raven\Core\Router\RouteHandler;
 use Raven\Ext\SignupFormRepository;
 use Raven\Ext\SignupSubmissionRepository;
 use Raven\Lib\Format\Csv;
@@ -30,7 +30,7 @@ use Raven\Lib\Transport\Redirect;
  *   extensionDirectory?: string
  * } $context
  */
-return static function (Router $router, array $context): void {
+return static function (RouteHandler $router, array $context): void {
     /** @var array<string, mixed> $rvn */
     $rvn = (array) ($context['rvn'] ?? []);
 

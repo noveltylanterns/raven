@@ -1,0 +1,422 @@
+<?php
+
+/**
+ * RAVEN CMS
+ * ~/private/sys/Router/Panel/PanelRuntimeBuilder.php
+ * Panel runtime assembly on top of the shared core bootstrap.
+ * Docs: https://raven.lanterns.io
+ */
+
+declare(strict_types=1);
+
+namespace Raven\Core\Router\Panel;
+
+use Closure;
+use PDO;
+use Raven\Core\Factory\Panel\ControllerFactories;
+use Raven\Core\Factory\Panel\DomainFactories;
+use Raven\Core\Factory\Panel\RepoFactories;
+use Raven\Core\Factory\Panel\RuntimeInitializer;
+use Raven\Core\Logger;
+use Raven\Core\Renderer;
+use Raven\Lib\Auth\AuthService;
+use Raven\Lib\Extension\ExtensionEditorCatalogService;
+use Raven\Lib\Extension\Panel\ExtensionCatalogService;
+use Raven\Lib\Extension\Panel\ExtensionPermissionCatalogService;
+use Raven\Lib\Extension\StateRead;
+use Raven\Lib\Parser\ConfigParser;
+use Raven\Lib\Media\Panel\MediaManager;
+use Raven\Lib\View\Panel\Editor;
+use Raven\Lib\View\Panel\EditorBlocks;
+use Raven\Lib\View\Panel\EditorMCE;
+use Raven\Lib\View\Panel\EditorMDE;
+use Raven\Lib\View\Panel\EditorTabs;
+use Raven\Lib\View\Public\ThemeCatalog;
+use RuntimeException;
+
+/**
+ * Builds panel-scope runtime factories on top of the shared Raven container.
+ *
+ * Keep this builder limited to wiring that is broadly needed across panel
+ * requests. Route-family behavior should keep moving into panel routing
+ * registrars and the split panel sub-controllers.
+ */
+final class PanelRuntimeBuilder
+{
+    /**
+     * Enriches the shared core container with panel-runtime factories.
+     *
+     * @param array<string, mixed> $rvn Shared core bootstrap container.
+     * @return array<string, mixed> Panel-enriched runtime container.
+     */
+    public static function build(array $rvn): array
+    {
+        if (!isset($rvn['root'], $rvn['db'], $rvn['auth_db'], $rvn['driver'], $rvn['prefix'], $rvn['config'], $rvn['auth'], $rvn['input'], $rvn['csrf'])) {
+            return $rvn;
+        }
+
+        // Panel entry closures ($hasPanelPermissionBit, $canRenderPanelProfiler) capture
+        // $rvn by value and call $rvn['auth']->method() directly, so auth must be a concrete
+        // AuthService before build() returns — resolve both lazy DB and service handles now.
+        if (is_callable($rvn['auth_db'])) {
+            $rvn['auth_db'] = ($rvn['auth_db'])();
+        }
+        if (is_callable($rvn['auth'])) {
+            $rvn['auth'] = ($rvn['auth'])();
+        }
+
+        $mediaManager = null;
+        $logger = null;
+        $extensionStateStore = null;
+        $extensionPermissionCatalogService = null;
+        $extensionCatalogService = null;
+        $extensionEditorCatalogService = null;
+        $themeCatalogService = null;
+
+        $rvn['view'] = new Renderer((string) $rvn['root'] . '/private/tpl');
+        $categoryEnabled = ConfigParser::bool($rvn['config']->get('category.enabled', true), true);
+        $tagEnabled = ConfigParser::bool($rvn['config']->get('tag.enabled', true), true);
+
+        // Shared panel editor services — created once here and reused across every
+        // controller factory so that extensions can also access panel_editor_tabs.
+        $rvn['panel_editor_tabs'] = new EditorTabs($rvn['input']);
+        $rvn['panel_editor'] = new Editor();
+        $rvn['panel_editor_blocks'] = new EditorBlocks();
+        // TinyMCE and EasyMDE helpers are registered here for extension access but
+        // only injected into PageEditController, which is the sole controller that
+        // serves the rich page body editor.
+        $rvn['panel_editor_mce'] = new EditorMCE();
+        $rvn['panel_editor_mde'] = new EditorMDE();
+
+        /**
+         * Resolves the lazy auth DB handle only for panel factories that truly need it.
+         */
+        $resolveAuthDb = static function () use (&$rvn): PDO {
+            $authDb = $rvn['auth_db'] ?? null;
+            if (is_callable($authDb)) {
+                $authDb = $authDb();
+                $rvn['auth_db'] = $authDb;
+            }
+
+            if (!$authDb instanceof PDO) {
+                throw new RuntimeException('Panel runtime auth database resolver is unavailable.');
+            }
+
+            return $authDb;
+        };
+
+        /**
+         * Resolves the lazy auth service only for panel factories that truly need it.
+         */
+        $resolveAuth = static function () use (&$rvn): AuthService {
+            $auth = $rvn['auth'] ?? null;
+            if (is_callable($auth)) {
+                $auth = $auth();
+                $rvn['auth'] = $auth;
+            }
+
+            if (!$auth instanceof AuthService) {
+                throw new RuntimeException('Panel runtime auth service resolver is unavailable.');
+            }
+
+            return $auth;
+        };
+
+        /**
+         * Request-scoped memoization keeps bootstrap factories lightweight while
+         * avoiding repeated repo construction within one request.
+         *
+         * @param callable(): mixed $builder Builder for one runtime value.
+         * @return Closure Memoized factory that resolves the value once per request.
+         */
+        $memoize = static function (callable $builder): Closure {
+            $resolved = false;
+            $value = null;
+
+            return static function () use (&$resolved, &$value, $builder): mixed {
+                if ($resolved) {
+                    return $value;
+                }
+
+                $value = $builder();
+                $resolved = true;
+                return $value;
+            };
+        };
+
+        /** @var array<string, Closure> $repoFactories */
+        $repoFactories = RepoFactories::build($rvn, $memoize, $resolveAuthDb, $categoryEnabled, $tagEnabled);
+        $channelReadFactory = $repoFactories['channel_read'];
+        $channelWriteFactory = $repoFactories['channel_write'];
+        $groupReadFactory = $repoFactories['group_read'];
+        $groupWriteFactory = $repoFactories['group_write'];
+        $mediaReadFactory = $repoFactories['media_read'];
+        $mediaWriteFactory = $repoFactories['media_write'];
+        $pageReadFactory = $repoFactories['page_read'];
+        $pageWriteFactory = $repoFactories['page_write'];
+        $redirectReadFactory = $repoFactories['redirect_read'];
+        $redirectWriteFactory = $repoFactories['redirect_write'];
+        $userReadFactory = $repoFactories['user_read'];
+        $userWriteFactory = $repoFactories['user_write'];
+        $categorySetFactory = $repoFactories['category_set'];
+        $tagSetFactory = $repoFactories['tag_set'];
+        $categorySetWriteFactory = $repoFactories['category_set_write'];
+        $tagSetWriteFactory = $repoFactories['tag_set_write'];
+        $inviteReadFactory = $repoFactories['invite_read'];
+        $inviteWriteFactory = $repoFactories['invite_write'];
+        $categoryReadFactory = $repoFactories['category_read'];
+        $categoryWriteFactory = $repoFactories['category_write'];
+        $tagReadFactory = $repoFactories['tag_read'];
+        $tagWriteFactory = $repoFactories['tag_write'];
+        $taxonomyLookupFactory = $repoFactories['taxonomy_lookup'];
+
+        /**
+         * Builds the panel media helper only when page editing enters media flows.
+         *
+         * The manager spans both gallery duplicate/order lookups and media-row mutations,
+         * so it takes the split read/write seams directly.
+         */
+        $mediaManagerFactory = $memoize(static function () use (&$mediaManager, $rvn, $mediaReadFactory, $mediaWriteFactory): MediaManager {
+            $mediaManager = new MediaManager(
+                $rvn['config'],
+                $rvn['input'],
+                $mediaReadFactory(),
+                $mediaWriteFactory(),
+                (string) $rvn['root']
+            );
+
+            return $mediaManager;
+        });
+
+        /**
+         * Builds panel log storage only for routes that touch the event log UI.
+         */
+        $loggerFactory = $memoize(static function () use (&$logger, $rvn): Logger {
+            $logger = new Logger(
+                $rvn['db'],
+                (string) $rvn['driver'],
+                (string) $rvn['prefix'],
+                (array) $rvn['config']->get('logging', [])
+            );
+
+            return $logger;
+        });
+
+        /** @var array<string, Closure> $domainFactories */
+        $domainFactories = DomainFactories::build(
+            $memoize,
+            $channelReadFactory,
+            $channelWriteFactory,
+            $pageReadFactory,
+            $pageWriteFactory,
+            $mediaReadFactory,
+            $mediaWriteFactory,
+            $mediaManagerFactory,
+            $userReadFactory,
+            $userWriteFactory,
+            $groupReadFactory,
+            $groupWriteFactory,
+            $inviteReadFactory,
+            $inviteWriteFactory,
+            $redirectReadFactory,
+            $redirectWriteFactory,
+            $categoryReadFactory,
+            $categoryWriteFactory,
+            $categorySetFactory,
+            $categorySetWriteFactory,
+            $tagReadFactory,
+            $tagWriteFactory,
+            $tagSetFactory,
+            $tagSetWriteFactory,
+            $taxonomyLookupFactory,
+            $categoryEnabled,
+            $tagEnabled
+        );
+        $panelContentDomain = $domainFactories['panel_domain_content'];
+        $panelTaxonomyDomain = $domainFactories['panel_domain_taxonomy'];
+        $panelUserDomain = $domainFactories['panel_domain_user'];
+        $panelPreferencesDomain = $domainFactories['panel_domain_preferences'];
+        $panelSystemDomain = $domainFactories['panel_domain_system'];
+
+        $rvn['panel_domain_content'] = $panelContentDomain;
+        $rvn['panel_domain_taxonomy'] = $panelTaxonomyDomain;
+        $rvn['panel_domain_user'] = $panelUserDomain;
+        $rvn['panel_domain_group'] = $panelUserDomain;
+        $rvn['panel_domain_preferences'] = $panelPreferencesDomain;
+        $rvn['panel_domain_logs'] = $loggerFactory;
+        $rvn['panel_domain_system'] = $panelSystemDomain;
+
+        /**
+         * Reads enabled form rows from one extension service map.
+         *
+         * Extension manifest validation needs the same shortcode/form context on
+         * panel bootstrap that the system controller already uses for extension
+         * management screens. Keep the lookup local to the runtime builder so the
+         * permission-map seam stays library-owned instead of routing through a controller.
+         *
+         * @param string $extensionKey Extension directory key.
+         * @return array<int, array{name: string, slug: string}>
+         */
+        $extensionFormsProvider = static function (string $extensionKey) use (&$rvn): array {
+            $normalized = strtolower(trim($extensionKey));
+            $extensionServicesFor = $rvn['extension_services_for'] ?? null;
+            if (!is_callable($extensionServicesFor)) {
+                return [];
+            }
+
+            $extensionServices = $extensionServicesFor($normalized);
+            if (!is_array($extensionServices)) {
+                return [];
+            }
+
+            $formsRepository = $extensionServices['forms'] ?? null;
+            if (!is_object($formsRepository) || !method_exists($formsRepository, 'listAll')) {
+                return [];
+            }
+
+            /** @var mixed $rows */
+            $rows = $formsRepository->listAll();
+            if (!is_array($rows)) {
+                return [];
+            }
+
+            $items = [];
+            foreach ($rows as $row) {
+                if (!is_array($row) || empty($row['enabled'])) {
+                    continue;
+                }
+
+                $slug = strtolower(trim((string) ($row['slug'] ?? '')));
+                if ($slug === '' || preg_match('/^[a-z0-9][a-z0-9_-]*$/', $slug) !== 1) {
+                    continue;
+                }
+
+                $name = trim((string) ($row['name'] ?? ''));
+                if ($name === '') {
+                    $name = $slug;
+                }
+
+                $items[] = [
+                    'name' => $name,
+                    'slug' => $slug,
+                ];
+            }
+
+            return $items;
+        };
+
+        /**
+         * Reuses one shared extension-state store across panel bootstrap helpers.
+         */
+        $extensionStateStoreFactory = $memoize(static function () use (&$extensionStateStore, $rvn): StateRead {
+            $extensionStateStore = new StateRead((string) $rvn['root'] . '/private/ext');
+
+            return $extensionStateStore;
+        });
+
+        /**
+         * Reuses one shared extension-permission catalog across panel bootstrap helpers.
+         */
+        $extensionPermissionCatalogFactory = $memoize(static function () use (
+            &$extensionPermissionCatalogService,
+            $rvn,
+            $extensionStateStoreFactory
+        ): ExtensionPermissionCatalogService {
+            $extensionPermissionCatalogService = new ExtensionPermissionCatalogService(
+                $extensionStateStoreFactory(),
+                $rvn['input']
+            );
+
+            return $extensionPermissionCatalogService;
+        });
+
+        /**
+         * Reuses one shared extension catalog for runtime-side manifest reads.
+         */
+        $extensionCatalogFactory = $memoize(static function () use (
+            &$extensionCatalogService,
+            $rvn,
+            $extensionStateStoreFactory,
+            $extensionPermissionCatalogFactory
+        ): ExtensionCatalogService {
+            $extensionCatalogService = new ExtensionCatalogService(
+                (string) $rvn['root'],
+                $extensionStateStoreFactory(),
+                $extensionPermissionCatalogFactory(),
+                $rvn['config'],
+                $rvn['input']
+            );
+
+            return $extensionCatalogService;
+        });
+
+        /**
+         * Reuses one shared extension editor catalog for page-editor contribution reads.
+         */
+        $extensionEditorCatalogFactory = $memoize(static function () use (
+            &$extensionEditorCatalogService,
+            $rvn
+        ): ExtensionEditorCatalogService {
+            $extensionEditorCatalogService = new ExtensionEditorCatalogService(
+                (string) $rvn['root'],
+                $rvn['input'],
+                new \Raven\Lib\Parser\PageBlockParser($rvn['input'])
+            );
+
+            return $extensionEditorCatalogService;
+        });
+
+        /**
+         * Reuses one shared public-theme catalog for runtime-side stock-theme reads.
+         */
+        $themeCatalogFactory = $memoize(static function () use (&$themeCatalogService, $rvn): ThemeCatalog {
+            $themeCatalogService = new ThemeCatalog(
+                (string) $rvn['root'] . '/public/theme',
+                $rvn['input'],
+                ['raven']
+            );
+
+            return $themeCatalogService;
+        });
+
+        ControllerFactories::registerBase(
+            $rvn,
+            $resolveAuth,
+            $extensionCatalogFactory,
+            $extensionFormsProvider,
+            $categoryEnabled,
+            $tagEnabled
+        );
+
+        ControllerFactories::registerContentTaxonomyControllers(
+            $rvn,
+            $panelContentDomain,
+            $panelTaxonomyDomain,
+            $extensionStateStoreFactory,
+            $extensionCatalogFactory,
+            $extensionEditorCatalogFactory
+        );
+
+        ControllerFactories::registerUserAdminControllers(
+            $rvn,
+            $panelUserDomain,
+            $panelSystemDomain,
+            $loggerFactory,
+            $themeCatalogFactory,
+            $extensionStateStoreFactory,
+            $extensionCatalogFactory
+        );
+
+        RuntimeInitializer::register(
+            $rvn,
+            $panelContentDomain,
+            $panelTaxonomyDomain,
+            $panelUserDomain,
+            $panelSystemDomain,
+            $categoryEnabled,
+            $tagEnabled
+        );
+
+        return $rvn;
+    }
+}

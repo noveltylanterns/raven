@@ -10,7 +10,7 @@
 declare(strict_types=1);
 
 use Raven\Ext\Cron\CronTaskService;
-use Raven\Core\Routing\Router;
+use Raven\Core\Router\RouteHandler;
 use Raven\Lib\Scheduler\Registry as SchedulerRegistry;
 use Raven\Lib\View\Panel\EditorBlocks;
 
@@ -27,7 +27,7 @@ use Raven\Lib\Transport\Redirect;
  *   extensionServices?: callable(?string=): array<string, mixed>
  * } $context
  */
-return static function (Router $router, array $context): void {
+return static function (RouteHandler $router, array $context): void {
     /** @var array<string, mixed> $rvn */
     $rvn = (array) ($context['rvn'] ?? []);
 

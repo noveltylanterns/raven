@@ -1,0 +1,63 @@
+<?php
+
+/**
+ * RAVEN CMS
+ * ~/private/sys/Router/Public/PublicRouter.php
+ * Public-route orchestration over one isolated router instance.
+ * Docs: https://raven.lanterns.io
+ */
+
+declare(strict_types=1);
+
+namespace Raven\Core\Router\Public;
+
+use Raven\Core\Router\RouteRequest;
+use Raven\Core\Router\RouteResponse;
+use Raven\Core\Router\RouteHandler;
+
+/**
+ * Owns public-route registration order and dispatch lifecycle.
+ */
+final class PublicRouter
+{
+    private RouteHandler $router;
+
+    /**
+     * Creates one isolated router instance for public route orchestration.
+     */
+    public function __construct()
+    {
+        $this->router = new RouteHandler();
+    }
+
+    /**
+     * Registers the full public route map in canonical registration order.
+     *
+     * @param PublicRouteDeps $deps Shared public route dependency payload.
+     * @return void
+     */
+    public function register(PublicRouteDeps $deps): void
+    {
+        AuthRouter::registerWithDeps($this->router, $deps);
+        FormRouter::registerWithDeps($this->router, $deps);
+        ExtensionRouter::registerWithDeps($this->router, $deps);
+        CategoryRouter::registerWithDeps($this->router, $deps);
+        ChannelRouter::registerWithDeps($this->router, $deps);
+        FeedRouter::registerWithDeps($this->router, $deps);
+        ProfileRouter::registerWithDeps($this->router, $deps);
+        GroupRouter::registerWithDeps($this->router, $deps);
+        TagRouter::registerWithDeps($this->router, $deps);
+        PageRouter::registerWithDeps($this->router, $deps);
+    }
+
+    /**
+     * Dispatches one normalized request through the isolated public route map.
+     *
+     * @param RouteRequest  Normalized routing request payload.
+     * @return RouteResponse Dispatch result indicating match state and params.
+     */
+    public function dispatch(RouteRequest $request): RouteResponse
+    {
+        return $this->router->dispatch($request);
+    }
+}

@@ -10,7 +10,7 @@ Maintenance note: keep this file updated whenever the panel updater routes, sour
 ## Key Files
 
 - `private/sys/Controller/Panel/UpdateController.php`
-- `private/sys/Routing/Panel/PanelUpdateRouteRegistrar.php`
+- `private/sys/Router/Panel/UpdateRouter.php`
 - `private/tpl/panel/update.php`
 
 ## Source Selection

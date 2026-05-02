@@ -13,10 +13,10 @@ namespace Raven\Core\Controller\Public;
 
 use Raven\Core\Repository\ChannelRead;
 use Raven\Core\Repository\PageRead;
-use Raven\Core\Routing\Public\ChannelPageRouter;
 use Raven\Lib\Parser\CategoryRepoParser;
 use Raven\Lib\Parser\CategoryRouteParser;
 use Raven\Lib\Parser\ChannelRouteParser;
+use Raven\Lib\Parser\PageRouteParser;
 use Raven\Lib\Parser\TagRepoParser;
 use Raven\Lib\Parser\TagRouteParser;
 
@@ -30,7 +30,6 @@ final class FeedController
     private PageRead $pageRead;
     private CategoryRepoParser $categoryLookupRepo;
     private TagRepoParser $tagLookupRepo;
-    private ChannelPageRouter $publicChannelPageRouteService;
 
     /**
      * @param SharedController $context Shared public request context.
@@ -52,7 +51,6 @@ final class FeedController
         $this->pageRead = $pageRead;
         $this->categoryLookupRepo = $categoryLookupRepo;
         $this->tagLookupRepo = $tagLookupRepo;
-        $this->publicChannelPageRouteService = new ChannelPageRouter($context->input());
     }
 
     /**
@@ -521,7 +519,7 @@ final class FeedController
 
             $channelSlug = $this->context->input()->slug((string) ($page['channel_slug'] ?? ''));
             if ($channelSlug === null || $channelSlug === '') {
-                $rootSegment = $this->publicChannelPageRouteService->canonicalSegment(
+                $rootSegment = PageRouteParser::buildRouteSegment($this->context->input(), 
                     $slug,
                     $pageId,
                     (string) ($page['created'] ?? ''),
@@ -537,7 +535,7 @@ final class FeedController
                 . rawurlencode($channelSlug)
                 . '/'
                 . rawurlencode(
-                    $this->publicChannelPageRouteService->canonicalSegment(
+                    PageRouteParser::buildRouteSegment($this->context->input(), 
                         $slug,
                         $pageId,
                         (string) ($page['created'] ?? ''),

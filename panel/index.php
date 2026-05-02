@@ -9,17 +9,16 @@
 
 declare(strict_types=1);
 
-use Raven\Core\Debug\OutputProfilerConfigResolver;
-use Raven\Core\Debug\OutputProfilerResponseHook;
+use Raven\Core\Debug\OutputProfilerConfig;
+use Raven\Core\Debug\OutputProfiler;
+use Raven\Core\Controller\Panel\SharedController;
 use Raven\Core\Factory\Panel\RuntimeContract as PanelRuntimeContract;
 use Raven\Core\Factory\RuntimePayloadAssert;
-use Raven\Core\Routing\Request;
-use Raven\Core\Routing\Panel\PanelRouter;
+use Raven\Core\Router\RouteRequest;
+use Raven\Core\Router\Panel\PanelRouter;
 use Raven\Lib\Transport\Request as HttpRequest;
-use Raven\Core\Routing\Panel\NavSessionPopulator;
-use Raven\Core\Routing\Panel\PanelRuntimeBuilder;
-use Raven\Core\Routing\Panel\RouteDeps;
-use Raven\Core\Routing\Panel\ThemeAssetResponder;
+use Raven\Core\Router\Panel\PanelRuntimeBuilder;
+use Raven\Core\Router\Panel\PanelRouteDeps;
 use Raven\Lib\Parser\ConfigParser;
 use Raven\Lib\Parser\PanelParser;
 use Raven\Lib\Scheduler\Cron;
@@ -81,8 +80,10 @@ $panelLogsController = $requirePanelFactory('panel_logs_controller');
 $panelRoutingController = $requirePanelFactory('panel_routing_controller');
 /** @var callable(): object $panelUpdateController */
 $panelUpdateController = $requirePanelFactory('panel_update_controller');
-/** @var callable(): object $panelSystemController */
-$panelSystemController = $requirePanelFactory('panel_system_controller');
+/** @var callable(): object $panelThemeController */
+$panelThemeController = $requirePanelFactory('panel_theme_controller');
+/** @var callable(): object $panelExtensionController */
+$panelExtensionController = $requirePanelFactory('panel_extension_controller');
 /** @var callable(array<int, string>=): array<string, array<string, mixed>> $panelPermissionMapProvider */
 $panelPermissionMapProvider = $requirePanelFactory('panel_permission_map_provider');
 /** @var callable(): object $panelRequestContext */
@@ -127,7 +128,7 @@ $_SESSION['_raven_tag_enabled'] = $tagEnabled;
 
 // Serve theme assets before panel route dispatch when front-controller rewrite is enabled.
 $requestMethod = strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET'));
-if (ThemeAssetResponder::serveIfMatched($rvn, $internalPath, $requestMethod)) {
+if (SharedController::serveThemeAssetIfMatched($rvn, $internalPath, $requestMethod)) {
     return;
 }
 
@@ -158,7 +159,7 @@ if ($shouldInitializeFullPanelRuntime) {
     $extensionPermissionCatalog = $panelPermissionMapProvider(array_keys($enabledExtensionManifests));
 }
 
-NavSessionPopulator::populate(
+SharedController::populateNavSession(
     $rvn,
     $categoryEnabled,
     $tagEnabled,
@@ -178,7 +179,7 @@ $renderPublicNotFound = static function () use ($rvn, $root): void {
 };
 
 $router = new PanelRouter();
-$routeDeps = new RouteDeps(
+$routeDeps = new PanelRouteDeps(
     $rvn,
     $authController,
     $panelDashboardController,
@@ -201,7 +202,8 @@ $routeDeps = new RouteDeps(
     $panelLogsController,
     $panelRoutingController,
     $panelUpdateController,
-    $panelSystemController,
+    $panelThemeController,
+    $panelExtensionController,
     $rvn['input'],
     $categoryEnabled,
     $tagEnabled,
@@ -215,7 +217,7 @@ $routeDeps = new RouteDeps(
 $router->register($routeDeps);
 
 $method = $requestMethod;
-$profilerSettings = OutputProfilerConfigResolver::fromConfig($rvn['config']);
+$profilerSettings = OutputProfilerConfig::fromConfig($rvn['config']);
 $canRenderPanelProfiler = static function () use ($rvn, $isPanelAuthHelperInternalPath, $internalPath): bool {
     if (!isset($rvn['auth']) || $isPanelAuthHelperInternalPath($internalPath)) {
         return false;
@@ -229,7 +231,7 @@ $canRenderPanelProfiler = static function () use ($rvn, $isPanelAuthHelperIntern
     return $rvn['auth']->isTwoFactorVerifiedForUser($userId);
 };
 
-OutputProfilerResponseHook::arm(
+OutputProfiler::arm(
     [
         'show_benchmarks' => (bool) ($profilerSettings['show_benchmarks'] ?? true),
         'show_queries' => (bool) ($profilerSettings['show_queries'] ?? true),
@@ -244,7 +246,7 @@ OutputProfilerResponseHook::arm(
     $canRenderPanelProfiler
 );
 
-$dispatchResult = $router->dispatch(new Request($method, $internalPath));
+$dispatchResult = $router->dispatch(new RouteRequest($method, $internalPath));
 if (!$dispatchResult->isHandled()) {
     $renderPublicNotFound();
 }

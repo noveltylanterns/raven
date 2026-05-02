@@ -18,7 +18,7 @@ use Raven\Core\Repository\ChannelRead;
 use Raven\Core\Repository\GroupRead;
 use Raven\Core\Repository\PageRead;
 use Raven\Core\Repository\UserRead;
-use Raven\Core\Routing\Public\PublicRuntimeBuilder;
+use Raven\Core\Router\Public\PublicRuntimeBuilder;
 use Raven\Lib\Parser\ChannelDataParser;
 use Raven\Lib\Parser\TaxonomyRepoParser;
 
