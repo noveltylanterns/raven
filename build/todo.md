@@ -26,6 +26,21 @@ Refactor wins that create room for targeted tuning (no urgency — open when rea
 - [ ] `panel/index.php` is now ~250 lines and clearly structured; profile per-request overhead of `NavSessionPopulator::populate()` on high-extension installs to see if the extension nav loop is worth caching.
 
 
+## Router Refactor Plan (`private/sys/Routing` -> `private/sys/Router`)
+
+Goal: align naming with core vernacular and tighten module boundaries without behavior drift.
+
+- [ ] Rename directory `private/sys/Routing/` to `private/sys/Router/` and update namespace references/imports to match.
+- [ ] Update all runtime/composer/autoload references that point at `private/sys/Routing/*` paths.
+- [ ] Update route bootstraps/entrypoints to use new `Router` paths (`public/index.php`, `panel/index.php`, and any factory/runtime builder glue that imports router classes).
+- [ ] Sweep panel router classes for ownership and naming consistency (keep request orchestration in `sys`, extract reusable policies/helpers to `private/lib/*` when discovered).
+- [ ] Sweep public router classes for ownership and naming consistency (same extraction rule as panel pass).
+- [ ] Re-check `RouteDeps`/`RouteConfig` shared contracts after rename to ensure no stale aliases or fallback paths remain.
+- [ ] Run full smoke checks for panel/public route registration and core auth/content CRUD flows after move.
+- [ ] Update docs that reference `private/sys/Routing` (`docs/filetree.md` and any routing architecture docs) in same batch.
+- [ ] Log any temporary fallback aliases/shims in "Legacy Fallback Log" if introduced during migration.
+
+
 
 
 # Legacy Fallback Log

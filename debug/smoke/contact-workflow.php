@@ -372,6 +372,9 @@ final class ContactWorkflowSmokeRunner
     {
         require_once $this->root . '/private/Raven.php';
         $rvn = \Raven\Raven::boot();
+        if (is_callable($rvn['auth_db'] ?? null)) {
+            $rvn['auth_db'] = ($rvn['auth_db'])();
+        }
         $groupRepo = new GroupRead($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix']);
         $userRepo = new UserWrite($rvn['auth_db'], $rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix']);
 
@@ -411,6 +414,9 @@ final class ContactWorkflowSmokeRunner
 
         require_once $this->root . '/private/Raven.php';
         $rvn = \Raven\Raven::boot();
+        if (is_callable($rvn['auth_db'] ?? null)) {
+            $rvn['auth_db'] = ($rvn['auth_db'])();
+        }
         $userRepo = new UserWrite($rvn['auth_db'], $rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix']);
         $userRepo->deleteById($this->tempUserId);
         $this->events[] = 'deleted_temp_user=' . $this->tempUserId;

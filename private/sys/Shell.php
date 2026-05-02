@@ -1609,7 +1609,7 @@ function raven_cli_command_group(RavenCliContext $context, array $tokens): int
                 'permissions' => $permissionMask,
             ]);
 
-            $saved = $parser->findById($id);
+            $saved = $repoRead->findById($id);
             $savedMask = is_array($saved) ? (int) ($saved['permissions'] ?? 0) : $permissionMask;
             if ($context->json) {
                 $context->printJson([

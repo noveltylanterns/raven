@@ -12,19 +12,30 @@ declare(strict_types=1);
 error_reporting(E_ALL & ~E_WARNING & ~E_NOTICE & ~E_DEPRECATED);
 ini_set('display_errors', '0');
 
-require_once __DIR__ . '/../../private/lib/Auth/Panel/PanelAccess.php';
-require_once __DIR__ . '/../../private/sys/Config.php';
-require_once __DIR__ . '/../../private/lib/Extension/ExtensionRegistry.php';
-require_once __DIR__ . '/../../private/lib/Extension/Panel/ExtensionScaffoldService.php';
-require_once __DIR__ . '/../../private/lib/Database/Schema/SchemaEnsureStateStore.php';
-require_once __DIR__ . '/../../private/lib/Scribe/ExtensionStateScribe.php';
-require_once __DIR__ . '/../../private/lib/Extension/ExtensionStateStore.php';
-require_once __DIR__ . '/../../private/lib/Extension/Panel/ExtensionPermissionCatalogService.php';
-require_once __DIR__ . '/../../private/lib/Extension/Layout.php';
-require_once __DIR__ . '/../../private/lib/Extension/Panel/ExtensionCatalogService.php';
-require_once __DIR__ . '/../../private/lib/Extension/ManifestContractValidator.php';
-require_once __DIR__ . '/../../private/lib/Extension/ExtensionBootstrapContractResolver.php';
-require_once __DIR__ . '/../../private/lib/Security/InputSanitizer.php';
+$root = dirname(__DIR__, 2);
+
+// Keep permission smoke checks independent from full Raven bootstrap while
+// following the same class resolution rules as live runtime entrypoints.
+spl_autoload_register(static function (string $class) use ($root): void {
+    $libPrefix = 'Raven\\Lib\\';
+    if (str_starts_with($class, $libPrefix)) {
+        $relative = str_replace('\\', '/', substr($class, strlen($libPrefix)));
+        $path = $root . '/private/lib/' . $relative . '.php';
+        if (is_file($path)) {
+            require_once $path;
+        }
+        return;
+    }
+
+    $corePrefix = 'Raven\\Core\\';
+    if (str_starts_with($class, $corePrefix)) {
+        $relative = str_replace('\\', '/', substr($class, strlen($corePrefix)));
+        $path = $root . '/private/sys/' . $relative . '.php';
+        if (is_file($path)) {
+            require_once $path;
+        }
+    }
+});
 
 use Raven\Core\Config;
 use Raven\Core\Repository\GroupRead;
@@ -34,7 +45,7 @@ use Raven\Lib\Auth\Panel\PanelAccess;
 use Raven\Lib\Extension\Panel\ExtensionCatalogService;
 use Raven\Lib\Extension\Panel\ExtensionPermissionCatalogService;
 use Raven\Lib\Extension\Panel\ExtensionScaffoldService;
-use Raven\Lib\Extension\ExtensionStateStore;
+use Raven\Lib\Extension\StateRead;
 use Raven\Lib\Security\InputSanitizer;
 
 final class PanelPermissionsSmokeRunner
@@ -362,7 +373,7 @@ PHP;
 
     private function enableDebugExtensions(): void
     {
-        $stateStore = new ExtensionStateStore(
+        $stateStore = new StateRead(
             $this->root . '/private/ext',
             $this->root . '/private/dat/ext'
         );
