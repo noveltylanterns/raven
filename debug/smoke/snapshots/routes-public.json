@@ -1,6 +1,6 @@
 {
     "schema": 1,
-    "generated_at": "2026-05-02T12:19:53+00:00",
+    "generated_at": "2026-05-02T13:22:53+00:00",
     "scope": "public",
     "routes": [
         {
@@ -141,23 +141,6 @@
         {
             "scope": "public",
             "order": 10,
-            "method": "POST",
-            "regex": "#^/forms/submit$#",
-            "handler": {
-                "type": "closure",
-                "file": "private/sys/Router/Public/FormRouter.php",
-                "line": 51,
-                "static_uses": [
-                    "input",
-                    "publicPageController",
-                    "publicRequestContext"
-                ]
-            },
-            "signature": "87160bf14dda62a6773a3ec3863a2cf958282b70"
-        },
-        {
-            "scope": "public",
-            "order": 11,
             "method": "GET",
             "regex": "#^/repo$#",
             "handler": {
@@ -171,11 +154,11 @@
                     "repoService"
                 ]
             },
-            "signature": "845a70a25f9933dc5bdd45e871875f02dcd73db0"
+            "signature": "c3bc8274c410037b5576e88794ef0ec14ad516ec"
         },
         {
             "scope": "public",
-            "order": 12,
+            "order": 11,
             "method": "GET",
             "regex": "#^/repo/(?P<slug>[^/]+)$#",
             "handler": {
@@ -190,11 +173,11 @@
                     "repoService"
                 ]
             },
-            "signature": "7ffae168e9dfd20c737798052c1cf1bfd6e0d01c"
+            "signature": "174d764a47e527e1462d8b5b9078a66e47f455d9"
         },
         {
             "scope": "public",
-            "order": 13,
+            "order": 12,
             "method": "GET",
             "regex": "#^/repo/(?P<slug>[^/]+)/raw$#",
             "handler": {
@@ -208,11 +191,11 @@
                     "streamFile"
                 ]
             },
-            "signature": "05ad94ca12c115b1a50a4ced35be81ef2740eeb5"
+            "signature": "e17c6a7f935866ddf035668fad9b75c9ffcb0ab9"
         },
         {
             "scope": "public",
-            "order": 14,
+            "order": 13,
             "method": "GET",
             "regex": "#^/repo/(?P<slug>[^/]+)/download$#",
             "handler": {
@@ -226,11 +209,11 @@
                     "streamFile"
                 ]
             },
-            "signature": "ea4557e370cc7dd3ee35c3b231c1ccdc15394fed"
+            "signature": "96fd74ff4f6e1c5efd6ef238201e17bd2b38fadd"
         },
         {
             "scope": "public",
-            "order": 15,
+            "order": 14,
             "method": "GET",
             "regex": "#^/repo/(?P<slug>[^/]+)/archive$#",
             "handler": {
@@ -244,11 +227,11 @@
                     "streamFile"
                 ]
             },
-            "signature": "bb342f789e98fada55000c62fee807527e0da245"
+            "signature": "bad6270c5b7d454d9de11db8e298d6f74a932d62"
         },
         {
             "scope": "public",
-            "order": 16,
+            "order": 15,
             "method": "GET",
             "regex": "#^/cat/(?P<slug>[^/]+)$#",
             "handler": {
@@ -261,11 +244,11 @@
                     "publicRequestContext"
                 ]
             },
-            "signature": "ba7bc0d9c884e4c39a669c93d003a4f6dada8b30"
+            "signature": "c215f3dfea944879329c1d3d1cdf0f2d88b68c2b"
         },
         {
             "scope": "public",
-            "order": 17,
+            "order": 16,
             "method": "GET",
             "regex": "#^/cat/(?P<slug>[^/]+)/(?P<page>[^/]+)$#",
             "handler": {
@@ -278,11 +261,11 @@
                     "publicRequestContext"
                 ]
             },
-            "signature": "2400dfb2528cb8e678d1f6efdf52f004da1e46d5"
+            "signature": "41b904b92426a73bb7bc6119118ab8885a601f5c"
         },
         {
             "scope": "public",
-            "order": 18,
+            "order": 17,
             "method": "GET",
             "regex": "#^/(?P<slug>[^/]+)$#",
             "handler": {
@@ -296,11 +279,11 @@
                     "reservedPrefixes"
                 ]
             },
-            "signature": "2812c7018cfbd770d77c0a7a538f71eeb7f221b2"
+            "signature": "3d2f6f788e1cf7b1cdb132eb4ca130cb1ef08f2a"
         },
         {
             "scope": "public",
-            "order": 19,
+            "order": 18,
             "method": "GET",
             "regex": "#^/rss$#",
             "handler": {
@@ -311,11 +294,11 @@
                     "publicFeedController"
                 ]
             },
-            "signature": "a7db44290d92f84911e37e3fc70b71b90852b6a8"
+            "signature": "f7418c1ee5477ab039dfbd3dc232b7f7a6ce11ec"
         },
         {
             "scope": "public",
-            "order": 20,
+            "order": 19,
             "method": "GET",
             "regex": "#^/rss/(?P<channel>[^/]+)$#",
             "handler": {
@@ -329,11 +312,11 @@
                     "reservedPrefixes"
                 ]
             },
-            "signature": "35d4aadc4568f58a6fb0fdabceccff0b1eaf73b4"
+            "signature": "cbb443869740455017c4191e25ca4b877b49ce30"
         },
         {
             "scope": "public",
-            "order": 21,
+            "order": 20,
             "method": "GET",
             "regex": "#^/rss/cat/(?P<slug>[^/]+)$#",
             "handler": {
@@ -346,11 +329,11 @@
                     "publicRequestContext"
                 ]
             },
-            "signature": "2df3979fa8375ca1806832006c491e4bc0b75a1d"
+            "signature": "4f1b1439225ed754cac2d5542eb2db69c6913b1f"
         },
         {
             "scope": "public",
-            "order": 22,
+            "order": 21,
             "method": "GET",
             "regex": "#^/rss/tag/(?P<slug>[^/]+)$#",
             "handler": {
@@ -363,11 +346,11 @@
                     "publicRequestContext"
                 ]
             },
-            "signature": "3eae695fa284e811004739e4be30e7b4e7970144"
+            "signature": "e9742ab9bcba5da56c3e20a3a5b077d646d5a0df"
         },
         {
             "scope": "public",
-            "order": 23,
+            "order": 22,
             "method": "GET",
             "regex": "#^/atom$#",
             "handler": {
@@ -378,11 +361,11 @@
                     "publicFeedController"
                 ]
             },
-            "signature": "e64e85654f16b7cda4da6f3399d5867eb2021901"
+            "signature": "a1076f96335c3129bd7d24378e607f854ae0a252"
         },
         {
             "scope": "public",
-            "order": 24,
+            "order": 23,
             "method": "GET",
             "regex": "#^/atom/(?P<channel>[^/]+)$#",
             "handler": {
@@ -396,11 +379,11 @@
                     "reservedPrefixes"
                 ]
             },
-            "signature": "f021fb4daf6eea82dde0bc1dafe2c2371749b36b"
+            "signature": "09bc1e51f6bbf9741298b6a8512e50a5e4a077a5"
         },
         {
             "scope": "public",
-            "order": 25,
+            "order": 24,
             "method": "GET",
             "regex": "#^/atom/cat/(?P<slug>[^/]+)$#",
             "handler": {
@@ -413,11 +396,11 @@
                     "publicRequestContext"
                 ]
             },
-            "signature": "2091a25d79a5eaa1ed2124181c9fb8647ce21046"
+            "signature": "7b9c19c269d71c4c5c5ba6182e2ecb2a4f51c322"
         },
         {
             "scope": "public",
-            "order": 26,
+            "order": 25,
             "method": "GET",
             "regex": "#^/atom/tag/(?P<slug>[^/]+)$#",
             "handler": {
@@ -430,11 +413,11 @@
                     "publicRequestContext"
                 ]
             },
-            "signature": "091a21ebd14b6aa53fb4d7fc7a2454c2ea51310b"
+            "signature": "008e6a66f7dc310b0164d749fb4fe61f5fc452e9"
         },
         {
             "scope": "public",
-            "order": 27,
+            "order": 26,
             "method": "GET",
             "regex": "#^/user/(?P<username>[^/]+)$#",
             "handler": {
@@ -447,11 +430,11 @@
                     "publicUserController"
                 ]
             },
-            "signature": "793dd934523c2405f29ac70ecb277df7ef1523de"
+            "signature": "d84c6b8e4bb1d0e11deab4d029d8e372629ecab2"
         },
         {
             "scope": "public",
-            "order": 28,
+            "order": 27,
             "method": "GET",
             "regex": "#^/group/(?P<slug>[^/]+)$#",
             "handler": {
@@ -464,11 +447,11 @@
                     "publicRequestContext"
                 ]
             },
-            "signature": "1393cfef7334454438e965e18c4a24ae4e8469c1"
+            "signature": "e88f3b1fbebdefa5b67eb25ebd3ef5ab17c1b29a"
         },
         {
             "scope": "public",
-            "order": 29,
+            "order": 28,
             "method": "GET",
             "regex": "#^/tag/(?P<slug>[^/]+)$#",
             "handler": {
@@ -481,11 +464,11 @@
                     "publicRequestContext"
                 ]
             },
-            "signature": "6096e009007e87f339b9169f525542a567d68e37"
+            "signature": "9597e2754c8e65b29de64378371a0e521d922d57"
         },
         {
             "scope": "public",
-            "order": 30,
+            "order": 29,
             "method": "GET",
             "regex": "#^/tag/(?P<slug>[^/]+)/(?P<page>[^/]+)$#",
             "handler": {
@@ -498,7 +481,24 @@
                     "publicRequestContext"
                 ]
             },
-            "signature": "cd28aa51cfe60ad3cc3d88ba5392a1243fb34967"
+            "signature": "0137d8502b5effd56c44d7c53be9b72ee6d085e6"
+        },
+        {
+            "scope": "public",
+            "order": 30,
+            "method": "POST",
+            "regex": "#^/forms/submit$#",
+            "handler": {
+                "type": "closure",
+                "file": "private/sys/Router/Public/PageRouter.php",
+                "line": 64,
+                "static_uses": [
+                    "input",
+                    "publicPageController",
+                    "publicRequestContext"
+                ]
+            },
+            "signature": "b2df0e1f1ba31c8c901c9ef662b88ea95220c4fd"
         },
         {
             "scope": "public",
@@ -508,12 +508,12 @@
             "handler": {
                 "type": "closure",
                 "file": "private/sys/Router/Public/PageRouter.php",
-                "line": 62,
+                "line": 77,
                 "static_uses": [
                     "publicPageController"
                 ]
             },
-            "signature": "740ca53811f5246ad165877c7fa8bbf0acfc11d2"
+            "signature": "37a5bce7437658a483d3f6faf627b8bf6aa55f9d"
         },
         {
             "scope": "public",
@@ -523,7 +523,7 @@
             "handler": {
                 "type": "closure",
                 "file": "private/sys/Router/Public/PageRouter.php",
-                "line": 67,
+                "line": 82,
                 "static_uses": [
                     "input",
                     "publicPageController",
@@ -531,7 +531,7 @@
                     "reservedPrefixes"
                 ]
             },
-            "signature": "0ad68fd640bf6f8d407a3badbc5e1b192310942c"
+            "signature": "7909c1843a4bd035994342feecb39cdc9ca67e74"
         }
     ]
 }

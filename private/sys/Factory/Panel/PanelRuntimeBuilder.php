@@ -2,14 +2,14 @@
 
 /**
  * RAVEN CMS
- * ~/private/sys/Router/Panel/PanelRuntimeBuilder.php
+ * ~/private/sys/Factory/Panel/PanelRuntimeBuilder.php
  * Panel runtime assembly on top of the shared core bootstrap.
  * Docs: https://raven.lanterns.io
  */
 
 declare(strict_types=1);
 
-namespace Raven\Core\Router\Panel;
+namespace Raven\Core\Factory\Panel;
 
 use Closure;
 use PDO;

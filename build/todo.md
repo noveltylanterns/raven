@@ -12,20 +12,6 @@ This is the default Build Mode backlog file. If the user asks about goals, unpat
 - `build/long.md` houses long-term project & roadmap goals, for optional secondary context. Do not load it on short-term build tasks.
 
 
-## Runtime Builder Refactor — Remaining Deferred Items
-
-The `sys/Factory` extraction and router consolidation refactor is otherwise complete and verified.
-
-- [ ] `Factory/Public/RuntimeInitializer.php` — deferred: public scope has no `initialize_public_runtime` bootstrap closure yet. Revisit when public runtime gains a lazy-init phase comparable to the panel's `initialize_panel_runtime`.
-
-
-## Follow-Up: Profiling / Optimization Phase
-
-Refactor wins that create room for targeted tuning (no urgency — open when ready to profile):
-
-- [ ] `panel/index.php` is now ~250 lines and clearly structured; profile per-request overhead of `SharedController::populateNavSession()` on high-extension installs to see if the extension nav loop is worth caching.
-
-
 
 
 

@@ -16,7 +16,7 @@ use Raven\Core\Factory\RuntimePayloadAssert;
 use Raven\Core\Router\RouteRequest;
 use Raven\Core\Router\Public\PublicRouter;
 use Raven\Lib\Transport\Request as HttpRequest;
-use Raven\Core\Router\Public\PublicRuntimeBuilder;
+use Raven\Core\Factory\Public\PublicRuntimeBuilder;
 use Raven\Core\Router\Public\PublicRouteDeps;
 use Raven\Core\Router\Public\PublicRoutePolicy;
 use Raven\Lib\Scheduler\Cron;
@@ -149,6 +149,15 @@ $publicFeedController = $requirePublicFactory('public_feed_controller');
 $publicTagController = $requirePublicFactory('public_tag_controller');
 /** @var callable(): object $publicRequestContext */
 $publicRequestContext = $requirePublicFactory('public_request_context');
+/** @var callable(): array<string, mixed> $initializePublicRuntime */
+$initializePublicRuntime = $requirePublicFactory('initialize_public_runtime');
+
+// Mirror the panel's two-phase bootstrap: skip the heavy init (extension services
+// priming, public_site_data population) for auth-helper paths that never need them.
+$shouldInitializePublicRuntime = !$isPublicAuthHelperPath($requestPath);
+if ($shouldInitializePublicRuntime) {
+    $rvn = $initializePublicRuntime();
+}
 
 $input = $rvn['input'];
 $routeConfig = PublicRoutePolicy::build($rvn['config'], $input);

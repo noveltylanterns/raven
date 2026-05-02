@@ -642,6 +642,25 @@ final class AuthService
     }
 
     /**
+     * Returns the combined panel permission bitmask for the current or specified user.
+     *
+     * Intended for cache-key derivation where one integer captures the full permission
+     * state without requiring individual bit checks. Returns 0 when no user is resolved.
+     *
+     * @param int|null $userId User ID to resolve; defaults to current session user.
+     * @return int Combined permission mask, or 0 when no user is active.
+     */
+    public function panelPermissionMask(?int $userId = null): int
+    {
+        $userId ??= $this->userId();
+        if ($userId === null) {
+            return 0;
+        }
+
+        return $this->permissionMaskForUser($userId);
+    }
+
+    /**
      * Returns true when current user has at least one panel permission bit in list.
      *
      * @param array<int, int> $bits

@@ -22,6 +22,7 @@ final class RuntimeContract
      * @var array<int, string>
      */
     private const REQUIRED_FACTORY_KEYS = [
+        'initialize_public_runtime',
         'public_page_controller',
         'public_auth_controller',
         'public_user_controller',

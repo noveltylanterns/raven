@@ -3,7 +3,7 @@
 /**
  * RAVEN CMS
  * ~/private/sys/Router/Public/PageRouter.php
- * Public homepage/page-route registration.
+ * Public homepage, page-route, and embedded-form route registration.
  * Docs: https://raven.lanterns.io
  */
 
@@ -16,14 +16,14 @@ use Raven\Core\Router\RouteHandler;
 use Raven\Lib\Security\InputSanitizer;
 
 /**
- * Registers homepage and channel-qualified page routes for the public runtime.
+ * Registers homepage, channel-qualified page, and embedded-form routes for the public runtime.
  */
 final class PageRouter
 {
     /**
-     * Registers page routes from one shared dependency payload.
+     * Registers page and embedded-form routes from one shared dependency payload.
      *
-     * @param RouteHandler $router Mutable router receiving page routes.
+     * @param RouteHandler $router Mutable router receiving page and form routes.
      * @param PublicRouteDeps $deps Shared public route dependency payload.
      * @return void
      */
@@ -39,9 +39,9 @@ final class PageRouter
     }
 
     /**
-     * Registers the public page route family.
+     * Registers the public page and embedded-form route family.
      *
-     * @param RouteHandler $router Mutable router receiving page routes.
+     * @param RouteHandler $router Mutable router receiving page and form routes.
      * @param callable(): object $publicPageController Lazy public-page controller factory.
      * @param callable(): object $publicRequestContext Lazy public request-context factory.
      * @param InputSanitizer $input Shared input normalizer for route params.
@@ -58,6 +58,21 @@ final class PageRouter
         $reservedPrefixes = is_array($routeConfig['reserved_prefixes'] ?? null)
             ? array_values($routeConfig['reserved_prefixes'])
             : [];
+
+        // Embedded-form submission; extension-agnostic and globally available to all
+        // public pages. Registered here since FormController was folded into PageController.
+        $router->add('POST', '/forms/submit', static function () use ($publicPageController, $publicRequestContext, $input): void {
+            $notFound = static function () use ($publicRequestContext): void {
+                $publicRequestContext()->notFound();
+            };
+            $type = RouteValidator::slugOrNotFound($input, (string) ($_POST['_rvn_form_type'] ?? ''), $notFound);
+            $slug = RouteValidator::slugOrNotFound($input, (string) ($_POST['_rvn_form_slug'] ?? ''), $notFound);
+            if ($type === null || $slug === null) {
+                return;
+            }
+
+            $publicPageController()->submitEmbeddedForm($type, $slug);
+        });
 
         $router->add('GET', '/', static function () use ($publicPageController): void {
             $publicPageController()->home();

@@ -1,6 +1,6 @@
 {
     "schema": 1,
-    "generated_at": "2026-05-02T12:19:53+00:00",
+    "generated_at": "2026-05-02T13:22:53+00:00",
     "scope": "panel",
     "routes": [
         {
@@ -1239,13 +1239,13 @@
             "regex": "#^/extensions$#",
             "handler": {
                 "type": "closure",
-                "file": "private/sys/Router/Panel/ExtensionManagerRouter.php",
+                "file": "private/sys/Router/Panel/ExtensionRouter.php",
                 "line": 42,
                 "static_uses": [
                     "panelExtensionController"
                 ]
             },
-            "signature": "61baad940bd0af0cc0dd5eaf9602eebd8f107f84"
+            "signature": "294de847d660a213e41b5b73f81fd72d1b9c4d3c"
         },
         {
             "scope": "panel",
@@ -1254,13 +1254,13 @@
             "regex": "#^/extensions/toggle$#",
             "handler": {
                 "type": "closure",
-                "file": "private/sys/Router/Panel/ExtensionManagerRouter.php",
+                "file": "private/sys/Router/Panel/ExtensionRouter.php",
                 "line": 46,
                 "static_uses": [
                     "panelExtensionController"
                 ]
             },
-            "signature": "deee19afad1bf8aeaaf79450450bb2f391b016e2"
+            "signature": "37b27f096d5976323d66ffd4304bf7ebb8eece19"
         },
         {
             "scope": "panel",
@@ -1269,13 +1269,13 @@
             "regex": "#^/extensions/upload$#",
             "handler": {
                 "type": "closure",
-                "file": "private/sys/Router/Panel/ExtensionManagerRouter.php",
+                "file": "private/sys/Router/Panel/ExtensionRouter.php",
                 "line": 50,
                 "static_uses": [
                     "panelExtensionController"
                 ]
             },
-            "signature": "251bfba00df6fb788578e27bee77832568101ed7"
+            "signature": "e868a57f902b4570350981a42a9e4ad36863d430"
         },
         {
             "scope": "panel",
@@ -1284,13 +1284,13 @@
             "regex": "#^/extensions/export$#",
             "handler": {
                 "type": "closure",
-                "file": "private/sys/Router/Panel/ExtensionManagerRouter.php",
+                "file": "private/sys/Router/Panel/ExtensionRouter.php",
                 "line": 54,
                 "static_uses": [
                     "panelExtensionController"
                 ]
             },
-            "signature": "72b4569fa7ac4cf462a757e946a0daefbc4a0384"
+            "signature": "de2ac52b63cd5e23e779317e39e9edb1f8baef90"
         },
         {
             "scope": "panel",
@@ -1299,13 +1299,13 @@
             "regex": "#^/extensions/create$#",
             "handler": {
                 "type": "closure",
-                "file": "private/sys/Router/Panel/ExtensionManagerRouter.php",
+                "file": "private/sys/Router/Panel/ExtensionRouter.php",
                 "line": 58,
                 "static_uses": [
                     "panelExtensionController"
                 ]
             },
-            "signature": "b06c19a80dfafa0353c21f5ba956b61acfeb6b80"
+            "signature": "4c4f89469d31c19f4572120e617169bc401ca56e"
         },
         {
             "scope": "panel",
@@ -1314,13 +1314,13 @@
             "regex": "#^/extensions/uninstall$#",
             "handler": {
                 "type": "closure",
-                "file": "private/sys/Router/Panel/ExtensionManagerRouter.php",
+                "file": "private/sys/Router/Panel/ExtensionRouter.php",
                 "line": 62,
                 "static_uses": [
                     "panelExtensionController"
                 ]
             },
-            "signature": "0aa95c78ea6c7a71824aee664761c49d18160a42"
+            "signature": "39c15c870b86f4b23ef0d8b652de2e13a50bde5c"
         },
         {
             "scope": "panel",
@@ -1329,13 +1329,13 @@
             "regex": "#^/extensions/permission$#",
             "handler": {
                 "type": "closure",
-                "file": "private/sys/Router/Panel/ExtensionManagerRouter.php",
+                "file": "private/sys/Router/Panel/ExtensionRouter.php",
                 "line": 66,
                 "static_uses": [
                     "panelExtensionController"
                 ]
             },
-            "signature": "d2bf671bda8906746388e8efcb0e35250926c3cc"
+            "signature": "cfd7cd9e59a238b922e03112abb46a72b12839d9"
         },
         {
             "scope": "panel",

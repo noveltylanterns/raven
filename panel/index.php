@@ -17,7 +17,7 @@ use Raven\Core\Factory\RuntimePayloadAssert;
 use Raven\Core\Router\RouteRequest;
 use Raven\Core\Router\Panel\PanelRouter;
 use Raven\Lib\Transport\Request as HttpRequest;
-use Raven\Core\Router\Panel\PanelRuntimeBuilder;
+use Raven\Core\Factory\Panel\PanelRuntimeBuilder;
 use Raven\Core\Router\Panel\PanelRouteDeps;
 use Raven\Lib\Parser\ConfigParser;
 use Raven\Lib\Parser\PanelParser;

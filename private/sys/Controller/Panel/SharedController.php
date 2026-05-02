@@ -418,6 +418,10 @@ final class SharedController
     /**
      * Populates all panel navigation session keys before route dispatch.
      *
+     * Skips all work on auth-helper paths (login, 2FA) and skips the expensive
+     * extension loop and channel DB query on subsequent requests where nothing
+     * that affects nav content has changed (session cache key match).
+     *
      * @param array<string, mixed> $rvn Runtime container (auth, root, panel_domain_content).
      * @param bool $categoryEnabled Whether category taxonomy routes are active.
      * @param bool $tagEnabled Whether tag taxonomy routes are active.
@@ -441,6 +445,33 @@ final class SharedController
         $hasBit = static function (int $bit) use ($rvn): bool {
             return $rvn['auth']->hasPanelPermissionBit($bit);
         };
+
+        // Auth-helper paths (login, 2FA) are pre-authentication — clear extension nav
+        // state and return before any permission checks or expensive work.
+        if (!$fullRuntime) {
+            $_SESSION['_raven_extension_permission_masks'] = [];
+            $_SESSION['_raven_enabled_extensions'] = [];
+            $_SESSION['_raven_nav_extensions'] = [];
+            $_SESSION['_raven_nav_modules'] = [];
+            $_SESSION['_raven_nav_system_extensions'] = [];
+            $_SESSION['_raven_nav_page_create_channels'] = [];
+            return;
+        }
+
+        // Cache key guard: skip all session writes, filesystem stats, and the channel
+        // DB query when nothing that affects nav content has changed since the last
+        // request. The key captures the full permission state, the active extension set,
+        // and the category/tag flags. Channel list staleness is accepted — the nav
+        // shortcuts self-heal on the next permission or extension change.
+        $navCacheKey = md5(implode('|', [
+            implode(',', array_keys($enabledExtensionManifests)),
+            (string) $rvn['auth']->panelPermissionMask(),
+            $categoryEnabled ? '1' : '0',
+            $tagEnabled ? '1' : '0',
+        ]));
+        if (($_SESSION['_raven_nav_cache_key'] ?? '') === $navCacheKey) {
+            return;
+        }
 
         $_SESSION['_raven_nav_stock'] = [
             'content' => [
@@ -468,16 +499,6 @@ final class SharedController
             ],
         ];
 
-        if (!$fullRuntime) {
-            $_SESSION['_raven_extension_permission_masks'] = [];
-            $_SESSION['_raven_enabled_extensions'] = [];
-            $_SESSION['_raven_nav_extensions'] = [];
-            $_SESSION['_raven_nav_modules'] = [];
-            $_SESSION['_raven_nav_system_extensions'] = [];
-            $_SESSION['_raven_nav_page_create_channels'] = [];
-            return;
-        }
-
         $_SESSION['_raven_extension_permission_masks'] = $extensionPermissionCatalog;
         $_SESSION['_raven_enabled_extensions'] = array_keys($enabledExtensions);
 
@@ -490,6 +511,8 @@ final class SharedController
         );
 
         self::populatePageCreateChannels($rvn, $hasBit);
+
+        $_SESSION['_raven_nav_cache_key'] = $navCacheKey;
     }
 
     /**

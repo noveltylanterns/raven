@@ -39,7 +39,6 @@ final class PublicRouter
     public function register(PublicRouteDeps $deps): void
     {
         AuthRouter::registerWithDeps($this->router, $deps);
-        FormRouter::registerWithDeps($this->router, $deps);
         ExtensionRouter::registerWithDeps($this->router, $deps);
         CategoryRouter::registerWithDeps($this->router, $deps);
         ChannelRouter::registerWithDeps($this->router, $deps);

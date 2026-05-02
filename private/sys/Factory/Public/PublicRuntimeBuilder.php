@@ -2,45 +2,25 @@
 
 /**
  * RAVEN CMS
- * ~/private/sys/Router/Public/PublicRuntimeBuilder.php
+ * ~/private/sys/Factory/Public/PublicRuntimeBuilder.php
  * Public runtime assembly on top of the shared core bootstrap.
  * Docs: https://raven.lanterns.io
  */
 
 declare(strict_types=1);
 
-namespace Raven\Core\Router\Public;
+namespace Raven\Core\Factory\Public;
 
 use Closure;
 use PDO;
-use Raven\Core\Controller\Public\AuthController as PublicAuthController;
-use Raven\Core\Controller\Public\CategoryController as PublicCategoryController;
-use Raven\Core\Controller\Public\ChannelController as PublicChannelController;
-use Raven\Core\Controller\Public\FeedController as PublicFeedController;
-use Raven\Core\Controller\Public\GroupController as PublicGroupController;
-use Raven\Core\Controller\Public\PageController as PublicPageController;
-use Raven\Core\Controller\Public\SharedController;
-use Raven\Core\Controller\Public\TagController as PublicTagController;
-use Raven\Core\Controller\Public\UserController as PublicUserController;
 use Raven\Core\Factory\Public\ControllerFactories;
 use Raven\Core\Factory\Public\DomainFactories;
 use Raven\Core\Factory\Public\RepoFactories;
-use Raven\Core\Repository\ChannelRead;
-use Raven\Core\Repository\GroupRead;
-use Raven\Core\Repository\InviteRead;
-use Raven\Core\Repository\InviteWrite;
-use Raven\Core\Repository\MediaRead;
-use Raven\Core\Repository\PageRead;
-use Raven\Core\Repository\RedirectRead;
-use Raven\Core\Repository\UserRead;
-use Raven\Core\Repository\UserWrite;
+use Raven\Core\Factory\Public\RuntimeInitializer;
 use Raven\Core\Renderer;
 use Raven\Lib\Auth\AuthService;
 use Raven\Lib\Extension\ExtensionEditorCatalogService;
-use Raven\Lib\Parser\CategoryRepoParser;
 use Raven\Lib\Parser\ConfigParser;
-use Raven\Lib\Parser\TagRepoParser;
-use Raven\Lib\Parser\TaxonomyRepoParser;
 use Raven\Lib\View\Public\ThemeCatalog;
 use RuntimeException;
 
@@ -65,30 +45,13 @@ final class PublicRuntimeBuilder
             return $rvn;
         }
 
-        $publicAuthController = null;
-        $publicPageController = null;
-        $publicFeedController = null;
-        $publicCategoryController = null;
-        $publicChannelController = null;
-        $publicGroupController = null;
-        $publicTagController = null;
-        $publicUserController = null;
-        $publicSharedController = null;
+        // These three are captured by reference in memoize closures below so they must be
+        // declared here; all other null-init scaffolding from earlier extraction passes has
+        // been removed since controller and repo wiring now lives in ControllerFactories and
+        // RepoFactories respectively.
         $extensionServices = null;
-        $inviteRead = null;
-        $inviteWrite = null;
-        $categoryLookup = null;
-        $taxonomyLookup = null;
-        $tagLookup = null;
-        $channelRead = null;
         $extensionEditorCatalogService = null;
-        $groupRead = null;
-        $mediaRead = null;
-        $pageRead = null;
-        $redirectRead = null;
         $themeCatalogService = null;
-        $userRead = null;
-        $userWrite = null;
 
         $rvn['view'] = new Renderer((string) $rvn['root'] . '/private/tpl');
         $categoryEnabled = ConfigParser::bool($rvn['config']->get('category.enabled', false), false);
@@ -274,6 +237,15 @@ final class PublicRuntimeBuilder
             $publicAuthDomain,
             $publicFormDomain,
             $extensionServicesProvider
+        );
+
+        RuntimeInitializer::register(
+            $rvn,
+            $publicContentDomain,
+            $publicAuthDomain,
+            $extensionServicesProvider,
+            $categoryEnabled,
+            $tagEnabled
         );
 
         return $rvn;
