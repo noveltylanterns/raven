@@ -7,7 +7,7 @@ namespace Raven\Lib\Auth;
 use Raven\Core\Config;
 use Raven\Lib\Auth\AuthService;
 use Raven\Lib\Security\InputSanitizer;
-use Raven\Lib\Security\TwoFactorMethodKey;
+use Raven\Lib\Auth\TwoFactorMethodKey;
 use Raven\Lib\Security\WebAuthn;
 
 /**

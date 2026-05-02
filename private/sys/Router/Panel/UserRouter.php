@@ -33,6 +33,7 @@ final class UserRouter
             $router,
             $deps->panelUserListController,
             $deps->panelUserEditController,
+            $deps->panelUserInviteController,
             $deps->input,
             $deps->renderNotFound
         );
@@ -43,7 +44,8 @@ final class UserRouter
      *
      * @param RouteHandler $router Mutable router receiving user routes.
      * @param callable(): object $panelUserListController Lazy user list controller factory for GET /user and GET /user/invites.
-     * @param callable(): object $panelUserEditController Lazy user edit controller factory for create/edit/save/delete and invite write routes.
+     * @param callable(): object $panelUserEditController Lazy user edit controller factory for create/edit/save/delete routes.
+     * @param callable(): object $panelUserInviteController Lazy user invite controller factory for invite write routes.
      * @param InputSanitizer $input Shared input normalizer for route params.
      * @param callable(): void $renderNotFound Renders a 404 response when a route param is invalid.
      * @return void
@@ -52,6 +54,7 @@ final class UserRouter
         RouteHandler $router,
         callable $panelUserListController,
         callable $panelUserEditController,
+        callable $panelUserInviteController,
         InputSanitizer $input,
         callable $renderNotFound
     ): void {
@@ -84,16 +87,16 @@ final class UserRouter
             $panelUserListController()->userInvites();
         });
 
-        $router->add('POST', '/user/invites/create', static function () use ($panelUserEditController): void {
-            $panelUserEditController()->userInvitesCreate($_POST);
+        $router->add('POST', '/user/invites/create', static function () use ($panelUserInviteController): void {
+            $panelUserInviteController()->userInvitesCreate($_POST);
         });
 
-        $router->add('POST', '/user/invites/generate', static function () use ($panelUserEditController): void {
-            $panelUserEditController()->userInvitesGenerate($_POST);
+        $router->add('POST', '/user/invites/generate', static function () use ($panelUserInviteController): void {
+            $panelUserInviteController()->userInvitesGenerate($_POST);
         });
 
-        $router->add('POST', '/user/invites/delete', static function () use ($panelUserEditController): void {
-            $panelUserEditController()->userInvitesDelete($_POST);
+        $router->add('POST', '/user/invites/delete', static function () use ($panelUserInviteController): void {
+            $panelUserInviteController()->userInvitesDelete($_POST);
         });
     }
 }

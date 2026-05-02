@@ -2,7 +2,10 @@
 
 declare(strict_types=1);
 
-namespace Raven\Lib\Security;
+namespace Raven\Lib\Auth;
+
+use Raven\Lib\Security\RecoveryPhrase;
+use Raven\Lib\Security\Totp;
 
 /**
  * Shared key format helpers for interactive 2FA method selection.

@@ -32,7 +32,7 @@
 /** @var string|null $flashSuccess */
 /** @var string|null $error */
 
-use Raven\Lib\Auth\Panel\PanelAccess;
+use Raven\Lib\Auth\PanelAccess;
 use Raven\Lib\View\Panel\Footer;
 use Raven\Lib\View\Panel\Header;
 use Raven\Lib\View\Panel\Toolbar;

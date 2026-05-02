@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Raven\Lib\Auth;
 
 use Raven\Lib\Security\TotpCipher;
-use Raven\Lib\Security\TwoFactorMethodNormalizer;
+use Raven\Lib\Auth\TwoFactorMethodNormalizer;
 
 /**
  * Shared codec for auth-adjacent JSON payload persistence.

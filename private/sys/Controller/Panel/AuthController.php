@@ -3,7 +3,7 @@
 /**
  * RAVEN CMS
  * ~/private/sys/Controller/Panel/AuthController.php
- * Controller for handling Raven HTTP request flow.
+ * Panel auth controller for login, 2FA, and logout routes.
  * Docs: https://raven.lanterns.io
  */
 
@@ -136,15 +136,13 @@ final class AuthController
     {
         $userId = $this->auth->userId();
         if ($userId === null || !$this->auth->canAccessPanel($userId)) {
-            $this->auth->logout();
-            $this->loginUiState()->clearAll();
+            $this->logoutPanelSession();
             Redirect::redirect($this->panelUrl('/login'));
         }
 
         $viewState = $this->loginChallengeWorkflowService()->buildViewState($this->auth, $this->loginUiState());
         if (!(bool) ($viewState['ok'] ?? false)) {
-            $this->auth->logout();
-            $this->loginUiState()->clearAll();
+            $this->logoutPanelSession();
             Redirect::redirect($this->panelUrl('/login'));
         }
 
@@ -176,8 +174,7 @@ final class AuthController
 
         $result = $this->loginChallengeWorkflowService()->verifyCodeChallenge($this->auth, $this->loginUiState(), $post);
         if (($result['status'] ?? '') === 'expired') {
-            $this->auth->logout();
-            $this->loginUiState()->clearAll();
+            $this->logoutPanelSession();
             $this->flash('error', (string) ($result['message'] ?? 'Your login session expired. Please log in again.'));
             Redirect::redirect($this->panelUrl('/login'));
         }
@@ -207,8 +204,7 @@ final class AuthController
 
         $result = $this->loginChallengeWorkflowService()->selectMethod($this->auth, $this->loginUiState(), $post);
         if (($result['status'] ?? '') === 'expired') {
-            $this->auth->logout();
-            $this->loginUiState()->clearAll();
+            $this->logoutPanelSession();
             $this->flash('error', (string) ($result['message'] ?? 'Your login session expired. Please log in again.'));
             Redirect::redirect($this->panelUrl('/login'));
         }
@@ -283,9 +279,25 @@ final class AuthController
             return;
         }
 
+        $this->logoutPanelSession();
+        Redirect::redirect($this->panelUrl('/login'));
+    }
+
+    /**
+     * Logs the current user out and clears panel-only session identity caches.
+     *
+     * @return void
+     */
+    private function logoutPanelSession(): void
+    {
         $this->auth->logout();
         $this->loginUiState()->clearAll();
-        Redirect::redirect($this->panelUrl('/login'));
+        unset($_SESSION['rvn-panel-identity']);
+        unset($_SESSION['_raven_can_manage_content']);
+        unset($_SESSION['_raven_can_manage_taxonomy']);
+        unset($_SESSION['_raven_can_manage_users']);
+        unset($_SESSION['_raven_can_manage_groups']);
+        unset($_SESSION['_raven_can_manage_configuration']);
     }
 
     /**

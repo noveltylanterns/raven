@@ -2,22 +2,21 @@
 
 /**
  * RAVEN CMS
- * ~/private/lib/Auth/Panel/PanelSessionGuard.php
+ * ~/private/lib/Auth/SessionGuard.php
  * Shared panel login gate and session-identity synchronizer.
  * Docs: https://raven.lanterns.io
  */
 
 declare(strict_types=1);
 
-namespace Raven\Lib\Auth\Panel;
+namespace Raven\Lib\Auth;
 
-use Raven\Lib\Auth\AuthService;
 use Raven\Lib\Transport\Redirect;
 
 /**
  * Shared panel-login guard and session identity synchronization helper.
  */
-final class PanelSessionGuard
+final class SessionGuard
 {
     /**
      * @param callable(): void $renderPublicNotFound

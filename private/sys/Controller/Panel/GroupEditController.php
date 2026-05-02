@@ -14,8 +14,8 @@ namespace Raven\Core\Controller\Panel;
 use Closure;
 use Raven\Core\Repository\GroupRead;
 use Raven\Core\Repository\GroupWrite;
-use Raven\Lib\Auth\Panel\PanelAccess;
-use Raven\Lib\Auth\Panel\PanelPermissionDefinitionCatalog;
+use Raven\Lib\Auth\PanelAccess;
+use Raven\Lib\Auth\PermissionDefinitionCatalog;
 use Raven\Lib\Media\Panel\TaxonomyImageService;
 use Raven\Lib\Parser\GroupRouteParser;
 use Raven\Lib\Security\InputSanitizer;
@@ -42,7 +42,7 @@ final class GroupEditController
     private EditorWrapper $editor;
     private TaxonomyImageService $taxonomyImageService;
     private MediaScribe $mediaScribe;
-    private PanelPermissionDefinitionCatalog $panelPermissionDefinitionCatalog;
+    private PermissionDefinitionCatalog $permissionDefinitionCatalog;
     private Upload $uploadFileSetNormalizer;
     private Closure $panelPermissionMapProvider;
 
@@ -56,7 +56,7 @@ final class GroupEditController
      * @param EditorWrapper $editor Shared panel editor utility methods.
      * @param TaxonomyImageService $taxonomyImageService Read-side taxonomy image config and path helper.
      * @param MediaScribe $mediaScribe Write-side meta-image upload and cleanup helper.
-     * @param PanelPermissionDefinitionCatalog $panelPermissionDefinitionCatalog Shared panel permission-definition catalog.
+     * @param PermissionDefinitionCatalog $permissionDefinitionCatalog Shared panel permission-definition catalog.
      * @param Upload $uploadFileSetNormalizer Shared upload payload flattener.
      * @param callable(): array<string, array<string, mixed>> $panelPermissionMapProvider Session-scoped extension permission map provider.
      * @return void
@@ -71,7 +71,7 @@ final class GroupEditController
         EditorWrapper $editor,
         TaxonomyImageService $taxonomyImageService,
         MediaScribe $mediaScribe,
-        PanelPermissionDefinitionCatalog $panelPermissionDefinitionCatalog,
+        PermissionDefinitionCatalog $permissionDefinitionCatalog,
         Upload $uploadFileSetNormalizer,
         callable $panelPermissionMapProvider
     ) {
@@ -84,7 +84,7 @@ final class GroupEditController
         $this->editor = $editor;
         $this->taxonomyImageService = $taxonomyImageService;
         $this->mediaScribe = $mediaScribe;
-        $this->panelPermissionDefinitionCatalog = $panelPermissionDefinitionCatalog;
+        $this->permissionDefinitionCatalog = $permissionDefinitionCatalog;
         $this->uploadFileSetNormalizer = $uploadFileSetNormalizer;
         $this->panelPermissionMapProvider = Closure::fromCallable($panelPermissionMapProvider);
     }
@@ -405,7 +405,7 @@ final class GroupEditController
      */
     private function permissionDefinitions(): array
     {
-        return $this->panelPermissionDefinitionCatalog->definitions(
+        return $this->permissionDefinitionCatalog->definitions(
             fn (): array => $this->currentPanelPermissionMap()
         );
     }
@@ -417,7 +417,7 @@ final class GroupEditController
      */
     private function extensionPermissionBitsMask(): int
     {
-        return $this->panelPermissionDefinitionCatalog->extensionBitsMask(
+        return $this->permissionDefinitionCatalog->extensionBitsMask(
             fn (): array => $this->currentPanelPermissionMap()
         );
     }

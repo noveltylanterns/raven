@@ -35,12 +35,12 @@ use Raven\Core\Controller\Panel\TagListController;
 use Raven\Core\Controller\Panel\ThemeController;
 use Raven\Core\Controller\Panel\UpdateController;
 use Raven\Core\Controller\Panel\UserEditController;
+use Raven\Core\Controller\Panel\UserInviteController;
 use Raven\Core\Controller\Panel\UserListController;
 use Raven\Lib\Auth\AuthService;
 use Raven\Lib\Auth\LoginIdentifierResolver;
-use Raven\Lib\Auth\Panel\PanelInvitePolicyService;
-use Raven\Lib\Auth\Panel\PanelPermissionDefinitionCatalog;
-use Raven\Lib\Auth\Panel\PanelTwoFactorPreferencesService;
+use Raven\Lib\Auth\PermissionDefinitionCatalog;
+use Raven\Lib\Auth\TwoFactorPreferences;
 use Raven\Lib\Auth\PasswordChangePolicy;
 use Raven\Lib\Auth\SessionFlash;
 use Raven\Lib\Extension\Panel\ExtensionCatalogService;
@@ -505,6 +505,7 @@ final class ControllerFactories
     ): void {
         $userListController = null;
         $userEditController = null;
+        $userInviteController = null;
         $groupListController = null;
         $groupEditController = null;
         $preferencesController = null;
@@ -544,7 +545,7 @@ final class ControllerFactories
 
         /**
          * Builds the user edit controller on first use.
-         * Owns user create/edit, save, delete, and invite token create/generate/delete routes.
+         * Owns user create/edit, save, and delete routes.
          */
         $rvn['panel_user_edit_controller'] = static function () use (&$userEditController, &$rvn, $panelUserDomain): UserEditController {
             if ($userEditController instanceof UserEditController) {
@@ -562,22 +563,42 @@ final class ControllerFactories
                 $userDomain['group_read'],
                 $userDomain['user_read'],
                 $userDomain['user_write'],
-                $userDomain['invite_write'],
-                new SessionFlash('_raven_flash_list'),
                 new GroupRouteParser($rvn['config'], $rvn['input']),
-                new PanelInvitePolicyService($rvn['input']),
                 new LoginIdentifierResolver(),
                 $rvn['panel_editor_tabs'](),
                 $rvn['panel_editor'](),
                 $rvn['panel_editor_blocks'](),
                 new MediaConfigService($rvn['config']),
                 new UserProfileParser($rvn['input']),
-                new PanelTwoFactorPreferencesService($rvn['input']),
+                new TwoFactorPreferences($rvn['input']),
                 new UserMediaScribe((string) $rvn['root']),
                 new UserMediaPathService()
             );
 
             return $userEditController;
+        };
+
+        /**
+         * Builds the user invite controller on first use.
+         * Owns invite token create/generate/delete routes.
+         */
+        $rvn['panel_user_invite_controller'] = static function () use (&$userInviteController, &$rvn, $panelUserDomain): UserInviteController {
+            if ($userInviteController instanceof UserInviteController) {
+                return $userInviteController;
+            }
+
+            /** @var callable(): SharedController $requestContextFactory */
+            $requestContextFactory = $rvn['panel_request_context'];
+            $userDomain = $panelUserDomain();
+            $userInviteController = new UserInviteController(
+                $requestContextFactory(),
+                $rvn['input'],
+                $userDomain['invite_write'],
+                new SessionFlash('_raven_flash_list'),
+                new GroupRouteParser($rvn['config'], $rvn['input'])
+            );
+
+            return $userInviteController;
         };
 
         /**
@@ -624,7 +645,7 @@ final class ControllerFactories
                 $rvn['panel_editor'](),
                 new TaxonomyImageService($rvn['config']),
                 new MediaScribe($rvn['db'], $rvn['driver'], $rvn['prefix'], $rvn['config'], (string) $rvn['root']),
-                new PanelPermissionDefinitionCatalog(),
+                new PermissionDefinitionCatalog(),
                 new Upload(),
                 static function () use (&$rvn): array {
                     $provider = $rvn['panel_permission_map_provider'] ?? null;
@@ -661,7 +682,7 @@ final class ControllerFactories
                 $rvn['panel_editor_blocks'](),
                 new MediaConfigService($rvn['config']),
                 new UserProfileParser($rvn['input']),
-                new PanelTwoFactorPreferencesService($rvn['input']),
+                new TwoFactorPreferences($rvn['input']),
                 new UserMediaScribe((string) $rvn['root']),
                 new UserMediaPathService(),
                 new PasswordChangePolicy()

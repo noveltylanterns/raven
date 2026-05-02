@@ -1,22 +1,39 @@
 <?php
 
+/**
+ * RAVEN CMS
+ * ~/private/lib/Auth/AccessCatalog.php
+ * Stock panel permission-route/group catalog definitions.
+ * Docs: https://raven.lanterns.io
+ */
+
 declare(strict_types=1);
 
-namespace Raven\Lib\Auth\Panel;
-
-use Raven\Lib\Auth\Panel\PanelAccess;
+namespace Raven\Lib\Auth;
 
 /**
  * Holds stock panel permission-route/group catalog definitions.
  */
-final class PanelAccessCatalog
+final class AccessCatalog
 {
+    /**
+     * @var array<string, array{label: string, view: int, create?: int, edit?: int, delete?: int, uninstall?: int}>|null
+     */
+    private static ?array $stockPanelRoutePermissionsCache = null;
+
+    /** @var array<int, int>|null */
+    private static ?array $allStockPanelBitsCache = null;
+
     /**
      * @return array<string, array{label: string, view: int, create?: int, edit?: int, delete?: int, uninstall?: int}>
      */
     public static function stockPanelRoutePermissions(): array
     {
-        return [
+        if (is_array(self::$stockPanelRoutePermissionsCache)) {
+            return self::$stockPanelRoutePermissionsCache;
+        }
+
+        self::$stockPanelRoutePermissionsCache = [
             'page' => [
                 'label' => 'Pages',
                 'view' => PanelAccess::PAGES_VIEW,
@@ -106,6 +123,8 @@ final class PanelAccessCatalog
                 'view' => PanelAccess::MANAGE_CONFIGURATION,
             ],
         ];
+
+        return self::$stockPanelRoutePermissionsCache;
     }
 
     /**
@@ -123,6 +142,10 @@ final class PanelAccessCatalog
      */
     public static function allStockPanelBits(): array
     {
+        if (is_array(self::$allStockPanelBitsCache)) {
+            return self::$allStockPanelBitsCache;
+        }
+
         $bits = [];
         foreach (self::stockPanelRoutePermissions() as $permissionRow) {
             foreach (['view', 'create', 'edit', 'delete', 'uninstall'] as $action) {
@@ -133,7 +156,8 @@ final class PanelAccessCatalog
             }
         }
 
-        return $bits;
+        self::$allStockPanelBitsCache = $bits;
+        return self::$allStockPanelBitsCache;
     }
 
     /**

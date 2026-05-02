@@ -2,17 +2,17 @@
 
 declare(strict_types=1);
 
-namespace Raven\Lib\Auth\Panel;
+namespace Raven\Lib\Auth;
 
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\Security\RecoveryPhrase;
 use Raven\Lib\Security\Totp;
-use Raven\Lib\Security\TwoFactorMethodNormalizer;
+use Raven\Lib\Auth\TwoFactorMethodNormalizer;
 
 /**
  * Shared panel preferences helpers for user-managed 2FA method payloads.
  */
-final class PanelTwoFactorPreferencesService
+final class TwoFactorPreferences
 {
     private InputSanitizer $input;
 

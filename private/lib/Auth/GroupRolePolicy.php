@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Raven\Lib\Auth;
 
-use Raven\Lib\Auth\Panel\PanelAccess;
+use Raven\Lib\Auth\PanelAccess;
 
 /**
  * Shared group-role slug and stock-role permission policy helpers.

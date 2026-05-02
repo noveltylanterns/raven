@@ -12,9 +12,7 @@ declare(strict_types=1);
 namespace Raven\Lib\Auth;
 
 use PDO;
-use Raven\Lib\Auth\AuthAccessGateService;
 use Raven\Lib\Auth\AuthGroupMembershipService;
-use Raven\Lib\Auth\AuthIdentityLookupService;
 use Raven\Lib\Auth\AuthPayloadCodec;
 use Raven\Lib\Auth\ContactProfileNormalizer;
 use Raven\Lib\Auth\LoginChallengeState;
@@ -23,7 +21,7 @@ use Raven\Lib\Auth\LoginThrottleService;
 use Raven\Lib\Auth\PermissionMaskService;
 use Raven\Lib\Auth\UserSecurityProfileService;
 use Raven\Lib\Database\TableNameResolver;
-use Raven\Lib\Security\TwoFactorMethodNormalizer;
+use Raven\Lib\Auth\TwoFactorMethodNormalizer;
 use Raven\Lib\Scribe\AuthProfileScribe;
 use RuntimeException;
 
@@ -51,10 +49,8 @@ final class AuthService
     private AuthPayloadCodec $authPayloadCodec;
     private PermissionMaskService $permissionMaskService;
     private UserSecurityProfileService $securityProfiles;
-    private AuthIdentityLookupService $identityLookup;
     private AuthGroupMembershipService $groupMembership;
     private LoginChallengeState $twoFactorSessionState;
-    private AuthAccessGateService $authAccessGateService;
     private LoginEmailChallenge $loginEmailChallenge;
     private AuthProfileScribe $authProfileScribe;
 
@@ -85,10 +81,8 @@ final class AuthService
         $this->authPayloadCodec = new AuthPayloadCodec(new ContactProfileNormalizer());
         $this->permissionMaskService = new PermissionMaskService($rvnDb, $driver, $prefix);
         $this->securityProfiles = new UserSecurityProfileService();
-        $this->identityLookup = new AuthIdentityLookupService($authDb, $driver, $this->prefix);
         $this->groupMembership = new AuthGroupMembershipService($rvnDb, $driver, $prefix);
         $this->twoFactorSessionState = new LoginChallengeState();
-        $this->authAccessGateService = new AuthAccessGateService();
         $this->loginEmailChallenge = new LoginEmailChallenge();
         $this->authProfileScribe = new AuthProfileScribe($authDb, $driver, $this->prefix);
 
@@ -189,7 +183,20 @@ final class AuthService
      */
     private function emailByUsername(string $username): ?string
     {
-        return $this->identityLookup->emailByUsername($username);
+        $stmt = $this->authDb->prepare(
+            'SELECT email
+             FROM ' . $this->authTable('users') . '
+             WHERE username = :username
+             LIMIT 1'
+        );
+        $stmt->execute([':username' => $username]);
+
+        $email = $stmt->fetchColumn();
+        if ($email === false || !is_string($email) || $email === '') {
+            return null;
+        }
+
+        return $email;
     }
 
     /**
@@ -198,8 +205,6 @@ final class AuthService
     public function logout(): void
     {
         $this->auth->logOut();
-        // Clear panel identity cache used by shared layout headings.
-        unset($_SESSION['rvn-panel-identity']);
         $this->twoFactorSessionState->clearAll();
         $this->clearPermissionCaches();
     }
@@ -620,7 +625,7 @@ final class AuthService
         }
 
         $mask = $this->permissionMaskForUser($userId);
-        return $this->authAccessGateService->canAccessPanel($mask);
+        return PanelAccess::canLoginPanel($mask);
     }
 
     /**
@@ -638,7 +643,15 @@ final class AuthService
         }
 
         $mask = $this->permissionMaskForUser($userId);
-        return $this->authAccessGateService->hasPanelPermissionBit($mask, $bit, $this->isAdmin($userId));
+        if (!PanelAccess::canLoginPanel($mask)) {
+            return false;
+        }
+
+        if ($this->isAdmin($userId)) {
+            return true;
+        }
+
+        return PanelAccess::hasPanelPermissionBit($mask, $bit);
     }
 
     /**
@@ -673,7 +686,15 @@ final class AuthService
         }
 
         $mask = $this->permissionMaskForUser($userId);
-        return $this->authAccessGateService->hasAnyPanelPermissionBit($mask, $bits, $this->isAdmin($userId));
+        if (!PanelAccess::canLoginPanel($mask)) {
+            return false;
+        }
+
+        if ($this->isAdmin($userId)) {
+            return true;
+        }
+
+        return PanelAccess::hasAnyPanelPermissionBit($mask, $bits);
     }
 
     /**
@@ -686,7 +707,7 @@ final class AuthService
             return false;
         }
 
-        return $this->authAccessGateService->canManageUsers($this->permissionMaskForUser($userId));
+        return PanelAccess::canManageUsers($this->permissionMaskForUser($userId));
     }
 
     /**
@@ -699,7 +720,7 @@ final class AuthService
             return false;
         }
 
-        return $this->authAccessGateService->canManageGroups($this->permissionMaskForUser($userId));
+        return PanelAccess::canManageGroups($this->permissionMaskForUser($userId));
     }
 
     /**
@@ -712,7 +733,7 @@ final class AuthService
             return false;
         }
 
-        return $this->authAccessGateService->canManageContent($this->permissionMaskForUser($userId));
+        return PanelAccess::canManageContent($this->permissionMaskForUser($userId));
     }
 
     /**
@@ -727,7 +748,7 @@ final class AuthService
             return false;
         }
 
-        return $this->authAccessGateService->canManageConfiguration($this->permissionMaskForUser($userId));
+        return PanelAccess::canManageConfiguration($this->permissionMaskForUser($userId));
     }
 
     /**
@@ -740,7 +761,7 @@ final class AuthService
             return false;
         }
 
-        return $this->authAccessGateService->canManageTaxonomy($this->permissionMaskForUser($userId));
+        return PanelAccess::canManageTaxonomy($this->permissionMaskForUser($userId));
     }
 
     /**
@@ -749,7 +770,7 @@ final class AuthService
     public function canViewPublicSite(?int $userId = null): bool
     {
         if ($userId !== null) {
-            return $this->authAccessGateService->canViewPublicSite($this->permissionMaskForUser($userId));
+            return PanelAccess::canViewPublicSite($this->permissionMaskForUser($userId));
         }
 
         if ($this->isLoggedIn()) {
@@ -758,10 +779,10 @@ final class AuthService
                 return false;
             }
 
-            return $this->authAccessGateService->canViewPublicSite($this->permissionMaskForUser($resolvedUserId));
+            return PanelAccess::canViewPublicSite($this->permissionMaskForUser($resolvedUserId));
         }
 
-        return $this->authAccessGateService->canViewPublicSite($this->permissionMaskForGuest());
+        return PanelAccess::canViewPublicSite($this->permissionMaskForGuest());
     }
 
     /**
@@ -774,7 +795,7 @@ final class AuthService
             return false;
         }
 
-        return $this->authAccessGateService->canViewPrivateSite($this->permissionMaskForUser($userId));
+        return PanelAccess::canViewPrivateSite($this->permissionMaskForUser($userId));
     }
 
     /**
@@ -787,7 +808,8 @@ final class AuthService
             return false;
         }
 
-        return $this->authAccessGateService->canViewDisabledSite($this->permissionMaskForUser($userId));
+        $mask = $this->permissionMaskForUser($userId);
+        return PanelAccess::canLoginPanel($mask) && PanelAccess::canViewDisabledSite($mask);
     }
 
     /**
@@ -878,7 +900,23 @@ final class AuthService
      */
     private function usernameExistsForOtherUser(int $userId, string $username): bool
     {
-        return $this->identityLookup->usernameExistsForOtherUser($userId, $username);
+        if (trim($username) === '') {
+            return false;
+        }
+
+        $stmt = $this->authDb->prepare(
+            'SELECT 1
+             FROM ' . $this->authTable('users') . '
+             WHERE username = :username
+               AND id <> :id
+             LIMIT 1'
+        );
+        $stmt->execute([
+            ':username' => $username,
+            ':id' => $userId,
+        ]);
+
+        return $stmt->fetchColumn() !== false;
     }
 
     /**
@@ -886,7 +924,19 @@ final class AuthService
      */
     private function emailExistsForOtherUser(int $userId, string $email): bool
     {
-        return $this->identityLookup->emailExistsForOtherUser($userId, $email);
+        $stmt = $this->authDb->prepare(
+            'SELECT 1
+             FROM ' . $this->authTable('users') . '
+             WHERE email = :email
+               AND id <> :id
+             LIMIT 1'
+        );
+        $stmt->execute([
+            ':email' => $email,
+            ':id' => $userId,
+        ]);
+
+        return $stmt->fetchColumn() !== false;
     }
 
     /**

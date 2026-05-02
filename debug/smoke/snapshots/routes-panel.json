@@ -1,6 +1,6 @@
 {
     "schema": 1,
-    "generated_at": "2026-05-02T13:22:53+00:00",
+    "generated_at": "2026-05-02T17:26:25+00:00",
     "scope": "panel",
     "routes": [
         {
@@ -711,12 +711,12 @@
             "handler": {
                 "type": "closure",
                 "file": "private/sys/Router/Panel/UserRouter.php",
-                "line": 58,
+                "line": 61,
                 "static_uses": [
                     "panelUserListController"
                 ]
             },
-            "signature": "91de4787a68e5208e9887a5d83155e311dbd6e0c"
+            "signature": "d25d4267dd9c111493be59aaf18f3fbdf27bd186"
         },
         {
             "scope": "panel",
@@ -726,12 +726,12 @@
             "handler": {
                 "type": "closure",
                 "file": "private/sys/Router/Panel/UserRouter.php",
-                "line": 62,
+                "line": 65,
                 "static_uses": [
                     "panelUserEditController"
                 ]
             },
-            "signature": "4d611b9615192c5647f7799de5d28df39dcd5dc2"
+            "signature": "a6929c79f3d723687c9e85c699d6780b5e5d60b2"
         },
         {
             "scope": "panel",
@@ -741,14 +741,14 @@
             "handler": {
                 "type": "closure",
                 "file": "private/sys/Router/Panel/UserRouter.php",
-                "line": 66,
+                "line": 69,
                 "static_uses": [
                     "input",
                     "panelUserEditController",
                     "renderNotFound"
                 ]
             },
-            "signature": "1701f1b39c0191aaf6a3ae4a814817506717acc5"
+            "signature": "b93e1fc52ab669591292a83a76a09ef7fb3a02a0"
         },
         {
             "scope": "panel",
@@ -758,12 +758,12 @@
             "handler": {
                 "type": "closure",
                 "file": "private/sys/Router/Panel/UserRouter.php",
-                "line": 75,
+                "line": 78,
                 "static_uses": [
                     "panelUserEditController"
                 ]
             },
-            "signature": "55850aa61b4c690ac5859de9d05cdaa6c0562db8"
+            "signature": "6529a247ba35fec527ec71c96c145300219cf405"
         },
         {
             "scope": "panel",
@@ -773,12 +773,12 @@
             "handler": {
                 "type": "closure",
                 "file": "private/sys/Router/Panel/UserRouter.php",
-                "line": 79,
+                "line": 82,
                 "static_uses": [
                     "panelUserEditController"
                 ]
             },
-            "signature": "932c6500fc1f93f7172dd3660e17251e616b15e1"
+            "signature": "7a2702fb2214491136187f73be7a65a509ef6fb5"
         },
         {
             "scope": "panel",
@@ -788,12 +788,12 @@
             "handler": {
                 "type": "closure",
                 "file": "private/sys/Router/Panel/UserRouter.php",
-                "line": 83,
+                "line": 86,
                 "static_uses": [
                     "panelUserListController"
                 ]
             },
-            "signature": "c5e576ff764657c2f610455a15b600e7816f0696"
+            "signature": "14950a8855cd531b686bc2186d772b357c2007c4"
         },
         {
             "scope": "panel",
@@ -803,12 +803,12 @@
             "handler": {
                 "type": "closure",
                 "file": "private/sys/Router/Panel/UserRouter.php",
-                "line": 87,
+                "line": 90,
                 "static_uses": [
-                    "panelUserEditController"
+                    "panelUserInviteController"
                 ]
             },
-            "signature": "39370f8fda6f8d0c0afe15b04b0289acc601a113"
+            "signature": "bf3345e98d901cd5d9e42e1286779284583994e7"
         },
         {
             "scope": "panel",
@@ -818,12 +818,12 @@
             "handler": {
                 "type": "closure",
                 "file": "private/sys/Router/Panel/UserRouter.php",
-                "line": 91,
+                "line": 94,
                 "static_uses": [
-                    "panelUserEditController"
+                    "panelUserInviteController"
                 ]
             },
-            "signature": "f7ccd7452a775dc1b674cf11347a3fbee290c309"
+            "signature": "3035bcf1c73a62e7cba7b55e367daa4ea9d6ccc7"
         },
         {
             "scope": "panel",
@@ -833,12 +833,12 @@
             "handler": {
                 "type": "closure",
                 "file": "private/sys/Router/Panel/UserRouter.php",
-                "line": 95,
+                "line": 98,
                 "static_uses": [
-                    "panelUserEditController"
+                    "panelUserInviteController"
                 ]
             },
-            "signature": "37cdb0100a6d27be0ae2e0ca9cc743454a317aed"
+            "signature": "9ef2721007880442813e117df40730cd6841f03f"
         },
         {
             "scope": "panel",

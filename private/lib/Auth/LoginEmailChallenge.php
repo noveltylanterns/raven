@@ -11,7 +11,7 @@ declare(strict_types=1);
 
 namespace Raven\Lib\Auth;
 
-use Raven\Lib\Security\TwoFactorMethodKey;
+use Raven\Lib\Auth\TwoFactorMethodKey;
 
 /**
  * Shared login-time email-code challenge issue/verify helpers for pending 2FA sessions.

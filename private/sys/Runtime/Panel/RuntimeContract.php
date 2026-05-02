@@ -34,6 +34,7 @@ final class RuntimeContract
         'panel_redirect_edit_controller',
         'panel_user_list_controller',
         'panel_user_edit_controller',
+        'panel_user_invite_controller',
         'panel_group_list_controller',
         'panel_group_edit_controller',
         'panel_page_list_controller',

@@ -3,17 +3,17 @@
 /**
  * RAVEN CMS
  * ~/private/lib/Auth/PanelAccess.php
- * Authentication and authorization core component.
+ * Permission bitmask helper and stock permission catalogs.
  * Docs: https://raven.lanterns.io
  */
 
 declare(strict_types=1);
 
-namespace Raven\Lib\Auth\Panel;
+namespace Raven\Lib\Auth;
 
-require_once __DIR__ . '/PanelAccessCatalog.php';
+require_once __DIR__ . '/AccessCatalog.php';
 
-use Raven\Lib\Auth\Panel\PanelAccessCatalog;
+use Raven\Lib\Auth\AccessCatalog;
 
 /**
  * Permission bitmask helpers and stock group definitions.
@@ -123,7 +123,7 @@ final class PanelAccess
      */
     public static function stockGroups(): array
     {
-        return PanelAccessCatalog::stockGroups();
+        return AccessCatalog::stockGroups();
     }
 
     /**
@@ -238,7 +238,7 @@ final class PanelAccess
      */
     public static function stockPanelRoutePermissions(): array
     {
-        return PanelAccessCatalog::stockPanelRoutePermissions();
+        return AccessCatalog::stockPanelRoutePermissions();
     }
 
     /**
@@ -248,7 +248,7 @@ final class PanelAccess
      */
     public static function stockPanelRoutePermission(string $routeKey): ?array
     {
-        return PanelAccessCatalog::stockPanelRoutePermission($routeKey);
+        return AccessCatalog::stockPanelRoutePermission($routeKey);
     }
 
     /**
@@ -258,7 +258,7 @@ final class PanelAccess
      */
     public static function allStockPanelBits(): array
     {
-        return PanelAccessCatalog::allStockPanelBits();
+        return AccessCatalog::allStockPanelBits();
     }
 
     /**
@@ -268,7 +268,7 @@ final class PanelAccess
      */
     public static function contentPanelBits(): array
     {
-        return PanelAccessCatalog::contentPanelBits();
+        return AccessCatalog::contentPanelBits();
     }
 
     /**
@@ -278,7 +278,7 @@ final class PanelAccess
      */
     public static function taxonomyPanelBits(): array
     {
-        return PanelAccessCatalog::taxonomyPanelBits();
+        return AccessCatalog::taxonomyPanelBits();
     }
 
     /**
@@ -288,7 +288,7 @@ final class PanelAccess
      */
     public static function usersPanelBits(): array
     {
-        return PanelAccessCatalog::usersPanelBits();
+        return AccessCatalog::usersPanelBits();
     }
 
     /**
@@ -298,7 +298,7 @@ final class PanelAccess
      */
     public static function groupsPanelBits(): array
     {
-        return PanelAccessCatalog::groupsPanelBits();
+        return AccessCatalog::groupsPanelBits();
     }
 
     /**
@@ -308,7 +308,7 @@ final class PanelAccess
      */
     public static function systemPanelBits(): array
     {
-        return PanelAccessCatalog::systemPanelBits();
+        return AccessCatalog::systemPanelBits();
     }
 
     /**

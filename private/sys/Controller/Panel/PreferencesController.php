@@ -15,7 +15,7 @@ use lbuchs\WebAuthn\WebAuthn as VendorWebAuthn;
 use lbuchs\WebAuthn\WebAuthnException;
 use Raven\Core\Config;
 use Raven\Lib\Auth\LoginIdentifierResolver;
-use Raven\Lib\Auth\Panel\PanelTwoFactorPreferencesService;
+use Raven\Lib\Auth\TwoFactorPreferences;
 use Raven\Lib\Auth\PasswordChangePolicy;
 use Raven\Lib\Media\Panel\AvatarValidationPolicy;
 use Raven\Lib\Media\Panel\AvatarValidator;
@@ -50,7 +50,7 @@ final class PreferencesController
     private EditorBlocks $editorBlocks;
     private MediaConfigService $panelMediaConfigService;
     private UserProfileParser $profileContactService;
-    private PanelTwoFactorPreferencesService $panelTwoFactorPreferencesService;
+    private TwoFactorPreferences $twoFactorPreferences;
     private UserMediaScribe $userMediaScribe;
     private UserMediaPathService $userMediaPathService;
     private PasswordChangePolicy $passwordChangePolicy;
@@ -66,7 +66,7 @@ final class PreferencesController
      * @param EditorBlocks $editorBlocks Shared repeater-block view helper for modular panel rows.
      * @param MediaConfigService $panelMediaConfigService Shared media-limit helper.
      * @param UserProfileParser $profileContactService Shared profile-contact normalizer.
-     * @param PanelTwoFactorPreferencesService $panelTwoFactorPreferencesService Shared 2FA helper set.
+     * @param TwoFactorPreferences $twoFactorPreferences Shared 2FA helper set.
      * @param UserMediaScribe $userMediaScribe Shared user-media write helper.
      * @param UserMediaPathService $userMediaPathService Shared user-media path resolver.
      * @param PasswordChangePolicy $passwordChangePolicy Shared password validation policy.
@@ -83,7 +83,7 @@ final class PreferencesController
         EditorBlocks $editorBlocks,
         MediaConfigService $panelMediaConfigService,
         UserProfileParser $profileContactService,
-        PanelTwoFactorPreferencesService $panelTwoFactorPreferencesService,
+        TwoFactorPreferences $twoFactorPreferences,
         UserMediaScribe $userMediaScribe,
         UserMediaPathService $userMediaPathService,
         PasswordChangePolicy $passwordChangePolicy
@@ -98,7 +98,7 @@ final class PreferencesController
         $this->editorBlocks = $editorBlocks;
         $this->panelMediaConfigService = $panelMediaConfigService;
         $this->profileContactService = $profileContactService;
-        $this->panelTwoFactorPreferencesService = $panelTwoFactorPreferencesService;
+        $this->twoFactorPreferences = $twoFactorPreferences;
         $this->userMediaScribe = $userMediaScribe;
         $this->userMediaPathService = $userMediaPathService;
         $this->passwordChangePolicy = $passwordChangePolicy;
@@ -410,7 +410,7 @@ final class PreferencesController
             return;
         }
 
-        $payload = $this->panelTwoFactorPreferencesService->buildTotpSetupPayload(
+        $payload = $this->twoFactorPreferences->buildTotpSetupPayload(
             $post['secret'] ?? '',
             (string) ($preferences['email'] ?? ''),
             $this->totpIssuer()
@@ -454,7 +454,7 @@ final class PreferencesController
             return;
         }
 
-        $recoveryCode = $this->panelTwoFactorPreferencesService->generateRecoveryPhrase(12);
+        $recoveryCode = $this->twoFactorPreferences->generateRecoveryPhrase(12);
         if (!is_string($recoveryCode)) {
             $this->jsonResponse(['ok' => false, 'message' => 'Unable to generate a recovery phrase.'], 500);
             return;
@@ -493,7 +493,7 @@ final class PreferencesController
             return;
         }
 
-        $excludeCredentialIds = $this->panelTwoFactorPreferencesService->collectWebauthnExcludeCredentialIds(
+        $excludeCredentialIds = $this->twoFactorPreferences->collectWebauthnExcludeCredentialIds(
             (array) ($preferences['two_factor'] ?? []),
             $post['exclude_credential_ids'] ?? null,
             20
@@ -508,7 +508,7 @@ final class PreferencesController
             return;
         }
 
-        $userIdentity = $this->panelTwoFactorPreferencesService->resolveWebauthnUserIdentity($preferences, $userId);
+        $userIdentity = $this->twoFactorPreferences->resolveWebauthnUserIdentity($preferences, $userId);
         $username = (string) ($userIdentity['username'] ?? ('user-' . $userId));
         $displayName = (string) ($userIdentity['display_name'] ?? $username);
 
@@ -671,7 +671,7 @@ final class PreferencesController
      */
     private function normalizeSubmittedTwoFactorMethods(mixed $rawMethods, string $fallbackEmail): array
     {
-        return $this->panelTwoFactorPreferencesService->normalizeSubmittedMethods(
+        return $this->twoFactorPreferences->normalizeSubmittedMethods(
             $rawMethods,
             $fallbackEmail,
             $this->totpIssuer()
@@ -687,7 +687,7 @@ final class PreferencesController
      */
     private function prepareTwoFactorMethodsForView(array $methods, string $fallbackEmail): array
     {
-        return $this->panelTwoFactorPreferencesService->prepareMethodsForView(
+        return $this->twoFactorPreferences->prepareMethodsForView(
             $methods,
             $fallbackEmail,
             $this->totpIssuer()
@@ -701,7 +701,7 @@ final class PreferencesController
      */
     private function twoFactorTypeOptions(): array
     {
-        return $this->panelTwoFactorPreferencesService->typeOptions();
+        return $this->twoFactorPreferences->typeOptions();
     }
 
     /**
@@ -769,7 +769,7 @@ final class PreferencesController
      */
     private function totpIssuer(): string
     {
-        return $this->panelTwoFactorPreferencesService->resolveTotpIssuer(
+        return $this->twoFactorPreferences->resolveTotpIssuer(
             (string) $this->config->get('site.name', 'Raven CMS')
         );
     }

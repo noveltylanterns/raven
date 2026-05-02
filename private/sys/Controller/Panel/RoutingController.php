@@ -19,7 +19,7 @@ use Raven\Core\Repository\RedirectRead;
 use Raven\Core\Repository\UserRead;
 use Raven\Core\Debug\RouteProfiler;
 use Raven\Lib\Auth\LoginIdentifierResolver;
-use Raven\Lib\Auth\Panel\PanelAccess;
+use Raven\Lib\Auth\PanelAccess;
 use Raven\Lib\Format\Csv;
 use Raven\Lib\Parser\CategoryRouteParser;
 use Raven\Lib\Parser\ChannelRouteParser;

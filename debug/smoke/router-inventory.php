@@ -167,6 +167,7 @@ final class RouterInventorySmokeRunner
         $panelRedirectEditController = $this->requireFactory($rvn, 'panel_redirect_edit_controller');
         $panelUserListController = $this->requireFactory($rvn, 'panel_user_list_controller');
         $panelUserEditController = $this->requireFactory($rvn, 'panel_user_edit_controller');
+        $panelUserInviteController = $this->requireFactory($rvn, 'panel_user_invite_controller');
         $panelGroupListController = $this->requireFactory($rvn, 'panel_group_list_controller');
         $panelGroupEditController = $this->requireFactory($rvn, 'panel_group_edit_controller');
         $panelPageListController = $this->requireFactory($rvn, 'panel_page_list_controller');
@@ -220,6 +221,7 @@ final class RouterInventorySmokeRunner
             $panelRedirectEditController,
             $panelUserListController,
             $panelUserEditController,
+            $panelUserInviteController,
             $panelGroupListController,
             $panelGroupEditController,
             $panelPageListController,

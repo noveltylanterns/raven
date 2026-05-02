@@ -11,7 +11,7 @@ declare(strict_types=1);
 
 namespace Raven\Lib\Auth;
 
-use Raven\Lib\Security\TwoFactorMethodKey;
+use Raven\Lib\Auth\TwoFactorMethodKey;
 
 /**
  * Shared helper for panel/public login-time interactive 2FA flow state.

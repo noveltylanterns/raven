@@ -33,6 +33,7 @@ final class PanelPayload
     public readonly Closure $panelRedirectEditController;
     public readonly Closure $panelUserListController;
     public readonly Closure $panelUserEditController;
+    public readonly Closure $panelUserInviteController;
     public readonly Closure $panelGroupListController;
     public readonly Closure $panelGroupEditController;
     public readonly Closure $panelPageListController;
@@ -71,6 +72,7 @@ final class PanelPayload
      * @param callable(): object $panelRedirectEditController Lazy redirect-edit controller factory.
      * @param callable(): object $panelUserListController Lazy user-list controller factory.
      * @param callable(): object $panelUserEditController Lazy user-edit controller factory.
+     * @param callable(): object $panelUserInviteController Lazy user-invite controller factory.
      * @param callable(): object $panelGroupListController Lazy group-list controller factory.
      * @param callable(): object $panelGroupEditController Lazy group-edit controller factory.
      * @param callable(): object $panelPageListController Lazy page-list controller factory.
@@ -106,6 +108,7 @@ final class PanelPayload
         callable $panelRedirectEditController,
         callable $panelUserListController,
         callable $panelUserEditController,
+        callable $panelUserInviteController,
         callable $panelGroupListController,
         callable $panelGroupEditController,
         callable $panelPageListController,
@@ -140,6 +143,7 @@ final class PanelPayload
         $this->panelRedirectEditController = Closure::fromCallable($panelRedirectEditController);
         $this->panelUserListController = Closure::fromCallable($panelUserListController);
         $this->panelUserEditController = Closure::fromCallable($panelUserEditController);
+        $this->panelUserInviteController = Closure::fromCallable($panelUserInviteController);
         $this->panelGroupListController = Closure::fromCallable($panelGroupListController);
         $this->panelGroupEditController = Closure::fromCallable($panelGroupEditController);
         $this->panelPageListController = Closure::fromCallable($panelPageListController);

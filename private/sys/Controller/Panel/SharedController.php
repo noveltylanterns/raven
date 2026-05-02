@@ -14,8 +14,8 @@ namespace Raven\Core\Controller\Panel;
 use Raven\Core\Config;
 use Raven\Core\Renderer;
 use Raven\Lib\Auth\AuthService;
-use Raven\Lib\Auth\Panel\PanelAccess;
-use Raven\Lib\Auth\Panel\PanelSessionGuard;
+use Raven\Lib\Auth\PanelAccess;
+use Raven\Lib\Auth\SessionGuard;
 use Raven\Lib\Auth\SessionFlash;
 use Raven\Lib\Extension\Resolver;
 use Raven\Lib\View\Pagination;
@@ -33,9 +33,11 @@ final class SharedController
     private AuthService $auth;
     private Csrf $csrf;
     private SessionFlash $flash;
-    private PanelSessionGuard $panelSessionGuard;
+    private SessionGuard $sessionGuard;
     private bool $categoryEnabled;
     private bool $tagEnabled;
+    /** @var array<string, bool> */
+    private array $routePermissionDecisionCache = [];
     /** @var callable(): void */
     private $publicNotFoundRenderer;
 
@@ -65,7 +67,7 @@ final class SharedController
         $this->auth = $auth;
         $this->csrf = $csrf;
         $this->flash = $flash;
-        $this->panelSessionGuard = new PanelSessionGuard();
+        $this->sessionGuard = new SessionGuard();
         $this->categoryEnabled = $categoryEnabled;
         $this->tagEnabled = $tagEnabled;
         $this->publicNotFoundRenderer = $publicNotFoundRenderer;
@@ -126,7 +128,7 @@ final class SharedController
      */
     public function requirePanelLogin(): void
     {
-        $this->panelSessionGuard->requirePanelLogin(
+        $this->sessionGuard->requirePanelLogin(
             $this->auth,
             $this->isGuestPanelLoginEntryRequest(),
             $this->panelUrl('/login'),
@@ -142,7 +144,7 @@ final class SharedController
      */
     public function panelIdentityFromSession(): array
     {
-        return $this->panelSessionGuard->panelIdentityFromSession($_SESSION['rvn-panel-identity'] ?? null);
+        return $this->sessionGuard->panelIdentityFromSession($_SESSION['rvn-panel-identity'] ?? null);
     }
 
     /**
@@ -154,23 +156,39 @@ final class SharedController
      */
     public function requireRoutePermissionOrForbidden(string $routeKey, string $action): bool
     {
-        $routePermission = PanelAccess::stockPanelRoutePermission($routeKey);
-        if ($routePermission === null) {
+        $normalizedRouteKey = strtolower(trim($routeKey));
+        $normalizedAction = strtolower(trim($action));
+        $cacheKey = $normalizedRouteKey . ':' . $normalizedAction;
+        if (array_key_exists($cacheKey, $this->routePermissionDecisionCache)) {
+            $granted = $this->routePermissionDecisionCache[$cacheKey];
+            if ($granted) {
+                return true;
+            }
+
             $this->renderPanelDenied();
             return false;
         }
 
-        $normalizedAction = strtolower(trim($action));
+        $routePermission = PanelAccess::stockPanelRoutePermission($routeKey);
+        if ($routePermission === null) {
+            $this->routePermissionDecisionCache[$cacheKey] = false;
+            $this->renderPanelDenied();
+            return false;
+        }
+
         if (!in_array($normalizedAction, ['view', 'create', 'edit', 'delete', 'uninstall'], true)) {
+            $this->routePermissionDecisionCache[$cacheKey] = false;
             $this->renderPanelDenied();
             return false;
         }
 
         $requiredBit = (int) ($routePermission[$normalizedAction] ?? 0);
         if ($requiredBit > 0 && $this->auth->hasPanelPermissionBit($requiredBit)) {
+            $this->routePermissionDecisionCache[$cacheKey] = true;
             return true;
         }
 
+        $this->routePermissionDecisionCache[$cacheKey] = false;
         $this->renderPanelDenied();
         return false;
     }
@@ -728,7 +746,7 @@ final class SharedController
      */
     private function isGuestPanelLoginEntryRequest(): bool
     {
-        return $this->panelSessionGuard->isGuestLoginEntryRequest(
+        return $this->sessionGuard->isGuestLoginEntryRequest(
             $_SERVER,
             (string) $this->config->get('panel.path', 'panel')
         );

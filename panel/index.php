@@ -62,6 +62,8 @@ $panelRedirectEditController = $requirePanelFactory('panel_redirect_edit_control
 $panelUserListController = $requirePanelFactory('panel_user_list_controller');
 /** @var callable(): object $panelUserEditController */
 $panelUserEditController = $requirePanelFactory('panel_user_edit_controller');
+/** @var callable(): object $panelUserInviteController */
+$panelUserInviteController = $requirePanelFactory('panel_user_invite_controller');
 /** @var callable(): object $panelGroupListController */
 $panelGroupListController = $requirePanelFactory('panel_group_list_controller');
 /** @var callable(): object $panelGroupEditController */
@@ -193,6 +195,7 @@ $routeDeps = new PanelPayload(
     $panelRedirectEditController,
     $panelUserListController,
     $panelUserEditController,
+    $panelUserInviteController,
     $panelGroupListController,
     $panelGroupEditController,
     $panelPageListController,

@@ -6,9 +6,9 @@ namespace Raven\Lib\Auth;
 
 use Raven\Lib\Security\RecoveryPhrase;
 use Raven\Lib\Security\Totp;
-use Raven\Lib\Security\TwoFactorMethodKey;
-use Raven\Lib\Security\TwoFactorMethodNormalizer;
-use Raven\Lib\Security\TwoFactorMethodRules;
+use Raven\Lib\Auth\TwoFactorMethodKey;
+use Raven\Lib\Auth\TwoFactorMethodNormalizer;
+use Raven\Lib\Auth\TwoFactorMethodRules;
 
 /**
  * Shared 2FA/contact preference payload normalization and verification helpers.

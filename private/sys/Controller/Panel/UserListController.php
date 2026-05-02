@@ -25,8 +25,9 @@ use Raven\Lib\Transport\Redirect;
 /**
  * Handles user list and invite list routes for the panel.
  *
- * Owns GET /user and GET /user/invites only. User create/edit/save/delete and
- * invite token create/generate/delete live in UserEditController.
+ * Owns GET /user and GET /user/invites only. User create/edit/save/delete live
+ * in UserEditController, and invite token create/generate/delete live in
+ * UserInviteController.
  */
 final class UserListController
 {

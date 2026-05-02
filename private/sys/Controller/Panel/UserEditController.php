@@ -3,7 +3,7 @@
 /**
  * RAVEN CMS
  * ~/private/sys/Controller/Panel/UserEditController.php
- * Panel user edit controller for user and invite CRUD routes.
+ * Panel user edit controller for user CRUD routes.
  * Docs: https://raven.lanterns.io
  */
 
@@ -11,17 +11,13 @@ declare(strict_types=1);
 
 namespace Raven\Core\Controller\Panel;
 
-use Closure;
 use Raven\Core\Config;
 use Raven\Core\Repository\GroupRead;
-use Raven\Core\Repository\InviteWrite;
 use Raven\Core\Repository\UserRead;
 use Raven\Core\Repository\UserWrite;
 use Raven\Lib\Auth\LoginIdentifierResolver;
-use Raven\Lib\Auth\Panel\PanelAccess;
-use Raven\Lib\Auth\Panel\PanelInvitePolicyService;
-use Raven\Lib\Auth\Panel\PanelTwoFactorPreferencesService;
-use Raven\Lib\Auth\SessionFlash;
+use Raven\Lib\Auth\PanelAccess;
+use Raven\Lib\Auth\TwoFactorPreferences;
 use Raven\Lib\Media\Panel\AvatarValidationPolicy;
 use Raven\Lib\Media\Panel\AvatarValidator;
 use Raven\Lib\Media\Panel\UserMediaPathService;
@@ -36,11 +32,10 @@ use Raven\Lib\View\Panel\EditorTabs;
 use Raven\Lib\Media\Panel\MediaConfigService;
 
 /**
- * Handles user and invite CRUD routes for the panel.
+ * Handles panel user create/edit/save/delete routes.
  *
- * Owns user create/edit, save, delete, and invite token create, generate, delete.
- * User list and invite list routes live in UserListController to keep read-only
- * and write concerns separate.
+ * Owns user create/edit, save, and delete. Invite-token list/write routes are
+ * split into UserListController and UserInviteController.
  */
 final class UserEditController
 {
@@ -51,18 +46,14 @@ final class UserEditController
     private GroupRead $groupRead;
     private UserRead $userRead;
     private UserWrite $userWrite;
-    private Closure $inviteWriteResolver;
-    private ?InviteWrite $inviteWrite = null;
-    private SessionFlash $flashList;
     private GroupRouteParser $groupParser;
-    private PanelInvitePolicyService $panelInvitePolicyService;
     private LoginIdentifierResolver $loginIdentifierResolver;
     private EditorTabs $editorTabs;
     private EditorWrapper $editor;
     private EditorBlocks $editorBlocks;
     private MediaConfigService $panelMediaConfigService;
     private UserProfileParser $profileContactService;
-    private PanelTwoFactorPreferencesService $panelTwoFactorPreferencesService;
+    private TwoFactorPreferences $twoFactorPreferences;
     private UserMediaScribe $userMediaScribe;
     private UserMediaPathService $userMediaPathService;
 
@@ -74,17 +65,14 @@ final class UserEditController
      * @param GroupRead $groupRead Group repository read side for group option reads and slug lookups.
      * @param UserRead $userRead User repository read side for user find and author lookups.
      * @param UserWrite $userWrite User repository write side for panel user saves and deletes.
-     * @param callable(): InviteWrite $inviteWriteResolver Lazy invite write resolver for token creation/deletion.
-     * @param SessionFlash $flashList List-style flash store for generated token batches.
      * @param GroupRouteParser $groupParser Shared group/profile routing-policy parser.
-     * @param PanelInvitePolicyService $panelInvitePolicyService Shared invite-form parsing helper.
      * @param LoginIdentifierResolver $loginIdentifierResolver Shared login-identifier normalization helper.
      * @param EditorTabs $editorTabs Shared editor-tab normalization helper.
      * @param EditorWrapper $editor Shared panel editor utility methods (theme normalization).
      * @param EditorBlocks $editorBlocks Shared repeater-block view helper for modular panel rows.
      * @param MediaConfigService $panelMediaConfigService Shared media-limit helper.
      * @param UserProfileParser $profileContactService Shared profile-contact normalizer.
-     * @param PanelTwoFactorPreferencesService $panelTwoFactorPreferencesService Shared 2FA list normalizer.
+     * @param TwoFactorPreferences $twoFactorPreferences Shared 2FA list normalizer.
      * @param UserMediaScribe $userMediaScribe Shared user-media write helper.
      * @param UserMediaPathService $userMediaPathService Shared user-media path resolver.
      * @return void
@@ -97,17 +85,14 @@ final class UserEditController
         GroupRead $groupRead,
         UserRead $userRead,
         UserWrite $userWrite,
-        callable $inviteWriteResolver,
-        SessionFlash $flashList,
         GroupRouteParser $groupParser,
-        PanelInvitePolicyService $panelInvitePolicyService,
         LoginIdentifierResolver $loginIdentifierResolver,
         EditorTabs $editorTabs,
         EditorWrapper $editor,
         EditorBlocks $editorBlocks,
         MediaConfigService $panelMediaConfigService,
         UserProfileParser $profileContactService,
-        PanelTwoFactorPreferencesService $panelTwoFactorPreferencesService,
+        TwoFactorPreferences $twoFactorPreferences,
         UserMediaScribe $userMediaScribe,
         UserMediaPathService $userMediaPathService
     ) {
@@ -118,17 +103,14 @@ final class UserEditController
         $this->groupRead = $groupRead;
         $this->userRead = $userRead;
         $this->userWrite = $userWrite;
-        $this->inviteWriteResolver = Closure::fromCallable($inviteWriteResolver);
-        $this->flashList = $flashList;
         $this->groupParser = $groupParser;
-        $this->panelInvitePolicyService = $panelInvitePolicyService;
         $this->loginIdentifierResolver = $loginIdentifierResolver;
         $this->editorTabs = $editorTabs;
         $this->editor = $editor;
         $this->editorBlocks = $editorBlocks;
         $this->panelMediaConfigService = $panelMediaConfigService;
         $this->profileContactService = $profileContactService;
-        $this->panelTwoFactorPreferencesService = $panelTwoFactorPreferencesService;
+        $this->twoFactorPreferences = $twoFactorPreferences;
         $this->userMediaScribe = $userMediaScribe;
         $this->userMediaPathService = $userMediaPathService;
     }
@@ -732,217 +714,6 @@ final class UserEditController
     }
 
     /**
-     * Creates one invite token from panel form input.
-     *
-     * @param array<string, mixed> $post Submitted form payload.
-     * @return void
-     */
-    public function userInvitesCreate(array $post): void
-    {
-        $this->context->requirePanelLogin();
-        if (!$this->context->requireRoutePermissionOrForbidden('user', 'create')) {
-            return;
-        }
-        if (!$this->ensureInviteRegistrationMode()) {
-            return;
-        }
-
-        if (!$this->context->csrf()->validate($post['_csrf'] ?? null)) {
-            $this->context->flash('error', 'Invalid CSRF token.');
-            Redirect::redirect($this->context->panelUrl('/user/invites'));
-        }
-
-        $isReusable = $this->panelInvitePolicyService->isReusableInviteType($post['invite_type'] ?? 'single');
-        $manualToken = null;
-        if (!$isReusable) {
-            $manualToken = trim((string) $this->input->text($post['token_slug'] ?? null, 255));
-            if ($manualToken === '') {
-                $manualToken = null;
-            }
-        }
-
-        try {
-            $expiresAt = $this->parseInviteExpirationTimestamp($post['expires_at'] ?? null);
-        } catch (\RuntimeException $exception) {
-            $this->context->flash('error', $exception->getMessage());
-            Redirect::redirect($this->context->panelUrl('/user/invites'));
-        }
-
-        try {
-            $token = $this->inviteWrite()->createToken($isReusable, $expiresAt, $this->context->auth()->userId(), $manualToken);
-        } catch (\Throwable $exception) {
-            $this->context->flash('error', 'Failed to create invite token: ' . ($exception->getMessage() ?: 'Unknown error.'));
-            Redirect::redirect($this->context->panelUrl('/user/invites'));
-        }
-
-        $this->context->flash('success', $isReusable ? 'Reusable invite token created.' : 'Single-use invite token created.');
-        $this->storeFlashList('generated_invites', [$token]);
-        Redirect::redirect($this->context->panelUrl('/user/invites'));
-    }
-
-    /**
-     * Generates a batch of single-use invite tokens from panel form input.
-     *
-     * @param array<string, mixed> $post Submitted form payload.
-     * @return void
-     */
-    public function userInvitesGenerate(array $post): void
-    {
-        $this->context->requirePanelLogin();
-        if (!$this->context->requireRoutePermissionOrForbidden('user', 'create')) {
-            return;
-        }
-        if (!$this->ensureInviteRegistrationMode()) {
-            return;
-        }
-
-        if (!$this->context->csrf()->validate($post['_csrf'] ?? null)) {
-            $this->context->flash('error', 'Invalid CSRF token.');
-            Redirect::redirect($this->context->panelUrl('/user/invites'));
-        }
-
-        $count = $this->panelInvitePolicyService->normalizeBatchCount($post['count'] ?? null, 10, 1, 100);
-
-        try {
-            $expiresAt = $this->parseInviteExpirationTimestamp($post['expires_at'] ?? null);
-        } catch (\RuntimeException $exception) {
-            $this->context->flash('error', $exception->getMessage());
-            Redirect::redirect($this->context->panelUrl('/user/invites'));
-        }
-
-        try {
-            $tokens = $this->inviteWrite()->createSingleUseBatch($count, $expiresAt, $this->context->auth()->userId());
-        } catch (\Throwable $exception) {
-            $this->context->flash('error', 'Failed to generate invite tokens: ' . ($exception->getMessage() ?: 'Unknown error.'));
-            Redirect::redirect($this->context->panelUrl('/user/invites'));
-        }
-
-        $this->context->flash('success', 'Generated ' . count($tokens) . ' single-use invite token' . (count($tokens) === 1 ? '' : 's') . '.');
-        $this->storeFlashList('generated_invites', $tokens);
-        Redirect::redirect($this->context->panelUrl('/user/invites'));
-    }
-
-    /**
-     * Deletes one invite token.
-     *
-     * @param array<string, mixed> $post Submitted form payload.
-     * @return void
-     */
-    public function userInvitesDelete(array $post): void
-    {
-        $this->context->requirePanelLogin();
-        if (!$this->context->requireRoutePermissionOrForbidden('user', 'delete')) {
-            return;
-        }
-        if (!$this->ensureInviteRegistrationMode()) {
-            return;
-        }
-
-        if (!$this->context->csrf()->validate($post['_csrf'] ?? null)) {
-            $this->context->flash('error', 'Invalid CSRF token.');
-            Redirect::redirect($this->context->panelUrl('/user/invites'));
-        }
-
-        $id = $this->input->int($post['id'] ?? null, 1);
-        if ($id === null) {
-            $this->context->flash('error', 'Invite token id is required.');
-            Redirect::redirect($this->context->panelUrl('/user/invites'));
-        }
-
-        if (!$this->inviteWrite()->deleteById($id)) {
-            $this->context->flash('error', 'Invite token was not found.');
-            Redirect::redirect($this->context->panelUrl('/user/invites'));
-        }
-
-        $this->context->flash('success', 'Invite token deleted.');
-        Redirect::redirect($this->context->panelUrl('/user/invites'));
-    }
-
-    /**
-     * Resolves the invite write side only when invite create/delete routes are hit.
-     *
-     * @return InviteWrite Invite-token write side for token creation and deletion.
-     */
-    private function inviteWrite(): InviteWrite
-    {
-        if ($this->inviteWrite instanceof InviteWrite) {
-            return $this->inviteWrite;
-        }
-
-        $repo = ($this->inviteWriteResolver)();
-        if (!$repo instanceof InviteWrite) {
-            throw new \RuntimeException('Panel invite write resolver returned an invalid value.');
-        }
-
-        $this->inviteWrite = $repo;
-        return $this->inviteWrite;
-    }
-
-    /**
-     * Stores one flash-list payload in session after sanitizing the items.
-     *
-     * @param string $key Flash-list storage key.
-     * @param array<int, string> $values Flash-list values to store.
-     * @return void
-     */
-    private function storeFlashList(string $key, array $values): void
-    {
-        $normalized = [];
-        foreach ($values as $value) {
-            $item = trim($value);
-            if ($item === '') {
-                continue;
-            }
-
-            $normalized[] = $this->input->text($item, 400);
-        }
-
-        if ($normalized === []) {
-            return;
-        }
-
-        $this->flashList->putList($key, $normalized);
-    }
-
-    /**
-     * Resolves configured public registration mode.
-     *
-     * @return string Normalized public registration mode.
-     */
-    private function registrationMode(): string
-    {
-        return $this->groupParser->registrationMode();
-    }
-
-    /**
-     * Restricts invite-token management to invite-only registration mode.
-     *
-     * @return bool True when invite-token management is allowed.
-     */
-    private function ensureInviteRegistrationMode(): bool
-    {
-        if ($this->registrationMode() === 'invite') {
-            return true;
-        }
-
-        $this->context->flash('error', 'User invite tokens are available only when public registration mode is set to Invite.');
-        Redirect::redirect($this->context->panelUrl('/user'));
-        return false;
-    }
-
-    /**
-     * Parses one optional invite-expiration datetime into a unix timestamp.
-     *
-     * @param mixed $rawValue User-submitted expiration value.
-     * @return int|null Parsed timestamp, or null when blank.
-     * @throws \RuntimeException When the submitted value is invalid or not in the future.
-     */
-    private function parseInviteExpirationTimestamp(mixed $rawValue): ?int
-    {
-        return $this->panelInvitePolicyService->parseExpirationTimestamp($rawValue);
-    }
-
-    /**
      * Resolves the configured panel login identifier mode.
      *
      * @return string `email` or `username`.
@@ -1046,7 +817,7 @@ final class UserEditController
      */
     private function twoFactorTypeOptions(): array
     {
-        return $this->panelTwoFactorPreferencesService->typeOptions();
+        return $this->twoFactorPreferences->typeOptions();
     }
 
     /**
@@ -1057,7 +828,7 @@ final class UserEditController
      */
     private function normalizeSubmittedTwoFactorExistingIndices(mixed $rawMethods): array
     {
-        return $this->panelTwoFactorPreferencesService->normalizeSubmittedExistingIndices($rawMethods);
+        return $this->twoFactorPreferences->normalizeSubmittedExistingIndices($rawMethods);
     }
 
     /**

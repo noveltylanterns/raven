@@ -1,15 +1,20 @@
 <?php
 
+/**
+ * RAVEN CMS
+ * ~/private/lib/Auth/PermissionDefinitionCatalog.php
+ * Builds permission-definition rows from stock and extension sources.
+ * Docs: https://raven.lanterns.io
+ */
+
 declare(strict_types=1);
 
-namespace Raven\Lib\Auth\Panel;
-
-use Raven\Lib\Auth\Panel\PanelAccess;
+namespace Raven\Lib\Auth;
 
 /**
  * Builds panel permission-definition rows from stock and extension sources.
  */
-final class PanelPermissionDefinitionCatalog
+final class PermissionDefinitionCatalog
 {
     /**
      * @param callable(): array<string, array<string, mixed>> $extensionPermissionMapProvider

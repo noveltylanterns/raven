@@ -13,20 +13,77 @@ This is the default Build Mode backlog file. If the user asks about goals, unpat
 
 
 ## Auth Library Refactor
-Our lib/Auth/ folder is a massive unorganized dump of functions:
-- First, move our three lib/Security/TwoFactorMethod*.php files to this folder so everything is in one place.
-- Lets keep lib/Auth/ shared Authentication primitives for public+panel routes:
-	- This means decommissioning lib/Auth/Panel/
-	- Panel/PanelInvitePolicyService.php looks like something that should be part of a dedicated Panel\UserInviteController with our other user-route panel controllers.
-	- Panel/PanelTwoFactorPreferencesService.php should be made a generic lib/Auth/Panel/TwoFactorPreferences.php file.
-	- Panel/PanelAccess.php, Panel/PanelAccessCatalog.php, Panel/PanelPermissionDefinitionCatalog.php and Panel/PanelSessionGuard.php are all computed on every Panel route. They should probably be in Panel\SharedController- There are still so many files here. See what can be condensed or folded into other classes:
-	- These functions should all be universal+generic for public+panel routes.
-	- Anything panel-only or public-only that can't be genericized needs to be moved somewhere else, like sys/Controller/(Panel|Public)/*Controller.php or lib/View/(Panel|Public)/
-	- Purely UI functions should be stored in lib/View/
-	- Look at what remains and see what can be condensed or flattened.
-- Analyze this folder and then replace this section with a detailed checklist plan.
-	- Prioritize processing efficiency + load-bearing performance over a raw reduction in files/lines.
-	- (There's so many files here, so in theory it should be a substantial reduction regardless)
+Goal: reduce auth-layer sprawl while keeping high-traffic request paths stable and minimizing risky contract breaks.
+
+### Phase 0 — Baseline + Guardrails
+- [x] Capture baseline before refactor:
+	- [x] `debug/smoke/auth-workflow.php`
+	- [x] `debug/smoke/panel-permissions.php`
+	- [x] `debug/smoke/cli.php`
+- [x] Add temporary class-map checklist for every moved/renamed auth class (source path -> target path -> updated callers).
+	- [x] `private/lib/Security/TwoFactorMethodKey.php` -> `private/lib/Auth/TwoFactorMethodKey.php` (updated `LoginChallengeFlow`, `LoginChallengeWorkflowService`, `LoginEmailChallenge`, `UserSecurityProfileService`).
+	- [x] `private/lib/Security/TwoFactorMethodNormalizer.php` -> `private/lib/Auth/TwoFactorMethodNormalizer.php` (updated `AuthPayloadCodec`, `AuthService`, `TwoFactorPreferences`, `UserSecurityProfileService`).
+	- [x] `private/lib/Security/TwoFactorMethodRules.php` -> `private/lib/Auth/TwoFactorMethodRules.php` (updated `TwoFactorMethodNormalizer`, `UserSecurityProfileService`).
+	- [x] `private/lib/Auth/Panel/PanelTwoFactorPreferencesService.php` -> `private/lib/Auth/TwoFactorPreferences.php` (updated panel controller factories + `PreferencesController`/`UserEditController` imports).
+	- [x] `private/lib/Auth/Panel/PanelAccess.php` -> `private/lib/Auth/PanelAccess.php` (updated templates, controllers, schema seeding, shell, extension panel route registrar).
+	- [x] `private/lib/Auth/Panel/PanelAccessCatalog.php` -> `private/lib/Auth/PanelAccessCatalog.php` (updated `PanelAccess` internal include/import).
+	- [x] `private/lib/Auth/Panel/PanelPermissionDefinitionCatalog.php` -> `private/lib/Auth/PanelPermissionDefinitionCatalog.php` (updated controller factories + `GroupEditController` imports).
+	- [x] `private/lib/Auth/Panel/PanelSessionGuard.php` -> `private/lib/Auth/PanelSessionGuard.php` (updated `SharedController` + extension panel route registrar imports).
+- [x] Verify no extension-facing `Raven\Lib\Auth\*` class names are removed without either 1) same-name replacement or 2) logged compatibility lane in Legacy Fallback Log.
+	- [x] Repo-wide scan confirms no in-repo extension/provider callsites for removed `AuthAccessGateService` or `AuthIdentityLookupService`; removals were internal `AuthService` folds with no extension contracts in `private/ext/`.
+
+### Phase 1 — 2FA Primitive Consolidation (Security -> Auth)
+- [x] Move `private/lib/Security/TwoFactorMethodKey.php` -> `private/lib/Auth/TwoFactorMethodKey.php`
+- [x] Move `private/lib/Security/TwoFactorMethodNormalizer.php` -> `private/lib/Auth/TwoFactorMethodNormalizer.php`
+- [x] Move `private/lib/Security/TwoFactorMethodRules.php` -> `private/lib/Auth/TwoFactorMethodRules.php`
+- [x] Update all imports in:
+	- [x] `AuthService`, `LoginChallengeFlow`, `LoginEmailChallenge`, `LoginChallengeWorkflowService`, `UserSecurityProfileService`, `PanelTwoFactorPreferencesService`, and related callers.
+- [x] Re-run 2FA-sensitive smoke checks after move.
+
+### Phase 2 — Decommission `lib/Auth/Panel/` Safely
+- [x] `PanelInvitePolicyService`:
+	- [x] Move invite-request parsing (`isReusableInviteType`, `normalizeBatchCount`, `parseExpirationTimestamp`) into `sys/Controller/Panel/UserInviteController` (panel sys-layer invite controller).
+	- [x] Remove `lib/Auth/Panel/PanelInvitePolicyService.php` once no shared callers remain.
+- [x] `PanelTwoFactorPreferencesService`:
+	- [x] Rename to `lib/Auth/TwoFactorPreferences.php` (drop panel-only prefix; keep it auth-domain).
+	- [x] Keep non-UI normalization/build helpers in auth lib; avoid controller-only duplication.
+- [x] `PanelAccess`, `PanelAccessCatalog`, `PanelPermissionDefinitionCatalog`, `PanelSessionGuard`:
+	- [x] Keep these as reusable auth-domain policy primitives (they are shared by controllers, extension services, schema seeding, and CLI-adjacent paths).
+	- [x] Optimize panel hot path by memoizing resolved permission-definition payloads and guard decisions in `Panel\SharedController` instead of relocating policy classes into controller code.
+	- [x] Remove `lib/Auth/Panel/` directory only after all remaining files are either moved to `lib/Auth/` or intentionally retained elsewhere.
+
+### Phase 3 — Flatten Auth Micro-Services With Single Callers
+- [x] Audit and fold thin one-caller wrappers into owning classes where they add no policy boundary:
+	- [x] `AuthAccessGateService` folded into `AuthService` with direct `PanelAccess` policy calls.
+	- [x] `AuthIdentityLookupService` folded into `AuthService` (username/email lookup + uniqueness checks now local private methods).
+	- [x] `AuthGroupMembershipService` intentionally retained (cache + app-db membership query/mutation boundary remains valuable).
+	- [x] `PermissionMaskService` intentionally retained (cache + guest/user permission-mask composition boundary remains valuable).
+- [x] Keep classes that encode real reusable policy (do not fold just to reduce file count).
+
+### Phase 4 — Move Surface-Specific/UI-Like Auth Helpers Out of Core Auth
+- [x] Evaluate `LoginUiStateService` for placement:
+	- [x] If it remains session-state/policy only, keep in `lib/Auth/`.
+	- [x] No presentation shaping detected in current implementation; keep in `lib/Auth/` and re-evaluate only if view payload shaping is added.
+- [x] Confirm all panel-only branches are routed through panel controllers/shared context, not generic auth core.
+
+### Phase 5 — Naming and Contract Cleanup
+- [x] Normalize class names after moves (drop redundant `Panel*` prefixes where class scope is already clear).
+	- [x] Canonicalized auth-root panel ACL helper names: `PanelAccessCatalog` -> `AccessCatalog`, `PanelPermissionDefinitionCatalog` -> `PermissionDefinitionCatalog`, `PanelSessionGuard` -> `SessionGuard`.
+	- [x] Updated core imports/usages (`PanelAccess`, `GroupEditController`, `SharedController`, `PanelRouteRegistrar`, panel runtime factories) to the canonical class names.
+- [x] Update PHPDoc/file headers after every move (path/purpose/docs link must stay accurate).
+	- [x] Updated new canonical files with Raven headers: `AccessCatalog.php`, `PermissionDefinitionCatalog.php`, `SessionGuard.php`.
+	- [x] Updated compatibility alias file headers to explicit alias purpose and deprecation notes.
+- [x] Sync `docs/filetree.md` and related auth docs only for non-`build/` code changes.
+- [x] Log all compatibility shims/aliases in Legacy Fallback Log with explicit removal criteria.
+
+### Phase 6 — Closeout Verification
+- [x] Re-run full auth/panel smoke set:
+	- [x] `debug/smoke/auth-workflow.php`
+	- [x] `debug/smoke/panel-permissions.php`
+	- [x] `debug/smoke/router-inventory.php`
+	- [x] `debug/smoke/cli.php`
+- [x] Verify no remaining imports reference retired paths under `lib/Auth/Panel/` (except intentionally retained files).
+- [ ] Prune completed checklist items from this section after release-notes capture.
 
 
 
@@ -64,6 +121,10 @@ Items below are the remaining classified legacy/compatibility lanes after the cu
 
 ---
 
-- None currently logged for this router-refactor batch (no temporary compatibility aliases/shims introduced in this pass).
+- Auth compatibility aliases retained after Phase 5 class-name normalization:
+	- `Raven\Lib\Auth\PanelAccessCatalog` -> alias of `Raven\Lib\Auth\AccessCatalog` (`private/lib/Auth/PanelAccessCatalog.php`).
+	- `Raven\Lib\Auth\PanelPermissionDefinitionCatalog` -> alias of `Raven\Lib\Auth\PermissionDefinitionCatalog` (`private/lib/Auth/PanelPermissionDefinitionCatalog.php`).
+	- `Raven\Lib\Auth\PanelSessionGuard` -> alias of `Raven\Lib\Auth\SessionGuard` (`private/lib/Auth/PanelSessionGuard.php`).
+	- Removal criteria: remove aliases after one documented release cycle once extension ecosystem guidance has been updated and no known external imports depend on `Panel*` names.
 
 ---

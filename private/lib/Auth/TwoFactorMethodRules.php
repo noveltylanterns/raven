@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Raven\Lib\Security;
+namespace Raven\Lib\Auth;
 
 /**
  * Shared 2FA method type/status/label and dedupe rules.

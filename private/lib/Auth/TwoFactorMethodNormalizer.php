@@ -2,9 +2,11 @@
 
 declare(strict_types=1);
 
-namespace Raven\Lib\Security;
+namespace Raven\Lib\Auth;
 
 use Raven\Lib\View\Qr;
+use Raven\Lib\Security\RecoveryPhrase;
+use Raven\Lib\Security\Totp;
 
 /**
  * Shared 2FA method normalization helpers used by panel and auth flows.
