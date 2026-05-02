@@ -2,7 +2,7 @@
 
 /**
  * RAVEN CMS
- * ~/private/lib/Parser/FeedRouteParser.php
+ * ~/private/lib/Parser/FeedParser.php
  * Atom and RSS feed routing configuration helpers.
  * Docs: https://raven.lanterns.io
  */
@@ -21,7 +21,7 @@ use Raven\Lib\Security\InputSanitizer;
  * Reads feed.* config keys. There is no FeedDataParser because feed content
  * is assembled from channel and page records rather than a dedicated feed table.
  */
-final class FeedRouteParser
+final class FeedParser
 {
     private Config $config;
     private InputSanitizer $input;

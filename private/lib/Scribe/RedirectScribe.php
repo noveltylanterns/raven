@@ -15,7 +15,7 @@ use PDO;
 use Raven\Core\Repository\ChannelRead;
 use Raven\Lib\Database\TableNameResolver;
 use Raven\Lib\Parser\ChannelRepoParser;
-use Raven\Lib\Parser\PageDuplicateParser;
+use Raven\Core\Debug\UniquenessProfiler;
 use RuntimeException;
 
 /**
@@ -159,7 +159,7 @@ final class RedirectScribe
      */
     private function pathExists(string $slug, ?int $channelId, ?int $ignoreId = null): bool
     {
-        return PageDuplicateParser::exists(
+        return UniquenessProfiler::exists(
             $this->db,
             $this->table('redirects'),
             $slug,

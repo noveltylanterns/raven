@@ -12,7 +12,6 @@ declare(strict_types=1);
 namespace Raven\Core\Controller\Public;
 
 use Raven\Core\Repository\GroupRead;
-use Raven\Lib\View\Public\RouteRenderService;
 use Raven\Lib\View\Public\TemplateDecorator;
 
 /**
@@ -22,7 +21,6 @@ final class GroupController
 {
     private SharedController $context;
     private GroupRead $groupRead;
-    private RouteRenderService $routeRenderService;
     private TemplateDecorator $templateDecorator;
 
     /**
@@ -36,7 +34,6 @@ final class GroupController
     ) {
         $this->context = $context;
         $this->groupRead = $groupRead;
-        $this->routeRenderService = new RouteRenderService();
         $this->templateDecorator = new TemplateDecorator(
             $context->config(),
             $context->input(),
@@ -109,12 +106,17 @@ final class GroupController
      */
     private function renderGroupUnavailable(string $error, string $mode): void
     {
-        $payload = $this->routeRenderService->groupUnavailablePayload($error, $mode, $this->context->siteData());
-        http_response_code((int) ($payload['status'] ?? 404));
+        $status = $error === 'permission_denied' ? 403 : 404;
+        $siteData = $this->context->siteData();
+
+        http_response_code($status);
         $this->context->renderPublic(
-            (string) ($payload['template'] ?? 'group/index'),
-            is_array($payload['data'] ?? null) ? $payload['data'] : [],
-            (string) ($payload['layout'] ?? 'wrapper')
+            'group/index',
+            [
+                'site' => $siteData,
+                'group_denied' => $error === 'permission_denied' && $mode === 'private',
+            ],
+            'wrapper'
         );
     }
 }

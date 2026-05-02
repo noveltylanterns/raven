@@ -67,7 +67,7 @@ final class Registry
     // -------------------------------------------------------------------------
 
     private string $root;
-    private ExtensionBootstrapContractResolver $bootstrapResolver;
+    private Bootstrap $bootstrapResolver;
 
     /**
      * Parsed manifests discovered during construction, keyed by directory name.
@@ -123,15 +123,15 @@ final class Registry
      *
      * @param string                             $root                        Project root path.
      * @param array<int, string>                 $enabledExtensionDirectories Enabled extension directory names.
-     * @param ExtensionBootstrapContractResolver|null $bootstrapResolver       Optional override for testing.
+     * @param Bootstrap|null $bootstrapResolver       Optional override for testing.
      */
     public function __construct(
         string $root,
         array $enabledExtensionDirectories,
-        ?ExtensionBootstrapContractResolver $bootstrapResolver = null
+        ?Bootstrap $bootstrapResolver = null
     ) {
         $this->root = rtrim($root, '/');
-        $this->bootstrapResolver = $bootstrapResolver ?? new ExtensionBootstrapContractResolver();
+        $this->bootstrapResolver = $bootstrapResolver ?? new Bootstrap();
         $this->discoverEnabledExtensions($enabledExtensionDirectories);
     }
 

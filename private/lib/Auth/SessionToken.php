@@ -2,15 +2,16 @@
 
 /**
  * RAVEN CMS
- * ~/private/lib/Security/SessionToken.php
+ * ~/private/lib/Auth/SessionToken.php
  * PHP session-backed token storage for the shared CSRF helper.
  * Docs: https://raven.lanterns.io
  */
 
 declare(strict_types=1);
 
-namespace Raven\Lib\Security;
+namespace Raven\Lib\Auth;
 
+use Raven\Lib\Security\CsrfToken;
 use RuntimeException;
 
 /**

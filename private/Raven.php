@@ -13,7 +13,7 @@ namespace Raven;
 
 use PDO;
 use Raven\Core\Config;
-use Raven\Core\Controller\DatabaseController;
+use Raven\Core\Runtime\DatabaseFactory;
 use Raven\Lib\Database\Schema\SchemaManager;
 use Raven\Core\Logger;
 use Raven\Lib\Parser\PageRepoParser;
@@ -120,7 +120,7 @@ final class Raven
     $sessionCookie->startIfNeeded($config, $root, $_SERVER);
 
     $databaseConfig = (array) $config->get('database', []);
-    $connectionFactory = new DatabaseController($databaseConfig);
+    $connectionFactory = new DatabaseFactory($databaseConfig);
 
     $driver = $connectionFactory->getDriver();
     $prefix = $connectionFactory->getPrefix();

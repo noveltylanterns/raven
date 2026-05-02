@@ -17,13 +17,13 @@ use Raven\Core\Repository\ChannelWrite;
 use Raven\Core\Repository\SetRead;
 use Raven\Lib\Media\Panel\TaxonomyImageService;
 use Raven\Lib\Parser\ChannelRouteParser;
-use Raven\Lib\Parser\FeedRouteParser;
+use Raven\Lib\Parser\FeedParser;
 use Raven\Lib\Parser\SetParser;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\Scribe\MediaScribe;
 use Raven\Lib\Transport\Redirect;
 use Raven\Lib\Transport\Upload;
-use Raven\Lib\View\Panel\Editor;
+use Raven\Lib\View\Panel\EditorWrapper;
 use Raven\Lib\View\Panel\EditorTabs;
 
 /**
@@ -48,9 +48,9 @@ final class ChannelEditController
     private bool $tagEnabled;
     private TaxonomyImageService $taxonomyImageService;
     private MediaScribe $mediaScribe;
-    private FeedRouteParser $feedParser;
+    private FeedParser $feedParser;
     private EditorTabs $editorTabs;
-    private Editor $editor;
+    private EditorWrapper $editor;
     private Upload $uploadFileSetNormalizer;
 
     /**
@@ -64,9 +64,9 @@ final class ChannelEditController
      * @param bool $tagEnabled Whether tag features are enabled in runtime config.
      * @param TaxonomyImageService $taxonomyImageService Read-side taxonomy image config and path helper.
      * @param MediaScribe $mediaScribe Write-side meta-image upload and cleanup helper.
-     * @param FeedRouteParser $feedParser Feed route parser for RSS/Atom route settings.
+     * @param FeedParser $feedParser Feed route parser for RSS/Atom route settings.
      * @param EditorTabs $editorTabs Panel editor tab normalization and tab-preserving URL builder.
-     * @param Editor $editor Shared panel editor normalizers.
+     * @param EditorWrapper $editor Shared panel editor normalizers.
      * @param Upload $uploadFileSetNormalizer Normalizer for $_FILES upload groups.
      * @return void
      */
@@ -81,9 +81,9 @@ final class ChannelEditController
         bool $tagEnabled,
         TaxonomyImageService $taxonomyImageService,
         MediaScribe $mediaScribe,
-        FeedRouteParser $feedParser,
+        FeedParser $feedParser,
         EditorTabs $editorTabs,
-        Editor $editor,
+        EditorWrapper $editor,
         Upload $uploadFileSetNormalizer
     ) {
         $this->context = $context;

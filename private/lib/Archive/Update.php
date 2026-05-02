@@ -872,7 +872,7 @@ final class Update
     /**
      * Returns a map of relative paths for symlinks present in private/bin/.
      *
-     * Extension bin commands are symlinks created by ExtensionStorageProvisioner::ensureBinSymlinks().
+     * Extension bin commands are symlinks created by StorageProvisioner::ensureBinSymlinks().
      * Stock CLI scripts are regular files shipped in the source tree. Scanning for symlinks here
      * lets the updater distinguish between the two without any extension-registry coupling.
      *

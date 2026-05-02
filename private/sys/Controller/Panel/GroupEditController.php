@@ -22,7 +22,7 @@ use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\Scribe\MediaScribe;
 use Raven\Lib\Transport\Redirect;
 use Raven\Lib\Transport\Upload;
-use Raven\Lib\View\Panel\Editor;
+use Raven\Lib\View\Panel\EditorWrapper;
 use Raven\Lib\View\Panel\EditorTabs;
 
 /**
@@ -39,7 +39,7 @@ final class GroupEditController
     private GroupRead $groupRead;
     private GroupRouteParser $groupRouteParser;
     private EditorTabs $editorTabs;
-    private Editor $editor;
+    private EditorWrapper $editor;
     private TaxonomyImageService $taxonomyImageService;
     private MediaScribe $mediaScribe;
     private PanelPermissionDefinitionCatalog $panelPermissionDefinitionCatalog;
@@ -53,7 +53,7 @@ final class GroupEditController
      * @param GroupRead $groupRead Group repository read side for repo-backed group reads.
      * @param GroupRouteParser $groupRouteParser Group route parser for routing-policy reads.
      * @param EditorTabs $editorTabs Panel editor tab normalization and tab-preserving URL builder.
-     * @param Editor $editor Shared panel editor utility methods.
+     * @param EditorWrapper $editor Shared panel editor utility methods.
      * @param TaxonomyImageService $taxonomyImageService Read-side taxonomy image config and path helper.
      * @param MediaScribe $mediaScribe Write-side meta-image upload and cleanup helper.
      * @param PanelPermissionDefinitionCatalog $panelPermissionDefinitionCatalog Shared panel permission-definition catalog.
@@ -68,7 +68,7 @@ final class GroupEditController
         GroupRead $groupRead,
         GroupRouteParser $groupRouteParser,
         EditorTabs $editorTabs,
-        Editor $editor,
+        EditorWrapper $editor,
         TaxonomyImageService $taxonomyImageService,
         MediaScribe $mediaScribe,
         PanelPermissionDefinitionCatalog $panelPermissionDefinitionCatalog,

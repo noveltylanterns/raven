@@ -14,7 +14,6 @@ namespace Raven\Core\Controller\Public;
 use Raven\Core\Repository\UserRead;
 use Raven\Lib\Auth\LoginIdentifierResolver;
 use Raven\Lib\Parser\UserProfileParser;
-use Raven\Lib\View\Public\RouteRenderService;
 use Raven\Lib\View\Public\TemplateDecorator;
 
 /**
@@ -26,7 +25,6 @@ final class UserController
     private UserRead $userRead;
     private LoginIdentifierResolver $loginIdentifierResolver;
     private UserProfileParser $profileContactService;
-    private RouteRenderService $routeRenderService;
     private TemplateDecorator $templateDecorator;
 
     /**
@@ -42,7 +40,6 @@ final class UserController
         $this->userRead = $userRepo;
         $this->loginIdentifierResolver = new LoginIdentifierResolver();
         $this->profileContactService = new UserProfileParser($context->input());
-        $this->routeRenderService = new RouteRenderService();
         $this->templateDecorator = new TemplateDecorator(
             $context->config(),
             $context->input(),
@@ -106,12 +103,17 @@ final class UserController
      */
     private function renderProfileUnavailable(string $error, string $mode): void
     {
-        $payload = $this->routeRenderService->profileUnavailablePayload($error, $mode, $this->context->siteData());
-        http_response_code((int) ($payload['status'] ?? 404));
+        $status = $error === 'permission_denied' ? 403 : 404;
+        $siteData = $this->context->siteData();
+
+        http_response_code($status);
         $this->context->renderPublic(
-            (string) ($payload['template'] ?? 'profile/index'),
-            is_array($payload['data'] ?? null) ? $payload['data'] : [],
-            (string) ($payload['layout'] ?? 'wrapper')
+            'profile/index',
+            [
+                'site' => $siteData,
+                'profile_denied' => $error === 'permission_denied' && $mode === 'private',
+            ],
+            'wrapper'
         );
     }
 

@@ -12,7 +12,7 @@ declare(strict_types=1);
 namespace Raven\Ext\Smallweb;
 
 use Raven\Lib\Archive\Folder;
-use Raven\Lib\Extension\ExtensionStorageProvisioner;
+use Raven\Lib\Extension\StorageProvisioner;
 use Raven\Lib\Format\Txt;
 
 final class SmallwebService
@@ -365,7 +365,7 @@ final class SmallwebService
 
         if (!$this->folders->ensureDirectory($dir, $chmodDir)) {
             try {
-                $dir = (new ExtensionStorageProvisioner($this->projectRoot))->ensureAuxStorageDirectory($protocol);
+                $dir = (new StorageProvisioner($this->projectRoot))->ensureAuxStorageDirectory($protocol);
             } catch (\Throwable) {
                 return false;
             }

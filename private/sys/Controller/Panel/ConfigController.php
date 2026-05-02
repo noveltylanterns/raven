@@ -20,7 +20,7 @@ use Raven\Lib\Parser\ConfigParser;
 use Raven\Lib\Parser\UserProfileParser;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\Scribe\ConfigScribe;
-use Raven\Lib\View\Panel\Editor;
+use Raven\Lib\View\Panel\EditorWrapper;
 use Raven\Lib\View\Panel\EditorBlocks;
 use Raven\Lib\View\Panel\EditorTabs;
 use Raven\Lib\View\Public\ThemeCatalog;
@@ -140,7 +140,7 @@ final class ConfigController
     private ?SetRead $tagSetRepo = null;
     private UserProfileParser $profileContacts;
     private EditorTabs $editorTabs;
-    private Editor $editor;
+    private EditorWrapper $editor;
     private EditorBlocks $editorBlocks;
     /** @var array<string, string>|null */
     private ?array $publicThemeOptionsCache = null;
@@ -160,7 +160,7 @@ final class ConfigController
      * @param callable(): SetRead $categorySetRepoResolver Lazy category-set read resolver.
      * @param callable(): SetRead $tagSetRepoResolver Lazy tag-set read resolver.
      * @param EditorTabs $editorTabs Shared panel editor-tab normalization and URL builder.
-     * @param Editor $editor Shared panel editor utility methods (body-text editor, theme normalization).
+     * @param EditorWrapper $editor Shared panel editor utility methods (body-text editor, theme normalization).
      * @param EditorBlocks $editorBlocks Shared repeater-block view helper for modular panel rows.
      * @param ThemeCatalog $themeCatalogService Shared public-theme catalog for config theme options.
      * @return void
@@ -173,7 +173,7 @@ final class ConfigController
         callable $categorySetRepoResolver,
         callable $tagSetRepoResolver,
         EditorTabs $editorTabs,
-        Editor $editor,
+        EditorWrapper $editor,
         EditorBlocks $editorBlocks,
         ThemeCatalog $themeCatalogService
     ) {

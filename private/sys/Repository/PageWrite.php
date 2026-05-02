@@ -14,7 +14,7 @@ use PDO;
 use RuntimeException;
 use Raven\Lib\Parser\ChannelRepoParser;
 use Raven\Lib\Parser\PageBlockParser;
-use Raven\Lib\Parser\PageDuplicateParser;
+use Raven\Core\Debug\UniquenessProfiler;
 use Raven\Lib\Parser\PageRepoParser;
 use Raven\Lib\Scribe\PageScribe;
 use Raven\Lib\Database\TableNameResolver;
@@ -189,7 +189,7 @@ final class PageWrite
      */
     private function pathExists(string $slug, ?int $channelId, ?int $excludeId = null): bool
     {
-        return PageDuplicateParser::exists(
+        return UniquenessProfiler::exists(
             $this->db,
             $this->table('pages'),
             $slug,

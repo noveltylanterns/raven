@@ -23,12 +23,12 @@ use Raven\Lib\Auth\Panel\PanelAccess;
 use Raven\Lib\Format\Csv;
 use Raven\Lib\Parser\CategoryRouteParser;
 use Raven\Lib\Parser\ChannelRouteParser;
-use Raven\Lib\Parser\FeedRouteParser;
+use Raven\Lib\Parser\FeedParser;
 use Raven\Lib\Parser\GroupRouteParser;
 use Raven\Lib\Parser\TagRouteParser;
 use Raven\Lib\Parser\TaxonomyRepoParser;
 use Raven\Lib\Security\InputSanitizer;
-use Raven\Lib\View\Panel\PanelRoutingPreviewService;
+use Raven\Core\Router\RoutePreview;
 use Raven\Lib\View\Public\ThemeCatalog;
 
 /**
@@ -54,10 +54,10 @@ final class RoutingController
     private LoginIdentifierResolver $identifierResolver;
     private ?RouteProfiler $routeProfiler = null;
     private ?Csv $csvHandler = null;
-    private ?FeedRouteParser $feedParser = null;
+    private ?FeedParser $feedParser = null;
     private ?GroupRouteParser $groupParser = null;
     private ThemeCatalog $themeCatalogService;
-    private ?PanelRoutingPreviewService $panelRoutingPreviewService = null;
+    private ?RoutePreview $panelRoutingPreviewService = null;
 
     /**
      * @param SharedController $context Shared panel request context.
@@ -547,10 +547,10 @@ final class RoutingController
     /**
      * Returns the feed route parser on first use.
      */
-    private function feedParser(): FeedRouteParser
+    private function feedParser(): FeedParser
     {
-        if (!$this->feedParser instanceof FeedRouteParser) {
-            $this->feedParser = new FeedRouteParser($this->config, $this->input);
+        if (!$this->feedParser instanceof FeedParser) {
+            $this->feedParser = new FeedParser($this->config, $this->input);
         }
 
         return $this->feedParser;
@@ -595,10 +595,10 @@ final class RoutingController
     /**
      * Returns the panel routing-preview service on first use.
      */
-    private function panelRoutingPreviewService(): PanelRoutingPreviewService
+    private function panelRoutingPreviewService(): RoutePreview
     {
-        if (!$this->panelRoutingPreviewService instanceof PanelRoutingPreviewService) {
-            $this->panelRoutingPreviewService = new PanelRoutingPreviewService(
+        if (!$this->panelRoutingPreviewService instanceof RoutePreview) {
+            $this->panelRoutingPreviewService = new RoutePreview(
                 $this->root,
                 $this->input,
                 $this->themeCatalogService

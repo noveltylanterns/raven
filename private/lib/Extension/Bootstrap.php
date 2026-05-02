@@ -1,5 +1,12 @@
 <?php
 
+/**
+ * RAVEN CMS
+ * ~/private/lib/Extension/Bootstrap.php
+ * Loads and validates extension `ext.php` bootstrap + storage contract data.
+ * Docs: https://raven.lanterns.io
+ */
+
 declare(strict_types=1);
 
 namespace Raven\Lib\Extension;
@@ -7,7 +14,7 @@ namespace Raven\Lib\Extension;
 /**
  * Loads and validates extension `ext.php` bootstrap + storage contract data.
  */
-final class ExtensionBootstrapContractResolver
+final class Bootstrap
 {
     private ValidateManifest $manifestValidator;
 

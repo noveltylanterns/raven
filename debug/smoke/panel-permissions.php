@@ -44,7 +44,7 @@ use Raven\Core\Repository\UserWrite;
 use Raven\Lib\Auth\Panel\PanelAccess;
 use Raven\Lib\Extension\Panel\ExtensionCatalogService;
 use Raven\Lib\Extension\Panel\ExtensionPermissionCatalogService;
-use Raven\Lib\Extension\Panel\ExtensionScaffoldService;
+use Raven\Lib\Extension\Scaffold;
 use Raven\Lib\Extension\StateRead;
 use Raven\Lib\Security\InputSanitizer;
 
@@ -155,7 +155,7 @@ final class PanelPermissionsSmokeRunner
 
     private function seedDebugExtensions(): void
     {
-        $scaffold = new ExtensionScaffoldService();
+        $scaffold = new Scaffold();
 
         $definitions = [
             [

@@ -12,7 +12,7 @@ declare(strict_types=1);
 namespace Raven\Lib\Scribe;
 
 use PDO;
-use Raven\Lib\Auth\UserStringService;
+use Raven\Lib\Security\UserString;
 use RuntimeException;
 
 /**
@@ -24,14 +24,14 @@ use RuntimeException;
  */
 final class UserScribe
 {
-    private UserStringService $userStringService;
+    private UserString $userStringService;
 
     /**
      * Prepares the user scribe for user write operations.
      */
     public function __construct()
     {
-        $this->userStringService = new UserStringService();
+        $this->userStringService = new UserString();
     }
 
     /**

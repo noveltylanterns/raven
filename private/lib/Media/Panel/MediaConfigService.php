@@ -2,21 +2,21 @@
 
 /**
  * RAVEN CMS
- * ~/private/lib/View/Panel/PanelMediaConfigService.php
+ * ~/private/lib/Media/Panel/MediaConfigService.php
  * Media config readers and upload-limit display helpers for panel controllers.
  * Docs: https://raven.lanterns.io
  */
 
 declare(strict_types=1);
 
-namespace Raven\Lib\View\Panel;
+namespace Raven\Lib\Media\Panel;
 
 use Raven\Core\Config;
 
 /**
  * Shared panel media configuration and helper-text formatting policy.
  */
-final class PanelMediaConfigService
+final class MediaConfigService
 {
     private Config $config;
 

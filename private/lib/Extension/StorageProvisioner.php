@@ -1,5 +1,12 @@
 <?php
 
+/**
+ * RAVEN CMS
+ * ~/private/lib/Extension/StorageProvisioner.php
+ * Creates extension-owned local storage directories and asset mirrors.
+ * Docs: https://raven.lanterns.io
+ */
+
 declare(strict_types=1);
 
 namespace Raven\Lib\Extension;
@@ -9,7 +16,7 @@ use RuntimeException;
 /**
  * Creates extension-owned local storage directories and asset mirrors.
  */
-final class ExtensionStorageProvisioner
+final class StorageProvisioner
 {
     private string $projectRoot;
     private ValidateManifest $manifestValidator;

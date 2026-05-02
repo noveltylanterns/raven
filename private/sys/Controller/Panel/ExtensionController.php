@@ -13,16 +13,16 @@ namespace Raven\Core\Controller\Panel;
 
 use Closure;
 use Raven\Core\Config;
-use Raven\Core\Controller\DatabaseController;
+use Raven\Core\Runtime\DatabaseFactory;
 use Raven\Lib\Archive\Folder as ArchiveDelete;
 use Raven\Lib\Archive\Install as ArchiveInstall;
 use Raven\Lib\Archive\Package as ArchivePackage;
-use Raven\Lib\Extension\ExtensionBootstrapContractResolver;
-use Raven\Lib\Extension\ExtensionStorageCleaner;
-use Raven\Lib\Extension\ExtensionStorageProvisioner;
+use Raven\Lib\Extension\Bootstrap;
+use Raven\Lib\Extension\StorageCleaner;
+use Raven\Lib\Extension\StorageProvisioner;
 use Raven\Lib\Extension\StateRead;
 use Raven\Lib\Extension\Panel\ExtensionCatalogService;
-use Raven\Lib\Extension\Panel\ExtensionScaffoldService;
+use Raven\Lib\Extension\Scaffold;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\Transport\Upload;
 use Raven\Lib\Transport\Redirect;
@@ -43,9 +43,9 @@ final class ExtensionController
     private ?ArchivePackage $archivePackages = null;
     private ?ArchiveInstall $packageInstallWorkflowService = null;
     private ?ArchiveDelete $directoryTreeService = null;
-    private ?ExtensionScaffoldService $extensionScaffoldService = null;
-    private ?ExtensionStorageProvisioner $extensionStorageProvisioner = null;
-    private ?ExtensionBootstrapContractResolver $extensionBootstrapContractResolver = null;
+    private ?Scaffold $extensionScaffoldService = null;
+    private ?StorageProvisioner $extensionStorageProvisioner = null;
+    private ?Bootstrap $extensionBootstrapContractResolver = null;
 
     /**
      * @param SharedController $context Shared panel request context.
@@ -719,10 +719,10 @@ final class ExtensionController
     /**
      * Returns the extension storage provisioner on first use.
      */
-    private function extensionStorageProvisioner(): ExtensionStorageProvisioner
+    private function extensionStorageProvisioner(): StorageProvisioner
     {
-        if (!$this->extensionStorageProvisioner instanceof ExtensionStorageProvisioner) {
-            $this->extensionStorageProvisioner = new ExtensionStorageProvisioner($this->root);
+        if (!$this->extensionStorageProvisioner instanceof StorageProvisioner) {
+            $this->extensionStorageProvisioner = new StorageProvisioner($this->root);
         }
 
         return $this->extensionStorageProvisioner;
@@ -731,10 +731,10 @@ final class ExtensionController
     /**
      * Returns the extension bootstrap-contract resolver on first use.
      */
-    private function extensionBootstrapContractResolver(): ExtensionBootstrapContractResolver
+    private function extensionBootstrapContractResolver(): Bootstrap
     {
-        if (!$this->extensionBootstrapContractResolver instanceof ExtensionBootstrapContractResolver) {
-            $this->extensionBootstrapContractResolver = new ExtensionBootstrapContractResolver();
+        if (!$this->extensionBootstrapContractResolver instanceof Bootstrap) {
+            $this->extensionBootstrapContractResolver = new Bootstrap();
         }
 
         return $this->extensionBootstrapContractResolver;
@@ -775,8 +775,8 @@ final class ExtensionController
         }
 
         $databaseConfig = (array) $this->config->get('database', []);
-        $connectionFactory = new DatabaseController($databaseConfig);
-        $cleaner = new ExtensionStorageCleaner(
+        $connectionFactory = new DatabaseFactory($databaseConfig);
+        $cleaner = new StorageCleaner(
             $this->root,
             $connectionFactory->createAppConnection(),
             $connectionFactory->getDriver(),
@@ -801,10 +801,10 @@ final class ExtensionController
     /**
      * Returns the extension-scaffold service on first use.
      */
-    private function extensionScaffoldService(): ExtensionScaffoldService
+    private function extensionScaffoldService(): Scaffold
     {
-        if (!$this->extensionScaffoldService instanceof ExtensionScaffoldService) {
-            $this->extensionScaffoldService = new ExtensionScaffoldService();
+        if (!$this->extensionScaffoldService instanceof Scaffold) {
+            $this->extensionScaffoldService = new Scaffold();
         }
 
         return $this->extensionScaffoldService;

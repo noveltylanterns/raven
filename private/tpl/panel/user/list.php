@@ -23,7 +23,7 @@
 use Raven\Lib\Auth\Panel\PanelAccess;
 use Raven\Lib\View\Panel\Footer;
 use Raven\Lib\View\Panel\Header;
-use Raven\Lib\View\Panel\ListCard;
+use Raven\Lib\View\Panel\ListWrapper;
 use Raven\Lib\View\Panel\Toolbar;
 use function Raven\Lib\Security\e;
 
@@ -249,7 +249,7 @@ $userListToolbarItems[] = '<button type="submit" class="btn btn-danger" form="' 
     </tbody>
 </table>
 <?php $usersTableHtml = (string) ob_get_clean(); ?>
-<?= ListCard::render([
+<?= ListWrapper::render([
     'is_empty'            => $users === [],
     'empty_message'       => 'No users found.',
     'search_id'           => $usersSearchId,

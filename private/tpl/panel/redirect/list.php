@@ -18,7 +18,7 @@
 
 use Raven\Lib\View\Panel\Footer;
 use Raven\Lib\View\Panel\Header;
-use Raven\Lib\View\Panel\ListCard;
+use Raven\Lib\View\Panel\ListWrapper;
 use Raven\Lib\View\Panel\Toolbar;
 use function Raven\Lib\Security\e;
 
@@ -190,7 +190,7 @@ $redirectListToolbarItems = [
     </tbody>
 </table>
 <?php $redirectTableHtml = (string) ob_get_clean(); ?>
-<?= ListCard::render([
+<?= ListWrapper::render([
     'is_empty'            => $redirectRows === [],
     'empty_message'       => 'No redirects yet.',
     'search_id'           => $redirectSearchId,

@@ -34,13 +34,13 @@ use Raven\Lib\Parser\TaxonomyRepoParser;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\Transport\Redirect;
 use Raven\Lib\Transport\Upload;
-use Raven\Lib\View\Panel\Editor;
+use Raven\Lib\View\Panel\EditorWrapper;
 use Raven\Lib\View\Panel\EditorAuthor;
 use Raven\Lib\View\Panel\EditorBlocks;
 use Raven\Lib\View\Panel\EditorMCE;
 use Raven\Lib\View\Panel\EditorMDE;
 use Raven\Lib\View\Panel\EditorTabs;
-use Raven\Lib\View\Panel\PageBlocks;
+use Raven\Lib\View\Panel\EditorBlocksPage;
 use Raven\Lib\View\Panel\PanelPost;
 
 /**
@@ -79,7 +79,7 @@ final class PageEditController
     /** @var Closure(string): array<string, mixed> */
     private Closure $extensionServicesFor;
     private ?PageBlockParser $pageBlockParser = null;
-    private ?PageBlocks $pageBlocks = null;
+    private ?EditorBlocksPage $pageBlocks = null;
     private ?Upload $uploadFileSetNormalizer = null;
     private ?PanelPost $panelPostNormalizer = null;
     private ?EditorAuthor $pageAuthorOptionBuilder = null;
@@ -87,7 +87,7 @@ final class PageEditController
     private UserRead $userRepo;
     private ChannelRead $channelRead;
     private EditorTabs $editorTabs;
-    private Editor $editor;
+    private EditorWrapper $editor;
     private EditorBlocks $editorBlocks;
     private EditorMCE $editorMce;
     private EditorMDE $editorMde;
@@ -114,7 +114,7 @@ final class PageEditController
      * @param UserRead $userRepo User repository read side for author validation and author select options.
      * @param ChannelRead $channelRead Channel repository read side for channel-scope and slug lookups.
      * @param EditorTabs $editorTabs Panel editor tab normalization and tab-preserving URL builder.
-     * @param Editor $editor Shared panel editor utility methods (body-text editor normalization).
+     * @param EditorWrapper $editor Shared panel editor utility methods (body-text editor normalization).
      * @param EditorBlocks $editorBlocks Shared repeater-block view helper for modular panel rows.
      * @param EditorMCE $editorMce TinyMCE-specific helpers for asset URL and gallery-item payload building.
      * @param EditorMDE $editorMde EasyMDE-specific helpers for asset URLs and JS fallback path lists.
@@ -141,7 +141,7 @@ final class PageEditController
         UserRead $userRepo,
         ChannelRead $channelRead,
         EditorTabs $editorTabs,
-        Editor $editor,
+        EditorWrapper $editor,
         EditorBlocks $editorBlocks,
         EditorMCE $editorMce,
         EditorMDE $editorMde,
@@ -862,12 +862,12 @@ final class PageEditController
     /**
      * Returns the panel page-block helper on first use.
      *
-     * @return PageBlocks Panel page-block helper for editor payload normalization.
+     * @return EditorBlocksPage Panel page-block helper for editor payload normalization.
      */
-    private function pageBlocks(): PageBlocks
+    private function pageBlocks(): EditorBlocksPage
     {
-        if (!$this->pageBlocks instanceof PageBlocks) {
-            $this->pageBlocks = new PageBlocks($this->input, $this->pageBlockParser());
+        if (!$this->pageBlocks instanceof EditorBlocksPage) {
+            $this->pageBlocks = new EditorBlocksPage($this->input, $this->pageBlockParser());
         }
 
         return $this->pageBlocks;

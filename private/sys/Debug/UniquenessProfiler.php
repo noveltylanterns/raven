@@ -2,14 +2,14 @@
 
 /**
  * RAVEN CMS
- * ~/private/lib/Parser/PageDuplicateParser.php
+ * ~/private/sys/Debug/UniquenessProfiler.php
  * Shared (slug, channel) path-scope uniqueness lookup helper.
  * Docs: https://raven.lanterns.io
  */
 
 declare(strict_types=1);
 
-namespace Raven\Lib\Parser;
+namespace Raven\Core\Debug;
 
 use PDO;
 
@@ -18,7 +18,7 @@ use PDO;
  *
  * Used by repositories to enforce slug uniqueness before inserting or updating page records.
  */
-final class PageDuplicateParser
+final class UniquenessProfiler
 {
     /**
      * Returns whether a slug exists within a given channel scope in a database table.

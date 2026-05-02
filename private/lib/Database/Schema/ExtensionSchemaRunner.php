@@ -13,7 +13,7 @@ namespace Raven\Lib\Database\Schema;
 
 use PDO;
 use Raven\Lib\Database\TableNameResolver;
-use Raven\Lib\Extension\ExtensionBootstrapContractResolver;
+use Raven\Lib\Extension\Bootstrap;
 use Raven\Lib\Extension\Registry;
 use Raven\Lib\Extension\Resolver;
 
@@ -23,15 +23,15 @@ use Raven\Lib\Extension\Resolver;
 final class ExtensionSchemaRunner
 {
     private TableNameResolver $tables;
-    private ExtensionBootstrapContractResolver $bootstrapResolver;
+    private Bootstrap $bootstrapResolver;
 
     public function __construct(
         ?TableNameResolver $tables = null,
-        ?ExtensionBootstrapContractResolver $bootstrapResolver = null
+        ?Bootstrap $bootstrapResolver = null
     )
     {
         $this->tables = $tables ?? new TableNameResolver();
-        $this->bootstrapResolver = $bootstrapResolver ?? new ExtensionBootstrapContractResolver();
+        $this->bootstrapResolver = $bootstrapResolver ?? new Bootstrap();
     }
 
     public function ensureEnabledExtensionSchemas(PDO $db, string $driver, string $prefix): void

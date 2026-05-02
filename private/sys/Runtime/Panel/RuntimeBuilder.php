@@ -26,7 +26,7 @@ use Raven\Lib\Extension\Panel\ExtensionPermissionCatalogService;
 use Raven\Lib\Extension\StateRead;
 use Raven\Lib\Parser\ConfigParser;
 use Raven\Lib\Media\Panel\MediaManager;
-use Raven\Lib\View\Panel\Editor;
+use Raven\Lib\View\Panel\EditorWrapper;
 use Raven\Lib\View\Panel\EditorBlocks;
 use Raven\Lib\View\Panel\EditorMCE;
 use Raven\Lib\View\Panel\EditorMDE;
@@ -134,14 +134,14 @@ final class RuntimeBuilder
             };
         };
 
-        // Editor helpers are lazy factories so non-edit routes (dashboard, logs, config,
+        // EditorWrapper helpers are lazy factories so non-edit routes (dashboard, logs, config,
         // user list, etc.) pay zero construction cost. Each $memoize wrapper ensures the
         // object is created at most once per request regardless of how many edit routes
         // share the same controller instance.
         $rvn['panel_editor_tabs'] = $memoize(static function () use ($rvn): EditorTabs {
             return new EditorTabs($rvn['input']);
         });
-        $rvn['panel_editor'] = $memoize(static fn (): Editor => new Editor());
+        $rvn['panel_editor'] = $memoize(static fn (): EditorWrapper => new EditorWrapper());
         $rvn['panel_editor_blocks'] = $memoize(static fn (): EditorBlocks => new EditorBlocks());
         // MCE and MDE are page-editor-only; kept here so extensions accessing $rvn
         // can also pull them lazily if needed.

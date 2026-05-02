@@ -46,14 +46,14 @@ use Raven\Lib\Auth\SessionFlash;
 use Raven\Lib\Extension\Panel\ExtensionCatalogService;
 use Raven\Lib\Media\Panel\TaxonomyImageService;
 use Raven\Lib\Media\Panel\UserMediaPathService;
-use Raven\Lib\Parser\FeedRouteParser;
+use Raven\Lib\Parser\FeedParser;
 use Raven\Lib\Parser\GroupRouteParser;
 use Raven\Lib\Parser\UserProfileParser;
 use Raven\Lib\Scribe\MediaScribe;
 use Raven\Lib\Scribe\UserMediaScribe;
 use Raven\Lib\Transport\Upload;
 use Raven\Lib\View\Error as ViewError;
-use Raven\Lib\View\Panel\PanelMediaConfigService;
+use Raven\Lib\Media\Panel\MediaConfigService;
 use Raven\Lib\View\Public\ThemeCatalog;
 
 /**
@@ -320,7 +320,7 @@ final class ControllerFactories
                 $taxonomyDomain['tag_enabled'],
                 new TaxonomyImageService($rvn['config']),
                 new MediaScribe($rvn['db'], $rvn['driver'], $rvn['prefix'], $rvn['config'], (string) $rvn['root']),
-                new FeedRouteParser($rvn['config'], $rvn['input']),
+                new FeedParser($rvn['config'], $rvn['input']),
                 $rvn['panel_editor_tabs'](),
                 $rvn['panel_editor'](),
                 new Upload()
@@ -570,7 +570,7 @@ final class ControllerFactories
                 $rvn['panel_editor_tabs'](),
                 $rvn['panel_editor'](),
                 $rvn['panel_editor_blocks'](),
-                new PanelMediaConfigService($rvn['config']),
+                new MediaConfigService($rvn['config']),
                 new UserProfileParser($rvn['input']),
                 new PanelTwoFactorPreferencesService($rvn['input']),
                 new UserMediaScribe((string) $rvn['root']),
@@ -659,7 +659,7 @@ final class ControllerFactories
                 $rvn['panel_editor_tabs'](),
                 $rvn['panel_editor'](),
                 $rvn['panel_editor_blocks'](),
-                new PanelMediaConfigService($rvn['config']),
+                new MediaConfigService($rvn['config']),
                 new UserProfileParser($rvn['input']),
                 new PanelTwoFactorPreferencesService($rvn['input']),
                 new UserMediaScribe((string) $rvn['root']),

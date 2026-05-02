@@ -4,6 +4,11 @@
 
 ### May 2, 2026 — Public runtime initializer, nav session cache guard, runtime builder relocation, and naming cleanup
 
+- Completed the `build/todo.md` "Misc Bugs & Tweaks" renaming batch: `FeedRouteParser` -> `FeedParser`, `RedirectDataParser` -> `RedirectParser`, `PageDuplicateParser` moved/renamed to `sys/Debug/UniquenessProfiler`, `View/Panel/PageBlocks` -> `EditorBlocksPage`, `View/Panel/Editor` -> `EditorWrapper`, and panel list rendering consolidated to a single `View/Panel/ListWrapper` implementation.
+- Moved cross-domain helpers to their intended homes: `PanelMediaConfigService` moved to `lib/Media/Panel/MediaConfigService`, `PanelRoutingPreviewService` moved/renamed to `sys/Router/RoutePreview`, `Security/SessionToken` moved to `Auth/SessionToken`, `Auth/UserStringService` moved/renamed to `Security/UserString`, and extension storage/bootstrap/scaffold helpers were flattened to `lib/Extension/{Bootstrap,StorageProvisioner,StorageCleaner,Scaffold}`.
+- Removed `lib/View/Public/RouteRenderService` and inlined its two unavailable-route payload builders directly into `Public/UserController` and `Public/GroupController` as requested by the backlog note.
+- Updated `docs/filetree.md` and the checklist entries in `build/todo.md` to match the new file/class locations, and re-ran syntax validation on all modified PHP files plus `debug/smoke/panel-permissions.php` (PASS).
+
 - Completed the panel orchestration fold-in for routing-adjacent helpers: `private/sys/Router/Panel/NavSessionPopulator.php` and `private/sys/Router/Panel/ThemeAssetResponder.php` were removed, their logic now lives on `private/sys/Controller/Panel/SharedController.php` (`populateNavSession()` and `serveThemeAssetIfMatched()`), and `panel/index.php` now calls those shared-controller methods directly.
 - Decommissioned `private/sys/Router/Panel/ExtensionRouter.php` and moved reusable extension panel-route loading/gating primitives into `private/lib/Extension/Panel/PanelRouteRegistrar.php`.
 - `private/sys/Router/Panel/PanelRouter.php` now loads extension-provided panel routes directly via `PanelRouteRegistrar::register(...)`, keeping the `sys` layer as orchestration while reusable extension policy/route-loading logic lives under `lib\Extension`.

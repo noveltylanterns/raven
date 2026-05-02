@@ -16,7 +16,7 @@ use Raven\Lib\Auth\AuthService;
 use Raven\Lib\Transport\Response;
 use Raven\Lib\Transport\Request;
 use Raven\Lib\Auth\SessionFlash;
-use Raven\Lib\Parser\FeedRouteParser;
+use Raven\Lib\Parser\FeedParser;
 use Raven\Lib\Parser\GroupRouteParser;
 use Raven\Lib\Parser\PanelParser;
 use Raven\Lib\Parser\UserProfileParser;
@@ -43,7 +43,7 @@ final class SharedController
     private ThemeBrace $themeBrace;
     private bool $captchaScriptIncluded = false;
     private ?Request $requestContextResolver = null;
-    private ?FeedRouteParser $feedParser = null;
+    private ?FeedParser $feedParser = null;
     private ?GroupRouteParser $groupParser = null;
     private ?UserProfileParser $profileContactService = null;
     private ?Captcha $captchaService = null;
@@ -152,12 +152,12 @@ final class SharedController
     /**
      * Returns the cached feed route parser.
      *
-     * @return FeedRouteParser Shared feed routing-policy parser.
+     * @return FeedParser Shared feed routing-policy parser.
      */
-    public function feedParser(): FeedRouteParser
+    public function feedParser(): FeedParser
     {
-        if (!$this->feedParser instanceof FeedRouteParser) {
-            $this->feedParser = new FeedRouteParser($this->config, $this->input);
+        if (!$this->feedParser instanceof FeedParser) {
+            $this->feedParser = new FeedParser($this->config, $this->input);
         }
 
         return $this->feedParser;

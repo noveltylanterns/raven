@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Raven\Lib\Extension\Panel;
 
 use Raven\Core\Config;
-use Raven\Lib\Extension\ExtensionBootstrapContractResolver;
+use Raven\Lib\Extension\Bootstrap;
 use Raven\Lib\Extension\Registry;
 use Raven\Lib\Extension\Resolver;
 use Raven\Lib\Extension\StateRead;
@@ -23,7 +23,7 @@ final class ExtensionCatalogService
     private Config $config;
     private InputSanitizer $input;
     private ValidateManifest $manifestValidator;
-    private ExtensionBootstrapContractResolver $bootstrapContractResolver;
+    private Bootstrap $bootstrapContractResolver;
 
     public function __construct(
         string $projectRoot,
@@ -32,7 +32,7 @@ final class ExtensionCatalogService
         Config $config,
         InputSanitizer $input,
         ?ValidateManifest $manifestValidator = null,
-        ?ExtensionBootstrapContractResolver $bootstrapContractResolver = null
+        ?Bootstrap $bootstrapContractResolver = null
     ) {
         $this->projectRoot = rtrim($projectRoot, '/\\');
         $this->stateStore = $stateStore;
@@ -40,7 +40,7 @@ final class ExtensionCatalogService
         $this->config = $config;
         $this->input = $input;
         $this->manifestValidator = $manifestValidator ?? new ValidateManifest();
-        $this->bootstrapContractResolver = $bootstrapContractResolver ?? new ExtensionBootstrapContractResolver($this->manifestValidator);
+        $this->bootstrapContractResolver = $bootstrapContractResolver ?? new Bootstrap($this->manifestValidator);
     }
 
     /**

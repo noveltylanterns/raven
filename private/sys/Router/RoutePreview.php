@@ -2,14 +2,14 @@
 
 /**
  * RAVEN CMS
- * ~/private/lib/View/Panel/PanelRoutingPreviewService.php
+ * ~/private/sys/Router/RoutePreview.php
  * Shared routing-preview derivation helpers for panel diagnostics.
  * Docs: https://raven.lanterns.io
  */
 
 declare(strict_types=1);
 
-namespace Raven\Lib\View\Panel;
+namespace Raven\Core\Router;
 
 use Raven\Core\Config;
 use Raven\Lib\Parser\ChannelRouteParser;
@@ -20,7 +20,7 @@ use Raven\Lib\View\Public\ThemeCatalog;
 /**
  * Shared helpers for panel routing-preview derivations.
  */
-final class PanelRoutingPreviewService
+final class RoutePreview
 {
     private string $projectRoot;
     private InputSanitizer $input;

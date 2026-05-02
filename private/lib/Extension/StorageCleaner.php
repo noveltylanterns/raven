@@ -2,7 +2,7 @@
 
 /**
  * RAVEN CMS
- * ~/private/lib/Extension/ExtensionStorageCleaner.php
+ * ~/private/lib/Extension/StorageCleaner.php
  * Deletes extension-owned storage directories and database tables during uninstall.
  * Docs: https://raven.lanterns.io
  */
@@ -18,7 +18,7 @@ use RuntimeException;
 /**
  * Deletes extension-owned local storage directories and DB tables.
  */
-final class ExtensionStorageCleaner
+final class StorageCleaner
 {
     private string $projectRoot;
     private PDO $db;

@@ -2,19 +2,19 @@
 
 /**
  * RAVEN CMS
- * ~/private/lib/Extension/Panel/ExtensionScaffoldService.php
+ * ~/private/lib/Extension/Scaffold.php
  * Shared extension scaffold generator for panel and CLI create workflows.
  * Docs: https://raven.lanterns.io
  */
 
 declare(strict_types=1);
 
-namespace Raven\Lib\Extension\Panel;
+namespace Raven\Lib\Extension;
 
 /**
  * Shared extension scaffold generator for panel and CLI create workflows.
  */
-final class ExtensionScaffoldService
+final class Scaffold
 {
     /**
      * Creates a minimal extension scaffold on disk.

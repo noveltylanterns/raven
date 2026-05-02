@@ -30,10 +30,10 @@ use Raven\Lib\Parser\UserProfileParser;
 use Raven\Lib\Scribe\UserMediaScribe;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\Transport\Redirect;
-use Raven\Lib\View\Panel\Editor;
+use Raven\Lib\View\Panel\EditorWrapper;
 use Raven\Lib\View\Panel\EditorBlocks;
 use Raven\Lib\View\Panel\EditorTabs;
-use Raven\Lib\View\Panel\PanelMediaConfigService;
+use Raven\Lib\Media\Panel\MediaConfigService;
 
 /**
  * Handles user and invite CRUD routes for the panel.
@@ -58,9 +58,9 @@ final class UserEditController
     private PanelInvitePolicyService $panelInvitePolicyService;
     private LoginIdentifierResolver $loginIdentifierResolver;
     private EditorTabs $editorTabs;
-    private Editor $editor;
+    private EditorWrapper $editor;
     private EditorBlocks $editorBlocks;
-    private PanelMediaConfigService $panelMediaConfigService;
+    private MediaConfigService $panelMediaConfigService;
     private UserProfileParser $profileContactService;
     private PanelTwoFactorPreferencesService $panelTwoFactorPreferencesService;
     private UserMediaScribe $userMediaScribe;
@@ -80,9 +80,9 @@ final class UserEditController
      * @param PanelInvitePolicyService $panelInvitePolicyService Shared invite-form parsing helper.
      * @param LoginIdentifierResolver $loginIdentifierResolver Shared login-identifier normalization helper.
      * @param EditorTabs $editorTabs Shared editor-tab normalization helper.
-     * @param Editor $editor Shared panel editor utility methods (theme normalization).
+     * @param EditorWrapper $editor Shared panel editor utility methods (theme normalization).
      * @param EditorBlocks $editorBlocks Shared repeater-block view helper for modular panel rows.
-     * @param PanelMediaConfigService $panelMediaConfigService Shared media-limit helper.
+     * @param MediaConfigService $panelMediaConfigService Shared media-limit helper.
      * @param UserProfileParser $profileContactService Shared profile-contact normalizer.
      * @param PanelTwoFactorPreferencesService $panelTwoFactorPreferencesService Shared 2FA list normalizer.
      * @param UserMediaScribe $userMediaScribe Shared user-media write helper.
@@ -103,9 +103,9 @@ final class UserEditController
         PanelInvitePolicyService $panelInvitePolicyService,
         LoginIdentifierResolver $loginIdentifierResolver,
         EditorTabs $editorTabs,
-        Editor $editor,
+        EditorWrapper $editor,
         EditorBlocks $editorBlocks,
-        PanelMediaConfigService $panelMediaConfigService,
+        MediaConfigService $panelMediaConfigService,
         UserProfileParser $profileContactService,
         PanelTwoFactorPreferencesService $panelTwoFactorPreferencesService,
         UserMediaScribe $userMediaScribe,

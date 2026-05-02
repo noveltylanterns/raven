@@ -2,7 +2,7 @@
 
 /**
  * RAVEN CMS
- * ~/private/lib/View/Panel/PageBlocks.php
+ * ~/private/lib/View/Panel/EditorBlocksPage.php
  * Panel page body-block helpers for editor submissions and block menus.
  * Docs: https://raven.lanterns.io
  */
@@ -17,7 +17,7 @@ use Raven\Lib\Security\InputSanitizer;
 /**
  * Panel-only page body-block helper for editor payload normalization.
  */
-final class PageBlocks
+final class EditorBlocksPage
 {
     private InputSanitizer $input;
     private PageBlockParser $pageBlockParser;

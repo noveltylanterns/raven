@@ -2,7 +2,7 @@
 
 /**
  * RAVEN CMS
- * ~/private/lib/Parser/RedirectDataParser.php
+ * ~/private/lib/Parser/RedirectParser.php
  * Read-only redirect lookup and panel-list parser backed by RedirectRead.
  * Docs: https://raven.lanterns.io
  */
@@ -18,7 +18,7 @@ use RuntimeException;
 /**
  * Repository-backed redirect read helper with shared slug/channel normalization.
  */
-final class RedirectDataParser
+final class RedirectParser
 {
     private InputSanitizer $input;
     private ?RedirectRead $redirectRepo;
@@ -125,7 +125,7 @@ final class RedirectDataParser
     private function redirectRepo(): RedirectRead
     {
         if (!$this->redirectRepo instanceof RedirectRead) {
-            throw new RuntimeException('RedirectDataParser requires a RedirectRead for repository-backed reads.');
+            throw new RuntimeException('RedirectParser requires a RedirectRead for repository-backed reads.');
         }
 
         return $this->redirectRepo;

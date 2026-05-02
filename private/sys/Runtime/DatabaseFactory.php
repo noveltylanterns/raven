@@ -2,14 +2,14 @@
 
 /**
  * RAVEN CMS
- * ~/private/sys/Controller/DatabaseController.php
+ * ~/private/sys/Runtime/DatabaseFactory.php
  * Database connection factory; wires driver config into profiled PDO connections.
  * Docs: https://raven.lanterns.io
  */
 
 declare(strict_types=1);
 
-namespace Raven\Core\Controller;
+namespace Raven\Core\Runtime;
 
 use PDO;
 use Raven\Core\Debug\RequestProfilerAdapter;
@@ -27,7 +27,7 @@ use Raven\Lib\Database\QueryProfilerInterface;
  * applying driver-specific DSN construction, SQLite bootstrapping, and
  * query profiler wiring in one place.
  */
-final class DatabaseController
+final class DatabaseFactory
 {
     /** @var array<string, mixed> */
     private array $config;

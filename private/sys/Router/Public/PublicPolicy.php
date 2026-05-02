@@ -13,7 +13,7 @@ namespace Raven\Core\Router\Public;
 
 use Raven\Core\Config;
 use Raven\Lib\Parser\CategoryRouteParser;
-use Raven\Lib\Parser\FeedRouteParser;
+use Raven\Lib\Parser\FeedParser;
 use Raven\Lib\Parser\GroupRouteParser;
 use Raven\Lib\Parser\TagRouteParser;
 use Raven\Lib\Security\InputSanitizer;
@@ -43,7 +43,7 @@ final class PublicPolicy
     public static function build(Config $config, InputSanitizer $input): array
     {
         $groupRouteParser = new GroupRouteParser($config, $input);
-        $feedRouteParser = new FeedRouteParser($config, $input);
+        $feedRouteParser = new FeedParser($config, $input);
 
         $panelPath = (string) $config->get('panel.path', 'panel');
         $categoryPrefix = CategoryRouteParser::categoryRoutePrefix($config, $input);

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Raven\Lib\Security;
 
+use Raven\Lib\Auth\SessionToken;
+
 /**
  * Generic CSRF helper that delegates persistence to a token store contract.
  */

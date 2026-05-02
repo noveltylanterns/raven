@@ -2,7 +2,7 @@
 
 /**
  * RAVEN CMS
- * ~/private/lib/View/Panel/Editor.php
+ * ~/private/lib/View/Panel/EditorWrapper.php
  * Shared panel editor utility methods used across multiple tabbed editor controllers.
  * Docs: https://raven.lanterns.io
  */
@@ -18,7 +18,7 @@ namespace Raven\Lib\View\Panel;
  * PreferencesController, where the same pure normalization logic was duplicated.
  * No injected dependencies — all methods are stateless string normalizers.
  */
-final class Editor
+final class EditorWrapper
 {
     /**
      * Normalizes a body-text editor option value to a canonical editor key.

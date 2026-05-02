@@ -1,15 +1,22 @@
 <?php
 
+/**
+ * RAVEN CMS
+ * ~/private/lib/Security/UserString.php
+ * Generates normalized random public user selector strings.
+ * Docs: https://raven.lanterns.io
+ */
+
 declare(strict_types=1);
 
-namespace Raven\Lib\Auth;
+namespace Raven\Lib\Security;
 
 use RuntimeException;
 
 /**
  * Generates normalized random public user selector strings.
  */
-final class UserStringService
+final class UserString
 {
     private const ALPHABET = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     private const DEFAULT_LENGTH = 28;

@@ -11,7 +11,7 @@
 
 declare(strict_types=1);
 
-use Raven\Core\Controller\DatabaseController;
+use Raven\Core\Runtime\DatabaseFactory;
 use Raven\Lib\Database\Schema\SchemaManager;
 use Raven\Core\Repository\GroupRead;
 use Raven\Core\Repository\UserRead;
@@ -777,7 +777,7 @@ if ($isPost) {
                 }
             }
 
-            $connectionFactory = new DatabaseController((array) ($nextConfig['database'] ?? []));
+            $connectionFactory = new DatabaseFactory((array) ($nextConfig['database'] ?? []));
             $driverName = $connectionFactory->getDriver();
             $prefix = $connectionFactory->getPrefix();
 

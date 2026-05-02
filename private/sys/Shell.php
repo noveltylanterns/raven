@@ -24,7 +24,7 @@ use Raven\Lib\Archive\Install as ArchiveInstall;
 use Raven\Lib\Archive\Package as ArchivePackage;
 use Raven\Lib\Auth\Panel\PanelAccess;
 use Raven\Lib\Extension\Registry;
-use Raven\Lib\Extension\Panel\ExtensionScaffoldService;
+use Raven\Lib\Extension\Scaffold;
 use Raven\Lib\Extension\Resolver;
 use Raven\Lib\Extension\StateRead;
 use Raven\Lib\Scheduler\Registry as SchedulerRegistry;
@@ -2043,8 +2043,8 @@ function raven_cli_command_extension(RavenCliContext $context, array $tokens): i
         }
 
         if ($action === 'enable' || $action === 'disable') {
-            require_once $root . '/private/lib/Extension/ExtensionBootstrapContractResolver.php';
-            require_once $root . '/private/lib/Extension/ExtensionStorageProvisioner.php';
+            require_once $root . '/private/lib/Extension/Bootstrap.php';
+            require_once $root . '/private/lib/Extension/StorageProvisioner.php';
             $slug = strtolower(trim(raven_cli_required_scalar_option($options, 'slug', 'Missing --slug option.')));
             if (preg_match('/^[a-z0-9][a-z0-9_-]{0,119}$/', $slug) !== 1) {
                 throw new RuntimeException('Extension slug is invalid.');
@@ -2062,14 +2062,14 @@ function raven_cli_command_extension(RavenCliContext $context, array $tokens): i
 
             $state = raven_cli_extension_state_load($root);
             if ($action === 'enable') {
-                $resolver = new \Raven\Lib\Extension\ExtensionBootstrapContractResolver();
+                $resolver = new \Raven\Lib\Extension\Bootstrap();
                 $contract = $resolver->resolve($root, $slug, $manifest);
                 if (!$contract['valid']) {
                     throw new RuntimeException((string) ($contract['error'] ?? 'Invalid extension bootstrap contract.'));
                 }
 
                 if (!empty($contract['storage'])) {
-                    $provisioner = new \Raven\Lib\Extension\ExtensionStorageProvisioner($root);
+                    $provisioner = new \Raven\Lib\Extension\StorageProvisioner($root);
                     $provisioner->provision($slug, (array) $contract['storage']);
                 }
 
@@ -2088,8 +2088,8 @@ function raven_cli_command_extension(RavenCliContext $context, array $tokens): i
         }
 
         if ($action === 'uninstall') {
-            require_once $root . '/private/lib/Extension/ExtensionBootstrapContractResolver.php';
-            require_once $root . '/private/lib/Extension/ExtensionStorageCleaner.php';
+            require_once $root . '/private/lib/Extension/Bootstrap.php';
+            require_once $root . '/private/lib/Extension/StorageCleaner.php';
             $slug = strtolower(trim(raven_cli_required_scalar_option($options, 'slug', 'Missing --slug option.')));
             if (preg_match('/^[a-z0-9][a-z0-9_-]{0,119}$/', $slug) !== 1) {
                 throw new RuntimeException('Extension slug is invalid.');
@@ -2113,7 +2113,7 @@ function raven_cli_command_extension(RavenCliContext $context, array $tokens): i
 
             $manifest = Registry::readManifest($root, $slug);
             if ($manifest !== null) {
-                $resolver = new \Raven\Lib\Extension\ExtensionBootstrapContractResolver();
+                $resolver = new \Raven\Lib\Extension\Bootstrap();
                 $contract = $resolver->resolve($root, $slug, $manifest);
                 if (!$contract['valid']) {
                     throw new RuntimeException((string) ($contract['error'] ?? 'Invalid extension bootstrap contract.'));
@@ -2124,7 +2124,7 @@ function raven_cli_command_extension(RavenCliContext $context, array $tokens): i
                 $driver = $rvn['driver'] ?? null;
                 $prefix = $rvn['prefix'] ?? null;
                 if ($db instanceof PDO && is_string($driver) && is_string($prefix)) {
-                    $cleaner = new \Raven\Lib\Extension\ExtensionStorageCleaner($root, $db, $driver, $prefix);
+                    $cleaner = new \Raven\Lib\Extension\StorageCleaner($root, $db, $driver, $prefix);
                     $cleaner->deleteStorageByContract($slug, (array) ($contract['storage'] ?? []));
                 }
             }
@@ -2251,7 +2251,7 @@ function raven_cli_command_extension(RavenCliContext $context, array $tokens): i
             }
 
             try {
-                $scaffold = new ExtensionScaffoldService();
+                $scaffold = new Scaffold();
                 $scaffold->createSkeleton($path, [
                     'directory' => $slug,
                     'name' => $name,

@@ -2,7 +2,7 @@
 
 /**
  * RAVEN CMS
- * ~/private/lib/View/Panel/ListCard.php
+ * ~/private/lib/View/Panel/ListWrapper.php
  * Universal panel list card renderer with search, filter, and pagination.
  * Docs: https://raven.lanterns.io
  */
@@ -27,7 +27,7 @@ use function Raven\Lib\Security\e;
  *   // ... emit the <table>...</table> HTML here ...
  *   $tableHtml = (string) ob_get_clean();
  *
- *   echo ListCard::render([
+ *   echo ListWrapper::render([
  *       'is_empty'           => $rows === [],
  *       'empty_message'      => 'No items yet.',
  *       'search_id'          => 'my-search',
@@ -53,7 +53,7 @@ use function Raven\Lib\Security\e;
  *   ]);
  *
  * Config keys:
- *   is_empty             (bool)         True → render empty_message only; false → full list UI.
+ *   is_empty             (bool)         True -> render empty_message only; false -> full list UI.
  *   empty_message        (string)       Text when the row collection itself is empty.
  *   search_id            (string)       HTML id for the search input element.
  *   search_col           (string)       Bootstrap col class for the search column.
@@ -62,7 +62,7 @@ use function Raven\Lib\Security\e;
  *   count_id             (string)       HTML id for the count label div.
  *   empty_id             (string)       HTML id for the no-results paragraph.
  *   empty_match_message  (string)       Text when all rows are hidden by filters.
- *   table_html           (string)       Trusted full `<table …>…</table>` HTML from the template.
+ *   table_html           (string)       Trusted full `<table ...>...</table>` HTML from the template.
  *   pagination           (array|null)   Pagination data (see below). Null or missing = no pagination.
  *
  * Each filter entry (in `filters`) must contain:
@@ -77,10 +77,10 @@ use function Raven\Lib\Security\e;
  *   total_items (int)     Total item count across all pages.
  *   base_path   (string)  URL path for pagination links (without query string).
  *   query       (array)   Additional query parameters to preserve across page links.
- *   label       (string)  Noun appended to "Page X of Y (Z total …)".
+ *   label       (string)  Noun appended to "Page X of Y (Z total ...)".
  *   aria_label  (string)  Aria-label for the pagination btn-group.
  */
-final class ListCard
+final class ListWrapper
 {
     /**
      * Renders the full list card HTML from a declarative config array.

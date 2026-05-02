@@ -9,7 +9,7 @@ declare(strict_types=1);
 /** @var string|null $flashError */
 
 use Raven\Lib\View\Panel\Header;
-use Raven\Lib\View\Panel\ListCard;
+use Raven\Lib\View\Panel\ListWrapper;
 use Raven\Lib\View\Panel\Toolbar;
 use function Raven\Lib\Security\e;
 
@@ -89,7 +89,7 @@ $categorySetListToolbarItems = [
     </tbody>
 </table>
 <?php $categorySetTableHtml = (string) ob_get_clean(); ?>
-<?= ListCard::render([
+<?= ListWrapper::render([
     'is_empty'      => $setRows === [],
     'empty_message' => 'No category sets yet.',
     'table_html'    => $categorySetTableHtml,
