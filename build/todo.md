@@ -12,20 +12,51 @@ This is the default Build Mode backlog file. If the user asks about goals, unpat
 - `build/long.md` houses long-term project & roadmap goals, for optional secondary context. Do not load it on short-term build tasks.
 
 
-
-# Format Library Cleanup
-- [x] All Format library method renames complete (see release-notes.md — May 3, 2026 — Format library method naming pass)
-
-
 # Misc Bugs & Tweaks
 **Do not delete this heading!**
 
+
+
 # Postmaster Service
-- [ ] We need a dedicated set of mail delivery primitives in sys/Postmaster.php
-- [ ] Anything that sends out email should be routing it through Postmaster.php for canonical mail delivery contracts, metadata assembly & message assembly.
-- [ ] Email-based 2fa code functions should be updated to use this mailer instead of its own delivery logic.
-- [ ] Put reusable mail primitives in lib/Mail/ since many of them will likely be independently useful to extension authiors outside of default Postmaster logic. That gives us a spot for future additional mail handlers like Mailgun, in-house SMTP, etc, etc.
-- [ ] Plan this out, and append these guidelines with a more detailed checklist in case we lose session.
+
+**Context:** Two places currently send mail independently — `lib/Auth/LoginEmail.php::sendCode()` (2FA codes, uses `mail()` only) and `ext/contact/lib/ContactPublicFormRuntime.php::sendContactMail()` (form submissions, tries sendmail binary first then falls back to `mail()`). Both duplicate: address normalization, domain extraction for headers, no-reply fallback generation, header sanitization, and Message-ID generation. Postmaster lifts the working contact-ext sendmail+fallback delivery into a shared service; lib/Mail/ houses the reusable primitives both it and extensions need.
+
+### Phase 1 — lib/Mail/ primitives (new files)
+- [x] `lib/Mail/Address.php` — static utility class: `normalize(string): ?string`, `mask(string): string`, `headerDomain(string): string`, `defaultNoReply(string): string`, `sanitizeHeader(string, int): string`
+- [x] `lib/Mail/Message.php` — immutable value object: `to`, `cc`, `bcc`, `replyTo`, `subject`, `body`, `customHeaders`; fluent builder: `withReplyTo`, `withCc`, `withBcc`, `withHeader`
+
+### Phase 2 — sys/Postmaster.php (new file)
+- [x] `__construct(Config $config)` — reads `mail.agent`, `mail.sender_address`, `mail.sender_name`, `site.domain`
+- [x] `send(Message $message): array{ok, message?}` — tries sendmail binary first (lifted from contact ext), falls back to `mail()`
+- [x] `senderAddress(): string` and `senderName(): string` — expose configured sender metadata
+- [x] Private: `sendmailBinary(): ?string`, `viaSendmail(...)`, `buildBaseHeaders(...)`, `buildMessageId(string): string`
+
+### Phase 3 — Wire Postmaster into container
+- [x] Add `'postmaster' => new Postmaster($config)` to `$rvn` in `private/Raven.php` (after Config is ready, before extension boot)
+
+### Phase 4 — Refactor lib/Auth/LoginEmail.php
+- [ ] `sendCode()` signature: drop `$siteDomain`, `$senderAddress`, `$senderName`, `$mailAgent` params; add `Postmaster $postmaster`; use `Address::` helpers and build a `Message`, call `$postmaster->send()`
+- [ ] `maskEmail()` → thin wrapper around `Address::mask()`
+- [ ] Remove private helpers now owned by Address/Postmaster: `sanitizeText`, `defaultNoReplyAddress`, `mailHeaderDomain`
+
+### Phase 5 — Refactor lib/Auth/LoginChallenge.php
+- [ ] Add `Postmaster $postmaster` to constructor; remove mail config reads from `sendCode()` call site
+
+### Phase 6 — Update LoginChallenge instantiation sites (2 files)
+- [ ] `sys/Controller/Public/AuthController.php::loginChallengeWorkflow()` — pass `new Postmaster($this->context->config())`
+- [ ] `sys/Controller/Panel/AuthController.php::loginChallengeWorkflow()` — pass `new Postmaster($this->config)`
+
+### Phase 7 — Refactor ext/contact/lib/ContactPublicFormRuntime.php
+- [ ] Add `Postmaster $postmaster` to constructor
+- [ ] `sendContactMail()` — build a `Message`, call `$this->postmaster->send()`; remove thrown RuntimeException style (return error instead, or keep throw — decide at implementation time)
+- [ ] Remove private helpers now owned by Postmaster/Address: `sendContactMailViaSendmail`, `sendmailBinaryPath`, `configuredMailSenderAddress`, `configuredMailSenderName`, `mailHeaderDomain`, `defaultNoReplyEmail`
+
+### Phase 8 — Update ext/contact/ext.php
+- [ ] Pass `$rvn['postmaster']` when constructing `ContactPublicFormRuntime`
+
+### Phase 9 — PHPDoc sweep & release notes
+- [ ] PHPDoc all new and changed methods (lib/Mail/*, sys/Postmaster.php, LoginEmail, LoginChallenge)
+- [ ] Append to release-notes.md
 
 
 # Legacy Fallback Log

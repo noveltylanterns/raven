@@ -16,6 +16,7 @@ use Raven\Core\Config;
 use Raven\Core\Runtime\DatabaseFactory;
 use Raven\Lib\Database\SchemaManager;
 use Raven\Core\Logger;
+use Raven\Core\Postmaster;
 use Raven\Lib\Parser\PageRepoParser;
 use Raven\Lib\Auth\AuthService;
 use Raven\Lib\Auth\SessionCookie;
@@ -216,6 +217,7 @@ final class Raven
     $rvn = [
         'root' => $root,
         'config' => $config,
+        'postmaster' => new Postmaster($config),
         'driver' => $driver,
         'prefix' => $prefix,
         'db' => $rvnDb,
