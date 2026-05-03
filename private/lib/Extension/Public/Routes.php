@@ -2,7 +2,7 @@
 
 /**
  * RAVEN CMS
- * ~/private/lib/Extension/Public/PublicRouteRegistrar.php
+ * ~/private/lib/Extension/Public/Routes.php
  * Reusable public extension-route registration primitives.
  * Docs: https://raven.lanterns.io
  */
@@ -21,7 +21,7 @@ use Raven\Lib\Security\InputSanitizer;
  * Lives in lib/ alongside its panel counterpart (PanelRouteRegistrar) so the
  * extension route-loading contract stays out of the sys/Router scope routers.
  */
-final class PublicRouteRegistrar
+final class Routes
 {
     /**
      * Registers all enabled module extension public routes onto the shared router.

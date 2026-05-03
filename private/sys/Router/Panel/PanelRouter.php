@@ -11,7 +11,7 @@ declare(strict_types=1);
 
 namespace Raven\Core\Router\Panel;
 
-use Raven\Lib\Extension\Panel\PanelRouteRegistrar;
+use Raven\Lib\Extension\Panel\Routes as PanelRoutes;
 use Raven\Core\Router\RouteRequest;
 use Raven\Core\Router\RouteResponse;
 use Raven\Core\Router\RouteHandler;
@@ -55,7 +55,7 @@ final class PanelRouter
         ConfigRouter::registerWithDeps($this->router, $deps);
         ThemeRouter::registerWithDeps($this->router, $deps);
         ExtensionRouter::registerWithDeps($this->router, $deps);
-        PanelRouteRegistrar::register(
+        PanelRoutes::register(
             $this->router,
             $deps->rvn,
             $deps->enabledExtensions,

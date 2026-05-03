@@ -1,11 +1,16 @@
 <?php
 
+/**
+ * RAVEN CMS
+ * ~/private/lib/Extension/Public/FormInstance.php
+ * Shortcode runtime resolver and renderer for embedded form and content runtimes.
+ * Docs: https://raven.lanterns.io
+ */
+
 declare(strict_types=1);
 
 namespace Raven\Lib\Extension\Public;
 
-use Raven\Lib\Extension\Public\EmbeddedFormRuntimeInterface;
-use Raven\Lib\Extension\Public\EmbeddedShortcodeRuntimeInterface;
 use Raven\Lib\Extension\Registry;
 use Raven\Lib\Security\InputSanitizer;
 
@@ -13,14 +18,14 @@ use Raven\Lib\Security\InputSanitizer;
  * Shared shortcode runtime resolver and renderer for both content and form runtimes.
  *
  * Discovers two kinds of shortcode runtime:
- *   - EmbeddedShortcodeRuntimeInterface — general content (registered as `shortcode_runtimes`)
- *   - EmbeddedFormRuntimeInterface      — form-capable variant (also registered in `shortcode_runtimes`)
+ *   - Shortcodes  — general content (registered as `shortcode_runtimes`)
+ *   - FormRuntime — form-capable variant (also registered in `shortcode_runtimes`)
  *
  * Both are resolved from extension_services at runtime and merged into one type-keyed map.
  * At render time, form runtimes get a full form context (definition, CSRF, captcha);
  * content runtimes receive a simpler context (slug, raw_args).
  */
-final class EmbeddedFormRuntimeService
+final class FormInstance
 {
     private InputSanitizer $input;
     private string $projectRoot;
@@ -33,6 +38,10 @@ final class EmbeddedFormRuntimeService
      */
     private array $embeddedFormLookupCache = [];
 
+    /**
+     * @param InputSanitizer $input Shared input sanitizer for slug normalization.
+     * @param string $projectRoot Absolute project root path for extension enablement checks.
+     */
     public function __construct(InputSanitizer $input, string $projectRoot)
     {
         $this->input = $input;
@@ -48,7 +57,7 @@ final class EmbeddedFormRuntimeService
      * type token so one extension cannot shadow another.
      *
      * @param array<string, mixed> $extensionServices
-     * @return array<string, EmbeddedShortcodeRuntimeInterface|EmbeddedFormRuntimeInterface>
+     * @return array<string, Shortcodes|FormRuntime>
      */
     public function discoverRuntimes(array $extensionServices): array
     {
@@ -69,10 +78,10 @@ final class EmbeddedFormRuntimeService
             }
 
             foreach ($rawCandidates as $candidate) {
-                // Accept either interface; EmbeddedFormRuntimeInterface is not required to
-                // extend EmbeddedShortcodeRuntimeInterface so we check both explicitly.
-                if (!$candidate instanceof EmbeddedShortcodeRuntimeInterface
-                    && !$candidate instanceof EmbeddedFormRuntimeInterface) {
+                // Accept either interface; FormRuntime is not required to extend Shortcodes
+                // so we check both explicitly.
+                if (!$candidate instanceof Shortcodes
+                    && !$candidate instanceof FormRuntime) {
                     continue;
                 }
 
@@ -94,10 +103,10 @@ final class EmbeddedFormRuntimeService
     /**
      * Returns one registered runtime by type token, or null if not found.
      *
-     * @param array<string, EmbeddedShortcodeRuntimeInterface|EmbeddedFormRuntimeInterface> $runtimes
-     * @return EmbeddedShortcodeRuntimeInterface|EmbeddedFormRuntimeInterface|null
+     * @param array<string, Shortcodes|FormRuntime> $runtimes
+     * @return Shortcodes|FormRuntime|null
      */
-    public function runtime(string $type, array $runtimes): EmbeddedShortcodeRuntimeInterface|EmbeddedFormRuntimeInterface|null
+    public function runtime(string $type, array $runtimes): Shortcodes|FormRuntime|null
     {
         $normalized = strtolower(trim($type));
         return $runtimes[$normalized] ?? null;
@@ -106,20 +115,22 @@ final class EmbeddedFormRuntimeService
     /**
      * Returns one registered form runtime by type token, or null if not found or not a form runtime.
      *
-     * @param array<string, EmbeddedShortcodeRuntimeInterface|EmbeddedFormRuntimeInterface> $runtimes
+     * @param array<string, Shortcodes|FormRuntime> $runtimes
+     * @return FormRuntime|null
      */
-    public function formRuntime(string $type, array $runtimes): ?EmbeddedFormRuntimeInterface
+    public function formRuntime(string $type, array $runtimes): ?FormRuntime
     {
         $runtime = $this->runtime($type, $runtimes);
-        return $runtime instanceof EmbeddedFormRuntimeInterface ? $runtime : null;
+        return $runtime instanceof FormRuntime ? $runtime : null;
     }
 
     /**
      * Returns whether the owning extension of a runtime is currently enabled.
      *
-     * @param EmbeddedShortcodeRuntimeInterface|EmbeddedFormRuntimeInterface $runtime
+     * @param Shortcodes|FormRuntime $runtime Runtime whose extension to check.
+     * @return bool True when the owning extension is enabled.
      */
-    public function isRuntimeEnabled(EmbeddedShortcodeRuntimeInterface|EmbeddedFormRuntimeInterface $runtime): bool
+    public function isRuntimeEnabled(Shortcodes|FormRuntime $runtime): bool
     {
         return $this->isExtensionEnabled($runtime->extensionKey());
     }
@@ -127,8 +138,9 @@ final class EmbeddedFormRuntimeService
     /**
      * Applies shortcode substitution to an HTML string using the provided render callback.
      *
-     * @param array<string, EmbeddedShortcodeRuntimeInterface|EmbeddedFormRuntimeInterface> $runtimes
+     * @param array<string, Shortcodes|FormRuntime> $runtimes
      * @param callable(string $type, string $slug, string $rawArgs): string $renderMarkup
+     * @return string HTML with all recognized shortcodes replaced by their rendered output.
      */
     public function renderShortcodes(string $html, array $runtimes, callable $renderMarkup): string
     {
@@ -164,6 +176,9 @@ final class EmbeddedFormRuntimeService
 
     /**
      * Sanitizes a raw request URI into a safe return path for post-submit redirects.
+     *
+     * @param string $rawPath Raw request URI string.
+     * @return string Normalized absolute path, or '/' when the value is unsafe.
      */
     public function sanitizeReturnPath(string $rawPath): string
     {
@@ -186,8 +201,9 @@ final class EmbeddedFormRuntimeService
      * Form runtimes receive a full form context (definition, return path, CSRF, captcha).
      * Content runtimes receive a simple context (slug, raw_args) and are rendered directly.
      *
-     * @param array<string, EmbeddedShortcodeRuntimeInterface|EmbeddedFormRuntimeInterface> $runtimes
-     * @param callable(): string $captchaMarkup
+     * @param array<string, Shortcodes|FormRuntime> $runtimes
+     * @param callable(): string $captchaMarkup Returns rendered captcha widget HTML.
+     * @return string HTML with all shortcodes resolved.
      */
     public function renderShortcodesForPublicRoute(
         string $html,
@@ -204,7 +220,7 @@ final class EmbeddedFormRuntimeService
             function (string $type, string $slug, string $rawArgs) use ($runtimes, $returnPath, $csrfField, $captchaMarkup): string {
                 $runtime = $this->runtime($type, $runtimes);
 
-                if ($runtime instanceof EmbeddedFormRuntimeInterface) {
+                if ($runtime instanceof FormRuntime) {
                     // Form runtime: look up the registered form definition and render with full form context.
                     $definition = $this->findFormDefinition($type, $slug, $runtimes);
                     if ($definition === null) {
@@ -214,7 +230,7 @@ final class EmbeddedFormRuntimeService
                     return $runtime->render($definition, $returnPath, $csrfField, (string) $captchaMarkup());
                 }
 
-                if ($runtime instanceof EmbeddedShortcodeRuntimeInterface) {
+                if ($runtime instanceof Shortcodes) {
                     // Content runtime: render with lightweight slug/args context; no form wiring needed.
                     return $runtime->render(['slug' => $slug, 'raw_args' => $rawArgs]);
                 }
@@ -229,7 +245,7 @@ final class EmbeddedFormRuntimeService
      *
      * Returns null when the runtime is not found, not enabled, or has no matching definition.
      *
-     * @param array<string, EmbeddedShortcodeRuntimeInterface|EmbeddedFormRuntimeInterface> $runtimes
+     * @param array<string, Shortcodes|FormRuntime> $runtimes
      * @return array<string, mixed>|null
      */
     public function findFormDefinition(string $type, string $slug, array $runtimes): ?array
@@ -253,7 +269,7 @@ final class EmbeddedFormRuntimeService
     /**
      * Returns a slug-keyed map of all enabled form definitions for one form runtime type.
      *
-     * @param array<string, EmbeddedShortcodeRuntimeInterface|EmbeddedFormRuntimeInterface> $runtimes
+     * @param array<string, Shortcodes|FormRuntime> $runtimes
      * @return array<string, array<string, mixed>>
      */
     private function formDefinitionLookupByType(string $type, array $runtimes): array
@@ -340,7 +356,8 @@ final class EmbeddedFormRuntimeService
     /**
      * Builds a regex pattern that matches any registered shortcode type token.
      *
-     * @param array<string, EmbeddedShortcodeRuntimeInterface|EmbeddedFormRuntimeInterface> $runtimes
+     * @param array<string, Shortcodes|FormRuntime> $runtimes
+     * @return string|null Compiled regex pattern, or null when no runtimes are registered.
      */
     private function shortcodePattern(array $runtimes): ?string
     {

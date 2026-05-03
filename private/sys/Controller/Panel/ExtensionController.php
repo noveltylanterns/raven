@@ -21,7 +21,7 @@ use Raven\Lib\Extension\Bootstrap;
 use Raven\Lib\Extension\StorageCleaner;
 use Raven\Lib\Extension\StorageProvisioner;
 use Raven\Lib\Extension\StateRead;
-use Raven\Lib\Extension\Panel\ExtensionCatalogService;
+use Raven\Lib\Extension\Panel\Manager as ExtensionManager;
 use Raven\Lib\Extension\Scaffold;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\Transport\Upload;
@@ -39,7 +39,7 @@ final class ExtensionController
     /** @var Closure(string): array<string, mixed> */
     private Closure $extensionServicesFor;
     private StateRead $extensionStateStore;
-    private ExtensionCatalogService $extensionCatalogService;
+    private ExtensionManager $extensionCatalogService;
     private ?ArchivePackage $archivePackages = null;
     private ?ArchiveInstall $packageInstallWorkflowService = null;
     private ?ArchiveDelete $directoryTreeService = null;
@@ -53,7 +53,7 @@ final class ExtensionController
      * @param InputSanitizer $input Shared request input sanitizer.
      * @param string $root Project root path for filesystem-backed admin workflows.
      * @param StateRead $extensionStateStore Shared extension state store for panel extension reads/writes.
-     * @param ExtensionCatalogService $extensionCatalogService Shared extension catalog for manifest and stock-extension reads.
+     * @param ExtensionManager $extensionCatalogService Shared extension catalog for manifest and stock-extension reads.
      * @param callable(string): array<string, mixed> $extensionServicesFor Lazy per-extension services resolver.
      * @return void
      */
@@ -63,7 +63,7 @@ final class ExtensionController
         InputSanitizer $input,
         string $root,
         StateRead $extensionStateStore,
-        ExtensionCatalogService $extensionCatalogService,
+        ExtensionManager $extensionCatalogService,
         callable $extensionServicesFor
     ) {
         $this->context = $context;

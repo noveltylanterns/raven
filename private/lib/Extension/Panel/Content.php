@@ -2,35 +2,35 @@
 
 /**
  * RAVEN CMS
- * ~/private/lib/Extension/ExtensionEditorCatalogService.php
- * Shared extension-provided editor menu and body-block catalog helpers.
+ * ~/private/lib/Extension/Panel/Content.php
+ * Panel-side extension body-block and insertable shortcode catalog for the page editor.
  * Docs: https://raven.lanterns.io
  */
 
 declare(strict_types=1);
 
-namespace Raven\Lib\Extension;
+namespace Raven\Lib\Extension\Panel;
 
 use Raven\Core\Config;
+use Raven\Lib\Extension\Registry;
 use Raven\Lib\Parser\PageBlockParser;
 use Raven\Lib\Security\InputSanitizer;
 
 /**
- * Shared extension-provided editor menu/catalog helpers.
+ * Catalogs extension-provided body-block types and insertable shortcodes for the panel page editor.
  */
-final class ExtensionEditorCatalogService
+final class Content
 {
     private string $projectRoot;
     private InputSanitizer $input;
     private PageBlockParser $pageBlockParser;
 
     /**
-     * Initializes the extension editor catalog helper.
+     * Initializes the panel extension content catalog.
      *
      * @param string $projectRoot Absolute project root used to inspect extension manifests and field providers.
-     * @param InputSanitizer $input Shared sanitizer for human-facing labels and shortcode values.
+     * @param InputSanitizer $input Shared sanitizer for human-facing shortcode labels.
      * @param PageBlockParser $pageBlockParser Shared page-block parser for extension-provided body-block definitions.
-     * @return void
      */
     public function __construct(string $projectRoot, InputSanitizer $input, PageBlockParser $pageBlockParser)
     {
@@ -40,7 +40,10 @@ final class ExtensionEditorCatalogService
     }
 
     /**
-     * Returns panel-eligible extension body-block definitions.
+     * Returns panel-eligible extension body-block definitions for the page editor block picker.
+     *
+     * Only enabled content- and module-type extensions with a fields.php provider are included.
+     * Results are sorted alphabetically by label so the block picker order stays stable.
      *
      * @param array<string, bool> $enabledMap Enabled-extension map keyed by slug.
      * @param string $extensionsBasePath Absolute extension root path.
@@ -97,49 +100,11 @@ final class ExtensionEditorCatalogService
     }
 
     /**
-     * Returns public-route extension body-block definitions.
+     * Returns insertable extension shortcode options for the panel editor shortcode picker.
      *
-     * @return array<string, array{label: string, editor: string}> Extension body-block definitions keyed by type slug.
-     */
-    public function publicBodyBlockDefinitions(): array
-    {
-        $definitions = [];
-        foreach (Registry::enabledDirectories($this->projectRoot, true) as $extensionName) {
-            $manifest = Registry::readManifest($this->projectRoot, $extensionName);
-            if (
-                !is_array($manifest)
-                || !in_array((string) ($manifest['type'] ?? ''), ['content', 'module'], true)
-            ) {
-                continue;
-            }
-
-            $fields = Registry::fields(
-                $this->projectRoot,
-                (string) $extensionName,
-                [
-                    'extension' => (string) $extensionName,
-                ]
-            );
-            if ($fields === null) {
-                continue;
-            }
-
-            $definitions = $this->pageBlockParser->normalizeExtensionDefinitions(
-                (string) $extensionName,
-                $fields,
-                $definitions
-            );
-        }
-
-        uasort($definitions, static function (array $left, array $right): int {
-            return strcasecmp((string) ($left['label'] ?? ''), (string) ($right['label'] ?? ''));
-        });
-
-        return $definitions;
-    }
-
-    /**
-     * Returns insertable extension shortcode options for the panel editor.
+     * Only non-system content- and module-type extensions with a shortcodes.php provider are included.
+     * Duplicate shortcode tokens are deduplicated to prevent the picker from listing the same
+     * shortcode twice if multiple extensions declare the same token.
      *
      * @param array<string, bool> $enabledMap Enabled-extension map keyed by slug.
      * @param string $extensionsBasePath Absolute extension root path.

@@ -14,7 +14,7 @@ namespace Raven\Ext;
 use Raven\Core\Config;
 use Raven\Ext\ContactFormRepository;
 use Raven\Ext\ContactSubmissionRepository;
-use Raven\Lib\Extension\Public\EmbeddedFormRuntimeInterface;
+use Raven\Lib\Extension\Public\FormRuntime as ExtensionFormRuntime;
 use Raven\Lib\Security\Csrf;
 use Raven\Lib\Security\InputSanitizer;
 
@@ -23,7 +23,7 @@ use Raven\Lib\Transport\Redirect;
 /**
  * Owns Contact embedded shortcode rendering and submit pipeline.
  */
-final class ContactPublicFormRuntime implements EmbeddedFormRuntimeInterface
+final class ContactPublicFormRuntime implements ExtensionFormRuntime
 {
     private InputSanitizer $input;
     private Csrf $csrf;

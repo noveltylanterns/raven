@@ -19,7 +19,7 @@ use Raven\Core\Runtime\Public\RepoFactories;
 use Raven\Core\Runtime\Public\RuntimeInitializer;
 use Raven\Core\Renderer;
 use Raven\Lib\Auth\AuthService;
-use Raven\Lib\Extension\ExtensionEditorCatalogService;
+use Raven\Lib\Extension\Public\Content as ExtensionContent;
 use Raven\Lib\Parser\ConfigParser;
 use Raven\Lib\View\Public\ThemeCatalog;
 use RuntimeException;
@@ -50,7 +50,7 @@ final class RuntimeBuilder
         // been removed since controller and repo wiring now lives in ControllerFactories and
         // RepoFactories respectively.
         $extensionServices = null;
-        $extensionEditorCatalogService = null;
+        $extensionContent = null;
         $themeCatalogService = null;
 
         $rvn['view'] = new Renderer((string) $rvn['root'] . '/private/tpl');
@@ -187,14 +187,13 @@ final class RuntimeBuilder
         /**
          * Reuses one shared extension editor catalog for public page block reads.
          */
-        $extensionEditorCatalogFactory = $memoize(static function () use (&$extensionEditorCatalogService, $rvn): ExtensionEditorCatalogService {
-            $extensionEditorCatalogService = new ExtensionEditorCatalogService(
+        $extensionContentFactory = $memoize(static function () use (&$extensionContent, $rvn): ExtensionContent {
+            $extensionContent = new ExtensionContent(
                 (string) $rvn['root'],
-                $rvn['input'],
                 new \Raven\Lib\Parser\PageBlockParser($rvn['input'])
             );
 
-            return $extensionEditorCatalogService;
+            return $extensionContent;
         });
 
         /** @var array<string, Closure> $domainFactories */
@@ -232,7 +231,7 @@ final class RuntimeBuilder
             $rvn,
             $resolveAuth,
             $themeCatalogFactory,
-            $extensionEditorCatalogFactory,
+            $extensionContentFactory,
             $publicContentDomain,
             $publicAuthDomain,
             $publicFormDomain,

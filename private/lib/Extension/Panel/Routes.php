@@ -2,7 +2,7 @@
 
 /**
  * RAVEN CMS
- * ~/private/lib/Extension/Panel/PanelRouteRegistrar.php
+ * ~/private/lib/Extension/Panel/Routes.php
  * Reusable panel extension-route registration primitives.
  * Docs: https://raven.lanterns.io
  */
@@ -24,7 +24,7 @@ use Raven\Core\Router\RouteHandler;
  * closures so the panel entrypoint can stay focused on universal panel request
  * orchestration.
  */
-final class PanelRouteRegistrar
+final class Routes
 {
     /**
      * Registers enabled extension panel routes onto the shared router.

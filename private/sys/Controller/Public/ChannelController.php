@@ -16,10 +16,10 @@ use Raven\Core\Repository\MediaRead;
 use Raven\Core\Repository\PageRead;
 use Raven\Core\Repository\RedirectRead;
 use Raven\Core\Repository\UserRead;
-use Raven\Lib\Extension\ExtensionEditorCatalogService;
-use Raven\Lib\Extension\Public\EmbeddedFormRuntimeInterface;
-use Raven\Lib\Extension\Public\EmbeddedFormRuntimeService;
-use Raven\Lib\Extension\Public\EmbeddedShortcodeRuntimeInterface;
+use Raven\Lib\Extension\Public\Content as ExtensionContent;
+use Raven\Lib\Extension\Public\FormRuntime as ExtensionFormRuntime;
+use Raven\Lib\Extension\Public\FormInstance as ExtensionFormInstance;
+use Raven\Lib\Extension\Public\Shortcodes as ExtensionShortcodes;
 use Raven\Lib\Parser\ChannelRouteParser;
 use Raven\Lib\Parser\PageRouteParser;
 use Raven\Lib\Parser\PageBlockParser;
@@ -48,9 +48,9 @@ final class ChannelController
     private RedirectRead $redirectRead;
     private UserRead $userRead;
     private Closure $extensionServicesProvider;
-    /** @var array<string, EmbeddedShortcodeRuntimeInterface|EmbeddedFormRuntimeInterface> */
-    private array $embeddedFormRuntimes = [];
-    private bool $embeddedFormRuntimesLoaded = false;
+    /** @var array<string, ExtensionShortcodes|ExtensionFormRuntime> */
+    private array $shortcodeRuntimes = [];
+    private bool $shortcodeRuntimesLoaded = false;
     /** @var array<string, array{label: string, editor: string}>|null */
     private ?array $pageBodyBlockTypeDefinitionsCache = null;
     private ThemeCatalog $themeCatalogService;
@@ -60,8 +60,8 @@ final class ChannelController
     private ?PageMarkdown $pageMarkdown = null;
     private ?PageBlockParser $pageBlockParser = null;
     private ?PageBlocks $pageBlocks = null;
-    private ExtensionEditorCatalogService $extensionEditorCatalogService;
-    private ?EmbeddedFormRuntimeService $embeddedFormRuntimeService = null;
+    private ExtensionContent $extensionContent;
+    private ?ExtensionFormInstance $formInstance = null;
     private ?UserProfileParser $profileContactService = null;
 
     /**
@@ -71,7 +71,7 @@ final class ChannelController
      * @param RedirectRead $redirectRead Redirect repository read side for public redirect fallbacks.
      * @param UserRead $userRead User repository read side for author profile lookups in page meta.
      * @param ThemeCatalog $themeCatalogService Shared public-theme catalog for template resolution and meta reads.
-     * @param ExtensionEditorCatalogService $extensionEditorCatalogService Shared extension editor catalog for public block definitions.
+     * @param ExtensionContent $extensionContent Shared extension editor catalog for public block definitions.
      * @param callable(?string=): array<string, mixed> $extensionServicesProvider Lazy extension-services resolver for shortcode runtimes.
      * @return void
      */
@@ -82,7 +82,7 @@ final class ChannelController
         RedirectRead $redirectRead,
         UserRead $userRead,
         ThemeCatalog $themeCatalogService,
-        ExtensionEditorCatalogService $extensionEditorCatalogService,
+        ExtensionContent $extensionContent,
         callable $extensionServicesProvider
     ) {
         $this->context = $context;
@@ -91,7 +91,7 @@ final class ChannelController
         $this->redirectRead = $redirectRead;
         $this->userRead = $userRead;
         $this->themeCatalogService = $themeCatalogService;
-        $this->extensionEditorCatalogService = $extensionEditorCatalogService;
+        $this->extensionContent = $extensionContent;
         $this->extensionServicesProvider = Closure::fromCallable($extensionServicesProvider);
     }
 
@@ -233,7 +233,7 @@ final class ChannelController
             $page,
             $this->pageBodyBlockTypeDefinitions(),
             fn (): string => $this->renderPageGalleryBlockHtml($page),
-            fn (string $html): string => $this->renderEmbeddedForms($html)
+            fn (string $html): string => $this->renderEmbeddedExtensionFormInstance($html)
         );
     }
 
@@ -320,7 +320,7 @@ final class ChannelController
         }
 
         $this->pageBodyBlockTypeDefinitionsCache = $this->pageBlocks()->mergeTypeDefinitions(
-            $this->extensionEditorCatalogService->publicBodyBlockDefinitions()
+            $this->extensionContent->publicBodyBlockDefinitions()
         );
 
         return $this->pageBodyBlockTypeDefinitionsCache;
@@ -356,11 +356,11 @@ final class ChannelController
      * @param string $html Raw HTML containing potential shortcode markers.
      * @return string HTML with supported shortcodes expanded.
      */
-    private function renderEmbeddedForms(string $html): string
+    private function renderEmbeddedExtensionFormInstance(string $html): string
     {
-        return $this->embeddedFormRuntimeService()->renderShortcodesForPublicRoute(
+        return $this->formInstance()->renderShortcodesForPublicRoute(
             $html,
-            $this->embeddedFormRuntimes(),
+            $this->shortcodeRuntimes(),
             (string) ($_SERVER['REQUEST_URI'] ?? '/'),
             $this->context->csrfField(),
             fn (): string => $this->context->publicCaptchaMarkup()
@@ -370,33 +370,33 @@ final class ChannelController
     /**
      * Returns the embedded-form runtime service for the current request.
      *
-     * @return EmbeddedFormRuntimeService Shared embedded-form runtime service.
+     * @return ExtensionFormInstance Shared embedded-form runtime service.
      */
-    private function embeddedFormRuntimeService(): EmbeddedFormRuntimeService
+    private function formInstance(): ExtensionFormInstance
     {
-        if (!$this->embeddedFormRuntimeService instanceof EmbeddedFormRuntimeService) {
-            $this->embeddedFormRuntimeService = new EmbeddedFormRuntimeService(
+        if (!$this->formInstance instanceof ExtensionFormInstance) {
+            $this->formInstance = new ExtensionFormInstance(
                 $this->context->input(),
                 dirname(__DIR__, 4)
             );
         }
 
-        return $this->embeddedFormRuntimeService;
+        return $this->formInstance;
     }
 
     /**
      * Returns the discovered embedded shortcode/form runtimes for the current request.
      *
-     * @return array<string, EmbeddedShortcodeRuntimeInterface|EmbeddedFormRuntimeInterface> Runtime map keyed by shortcode type.
+     * @return array<string, ExtensionShortcodes|ExtensionFormRuntime> Runtime map keyed by shortcode type.
      */
-    private function embeddedFormRuntimes(): array
+    private function shortcodeRuntimes(): array
     {
-        if (!$this->embeddedFormRuntimesLoaded) {
-            $this->embeddedFormRuntimes = $this->embeddedFormRuntimeService()->discoverRuntimes($this->extensionServices());
-            $this->embeddedFormRuntimesLoaded = true;
+        if (!$this->shortcodeRuntimesLoaded) {
+            $this->shortcodeRuntimes = $this->formInstance()->discoverRuntimes($this->extensionServices());
+            $this->shortcodeRuntimesLoaded = true;
         }
 
-        return $this->embeddedFormRuntimes;
+        return $this->shortcodeRuntimes;
     }
 
     /**

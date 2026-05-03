@@ -11,12 +11,12 @@ declare(strict_types=1);
 
 namespace Raven\Ext\Repo;
 
-use Raven\Lib\Extension\Public\EmbeddedShortcodeRuntimeInterface;
+use Raven\Lib\Extension\Public\Shortcodes as ExtensionShortcodes;
 
 /**
  * Renders `[repo ...]` embeds through Raven's generic shortcode runtime contract.
  */
-final class RepoShortcodeRuntime implements EmbeddedShortcodeRuntimeInterface
+final class RepoShortcodeRuntime implements ExtensionShortcodes
 {
     private RepoService $service;
     private string $templatePath;

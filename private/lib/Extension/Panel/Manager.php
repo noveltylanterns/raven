@@ -1,5 +1,12 @@
 <?php
 
+/**
+ * RAVEN CMS
+ * ~/private/lib/Extension/Panel/Manager.php
+ * Extension catalog and manifest validation service for panel extension management.
+ * Docs: https://raven.lanterns.io
+ */
+
 declare(strict_types=1);
 
 namespace Raven\Lib\Extension\Panel;
@@ -13,22 +20,34 @@ use Raven\Lib\Extension\ValidateManifest;
 use Raven\Lib\Security\InputSanitizer;
 
 /**
- * Shared extension catalog and manifest validation service for panel workflows.
+ * Manages the panel extension catalog: listing installed extensions, reading and validating
+ * manifests, resolving permission levels, and checking name and stock-extension rules.
  */
-final class ExtensionCatalogService
+final class Manager
 {
     private string $projectRoot;
     private StateRead $stateStore;
-    private ExtensionPermissionCatalogService $permissionCatalog;
+    private Permissions $permissionCatalog;
     private Config $config;
     private InputSanitizer $input;
     private ValidateManifest $manifestValidator;
     private Bootstrap $bootstrapContractResolver;
 
+    /**
+     * Initializes the extension manager.
+     *
+     * @param string $projectRoot Absolute project root for extension discovery.
+     * @param StateRead $stateStore Shared extension state reader for enabled/permission maps.
+     * @param Permissions $permissionCatalog Shared permission catalog for level discovery and bit allocation.
+     * @param Config $config Runtime config passed to extension shortcode and field contract validators.
+     * @param InputSanitizer $input Shared sanitizer for human-facing extension metadata.
+     * @param ValidateManifest|null $manifestValidator Optional manifest validator; defaults to a fresh instance.
+     * @param Bootstrap|null $bootstrapContractResolver Optional bootstrap resolver; defaults to a fresh instance.
+     */
     public function __construct(
         string $projectRoot,
         StateRead $stateStore,
-        ExtensionPermissionCatalogService $permissionCatalog,
+        Permissions $permissionCatalog,
         Config $config,
         InputSanitizer $input,
         ?ValidateManifest $manifestValidator = null,
@@ -44,7 +63,13 @@ final class ExtensionCatalogService
     }
 
     /**
-     * @param callable(string): array<int, array<string, mixed>> $formsProvider
+     * Returns the full panel extension listing, pruning stale enabled/permission state for removed extensions.
+     *
+     * Each entry includes display metadata, enabled state, validity, stock-extension flags,
+     * and the uninstall eligibility verdict. State pruning is performed as a side-effect
+     * when the on-disk extension set diverges from the persisted state map.
+     *
+     * @param callable(string): array<int, array<string, mixed>> $formsProvider Callback that returns insertable forms for one extension slug.
      * @return array<int, array{
      *   directory: string,
      *   type: string,
@@ -68,8 +93,8 @@ final class ExtensionCatalogService
     {
         $this->stateStore->ensureDirectory();
 
-        // The panel catalog cleans state and manifest visibility together, so
-        // read the persisted extension-state payload once before walking disk.
+        // Read the persisted extension-state payload once before walking disk so
+        // enabled/permission maps are consistent across the full directory scan.
         $state = $this->stateStore->loadStateData();
         $enabledMap = $state['enabled'];
         $permissionMap = $state['permissions'];
@@ -126,6 +151,7 @@ final class ExtensionCatalogService
             return strnatcasecmp((string) $a['directory'], (string) $b['directory']);
         });
 
+        // Prune stale enabled/permission state entries for extensions no longer on disk.
         $activeKeys = array_map(
             static fn (array $extension): string => !empty($extension['valid']) ? (string) $extension['directory'] : '',
             $extensions
@@ -147,7 +173,14 @@ final class ExtensionCatalogService
     }
 
     /**
-     * @param callable(string): array<int, array<string, mixed>> $formsProvider
+     * Reads and validates a single extension manifest, returning a normalized metadata payload.
+     *
+     * Validates in layers: file presence, JSON structure, required fields, type contract,
+     * bootstrap contract, shortcodes.php, and fields.php. Returns the first failure encountered
+     * with a human-readable invalid_reason so the panel can display it directly.
+     *
+     * @param string $extensionPath Absolute path to the extension directory.
+     * @param callable(string): array<int, array<string, mixed>> $formsProvider Callback that returns insertable forms for one extension slug.
      * @return array{
      *   valid: bool,
      *   invalid_reason: string,
@@ -394,7 +427,10 @@ final class ExtensionCatalogService
     }
 
     /**
-     * @return array<int, array{key: string, label: string}>
+     * Returns the default single-level permission set for an extension that declares no custom levels.
+     *
+     * @param string $extensionName Human-readable extension name used to label the default access level.
+     * @return array<int, array{key: string, label: string}> Single-entry permission level array.
      */
     public function defaultPermissionLevels(string $extensionName): array
     {
@@ -402,7 +438,13 @@ final class ExtensionCatalogService
     }
 
     /**
-     * @return array<int, array{key: string, label: string}>
+     * Normalizes raw panel_permissions manifest data into a validated level array.
+     *
+     * Falls back to the default single-level set when the raw data is absent or invalid.
+     *
+     * @param mixed $rawLevels Raw panel_permissions value from ext.json (may be any type).
+     * @param string $extensionName Human-readable extension name used for the fallback default level label.
+     * @return array<int, array{key: string, label: string}> Normalized permission level array.
      */
     public function normalizePermissionLevels(mixed $rawLevels, string $extensionName): array
     {
@@ -410,8 +452,12 @@ final class ExtensionCatalogService
     }
 
     /**
-     * @param array<int, string> $directoryFilter
-     * @param callable(string): array<string, mixed>|null $manifestReader
+     * Returns the full permission map with stable bit assignments for a set of extension directories.
+     *
+     * Delegates to the permission catalog, which handles bit allocation and persistence.
+     *
+     * @param array<int, string> $directoryFilter Extension directory slugs to include; empty array includes all.
+     * @param callable(string): array<string, mixed>|null $manifestReader Callback that returns one extension manifest payload.
      * @return array<string, array{
      *   name: string,
      *   type: string,
@@ -425,24 +471,49 @@ final class ExtensionCatalogService
     }
 
     /**
-     * @return array<int, string>
+     * Returns the list of stock extension directory slugs that ship with Raven.
+     *
+     * @return array<int, string> Stock extension directory slug list.
      */
     public function stockExtensionDirectories(): array
     {
         return ['contact', 'cron', 'database', 'phpinfo', 'signups'];
     }
 
+    /**
+     * Returns true when the given directory name matches a known stock extension slug.
+     *
+     * @param string $directoryName Extension directory name to check.
+     * @return bool True when the directory is a stock extension.
+     */
     public function isStockExtensionDirectory(string $directoryName): bool
     {
         $normalized = strtolower(trim($directoryName));
         return in_array($normalized, $this->stockExtensionDirectories(), true);
     }
 
+    /**
+     * Returns true when the given string is a valid extension directory name.
+     *
+     * Valid names start with an alphanumeric character and contain only alphanumeric
+     * characters, hyphens, and underscores, up to 120 characters total.
+     *
+     * @param string $name Candidate directory name to validate.
+     * @return bool True when the name passes the safe-name pattern.
+     */
     public function isSafeExtensionDirectoryName(string $name): bool
     {
         return (bool) preg_match('/^[A-Za-z0-9][A-Za-z0-9_-]{0,119}$/', $name);
     }
 
+    /**
+     * Derives a safe extension directory name from an uploaded archive filename.
+     *
+     * Returns null when the filename cannot be normalized to a valid directory slug.
+     *
+     * @param string $archiveName Original archive filename (e.g. "my-extension.zip").
+     * @return string|null Normalized slug, or null when no valid slug can be derived.
+     */
     public function extensionNameFromArchiveFilename(string $archiveName): ?string
     {
         $base = strtolower($this->input->text((string) pathinfo($archiveName, PATHINFO_FILENAME), 120));
@@ -456,6 +527,14 @@ final class ExtensionCatalogService
         return $base;
     }
 
+    /**
+     * Returns a human-readable contract violation message when an extension directory fails its type contract,
+     * or null when the directory satisfies the contract for the given type.
+     *
+     * @param string $extensionPath Absolute extension directory path.
+     * @param string $type Normalized extension type token.
+     * @return string|null Contract error message, or null on success.
+     */
     private function extensionTypeContractError(string $extensionPath, string $type): ?string
     {
         return $this->manifestValidator->typeContractError($extensionPath, $type);

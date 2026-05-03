@@ -22,7 +22,6 @@ use Raven\Core\Controller\Public\SharedController;
 use Raven\Core\Controller\Public\TagController as PublicTagController;
 use Raven\Core\Controller\Public\UserController as PublicUserController;
 use Raven\Lib\Auth\AuthService;
-use Raven\Lib\Extension\ExtensionEditorCatalogService;
 use Raven\Lib\View\Public\ThemeCatalog;
 
 /**
@@ -36,7 +35,7 @@ final class ControllerFactories
      * @param array<string, mixed> $rvn Shared runtime container, mutated in-place.
      * @param callable(): AuthService $resolveAuth Lazy auth-service resolver.
      * @param Closure $themeCatalogFactory Theme catalog factory closure.
-     * @param Closure $extensionEditorCatalogFactory Extension editor catalog factory closure.
+     * @param Closure $extensionContentFactory Extension editor catalog factory closure.
      * @param Closure $publicContentDomain Public content domain aggregate factory closure.
      * @param Closure $publicAuthDomain Public auth/profile domain aggregate factory closure.
      * @param Closure $publicFormDomain Public form domain aggregate factory closure.
@@ -47,7 +46,7 @@ final class ControllerFactories
         array &$rvn,
         callable $resolveAuth,
         Closure $themeCatalogFactory,
-        Closure $extensionEditorCatalogFactory,
+        Closure $extensionContentFactory,
         Closure $publicContentDomain,
         Closure $publicAuthDomain,
         Closure $publicFormDomain,
@@ -107,7 +106,7 @@ final class ControllerFactories
         /**
          * Builds the split public channel controller on first use.
          */
-        $rvn['public_channel_controller'] = static function () use (&$publicChannelController, &$rvn, $publicContentDomain, $publicAuthDomain, $publicFormDomain, $themeCatalogFactory, $extensionEditorCatalogFactory): PublicChannelController {
+        $rvn['public_channel_controller'] = static function () use (&$publicChannelController, &$rvn, $publicContentDomain, $publicAuthDomain, $publicFormDomain, $themeCatalogFactory, $extensionContentFactory): PublicChannelController {
             if ($publicChannelController instanceof PublicChannelController) {
                 return $publicChannelController;
             }
@@ -124,7 +123,7 @@ final class ControllerFactories
                 $contentDomain['redirect_read'],
                 $authDomain['user_read'],
                 $themeCatalogFactory(),
-                $extensionEditorCatalogFactory(),
+                $extensionContentFactory(),
                 $formDomain['extension_services']
             );
 
@@ -236,7 +235,7 @@ final class ControllerFactories
         /**
          * Builds the split public page controller on first use.
          */
-        $rvn['public_page_controller'] = static function () use (&$publicPageController, &$rvn, $publicContentDomain, $publicAuthDomain, $publicFormDomain, $themeCatalogFactory, $extensionEditorCatalogFactory): PublicPageController {
+        $rvn['public_page_controller'] = static function () use (&$publicPageController, &$rvn, $publicContentDomain, $publicAuthDomain, $publicFormDomain, $themeCatalogFactory, $extensionContentFactory): PublicPageController {
             if ($publicPageController instanceof PublicPageController) {
                 return $publicPageController;
             }
@@ -254,7 +253,7 @@ final class ControllerFactories
                 $contentDomain['redirect_read'],
                 $authDomain['user_read'],
                 $themeCatalogFactory(),
-                $extensionEditorCatalogFactory(),
+                $extensionContentFactory(),
                 $formDomain['extension_services']
             );
 

@@ -13,7 +13,7 @@ namespace Raven\Ext;
 
 use Raven\Ext\SignupFormRepository;
 use Raven\Ext\SignupSubmissionRepository;
-use Raven\Lib\Extension\Public\EmbeddedFormRuntimeInterface;
+use Raven\Lib\Extension\Public\FormRuntime as ExtensionFormRuntime;
 use Raven\Lib\Security\Csrf;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\View\FormCountries;
@@ -23,7 +23,7 @@ use Raven\Lib\Transport\Redirect;
 /**
  * Owns Signup Sheets shortcode rendering and submit pipeline.
  */
-final class SignupPublicFormRuntime implements EmbeddedFormRuntimeInterface
+final class SignupPublicFormRuntime implements ExtensionFormRuntime
 {
     private InputSanitizer $input;
     private Csrf $csrf;

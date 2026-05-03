@@ -16,7 +16,7 @@ use Raven\Lib\Transport\Redirect;
 
 /**
  * Panel login gate and session identity synchronization helper.
- * Used by Panel\SharedController and lib/Extension/Panel/PanelRouteRegistrar.
+ * Used by Panel\SharedController and lib/Extension/Panel/Routes.
  */
 final class SessionGuard
 {

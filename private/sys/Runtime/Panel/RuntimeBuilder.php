@@ -20,9 +20,9 @@ use Raven\Core\Runtime\Panel\RuntimeInitializer;
 use Raven\Core\Logger;
 use Raven\Core\Renderer;
 use Raven\Lib\Auth\AuthService;
-use Raven\Lib\Extension\ExtensionEditorCatalogService;
-use Raven\Lib\Extension\Panel\ExtensionCatalogService;
-use Raven\Lib\Extension\Panel\ExtensionPermissionCatalogService;
+use Raven\Lib\Extension\Panel\Content as ExtensionContent;
+use Raven\Lib\Extension\Panel\Manager as ExtensionManager;
+use Raven\Lib\Extension\Panel\Permissions as ExtensionPermissions;
 use Raven\Lib\Extension\StateRead;
 use Raven\Lib\Parser\ConfigParser;
 use Raven\Lib\Media\Panel\MediaManager;
@@ -70,7 +70,7 @@ final class RuntimeBuilder
         $extensionStateStore = null;
         $extensionPermissionCatalogService = null;
         $extensionCatalogService = null;
-        $extensionEditorCatalogService = null;
+        $extensionContent = null;
         $themeCatalogService = null;
 
         $rvn['view'] = new Renderer((string) $rvn['root'] . '/private/tpl');
@@ -325,8 +325,8 @@ final class RuntimeBuilder
             &$extensionPermissionCatalogService,
             $rvn,
             $extensionStateStoreFactory
-        ): ExtensionPermissionCatalogService {
-            $extensionPermissionCatalogService = new ExtensionPermissionCatalogService(
+        ): ExtensionPermissions {
+            $extensionPermissionCatalogService = new ExtensionPermissions(
                 $extensionStateStoreFactory(),
                 $rvn['input']
             );
@@ -342,8 +342,8 @@ final class RuntimeBuilder
             $rvn,
             $extensionStateStoreFactory,
             $extensionPermissionCatalogFactory
-        ): ExtensionCatalogService {
-            $extensionCatalogService = new ExtensionCatalogService(
+        ): ExtensionManager {
+            $extensionCatalogService = new ExtensionManager(
                 (string) $rvn['root'],
                 $extensionStateStoreFactory(),
                 $extensionPermissionCatalogFactory(),
@@ -355,19 +355,19 @@ final class RuntimeBuilder
         });
 
         /**
-         * Reuses one shared extension editor catalog for page-editor contribution reads.
+         * Reuses one shared extension content catalog for page-editor block and shortcode reads.
          */
-        $extensionEditorCatalogFactory = $memoize(static function () use (
-            &$extensionEditorCatalogService,
+        $extensionContentFactory = $memoize(static function () use (
+            &$extensionContent,
             $rvn
-        ): ExtensionEditorCatalogService {
-            $extensionEditorCatalogService = new ExtensionEditorCatalogService(
+        ): ExtensionContent {
+            $extensionContent = new ExtensionContent(
                 (string) $rvn['root'],
                 $rvn['input'],
                 new \Raven\Lib\Parser\PageBlockParser($rvn['input'])
             );
 
-            return $extensionEditorCatalogService;
+            return $extensionContent;
         });
 
         /**
@@ -398,7 +398,7 @@ final class RuntimeBuilder
             $panelTaxonomyDomain,
             $extensionStateStoreFactory,
             $extensionCatalogFactory,
-            $extensionEditorCatalogFactory
+            $extensionContentFactory
         );
 
         ControllerFactories::registerUserAdminControllers(

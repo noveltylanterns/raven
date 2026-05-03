@@ -41,7 +41,7 @@ use Raven\Lib\Auth\AuthService;
 use Raven\Lib\Auth\LoginIdentifier;
 use Raven\Lib\Auth\Panel\PermissionDefinitionCatalog;
 use Raven\Lib\Auth\SessionFlash;
-use Raven\Lib\Extension\Panel\ExtensionCatalogService;
+use Raven\Lib\Extension\Panel\Manager as ExtensionManager;
 use Raven\Lib\Media\Panel\TaxonomyImageService;
 use Raven\Lib\Media\Panel\UserMediaPathService;
 use Raven\Lib\Parser\FeedParser;
@@ -66,7 +66,7 @@ final class ControllerFactories
      *
      * @param array<string, mixed> $rvn Shared runtime container, mutated in-place.
      * @param callable(): AuthService $resolveAuth Lazy auth-service resolver.
-     * @param callable(): ExtensionCatalogService $extensionCatalogFactory Extension catalog service factory.
+     * @param callable(): ExtensionManager $extensionCatalogFactory Extension catalog service factory.
      * @param callable(string): array<int, array{name: string, slug: string}> $extensionFormsProvider Extension enabled-form resolver.
      * @param bool $categoryEnabled Whether category support is enabled for the current request.
      * @param bool $tagEnabled Whether tag support is enabled for the current request.
@@ -159,8 +159,8 @@ final class ControllerFactories
      * @param Closure $panelContentDomain Panel content domain aggregate closure.
      * @param Closure $panelTaxonomyDomain Panel taxonomy domain aggregate closure.
      * @param callable(): mixed $extensionStateStoreFactory Extension state store factory.
-     * @param callable(): ExtensionCatalogService $extensionCatalogFactory Extension catalog service factory.
-     * @param callable(): mixed $extensionEditorCatalogFactory Extension editor catalog service factory.
+     * @param callable(): ExtensionManager $extensionCatalogFactory Extension catalog service factory.
+     * @param callable(): mixed $extensionContentFactory Extension editor catalog service factory.
      * @return void
      */
     public static function registerContentTaxonomyControllers(
@@ -169,7 +169,7 @@ final class ControllerFactories
         Closure $panelTaxonomyDomain,
         callable $extensionStateStoreFactory,
         callable $extensionCatalogFactory,
-        callable $extensionEditorCatalogFactory
+        callable $extensionContentFactory
     ): void {
         $dashboardController = null;
         $pageListController = null;
@@ -234,7 +234,7 @@ final class ControllerFactories
             $panelTaxonomyDomain,
             $extensionStateStoreFactory,
             $extensionCatalogFactory,
-            $extensionEditorCatalogFactory
+            $extensionContentFactory
         ): PageEditController {
             if ($pageEditController instanceof PageEditController) {
                 return $pageEditController;
@@ -267,7 +267,7 @@ final class ControllerFactories
                 $rvn['panel_editor_mde'](),
                 $extensionStateStoreFactory(),
                 $extensionCatalogFactory(),
-                $extensionEditorCatalogFactory(),
+                $extensionContentFactory(),
                 is_callable($rvn['extension_services_for'] ?? null)
                     ? $rvn['extension_services_for']
                     : static fn (?string $extensionDirectory = null): array => []
@@ -491,7 +491,7 @@ final class ControllerFactories
      * @param callable(): mixed $loggerFactory Event-log service factory.
      * @param callable(): ThemeCatalog $themeCatalogFactory Public-theme catalog service factory.
      * @param callable(): mixed $extensionStateStoreFactory Extension state store factory.
-     * @param callable(): ExtensionCatalogService $extensionCatalogFactory Extension catalog service factory.
+     * @param callable(): ExtensionManager $extensionCatalogFactory Extension catalog service factory.
      * @return void
      */
     public static function registerUserAdminControllers(

@@ -1,5 +1,12 @@
 <?php
 
+/**
+ * RAVEN CMS
+ * ~/private/lib/Extension/Panel/Permissions.php
+ * Extension panel-permission catalog: discovery, normalization, and stable bit allocation.
+ * Docs: https://raven.lanterns.io
+ */
+
 declare(strict_types=1);
 
 namespace Raven\Lib\Extension\Panel;
@@ -12,7 +19,7 @@ use Raven\Lib\Security\InputSanitizer;
 /**
  * Discovers extension panel-permission metadata and manages stable bit allocation.
  */
-final class ExtensionPermissionCatalogService
+final class Permissions
 {
     private StateRead $stateStore;
     private InputSanitizer $input;
