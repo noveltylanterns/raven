@@ -13,21 +13,8 @@ This is the default Build Mode backlog file. If the user asks about goals, unpat
 
 
 
-# Archive Library Cleanup
-- [ ] in lib/Archive/Upstream - $repoUrl should be $customUrl, normalizeRepoUrl should be normalizeCustomRepo, isValidCustomRepoUrl should be validateCustomRepo, and normalizeGitHubRepo should be normalizeGithubRepo. we also need a corresponding validateGithubRepo.
-- [ ] Many of our function names are all based on stale class names. Others are absurdly long. Go through all our Archive classes and make sure all their function names are concise & accurate.
-- [ ] Many parts of our codebase are using variables based on stale class/function names. Do a sweep of all lib/Archive/* callers and make sure the variables they use are concise & accurate.
-- [ ] Do a full sweep of lib/Archive/* and make sure all headings, classes & functions have present & accurate PHPdoc blocks.
-- [ ] Plan this out, and append these guidelines with a more detailed checklist in case we lose session.
-
-
 # Format Library Cleanup
-- [ ] in lib/Format/Json - decodeAssocString should be decode, and decodeFileAssoc should be decodeFile
-- [ ] in lib/Format/Git - extractWorktree should be extractTree, and cloneRepository should be clone
-- [ ] Many of our function names are all based on stale class names. Others are absurdly long. Go through all our Format classes and make sure all their function names are concise & accurate.
-- [ ] Many parts of our codebase are using variables based on stale class/function names. Do a sweep of all lib/Format/* callers and make sure the variables they use are concise & accurate.
-- [ ] Do a full sweep of lib/Format/* and make sure all headings, classes & functions have present & accurate PHPdoc blocks.
-- [ ] Plan this out, and append these guidelines with a more detailed checklist in case we lose session.
+- [x] All Format library method renames complete (see release-notes.md — May 3, 2026 — Format library method naming pass)
 
 
 # Misc Bugs & Tweaks

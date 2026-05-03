@@ -237,26 +237,26 @@ final class Extract
      * @return void
      * @throws RuntimeException When the archive type does not support directory extraction.
      */
-    public function extractDirectory(string $archivePath, string $entryName, string $targetDir): void
+    public function extractDir(string $archivePath, string $entryName, string $targetDir): void
     {
         $type = $this->packageType($archivePath);
 
         match ($type) {
-            'zip' => $this->zip->extractDirectory($archivePath, $entryName, $targetDir),
-            'tar' => $this->tar->extractDirectory($archivePath, $entryName, $targetDir),
+            'zip' => $this->zip->extractDir($archivePath, $entryName, $targetDir),
+            'tar' => $this->tar->extractDir($archivePath, $entryName, $targetDir),
             'tar.gz' => $this->withTempTar($archivePath, 'gz', function (string $tarPath) use ($entryName, $targetDir): void {
-                $this->tar->extractDirectory($tarPath, $entryName, $targetDir);
+                $this->tar->extractDir($tarPath, $entryName, $targetDir);
             }),
             'tar.bz2' => $this->withTempTar($archivePath, 'bz2', function (string $tarPath) use ($entryName, $targetDir): void {
-                $this->tar->extractDirectory($tarPath, $entryName, $targetDir);
+                $this->tar->extractDir($tarPath, $entryName, $targetDir);
             }),
             'tar.xz' => $this->withTempTar($archivePath, 'xz', function (string $tarPath) use ($entryName, $targetDir): void {
-                $this->tar->extractDirectory($tarPath, $entryName, $targetDir);
+                $this->tar->extractDir($tarPath, $entryName, $targetDir);
             }),
             'tar.zst' => $this->withTempTar($archivePath, 'zst', function (string $tarPath) use ($entryName, $targetDir): void {
-                $this->tar->extractDirectory($tarPath, $entryName, $targetDir);
+                $this->tar->extractDir($tarPath, $entryName, $targetDir);
             }),
-            '7z' => $this->szip->extractDirectory($archivePath, $entryName, $targetDir),
+            '7z' => $this->szip->extractDir($archivePath, $entryName, $targetDir),
             default => throw new RuntimeException('Unsupported archive type for directory extraction: ' . $archivePath),
         };
     }

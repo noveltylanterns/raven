@@ -75,8 +75,8 @@ final class Update
     public function compare(array $source): array
     {
         try {
-            $local = $this->localRepositoryState();
-            $remote = $this->remoteRepositoryState($source);
+            $local = $this->localState();
+            $remote = $this->remoteState($source);
 
             return [
                 'ok' => true,
@@ -171,11 +171,11 @@ final class Update
                 }
 
                 $appliedCount = $this->applyPlan($plan['actions'], (string) $workspace['source_tree']);
-                $this->syncLocalRepositoryToSource((string) $source['source_url'], (string) $workspace['remote']['branch']);
+                $this->syncToSource((string) $source['source_url'], (string) $workspace['remote']['branch']);
                 if ($appliedCount > 0) {
                     $this->schemaEnsureStateStore()->invalidate();
                 }
-                $localState = $this->localRepositoryState();
+                $localState = $this->localState();
                 $summary = $plan['summary'];
                 $summary['applied_count'] = $appliedCount;
 
@@ -254,8 +254,8 @@ final class Update
      */
     private function prepareWorkspace(array $source, bool $withWorkTree): array
     {
-        $local = $this->localRepositoryState();
-        $remote = $this->remoteRepositoryState($source);
+        $local = $this->localState();
+        $remote = $this->remoteState($source);
         if (!$withWorkTree) {
             return [
                 'local' => $local,
@@ -351,7 +351,7 @@ final class Update
         }
 
         $sourceFiles = $this->collectFiles($sourceTree);
-        $localFiles = $this->localManagedFiles();
+        $localFiles = $this->managedFiles();
         $customThemeRoots = $this->customProtectedRoots(
             $this->root . '/public/theme',
             'public/theme',
@@ -364,12 +364,12 @@ final class Update
         );
 
         $pathUniverse = array_values(array_unique(array_merge(array_keys($sourceFiles), array_keys($localFiles))));
-        $ignoredPaths = $this->ignoredPathsMap($pathUniverse);
-        $extensionBinAliases = $this->extensionBinAliasesMap(
+        $ignoredPaths = $this->ignoredPaths($pathUniverse);
+        $extensionBinAliases = $this->extensionBinAliases(
             $this->root . '/private/bin',
             'private/bin'
         );
-        $dirtyPaths = $this->dirtyPathsMap();
+        $dirtyPaths = $this->dirtyPaths();
 
         $actions = [];
         foreach ($sourceFiles as $relativePath => $sourcePath) {
@@ -509,19 +509,19 @@ final class Update
         rsort($deletedDirectories);
         $deletedDirectories = array_values(array_unique($deletedDirectories));
         foreach ($deletedDirectories as $directory) {
-            $this->pruneEmptyDirectories($directory);
+            $this->pruneEmptyDirs($directory);
         }
 
         return $appliedCount;
     }
 
     /**
-     * Reads local git repository state (branch, revision, timestamp).
+     * Reads local git state: branch, revision, and timestamp.
      *
      * @return array<string, mixed> Local state with `branch`, `revision`, and `timestamp` keys.
      * @throws RuntimeException When the local install is not inside a git working tree.
      */
-    private function localRepositoryState(): array
+    private function localState(): array
     {
         $insideWorkTree = $this->git->mustRun(['rev-parse', '--is-inside-work-tree'], $this->root);
         if (strtolower(trim((string) $insideWorkTree['stdout'])) !== 'true') {
@@ -545,13 +545,13 @@ final class Update
     }
 
     /**
-     * Fetches remote repository state (branch, revision, timestamp) via ls-remote.
+     * Fetches remote git state via ls-remote: branch, revision, and timestamp.
      *
      * @param array<string, mixed> $source Resolved update source descriptor.
      * @return array<string, mixed> Remote state with `branch`, `revision`, and `timestamp` keys.
      * @throws RuntimeException When the remote source URL is missing or the remote HEAD cannot be resolved.
      */
-    private function remoteRepositoryState(array $source): array
+    private function remoteState(array $source): array
     {
         $sourceUrl = trim((string) ($source['source_url'] ?? ''));
         if ($sourceUrl === '') {
@@ -631,8 +631,8 @@ final class Update
     /**
      * Compares local and remote revision hashes to determine update state.
      *
-     * @param array<string, mixed> $local Local state from localRepositoryState().
-     * @param array<string, mixed> $remote Remote state from remoteRepositoryState().
+     * @param array<string, mixed> $local Local state from localState().
+     * @param array<string, mixed> $remote Remote state from remoteState().
      * @return array<string, mixed> Comparison result with `state`, `label`, and ahead/behind counts.
      */
     private function compareRevisionHeads(array $local, array $remote): array
@@ -658,13 +658,13 @@ final class Update
     }
 
     /**
-     * Builds a map of relative paths that are excluded by .gitignore rules.
+     * Returns a map of relative paths excluded by .gitignore rules.
      *
      * @param array<int, string> $paths Candidate relative paths to check.
      * @return array<string, bool> Map of ignored relative paths.
      * @throws RuntimeException When git check-ignore fails with a non-standard exit code.
      */
-    private function ignoredPathsMap(array $paths): array
+    private function ignoredPaths(array $paths): array
     {
         if ($paths === []) {
             return [];
@@ -688,11 +688,11 @@ final class Update
     }
 
     /**
-     * Builds a map of relative paths with uncommitted local changes.
+     * Returns a map of relative paths with uncommitted local changes.
      *
      * @return array<string, bool> Map of dirty relative paths.
      */
-    private function dirtyPathsMap(): array
+    private function dirtyPaths(): array
     {
         $result = $this->git->mustRun(['status', '--porcelain', '-z', '--untracked-files=all', '--ignored=no'], $this->root);
         $raw = (string) ($result['stdout'] ?? '');
@@ -798,11 +798,11 @@ final class Update
     }
 
     /**
-     * Lists all tracked and untracked managed files as a relative-path => absolute-path map.
+     * Returns all tracked and untracked managed files as a relative-path => absolute-path map.
      *
      * @return array<string, string> Sorted map of relative path => absolute path.
      */
-    private function localManagedFiles(): array
+    private function managedFiles(): array
     {
         $result = $this->git->mustRun(['ls-files', '-z', '--cached', '--others', '--exclude-standard'], $this->root);
         $raw = (string) ($result['stdout'] ?? '');
@@ -873,14 +873,14 @@ final class Update
      * Returns a map of relative paths for symlinks present in private/bin/.
      *
      * Extension bin commands are symlinks created by StorageProvisioner::ensureBinSymlinks().
-     * Stock CLI scripts are regular files shipped in the source tree. Scanning for symlinks here
-     * lets the updater distinguish between the two without any extension-registry coupling.
+     * Stock CLI scripts are regular files. Scanning for symlinks here lets the updater
+     * distinguish between the two without any extension-registry coupling.
      *
      * @param string $absoluteBinDir Absolute path to the private/bin directory.
-     * @param string $relativeBinDir Relative prefix to use when building result keys (e.g. "private/bin").
+     * @param string $relativeBinDir Relative prefix for result keys (e.g. `private/bin`).
      * @return array<string, bool> Map of relative path => true for each symlink found.
      */
-    private function extensionBinAliasesMap(string $absoluteBinDir, string $relativeBinDir): array
+    private function extensionBinAliases(string $absoluteBinDir, string $relativeBinDir): array
     {
         if (!is_dir($absoluteBinDir)) {
             return [];
@@ -1026,12 +1026,12 @@ final class Update
     }
 
     /**
-     * Walks upward from a deleted file's directory and removes now-empty ancestors.
+     * Walks upward from a path and removes now-empty ancestor directories.
      *
      * @param string $directory Absolute path to start the upward pruning walk from.
      * @return void
      */
-    private function pruneEmptyDirectories(string $directory): void
+    private function pruneEmptyDirs(string $directory): void
     {
         $normalizedRoot = $this->root;
         $current = rtrim(str_replace('\\', '/', $directory), '/');
@@ -1083,13 +1083,13 @@ final class Update
     }
 
     /**
-     * Advances the local git HEAD to match the applied source state.
+     * Advances local git HEAD to match the applied source state.
      *
      * @param string $sourceUrl Resolved remote source URL.
      * @param string $branch Remote branch name to fetch and reset to.
      * @return void
      */
-    private function syncLocalRepositoryToSource(string $sourceUrl, string $branch): void
+    private function syncToSource(string $sourceUrl, string $branch): void
     {
         $this->git->mustRun(['fetch', '--quiet', '--depth', '1', $sourceUrl, $branch], $this->root);
         $this->git->mustRun(['reset', '--mixed', '--quiet', 'FETCH_HEAD'], $this->root);

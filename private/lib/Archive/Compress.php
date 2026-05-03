@@ -70,7 +70,7 @@ final class Compress
      *
      * @return array<int, string> Lowercase extension list without leading dots.
      */
-    public function directoryFormats(): array
+    public function dirFormats(): array
     {
         return [
             'zip',
@@ -106,7 +106,7 @@ final class Compress
     public function formats(): array
     {
         return array_values(array_unique([
-            ...$this->directoryFormats(),
+            ...$this->dirFormats(),
             ...$this->fileFormats(),
         ]));
     }
@@ -156,7 +156,7 @@ final class Compress
      * @return void
      * @throws RuntimeException When the source is not a directory or archiving fails.
      */
-    public function compressDirectory(string $sourceDir, string $archiveRoot, string $outputPath): void
+    public function compressDir(string $sourceDir, string $archiveRoot, string $outputPath): void
     {
         if (!is_dir($sourceDir)) {
             throw new RuntimeException('Directory archive compression requires a directory source: ' . $sourceDir);
@@ -169,11 +169,11 @@ final class Compress
      * Returns true when the output filename uses a supported directory-archive suffix.
      *
      * @param string $filename Output filename or archive path to inspect.
-     * @return bool True when `compressDirectory()` can handle the requested format.
+     * @return bool True when `compressDir()` can handle the requested format.
      */
-    public function supportsDirectory(string $filename): bool
+    public function supportsDir(string $filename): bool
     {
-        return $this->detectDirectoryType($filename) !== null;
+        return $this->detectDirType($filename) !== null;
     }
 
     /**
@@ -202,7 +202,7 @@ final class Compress
      */
     public function addPath(string $archivePath, string $sourcePath, string $entryName): void
     {
-        $type = $this->directoryType($archivePath);
+        $type = $this->dirType($archivePath);
 
         match ($type) {
             'zip' => $this->zip->addPath($archivePath, $sourcePath, $entryName),
@@ -230,7 +230,7 @@ final class Compress
      * @param string $archivePath Archive filename or absolute path.
      * @return string|null Canonical archive type key, or null when unsupported.
      */
-    private function detectDirectoryType(string $archivePath): ?string
+    private function detectDirType(string $archivePath): ?string
     {
         $filename = strtolower(trim((string) pathinfo($archivePath, PATHINFO_BASENAME)));
         if ($filename === '') {
@@ -266,7 +266,7 @@ final class Compress
      */
     private function detectType(string $archivePath): ?string
     {
-        $directoryType = $this->detectDirectoryType($archivePath);
+        $directoryType = $this->detectDirType($archivePath);
         if ($directoryType !== null) {
             return $directoryType;
         }
@@ -297,9 +297,9 @@ final class Compress
      * @return string Canonical archive type key.
      * @throws RuntimeException When the filename/path does not use a supported suffix.
      */
-    private function directoryType(string $archivePath): string
+    private function dirType(string $archivePath): string
     {
-        $type = $this->detectDirectoryType($archivePath);
+        $type = $this->detectDirType($archivePath);
         if ($type === null) {
             throw new RuntimeException('Unsupported archive type: ' . $archivePath);
         }

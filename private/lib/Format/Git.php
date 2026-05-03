@@ -161,7 +161,7 @@ final class Git
      * @return void
      * @throws RuntimeException When the clone fails.
      */
-    public function cloneRepository(string $url, string $targetDir, ?string $branch = null, int $depth = 1): void
+    public function clone(string $url, string $targetDir, ?string $branch = null, int $depth = 1): void
     {
         $arguments = ['clone', '--quiet'];
 
@@ -271,7 +271,7 @@ final class Git
      * @return void
      * @throws RuntimeException When extraction fails.
      */
-    public function extractWorktree(string $repoDir, string $targetDir): void
+    public function extractTree(string $repoDir, string $targetDir): void
     {
         if (!is_dir($targetDir) && !mkdir($targetDir, 0775, true) && !is_dir($targetDir)) {
             throw new RuntimeException('Failed to create worktree extraction target directory: ' . $targetDir);

@@ -3,7 +3,7 @@
 /**
  * RAVEN CMS
  * ~/private/lib/Archive/Folder.php
- * Recursive directory-removal utility for uninstall and cleanup flows.
+ * Directory creation, existence, and removal helpers for install and cleanup flows.
  * Docs: https://raven.lanterns.io
  */
 
@@ -12,10 +12,10 @@ declare(strict_types=1);
 namespace Raven\Lib\Archive;
 
 /**
- * Recursive directory-removal helper for uninstall and cleanup flows.
+ * Directory creation, existence enforcement, and removal helpers.
  *
- * Walks the tree bottom-up so children are removed before their parents,
- * which is required when removing non-empty directories on most filesystems.
+ * Walks the tree bottom-up during recursive removal so children are removed
+ * before their parents, which is required on most filesystems.
  */
 final class Folder
 {
@@ -26,7 +26,7 @@ final class Folder
      * @param int $mode Octal directory mode to enforce.
      * @return bool True when the directory exists after the call.
      */
-    public function ensureDirectory(string $directory, int $mode = 0775): bool
+    public function ensure(string $directory, int $mode = 0775): bool
     {
         if (!is_dir($directory) && !@mkdir($directory, $mode, true) && !is_dir($directory)) {
             return false;
@@ -43,7 +43,7 @@ final class Folder
      * @param int $mode Octal directory mode to apply.
      * @return bool True when the directory was created successfully.
      */
-    public function createDirectory(string $directory, int $mode = 0775): bool
+    public function create(string $directory, int $mode = 0775): bool
     {
         if (is_dir($directory) || is_file($directory)) {
             return false;
@@ -63,7 +63,7 @@ final class Folder
      * @param string $directory Absolute directory path.
      * @return bool True when the directory was removed or already absent.
      */
-    public function removeEmptyDirectory(string $directory): bool
+    public function removeEmpty(string $directory): bool
     {
         if (!is_dir($directory)) {
             return true;

@@ -2152,7 +2152,7 @@ function raven_cli_command_extension(RavenCliContext $context, array $tokens): i
 
             $archivePackages = raven_cli_archive_packages($root);
             $packageWorkflow = raven_cli_package_install_workflow($root);
-            if (!$archivePackages->supportsPackage($archivePath)) {
+            if (!$archivePackages->supports($archivePath)) {
                 throw new RuntimeException('Unsupported archive type. Use .zip, .tar, .tar.gz/.tgz, .tar.bz2/.tbz2, .tar.xz/.txz, .tar.zst/.tzst, or .7z.');
             }
 

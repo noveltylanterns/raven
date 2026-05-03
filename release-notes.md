@@ -2,6 +2,25 @@
 
 *The machine is supposed to be logging patches & mods to this file. Sometimes it does, sometimes it doesn't. It might be useful for historical architectural context to your Agent at one point.*
 
+### May 3, 2026 — Format library method naming pass
+
+- **Json.php** — `decodeAssocString` → `decode`; `decodeFileAssoc` → `decodeFile`; updated internal self-call in `decodeFile`; updated callers: `Auth/AuthPayloadCodec.php` (2 call sites).
+- **Git.php** — `cloneRepository` → `clone`; `extractWorktree` → `extractTree`. No external callers for either method.
+- **Tar.php** — shortened directory-scoped names: `extractDirectory` → `extractDir`; `compressDirectory` → `compressDir`; `compressDirectoryGz/Bz2/Xz/Zst` → `compressDirGz/Bz2/Xz/Zst`; private `normalizeDirectoryEntryName` → `normalizeDirEntry`. Updated all internal call sites and docblock cross-reference. Updated `Archive/Extract.php` callers.
+- **Zip.php** — `extractDirectory` → `extractDir`; `compressDirectory` → `compressDir`; private `normalizeDirectoryEntryName` → `normalizeDirEntry`; private `createDirectoryTreeInArchive` → `addDirTree`. Updated all internal call sites. Updated `Archive/Extract.php` callers.
+- **Szip.php** — `extractDirectory` → `extractDir`; private `normalizeDirectoryEntryName` → `normalizeDirEntry`; private `directoryEntries` → `dirEntries`. Updated all internal call sites. Updated `Archive/Extract.php` callers.
+- **Gz, Bz2, Xz, Zst, Csv, Txt** — all method names already concise and accurate; no changes.
+- Variable sweep of all `lib/Format/*` callers — no stale variable names found.
+
+### May 3, 2026 — Archive library method naming pass
+
+- **Upstream.php** — renamed internal methods and variable for accuracy: `normalizeGitHubRepo` → `normalizeGithubRepo` (consistent casing), `normalizeRepoUrl` → `normalizeCustomRepo`, `isValidCustomRepoUrl` → `validateCustomRepo`, local `$repoUrl` → `$customUrl`; added new `validateGithubRepo()` method; updated `validationErrors()` to call both validators.
+- **Compress.php** — shortened directory-scoped method names: `directoryFormats` → `dirFormats`, `compressDirectory` → `compressDir`, `supportsDirectory` → `supportsDir`, `detectDirectoryType` → `detectDirType`, `directoryType` → `dirType`; updated all internal call sites.
+- **Extract.php** — `extractDirectory` → `extractDir`.
+- **Folder.php** — `ensureDirectory` → `ensure`, `createDirectory` → `create`, `removeEmptyDirectory` → `removeEmpty`; updated file header and class docblock to reflect full scope. Updated `ext/smallweb/SmallwebService.php` callers.
+- **Package.php** — `packageExtensions` → `extensions`, `packageFormatLabels` → `formatLabels`, `packageAccept` → `accept`, `supportsPackage` → `supports`, `directoryHasFiles` → `hasFiles`; updated `compress->directoryFormats/compressDirectory` internal calls to match renamed Compress methods. Updated external callers: `ThemeController`, `ExtensionController`, `lib/Archive/Install.php`, `sys/Shell.php`.
+- **Update.php** — renamed eight private methods to drop redundant map/repository/directories suffixes: `localRepositoryState` → `localState`, `remoteRepositoryState` → `remoteState`, `ignoredPathsMap` → `ignoredPaths`, `dirtyPathsMap` → `dirtyPaths`, `localManagedFiles` → `managedFiles`, `extensionBinAliasesMap` → `extensionBinAliases`, `pruneEmptyDirectories` → `pruneEmptyDirs`, `syncLocalRepositoryToSource` → `syncToSource`; updated all internal call sites and docblocks.
+
 ### May 3, 2026 — Misc bugs & tweaks batch
 
 - Merged `Scribe/UserMediaScribe` into `UserScribe`: constructor now accepts optional `$projectRoot`; all avatar/cover filesystem methods absorbed. Updated callers: `Panel/ControllerFactory`, `PreferencesController`, `UserEditController`. Deleted `UserMediaScribe.php`.

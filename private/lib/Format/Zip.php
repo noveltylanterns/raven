@@ -145,9 +145,9 @@ final class Zip
      * @return void
      * @throws RuntimeException When the directory is unsafe, missing, or extraction fails.
      */
-    public function extractDirectory(string $archivePath, string $entryName, string $targetDir): void
+    public function extractDir(string $archivePath, string $entryName, string $targetDir): void
     {
-        $directory = $this->normalizeDirectoryEntryName($entryName);
+        $directory = $this->normalizeDirEntry($entryName);
         $zip = $this->open($archivePath);
 
         try {
@@ -257,7 +257,7 @@ final class Zip
      * @throws RuntimeException When the source directory cannot be resolved, the
      *                          archive cannot be initialized, or a file fails to add.
      */
-    public function compressDirectory(string $sourceDir, string $archiveRoot, string $outputPath): void
+    public function compressDir(string $sourceDir, string $archiveRoot, string $outputPath): void
     {
         $this->compressPath($sourceDir, $archiveRoot, $outputPath);
     }
@@ -485,7 +485,7 @@ final class Zip
      * @return string Safe normalized directory prefix ending in `/`.
      * @throws RuntimeException When the path is unsafe.
      */
-    private function normalizeDirectoryEntryName(string $entryName): string
+    private function normalizeDirEntry(string $entryName): string
     {
         return rtrim($this->normalizeEntryName($entryName), '/') . '/';
     }
@@ -504,7 +504,7 @@ final class Zip
         $entry = $this->normalizeEntryName($entryName);
 
         if (is_dir($sourcePath)) {
-            $this->createDirectoryTreeInArchive($zip, $sourcePath, $entry);
+            $this->addDirTree($zip, $sourcePath, $entry);
             return;
         }
 
@@ -522,7 +522,7 @@ final class Zip
      * @return void
      * @throws RuntimeException When a directory or file cannot be added.
      */
-    private function createDirectoryTreeInArchive(ZipArchive $zip, string $sourceDir, string $entryRoot): void
+    private function addDirTree(ZipArchive $zip, string $sourceDir, string $entryRoot): void
     {
         $sourceRoot = realpath($sourceDir);
         if ($sourceRoot === false || !is_dir($sourceRoot)) {

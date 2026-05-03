@@ -96,11 +96,11 @@ final class Upstream
             return $errors;
         }
 
-        if (($mode === 'github_mirror' || $mode === 'github_custom') && $source['github_repo'] === '') {
+        if (($mode === 'github_mirror' || $mode === 'github_custom') && !$this->validateGithubRepo($source['github_repo'])) {
             $errors[] = 'GitHub source must use the form owner/repo.';
         }
 
-        if ($mode === 'repo_custom' && !$this->isValidCustomRepoUrl($source['repo_url'])) {
+        if ($mode === 'repo_custom' && !$this->validateCustomRepo($source['repo_url'])) {
             $errors[] = 'Custom repo must be a valid git URL.';
         }
 
@@ -120,8 +120,8 @@ final class Upstream
     private function resolve(array $source): array
     {
         $mode = $this->normalizeMode((string) ($source['mode'] ?? 'github_mirror'));
-        $githubRepo = $this->normalizeGitHubRepo((string) ($source['github_repo'] ?? ''));
-        $repoUrl = $this->normalizeRepoUrl((string) ($source['repo_url'] ?? ''));
+        $githubRepo = $this->normalizeGithubRepo((string) ($source['github_repo'] ?? ''));
+        $customUrl = $this->normalizeCustomRepo((string) ($source['repo_url'] ?? ''));
 
         // The mirror mode always points to the canonical Raven repository.
         if ($mode === 'github_mirror') {
@@ -131,8 +131,8 @@ final class Upstream
         $sourceUrl = '';
         $sourceLabel = '';
         if ($mode === 'repo_custom') {
-            $sourceUrl = $repoUrl;
-            $sourceLabel = $repoUrl;
+            $sourceUrl = $customUrl;
+            $sourceLabel = $customUrl;
         } else {
             $sourceUrl = $githubRepo !== '' ? 'https://github.com/' . $githubRepo . '.git' : '';
             $sourceLabel = $githubRepo;
@@ -141,7 +141,7 @@ final class Upstream
         return [
             'mode' => $mode,
             'github_repo' => $githubRepo,
-            'repo_url' => $repoUrl,
+            'repo_url' => $customUrl,
             'source_url' => $sourceUrl,
             'source_label' => $sourceLabel,
         ];
@@ -169,7 +169,7 @@ final class Upstream
      * @param string $repo Raw repo value (may be owner/repo, full GitHub URL, or empty).
      * @return string Normalized owner/repo string, or empty string if invalid.
      */
-    private function normalizeGitHubRepo(string $repo): string
+    private function normalizeGithubRepo(string $repo): string
     {
         $value = trim($this->input->text($repo, 255));
         if ($value === '') {
@@ -196,7 +196,7 @@ final class Upstream
      * @param string $url Raw URL from config or POST.
      * @return string Trimmed URL string.
      */
-    private function normalizeRepoUrl(string $url): string
+    private function normalizeCustomRepo(string $url): string
     {
         return trim($this->input->text($url, 500));
     }
@@ -207,9 +207,9 @@ final class Upstream
      * Accepts http(s)://, ssh://, git://, and SCP-style (user@host:path) git URLs.
      *
      * @param string $url URL to validate.
-     * @return bool True if the URL matches a supported git remote format.
+     * @return bool True when the URL matches a supported git remote format.
      */
-    private function isValidCustomRepoUrl(string $url): bool
+    private function validateCustomRepo(string $url): bool
     {
         if ($url === '') {
             return false;
@@ -220,5 +220,23 @@ final class Upstream
         }
 
         return preg_match('/^[A-Za-z0-9._-]+@[A-Za-z0-9._-]+:.+$/', $url) === 1;
+    }
+
+    /**
+     * Returns whether a GitHub repo string is in valid owner/repo form.
+     *
+     * Applied after normalization, so the input is already stripped of full URLs
+     * and .git suffixes. An empty string always returns false.
+     *
+     * @param string $repo Normalized repo string to validate.
+     * @return bool True when the string matches owner/repo format.
+     */
+    private function validateGithubRepo(string $repo): bool
+    {
+        if ($repo === '') {
+            return false;
+        }
+
+        return preg_match('/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/', $repo) === 1;
     }
 }

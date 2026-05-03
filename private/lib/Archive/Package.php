@@ -42,7 +42,7 @@ final class Package
      *
      * @return array<int, string> Lowercase extension list without leading dots.
      */
-    public function packageExtensions(): array
+    public function extensions(): array
     {
         return $this->extract->packageExtensions();
     }
@@ -57,7 +57,7 @@ final class Package
      */
     public function exportFormats(): array
     {
-        return $this->compress->directoryFormats();
+        return $this->compress->dirFormats();
     }
 
     /**
@@ -68,7 +68,7 @@ final class Package
      *
      * @return array<int, string> Display labels without leading dots.
      */
-    public function packageFormatLabels(): array
+    public function formatLabels(): array
     {
         return [
             'zip',
@@ -102,7 +102,7 @@ final class Package
      *
      * @return string Comma-delimited `accept` attribute value.
      */
-    public function packageAccept(): string
+    public function accept(): string
     {
         return $this->extract->packageAccept();
     }
@@ -113,7 +113,7 @@ final class Package
      * @param string $filename Uploaded/archive filename to inspect.
      * @return bool True when Raven can extract the package.
      */
-    public function supportsPackage(string $filename): bool
+    public function supports(string $filename): bool
     {
         return $this->extract->supportsPackage($filename);
     }
@@ -136,7 +136,7 @@ final class Package
      * @param string $directory Absolute directory path to inspect.
      * @return bool True when the directory exists and is not empty.
      */
-    public function directoryHasFiles(string $directory): bool
+    public function hasFiles(string $directory): bool
     {
         if (!is_dir($directory)) {
             return false;
@@ -176,7 +176,7 @@ final class Package
         $resolvedFormat = $this->exportFormat($format);
         $suffix = $this->suffix($resolvedFormat);
         $temporaryArchivePath = $this->tempPath($suffix);
-        $this->compress->compressDirectory($sourceDirectory, $archiveRoot, $temporaryArchivePath);
+        $this->compress->compressDir($sourceDirectory, $archiveRoot, $temporaryArchivePath);
 
         return [
             'path' => $temporaryArchivePath,

@@ -127,10 +127,10 @@ final class Szip
      * @return void
      * @throws RuntimeException When the directory is unsafe, missing, or extraction fails.
      */
-    public function extractDirectory(string $archivePath, string $entryName, string $targetDir): void
+    public function extractDir(string $archivePath, string $entryName, string $targetDir): void
     {
-        $directory = $this->normalizeDirectoryEntryName($entryName);
-        $matches = $this->directoryEntries($archivePath, $directory);
+        $directory = $this->normalizeDirEntry($entryName);
+        $matches = $this->dirEntries($archivePath, $directory);
         if ($matches === []) {
             throw new RuntimeException('Directory "' . trim($directory, '/') . '" not found in 7Z archive.');
         }
@@ -356,7 +356,7 @@ final class Szip
      * @param string $directory Archive-internal directory prefix ending in `/`.
      * @return array<int, string> Matching entry paths.
      */
-    private function directoryEntries(string $archivePath, string $directory): array
+    private function dirEntries(string $archivePath, string $directory): array
     {
         $matches = [];
 
@@ -473,7 +473,7 @@ final class Szip
      * @return string Safe normalized directory prefix ending in `/`.
      * @throws RuntimeException When the path is unsafe.
      */
-    private function normalizeDirectoryEntryName(string $entryName): string
+    private function normalizeDirEntry(string $entryName): string
     {
         return rtrim($this->normalizeEntryName($entryName), '/') . '/';
     }

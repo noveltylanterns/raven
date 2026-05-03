@@ -66,7 +66,7 @@ final class Install
         $upload = $validatedUpload['upload'] ?? [];
         $tmpPath = (string) ($upload['tmp_name'] ?? '');
         $archiveName = $this->input->text((string) ($upload['name'] ?? 'package.zip'), 255);
-        if (!$this->archives->supportsPackage($archiveName)) {
+        if (!$this->archives->supports($archiveName)) {
             return [
                 'ok' => false,
                 'error' => $collectionLabel . ' must be uploaded as .zip, .tar, .tar.gz/.tgz, .tar.bz2/.tbz2, .tar.xz/.txz, .tar.zst/.tzst, or .7z archives.',
@@ -183,7 +183,7 @@ final class Install
             return $exception->getMessage() !== '' ? $exception->getMessage() : ucfirst($entityLabel) . ' upload failed.';
         }
 
-        if (!$this->archives->directoryHasFiles($targetDirectory)) {
+        if (!$this->archives->hasFiles($targetDirectory)) {
             $cleanup($targetDirectory);
             return 'Extracted ' . strtolower($entityLabel) . ' directory is empty.';
         }

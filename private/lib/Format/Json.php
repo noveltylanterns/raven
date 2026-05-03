@@ -23,7 +23,7 @@ final class Json
      * @param int $maxDepth Maximum decode depth.
      * @return array<int|string, mixed>|null Decoded associative payload, or null on invalid/missing data.
      */
-    public static function decodeAssocString(string $json, int $maxDepth = 64): ?array
+    public static function decode(string $json, int $maxDepth = 64): ?array
     {
         if (trim($json) === '') {
             return null;
@@ -63,7 +63,7 @@ final class Json
      * @param int $maxDepth Maximum decode depth.
      * @return array<int|string, mixed>|null Decoded payload, or null on read/decode failure.
      */
-    public static function decodeFileAssoc(string $path, int $maxBytes = 10485760, int $maxDepth = 64): ?array
+    public static function decodeFile(string $path, int $maxBytes = 10485760, int $maxDepth = 64): ?array
     {
         if ($path === '' || !is_file($path) || !is_readable($path)) {
             return null;
@@ -74,7 +74,7 @@ final class Json
             return null;
         }
 
-        return self::decodeAssocString($raw, $maxDepth);
+        return self::decode($raw, $maxDepth);
     }
 
     /**

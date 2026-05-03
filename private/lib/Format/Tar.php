@@ -114,9 +114,9 @@ final class Tar
      * @return void
      * @throws RuntimeException When the directory is unsafe, missing, or extraction fails.
      */
-    public function extractDirectory(string $archivePath, string $entryName, string $targetDir): void
+    public function extractDir(string $archivePath, string $entryName, string $targetDir): void
     {
-        $directory = $this->normalizeDirectoryEntryName($entryName);
+        $directory = $this->normalizeDirEntry($entryName);
         $matches = [];
 
         foreach ($this->listEntries($archivePath) as $entry) {
@@ -204,14 +204,14 @@ final class Tar
      * Creates a .tar archive from all files in a source directory.
      *
      * Symlinks are skipped. The caller supplies the output path including the
-     * .tar extension. Use `compressDirectoryGz()` to produce a .tar.gz.
+     * .tar extension. Use `compressDirGz()` to produce a .tar.gz.
      *
      * @param string $sourceDir  Absolute path to the source directory.
      * @param string $outputPath Absolute path where the .tar file should be written.
      * @return void
      * @throws RuntimeException When the source directory is invalid or archiving fails.
      */
-    public function compressDirectory(string $sourceDir, string $outputPath): void
+    public function compressDir(string $sourceDir, string $outputPath): void
     {
         $this->compressPath($sourceDir, $outputPath);
     }
@@ -227,7 +227,7 @@ final class Tar
      * @return void
      * @throws RuntimeException When the source directory is invalid or archiving fails.
      */
-    public function compressDirectoryGz(string $sourceDir, string $outputPath): void
+    public function compressDirGz(string $sourceDir, string $outputPath): void
     {
         $this->compressPathGz($sourceDir, $outputPath);
     }
@@ -266,7 +266,7 @@ final class Tar
      * @return void
      * @throws RuntimeException When the source directory is invalid or archiving fails.
      */
-    public function compressDirectoryBz2(string $sourceDir, string $outputPath): void
+    public function compressDirBz2(string $sourceDir, string $outputPath): void
     {
         $this->compressPathBz2($sourceDir, $outputPath);
     }
@@ -305,7 +305,7 @@ final class Tar
      * @return void
      * @throws RuntimeException When the source directory is invalid or archiving fails.
      */
-    public function compressDirectoryXz(string $sourceDir, string $outputPath): void
+    public function compressDirXz(string $sourceDir, string $outputPath): void
     {
         $this->compressPathXz($sourceDir, $outputPath);
     }
@@ -344,7 +344,7 @@ final class Tar
      * @return void
      * @throws RuntimeException When the source directory is invalid or archiving fails.
      */
-    public function compressDirectoryZst(string $sourceDir, string $outputPath): void
+    public function compressDirZst(string $sourceDir, string $outputPath): void
     {
         $this->compressPathZst($sourceDir, $outputPath);
     }
@@ -632,7 +632,7 @@ final class Tar
      * @return string Safe normalized directory prefix ending in `/`.
      * @throws RuntimeException When the path is unsafe.
      */
-    private function normalizeDirectoryEntryName(string $entryName): string
+    private function normalizeDirEntry(string $entryName): string
     {
         return rtrim($this->normalizeEntryName($entryName), '/') . '/';
     }

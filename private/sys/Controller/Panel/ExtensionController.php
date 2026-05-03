@@ -104,8 +104,8 @@ final class ExtensionController
             'flashError' => $this->context->pullFlash('error'),
             'section' => 'extensions',
             'extensions' => $extensions,
-            'packageArchiveAcceptAttribute' => $archivePackages->packageAccept(),
-            'packageArchiveFormats' => $archivePackages->packageFormatLabels(),
+            'packageArchiveAcceptAttribute' => $archivePackages->accept(),
+            'packageArchiveFormats' => $archivePackages->formatLabels(),
             'exportArchiveFormats' => $archivePackages->exportFormatOptions(),
         ]);
     }

@@ -82,8 +82,8 @@ final class ThemeController
             'themes' => $this->themeCatalogService->listForPanel(),
             'activeTheme' => $this->themeCatalogService->activeSlugFromConfig($this->config),
             'themeOptions' => Theme::options($this->themeCatalogService->root()),
-            'packageArchiveAcceptAttribute' => $archivePackages->packageAccept(),
-            'packageArchiveFormats' => $archivePackages->packageFormatLabels(),
+            'packageArchiveAcceptAttribute' => $archivePackages->accept(),
+            'packageArchiveFormats' => $archivePackages->formatLabels(),
             'exportArchiveFormats' => $archivePackages->exportFormatOptions(),
         ]);
     }

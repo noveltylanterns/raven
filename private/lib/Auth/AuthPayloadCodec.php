@@ -52,7 +52,7 @@ final class AuthPayloadCodec
             return [];
         }
 
-        $decoded = Json::decodeAssocString($raw, 32);
+        $decoded = Json::decode($raw, 32);
         if (!is_array($decoded)) {
             return [];
         }
@@ -165,7 +165,7 @@ final class AuthPayloadCodec
             return [];
         }
 
-        $decoded = Json::decodeAssocString($raw, 64);
+        $decoded = Json::decode($raw, 64);
         if (!is_array($decoded)) {
             return [];
         }

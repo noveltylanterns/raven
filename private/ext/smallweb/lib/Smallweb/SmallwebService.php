@@ -276,7 +276,7 @@ final class SmallwebService
 
     public function saveSettings(array $settings): bool
     {
-        if (!$this->folders->ensureDirectory($this->storageDir, 0750)) {
+        if (!$this->folders->ensure($this->storageDir, 0750)) {
             return false;
         }
 
@@ -363,14 +363,14 @@ final class SmallwebService
         $settings = $this->getProtocolSettings($protocol);
         $chmodDir = (int) octdec($settings['chmod_dir'] ?? '0755');
 
-        if (!$this->folders->ensureDirectory($dir, $chmodDir)) {
+        if (!$this->folders->ensure($dir, $chmodDir)) {
             try {
                 $dir = (new StorageProvisioner($this->projectRoot))->ensureAuxStorageDirectory($protocol);
             } catch (\Throwable) {
                 return false;
             }
 
-            if (!$this->folders->ensureDirectory($dir, $chmodDir)) {
+            if (!$this->folders->ensure($dir, $chmodDir)) {
                 return false;
             }
         }
@@ -397,7 +397,7 @@ final class SmallwebService
         $chmodTxt = (int) octdec($settings['chmod_txt'] ?? '0644');
         $chmodCgi = (int) octdec($settings['chmod_cgi'] ?? '0755');
 
-        $this->folders->ensureDirectory($dir, $chmodDir);
+        $this->folders->ensure($dir, $chmodDir);
 
         $entries = @scandir($dir);
         if ($entries === false) {
@@ -441,7 +441,7 @@ final class SmallwebService
             return false;
         }
 
-        return $this->folders->removeEmptyDirectory($dir);
+        return $this->folders->removeEmpty($dir);
     }
 
     public function syncProtocolDirectories(): void
@@ -581,7 +581,7 @@ final class SmallwebService
 
         $settings = $this->getProtocolSettings($protocol);
         $chmodDir = (int) octdec($settings['chmod_dir'] ?? '0755');
-        return $this->folders->createDirectory($newDir, $chmodDir);
+        return $this->folders->create($newDir, $chmodDir);
     }
 
     public function deleteProtocolSubdir(string $protocol, string $subdir): bool
@@ -607,7 +607,7 @@ final class SmallwebService
             return false;
         }
 
-        return $this->folders->removeEmptyDirectory($dir);
+        return $this->folders->removeEmpty($dir);
     }
 
     private function resolveWorkingDir(string $protocol, string $subdir = ''): string
