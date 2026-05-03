@@ -27,6 +27,16 @@ final class StorageCleaner
     private ValidateManifest $manifestValidator;
     private ArchiveDelete $directoryTreeService;
 
+    /**
+     * Prepares the storage cleaner for one project tree.
+     *
+     * @param string $projectRoot Absolute project root path.
+     * @param PDO $db Active database connection for DROP TABLE operations.
+     * @param string $driver Database driver token (mysql, sqlite, pgsql).
+     * @param string $prefix Table prefix used to derive the extension table stem.
+     * @param ValidateManifest|null $manifestValidator Optional validator; defaults to a fresh instance.
+     * @param ArchiveDelete|null $directoryTreeService Optional directory-removal helper; defaults to a fresh instance.
+     */
     public function __construct(
         string $projectRoot,
         PDO $db,
@@ -44,6 +54,13 @@ final class StorageCleaner
     }
 
     /**
+     * Deletes all extension-owned storage that was requested in the bootstrap storage contract.
+     *
+     * Removes local data directories, aux directories, panel/public asset directories, bin
+     * symlinks, and database tables according to the flags set in `$storage`. Only paths
+     * that were provisioned by the contract are touched; unrelated directories are never deleted.
+     *
+     * @param string $directoryName Extension directory name (slug).
      * @param array{
      *   local?: bool,
      *   table?: bool,
@@ -52,7 +69,10 @@ final class StorageCleaner
      *   panel?: bool,
      *   public?: bool,
      *   bin?: bool
-     * } $storage
+     * } $storage Storage contract flags from Bootstrap::resolve().
+     * @return void
+     *
+     * @throws RuntimeException When a directory or table cannot be removed.
      */
     public function deleteStorageByContract(string $directoryName, array $storage): void
     {
@@ -127,6 +147,15 @@ final class StorageCleaner
         }
     }
 
+    /**
+     * Removes one directory tree when it exists; throws on failure.
+     *
+     * @param string $path Absolute path to the directory to remove.
+     * @param string $label Human-readable label used in the exception message.
+     * @return void
+     *
+     * @throws RuntimeException When the directory exists but cannot be fully removed.
+     */
     private function deleteDirectory(string $path, string $label): void
     {
         if (!is_dir($path)) {
@@ -139,6 +168,16 @@ final class StorageCleaner
         }
     }
 
+    /**
+     * Drops all database tables whose names match the extension's table stem.
+     *
+     * Tables are resolved dynamically via information_schema / sqlite_master so the
+     * drop is always consistent with what was actually created, regardless of whether
+     * `table` or `tables` was used in the bootstrap contract.
+     *
+     * @param string $directoryName Extension directory name (slug).
+     * @return void
+     */
     private function dropDatabaseTables(string $directoryName): void
     {
         $stem = $this->physicalTableStem($directoryName);
@@ -231,6 +270,15 @@ final class StorageCleaner
         ), static fn (string $value): bool => $value !== ''));
     }
 
+    /**
+     * Derives the physical table-name stem for one extension directory.
+     *
+     * Maps the extension slug to the canonical `{prefix}ext_{slug}` form used by
+     * the schema provisioner, normalizing underscores and stripping unsafe characters.
+     *
+     * @param string $directoryName Extension directory name (slug).
+     * @return string Physical table stem, e.g. `rvn_ext_contact`.
+     */
     private function physicalTableStem(string $directoryName): string
     {
         $normalized = strtolower(trim($directoryName));
@@ -240,6 +288,12 @@ final class StorageCleaner
         return $this->prefix . 'ext_' . $normalized;
     }
 
+    /**
+     * Quotes one SQL identifier according to the active database driver.
+     *
+     * @param string $identifier Unquoted identifier (table name).
+     * @return string Driver-appropriate quoted identifier.
+     */
     private function quoteIdentifier(string $identifier): string
     {
         return $this->driver === 'mysql'
@@ -247,6 +301,12 @@ final class StorageCleaner
             : '"' . str_replace('"', '""', $identifier) . '"';
     }
 
+    /**
+     * Escapes a string for safe use as a LIKE pattern prefix.
+     *
+     * @param string $value Unescaped value to use as the prefix.
+     * @return string Escaped LIKE prefix safe for prepared-statement patterns.
+     */
     private function likePrefix(string $value): string
     {
         return str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $value);

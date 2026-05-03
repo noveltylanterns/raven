@@ -18,6 +18,11 @@ final class Bootstrap
 {
     private ValidateManifest $manifestValidator;
 
+    /**
+     * Prepares the bootstrap resolver with an optional manifest validator override.
+     *
+     * @param ValidateManifest|null $manifestValidator Optional validator; defaults to a fresh instance.
+     */
     public function __construct(?ValidateManifest $manifestValidator = null)
     {
         $this->manifestValidator = $manifestValidator ?? new ValidateManifest();
@@ -309,6 +314,12 @@ final class Bootstrap
         return array_values($normalized);
     }
 
+    /**
+     * Coerces a scalar to bool, accepting common truthy string tokens.
+     *
+     * @param mixed $value Raw value from an ext.php contract key.
+     * @return bool Resolved boolean value.
+     */
     private function boolish(mixed $value): bool
     {
         if (is_bool($value)) {

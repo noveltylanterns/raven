@@ -13,14 +13,21 @@ This is the default Build Mode backlog file. If the user asks about goals, unpat
 
 
 
-# Finish Extension Library Refactor
-Fairly straightforward cleanup project:
-- [ ] Rename lib/Extension/Panel/PanelRouteRegistrar.php to Routes.php
-- [ ] Rename lib/Extension/Panel/ExtensionPermissionCatalogService.php to Permissions.php
-- [ ] Rename lib/Extension/Public/PublicRouteRegistrar.php to Routes.php
-- [ ] Rename lib/Extension/Public/EmbeddedShortcodeRuntimeInterface.php to Shortcodes.php
-- [ ] Fold lib/Extension/Public/EmbeddedFormRuntimeInterface.php & EmbeddedFormRuntimeService.php into Forms.php, unless there is a good reason we shouldnt.
-- [ ] What is ExtensionEditorCatalogService.php and how does it compare to Panel/ExtensionCatalogService.php? What routes are these applicable on? Lets make a plan for these two files. At the very least they need new names, but we may have to move them and/or extract some of their functions to other library classes.
+# Archive Library Cleanup
+- [ ] in lib/Archive/Upstream - $repoUrl should be $customUrl, normalizeRepoUrl should be normalizeCustomRepo, isValidCustomRepoUrl should be validateCustomRepo, and normalizeGitHubRepo should be normalizeGithubRepo. we also need a corresponding validateGithubRepo.
+- [ ] Many of our function names are all based on stale class names. Others are absurdly long. Go through all our Archive classes and make sure all their function names are concise & accurate.
+- [ ] Many parts of our codebase are using variables based on stale class/function names. Do a sweep of all lib/Archive/* callers and make sure the variables they use are concise & accurate.
+- [ ] Do a full sweep of lib/Archive/* and make sure all headings, classes & functions have present & accurate PHPdoc blocks.
+- [ ] Plan this out, and append these guidelines with a more detailed checklist in case we lose session.
+
+
+# Format Library Cleanup
+- [ ] in lib/Format/Json - decodeAssocString should be decode, and decodeFileAssoc should be decodeFile
+- [ ] in lib/Format/Git - extractWorktree should be extractTree, and cloneRepository should be clone
+- [ ] Many of our function names are all based on stale class names. Others are absurdly long. Go through all our Format classes and make sure all their function names are concise & accurate.
+- [ ] Many parts of our codebase are using variables based on stale class/function names. Do a sweep of all lib/Format/* callers and make sure the variables they use are concise & accurate.
+- [ ] Do a full sweep of lib/Format/* and make sure all headings, classes & functions have present & accurate PHPdoc blocks.
+- [ ] Plan this out, and append these guidelines with a more detailed checklist in case we lose session.
 
 
 # Misc Bugs & Tweaks
@@ -37,6 +44,8 @@ Fairly straightforward cleanup project:
 - [ ] Anything that sends out email should be routing it through Postmaster.php for canonical mail delivery contracts, metadata assembly & message assembly.
 - [ ] Email-based 2fa code functions should be updated to use this mailer instead of its own delivery logic.
 - [ ] Put reusable mail primitives in lib/Mail/ since many of them will likely be independently useful to extension authiors outside of default Postmaster logic. That gives us a spot for future additional mail handlers like Mailgun, in-house SMTP, etc, etc.
+- [ ] Plan this out, and append these guidelines with a more detailed checklist in case we lose session.
+
 
 # Legacy Fallback Log
 

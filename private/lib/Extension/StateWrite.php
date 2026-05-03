@@ -133,7 +133,7 @@ final class StateWrite
      * @param string $name Candidate extension directory token.
      * @return bool True when the token matches Raven's extension-slug rules.
      */
-    private function isSafeExtensionDirectoryName(string $name): bool
+    private function isSafeDirectoryName(string $name): bool
     {
         return (bool) preg_match('/^[A-Za-z0-9][A-Za-z0-9_-]{0,119}$/', $name);
     }
@@ -147,7 +147,7 @@ final class StateWrite
         $normalized = [];
         foreach ($enabledMap as $name => $isEnabled) {
             $directory = (string) $name;
-            if ($this->isSafeExtensionDirectoryName($directory) && (bool) $isEnabled) {
+            if ($this->isSafeDirectoryName($directory) && (bool) $isEnabled) {
                 $normalized[$directory] = true;
             }
         }
@@ -166,7 +166,7 @@ final class StateWrite
         foreach ($permissionMap as $name => $rawBit) {
             $directory = (string) $name;
             $bit = (int) $rawBit;
-            if ($this->isSafeExtensionDirectoryName($directory) && $bit > 0) {
+            if ($this->isSafeDirectoryName($directory) && $bit > 0) {
                 $normalized[$directory] = $bit;
             }
         }
@@ -184,7 +184,7 @@ final class StateWrite
         $normalized = [];
         foreach ($permissionBitsMap as $name => $levelsRaw) {
             $directory = (string) $name;
-            if (!$this->isSafeExtensionDirectoryName($directory) || !is_array($levelsRaw)) {
+            if (!$this->isSafeDirectoryName($directory) || !is_array($levelsRaw)) {
                 continue;
             }
 

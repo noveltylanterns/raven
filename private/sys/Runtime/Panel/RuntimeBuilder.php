@@ -68,8 +68,8 @@ final class RuntimeBuilder
         $mediaManager = null;
         $logger = null;
         $extensionStateStore = null;
-        $extensionPermissionCatalogService = null;
-        $extensionCatalogService = null;
+        $extensionPermissions = null;
+        $extensionManager = null;
         $extensionContent = null;
         $themeCatalogService = null;
 
@@ -321,37 +321,37 @@ final class RuntimeBuilder
         /**
          * Reuses one shared extension-permission catalog across panel bootstrap helpers.
          */
-        $extensionPermissionCatalogFactory = $memoize(static function () use (
-            &$extensionPermissionCatalogService,
+        $extensionPermissionsFactory = $memoize(static function () use (
+            &$extensionPermissions,
             $rvn,
             $extensionStateStoreFactory
         ): ExtensionPermissions {
-            $extensionPermissionCatalogService = new ExtensionPermissions(
+            $extensionPermissions = new ExtensionPermissions(
                 $extensionStateStoreFactory(),
                 $rvn['input']
             );
 
-            return $extensionPermissionCatalogService;
+            return $extensionPermissions;
         });
 
         /**
          * Reuses one shared extension catalog for runtime-side manifest reads.
          */
-        $extensionCatalogFactory = $memoize(static function () use (
-            &$extensionCatalogService,
+        $extensionManagerFactory = $memoize(static function () use (
+            &$extensionManager,
             $rvn,
             $extensionStateStoreFactory,
-            $extensionPermissionCatalogFactory
+            $extensionPermissionsFactory
         ): ExtensionManager {
-            $extensionCatalogService = new ExtensionManager(
+            $extensionManager = new ExtensionManager(
                 (string) $rvn['root'],
                 $extensionStateStoreFactory(),
-                $extensionPermissionCatalogFactory(),
+                $extensionPermissionsFactory(),
                 $rvn['config'],
                 $rvn['input']
             );
 
-            return $extensionCatalogService;
+            return $extensionManager;
         });
 
         /**
@@ -386,7 +386,7 @@ final class RuntimeBuilder
         ControllerFactories::registerBase(
             $rvn,
             $resolveAuth,
-            $extensionCatalogFactory,
+            $extensionManagerFactory,
             $extensionFormsProvider,
             $categoryEnabled,
             $tagEnabled
@@ -397,7 +397,7 @@ final class RuntimeBuilder
             $panelContentDomain,
             $panelTaxonomyDomain,
             $extensionStateStoreFactory,
-            $extensionCatalogFactory,
+            $extensionManagerFactory,
             $extensionContentFactory
         );
 
@@ -408,7 +408,7 @@ final class RuntimeBuilder
             $loggerFactory,
             $themeCatalogFactory,
             $extensionStateStoreFactory,
-            $extensionCatalogFactory
+            $extensionManagerFactory
         );
 
         RuntimeInitializer::register(

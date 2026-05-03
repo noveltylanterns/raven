@@ -2,6 +2,42 @@
 
 *The machine is supposed to be logging patches & mods to this file. Sometimes it does, sometimes it doesn't. It might be useful for historical architectural context to your Agent at one point.*
 
+### May 3, 2026 — Extension refactor follow-up: bug fix, method renames, PHPDoc sweep, and variable naming pass
+
+- **Variable naming pass** — swept all `sys/` callers of `lib/Extension/` classes for variable names echoing stale class names:
+  - `ExtensionController`: `$extensionCatalogService` → `$extensionManager`, `$extensionScaffoldService` → `$extensionScaffold`, `$extensionBootstrapContractResolver` → `$extensionBootstrap`
+  - `PageEditController`: `$extensionCatalogService` → `$extensionManager`
+  - `ControllerFactories`: `$extensionCatalogFactory` → `$extensionManagerFactory`, `$extensionCatalog` (local) → `$extensionManager`; updated `@param` docblocks to match
+  - `Panel/RuntimeBuilder`: `$extensionPermissionCatalogFactory` → `$extensionPermissionsFactory`, `$extensionCatalogFactory` → `$extensionManagerFactory`
+
+### May 3, 2026 — Extension refactor follow-up: bug fix, method renames, and PHPDoc sweep
+
+- **Bug fix** — `ExtensionController.php` had 6 stale calls to `Manager::isSafeExtensionDirectoryName()`, which no longer existed after the previous session's rename to `isSafeDirectoryName()`. This broke enable/disable/export/import/delete/create in the Extension Manager. All 6 call sites fixed.
+- Completed Extension library method renames from the prior session (callers now all consistent):
+  - `Manager::panelPermissionMapForDirectories()` → `extensionPermissionMap()`
+  - `Manager::extensionNameFromArchiveFilename()` → `nameFromArchive()`
+  - `Permissions::panelPermissionMapForDirectories()` → `extensionPermissionMap()`
+  - `FormInstance::renderShortcodesForPublicRoute()` → `renderPublicShortcodes()`
+  - `FormInstance::formDefinitionLookupByType()` → `formDefinitionLookup()`
+  - Scaffold private method renames: `renderExtensionPublicRoutesSkeleton`, `renderExtensionPublicViewSkeleton`, `renderExtensionPanelViewSkeleton` all shortened to drop `Extension` prefix
+- PHPDoc sweep of all `lib/Extension/` files — added missing docblocks to:
+  - `Bootstrap.php`: constructor, `boolish()`
+  - `StorageCleaner.php`: constructor, `deleteStorageByContract()`, all undocumented private methods
+  - `StorageProvisioner.php`: constructor, all four `ensure*Directory()` public methods, `provision()`, `ensureDirectory()`, `syncBundledAssets()`
+  - Confirmed full coverage on: `Registry`, `Resolver`, `ValidateManifest`, `ValidateProvider`, `StateRead`, `StateWrite`, `Scaffold`, `Panel/Manager`, `Panel/Permissions`, `Panel/Content`, `Panel/Routes`, `Public/Content`, `Public/FormInstance`, `Public/FormRuntime`, `Public/Routes`, `Public/Shortcodes`
+
+### May 3, 2026 — Extension library refactor: file renames, scope splits, and naming cleanup
+
+- Completed the extension library refactor across `lib/Extension/Panel/` and `lib/Extension/Public/`:
+  - **Panel renames**: `PanelRouteRegistrar.php` → `Routes.php`, `ExtensionPermissionCatalogService.php` → `Permissions.php`, `ExtensionCatalogService.php` → `Manager.php`.
+  - **Public renames**: `PublicRouteRegistrar.php` → `Routes.php`, `EmbeddedShortcodeRuntimeInterface.php` → `Shortcodes.php`.
+  - **Form runtime split**: `EmbeddedFormRuntimeInterface.php` and `EmbeddedFormRuntimeService.php` merged into two properly scoped files — `FormRuntime.php` (interface) and `FormInstance.php` (resolver/renderer service).
+  - **Editor catalog split**: the shared `ExtensionEditorCatalogService` was analyzed, split by route scope, and replaced with `lib/Extension/Panel/Content.php` (panel body-block definitions and insertable shortcode catalog) and `lib/Extension/Public/Content.php` (public body-block definitions). The public variant takes no `InputSanitizer` since it never needed one.
+  - Updated `PanelRouter` and `PublicRouter` call sites to use the new `Routes::register()` class names.
+  - Updated all `use` statement aliases to unambiguous names: `ExtensionContent`, `ExtensionManager`, `ExtensionPermissions`, `ExtensionFormRuntime`, `ExtensionFormInstance`, `ExtensionShortcodes`.
+  - Cleaned up stale variable names throughout affected controllers and runtime builders: `$extensionEditorCatalogService` → `$extensionContent`, `$extensionEditorCatalogFactory` → `$extensionContentFactory`, `$embeddedFormRuntimeService` → `$formInstance`, `$embeddedFormRuntimes` / `$embeddedFormRuntimesLoaded` → `$shortcodeRuntimes` / `$shortcodeRuntimesLoaded`.
+  - Updated all three bundled extension implementors (`ContactPublicFormRuntime`, `SignupPublicFormRuntime`, `RepoShortcodeRuntime`) to the new interface names.
+
 ### May 2, 2026 — Auth library architecture correction: permissions domain, panel domain, and class consolidation
 
 - Completed auth library architecture correction across four phases:

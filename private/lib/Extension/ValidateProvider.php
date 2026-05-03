@@ -1,5 +1,12 @@
 <?php
 
+/**
+ * RAVEN CMS
+ * ~/private/lib/Extension/ValidateProvider.php
+ * Validates extension provider files (shortcodes.php, fields.php).
+ * Docs: https://raven.lanterns.io
+ */
+
 declare(strict_types=1);
 
 namespace Raven\Lib\Extension;
@@ -11,22 +18,28 @@ final class ValidateProvider
 {
     private ValidateManifest $manifestValidator;
 
+    /**
+     * @param ValidateManifest|null $manifestValidator Optional manifest validator; defaults to a fresh instance.
+     */
     public function __construct(?ValidateManifest $manifestValidator = null)
     {
         $this->manifestValidator = $manifestValidator ?? new ValidateManifest();
     }
 
     /**
+     * Loads and validates one extension shortcode provider file.
+     *
+     * Returns a valid result with an empty item list when the provider file is absent.
+     *
+     * @param string $root Project root path.
+     * @param string $directoryName Extension directory name.
      * @param array{
      *   extension?: string,
      *   forms?: callable(string): array<int, array{name: string, slug: string}>,
      *   config?: \Raven\Core\Config
-     * } $context
-     * @return array{
-     *   valid: bool,
-     *   error: string,
-     *   items: array<int, array{label: string, shortcode: string}>
-     * }
+     * } $context Optional context passed to the shortcode provider callable.
+     * @return array{valid: bool, error: string, items: array<int, array{label: string, shortcode: string}>}
+     *         Validation result with normalized shortcode item list on success.
      */
     public function validateShortcodesProvider(string $root, string $directoryName, array $context = []): array
     {
@@ -137,12 +150,15 @@ final class ValidateProvider
     }
 
     /**
-     * @param array{extension?: string} $context
-     * @return array{
-     *   valid: bool,
-     *   error: string,
-     *   items: array<int, array{slug: string, label: string, editor: string}>
-     * }
+     * Loads and validates one extension field provider file.
+     *
+     * Returns a valid result with an empty item list when the provider file is absent.
+     *
+     * @param string $root Project root path.
+     * @param string $directoryName Extension directory name.
+     * @param array{extension?: string} $context Optional context passed to the fields provider callable.
+     * @return array{valid: bool, error: string, items: array<int, array{slug: string, label: string, editor: string}>}
+     *         Validation result with normalized field item list on success.
      */
     public function validateFieldsProvider(string $root, string $directoryName, array $context = []): array
     {

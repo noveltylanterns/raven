@@ -66,7 +66,7 @@ final class ControllerFactories
      *
      * @param array<string, mixed> $rvn Shared runtime container, mutated in-place.
      * @param callable(): AuthService $resolveAuth Lazy auth-service resolver.
-     * @param callable(): ExtensionManager $extensionCatalogFactory Extension catalog service factory.
+     * @param callable(): ExtensionManager $extensionManagerFactory Extension manager factory.
      * @param callable(string): array<int, array{name: string, slug: string}> $extensionFormsProvider Extension enabled-form resolver.
      * @param bool $categoryEnabled Whether category support is enabled for the current request.
      * @param bool $tagEnabled Whether tag support is enabled for the current request.
@@ -75,7 +75,7 @@ final class ControllerFactories
     public static function registerBase(
         array &$rvn,
         callable $resolveAuth,
-        callable $extensionCatalogFactory,
+        callable $extensionManagerFactory,
         callable $extensionFormsProvider,
         bool $categoryEnabled,
         bool $tagEnabled
@@ -94,17 +94,17 @@ final class ControllerFactories
          */
         $rvn['panel_permission_map_provider'] = static function (array $directoryFilter = []) use (
             $resolveAuth,
-            $extensionCatalogFactory,
+            $extensionManagerFactory,
             $extensionFormsProvider
         ): array {
             if (($resolveAuth()->userId() ?? null) === null) {
                 return [];
             }
 
-            $extensionCatalog = $extensionCatalogFactory();
-            return $extensionCatalog->panelPermissionMapForDirectories(
+            $extensionManager = $extensionManagerFactory();
+            return $extensionManager->extensionPermissionMap(
                 $directoryFilter,
-                static fn (string $extensionPath): array => $extensionCatalog->readManifest($extensionPath, $extensionFormsProvider)
+                static fn (string $extensionPath): array => $extensionManager->readManifest($extensionPath, $extensionFormsProvider)
             );
         };
 
@@ -159,8 +159,8 @@ final class ControllerFactories
      * @param Closure $panelContentDomain Panel content domain aggregate closure.
      * @param Closure $panelTaxonomyDomain Panel taxonomy domain aggregate closure.
      * @param callable(): mixed $extensionStateStoreFactory Extension state store factory.
-     * @param callable(): ExtensionManager $extensionCatalogFactory Extension catalog service factory.
-     * @param callable(): mixed $extensionContentFactory Extension editor catalog service factory.
+     * @param callable(): ExtensionManager $extensionManagerFactory Extension manager factory.
+     * @param callable(): mixed $extensionContentFactory Extension content catalog factory.
      * @return void
      */
     public static function registerContentTaxonomyControllers(
@@ -168,7 +168,7 @@ final class ControllerFactories
         Closure $panelContentDomain,
         Closure $panelTaxonomyDomain,
         callable $extensionStateStoreFactory,
-        callable $extensionCatalogFactory,
+        callable $extensionManagerFactory,
         callable $extensionContentFactory
     ): void {
         $dashboardController = null;
@@ -233,7 +233,7 @@ final class ControllerFactories
             $panelContentDomain,
             $panelTaxonomyDomain,
             $extensionStateStoreFactory,
-            $extensionCatalogFactory,
+            $extensionManagerFactory,
             $extensionContentFactory
         ): PageEditController {
             if ($pageEditController instanceof PageEditController) {
@@ -266,7 +266,7 @@ final class ControllerFactories
                 $rvn['panel_editor_mce'](),
                 $rvn['panel_editor_mde'](),
                 $extensionStateStoreFactory(),
-                $extensionCatalogFactory(),
+                $extensionManagerFactory(),
                 $extensionContentFactory(),
                 is_callable($rvn['extension_services_for'] ?? null)
                     ? $rvn['extension_services_for']
@@ -491,7 +491,7 @@ final class ControllerFactories
      * @param callable(): mixed $loggerFactory Event-log service factory.
      * @param callable(): ThemeCatalog $themeCatalogFactory Public-theme catalog service factory.
      * @param callable(): mixed $extensionStateStoreFactory Extension state store factory.
-     * @param callable(): ExtensionManager $extensionCatalogFactory Extension catalog service factory.
+     * @param callable(): ExtensionManager $extensionManagerFactory Extension manager factory.
      * @return void
      */
     public static function registerUserAdminControllers(
@@ -501,7 +501,7 @@ final class ControllerFactories
         callable $loggerFactory,
         callable $themeCatalogFactory,
         callable $extensionStateStoreFactory,
-        callable $extensionCatalogFactory
+        callable $extensionManagerFactory
     ): void {
         $userListController = null;
         $userEditController = null;
@@ -746,7 +746,7 @@ final class ControllerFactories
         $rvn['panel_update_controller'] = static function () use (
             &$updateController,
             &$rvn,
-            $extensionCatalogFactory,
+            $extensionManagerFactory,
             $themeCatalogFactory
         ): UpdateController {
             if ($updateController instanceof UpdateController) {
@@ -761,7 +761,7 @@ final class ControllerFactories
                 $rvn['input'],
                 (string) $rvn['root'],
                 $themeCatalogFactory()->stockSlugs(),
-                $extensionCatalogFactory()->stockExtensionDirectories()
+                $extensionManagerFactory()->stockExtensionDirectories()
             );
 
             return $updateController;
@@ -824,7 +824,7 @@ final class ControllerFactories
             &$extensionController,
             &$rvn,
             $extensionStateStoreFactory,
-            $extensionCatalogFactory
+            $extensionManagerFactory
         ): ExtensionController {
             if ($extensionController instanceof ExtensionController) {
                 return $extensionController;
@@ -838,7 +838,7 @@ final class ControllerFactories
                 $rvn['input'],
                 (string) $rvn['root'],
                 $extensionStateStoreFactory(),
-                $extensionCatalogFactory(),
+                $extensionManagerFactory(),
                 is_callable($rvn['extension_services_for'] ?? null)
                     ? $rvn['extension_services_for']
                     : static fn (?string $extensionDirectory = null): array => []

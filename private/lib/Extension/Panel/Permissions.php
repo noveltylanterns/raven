@@ -24,6 +24,10 @@ final class Permissions
     private StateRead $stateStore;
     private InputSanitizer $input;
 
+    /**
+     * @param StateRead $stateStore Shared extension state reader for extension-directory enumeration.
+     * @param InputSanitizer $input Shared sanitizer for permission level labels.
+     */
     public function __construct(StateRead $stateStore, InputSanitizer $input)
     {
         $this->stateStore = $stateStore;
@@ -31,7 +35,10 @@ final class Permissions
     }
 
     /**
-     * @return array<int, array{key: string, label: string}>
+     * Returns the default single-level permission set for an extension declaring no custom levels.
+     *
+     * @param string $extensionName Human-readable extension name used to label the access level.
+     * @return array<int, array{key: string, label: string}> Single-entry permission level array.
      */
     public function defaultPermissionLevels(string $extensionName): array
     {
@@ -45,7 +52,13 @@ final class Permissions
     }
 
     /**
-     * @return array<int, array{key: string, label: string}>
+     * Normalizes raw panel_permissions manifest data into a validated level array.
+     *
+     * Falls back to the default single-level set when the raw data is absent or invalid.
+     *
+     * @param mixed $rawLevels Raw panel_permissions value from ext.json (may be any type).
+     * @param string $extensionName Human-readable extension name used for the fallback default level label.
+     * @return array<int, array{key: string, label: string}> Normalized permission level array.
      */
     public function normalizePermissionLevels(mixed $rawLevels, string $extensionName): array
     {
@@ -93,16 +106,18 @@ final class Permissions
     }
 
     /**
-     * @param array<int, string> $directoryFilter
-     * @param callable(string): array<string, mixed>|null $manifestReader
+     * Returns the full permission map with stable bit assignments for a set of extension directories.
+     *
+     * @param array<int, string> $directoryFilter Extension directory slugs to include; empty array includes all.
+     * @param callable(string): array<string, mixed> $manifestReader Callback returning one extension manifest payload.
      * @return array<string, array{
      *   name: string,
      *   type: string,
      *   default_level: string,
      *   levels: array<int, array{key: string, label: string, bit: int}>
-     * }>
+     * }> Permission map keyed by extension directory slug.
      */
-    public function panelPermissionMapForDirectories(array $directoryFilter, callable $manifestReader): array
+    public function extensionPermissionMap(array $directoryFilter, callable $manifestReader): array
     {
         $catalog = $this->catalog($directoryFilter, $manifestReader);
         $bitMap = $this->ensurePermissionBits($catalog);
@@ -145,14 +160,19 @@ final class Permissions
     }
 
     /**
-     * @param array<int, string> $directoryFilter
-     * @param callable(string): array<string, mixed>|null $manifestReader
+     * Builds a permission catalog entry for each eligible enabled extension directory.
+     *
+     * Only extensions that have a routes_panel.php provider and are non-system content/helper/module
+     * types are included. Results are sorted by directory slug.
+     *
+     * @param array<int, string> $directoryFilter Extension directory slugs to include; empty array includes all.
+     * @param callable(string): array<string, mixed> $manifestReader Callback returning one extension manifest payload.
      * @return array<string, array{
      *   name: string,
      *   type: string,
      *   default_level: string,
      *   levels: array<int, array{key: string, label: string}>
-     * }>
+     * }> Catalog entries keyed by extension directory slug.
      */
     public function catalog(array $directoryFilter, callable $manifestReader): array
     {
@@ -160,7 +180,7 @@ final class Permissions
         $filter = [];
         foreach ($directoryFilter as $directory) {
             $normalized = strtolower(trim((string) $directory));
-            if ($this->isSafeExtensionDirectoryName($normalized)) {
+            if ($this->isSafeDirectoryName($normalized)) {
                 $filter[$normalized] = true;
             }
         }
@@ -171,7 +191,7 @@ final class Permissions
             if ($entry === '.' || $entry === '..' || str_starts_with($entry, '.')) {
                 continue;
             }
-            if (!$this->isSafeExtensionDirectoryName($entry)) {
+            if (!$this->isSafeDirectoryName($entry)) {
                 continue;
             }
             if ($filter !== [] && !isset($filter[$entry])) {
@@ -248,13 +268,18 @@ final class Permissions
     }
 
     /**
+     * Ensures stable power-of-two bit assignments exist for every level in the catalog.
+     *
+     * Reads existing bit assignments from state, validates them, and allocates new bits for
+     * any levels not yet assigned. Persists only when the bit map changes.
+     *
      * @param array<string, array{
      *   name: string,
      *   type: string,
      *   default_level: string,
      *   levels: array<int, array{key: string, label: string}>
-     * }> $catalog
-     * @return array<string, array<string, int>>
+     * }> $catalog Permission catalog returned by `catalog()`.
+     * @return array<string, array<string, int>> Bit map keyed by directory then level key.
      */
     public function ensurePermissionBits(array $catalog): array
     {
@@ -265,7 +290,7 @@ final class Permissions
             $normalized[$directory] = [];
             foreach ($levels as $levelKey => $bit) {
                 $candidateBit = (int) $bit;
-                if ($candidateBit <= 0 || !$this->isPowerOfTwoBit($candidateBit) || isset($usedBits[$candidateBit])) {
+                if ($candidateBit <= 0 || !$this->isPowerOfTwo($candidateBit) || isset($usedBits[$candidateBit])) {
                     continue;
                 }
 
@@ -287,7 +312,7 @@ final class Permissions
                 }
 
                 $assignedBit = (int) ($normalized[$directory][$levelKey] ?? 0);
-                if ($assignedBit > 0 && $this->isPowerOfTwoBit($assignedBit) && isset($usedBits[$assignedBit])) {
+                if ($assignedBit > 0 && $this->isPowerOfTwo($assignedBit) && isset($usedBits[$assignedBit])) {
                     continue;
                 }
 
@@ -322,7 +347,7 @@ final class Permissions
         return $bit;
     }
 
-    private function isPowerOfTwoBit(int $bit): bool
+    private function isPowerOfTwo(int $bit): bool
     {
         if ($bit <= 0) {
             return false;
@@ -331,7 +356,7 @@ final class Permissions
         return ($bit & ($bit - 1)) === 0;
     }
 
-    private function isSafeExtensionDirectoryName(string $name): bool
+    private function isSafeDirectoryName(string $name): bool
     {
         return (bool) preg_match('/^[A-Za-z0-9][A-Za-z0-9_-]{0,119}$/', $name);
     }

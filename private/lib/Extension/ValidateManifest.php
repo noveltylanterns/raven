@@ -1,5 +1,12 @@
 <?php
 
+/**
+ * RAVEN CMS
+ * ~/private/lib/Extension/ValidateManifest.php
+ * Validates extension manifest metadata and type/file capability contracts.
+ * Docs: https://raven.lanterns.io
+ */
+
 declare(strict_types=1);
 
 namespace Raven\Lib\Extension;
@@ -9,11 +16,25 @@ namespace Raven\Lib\Extension;
  */
 final class ValidateManifest
 {
+    /**
+     * Returns whether a directory name is safe for use as an extension slug.
+     *
+     * @param string $directoryName Candidate directory name to check.
+     * @return bool True when the name matches the slug pattern.
+     */
     public function isSafeDirectoryName(string $directoryName): bool
     {
         return preg_match('/^[a-z0-9][a-z0-9_-]{0,63}$/', $directoryName) === 1;
     }
 
+    /**
+     * Normalizes an extension type string to one of the canonical type tokens.
+     *
+     * Falls back to `content` when the value is unrecognized.
+     *
+     * @param string $type Raw type string from ext.json.
+     * @return string Canonical type token: helper, content, framework, module, or system.
+     */
     public function normalizeType(string $type): string
     {
         $type = strtolower(trim($type));
@@ -24,6 +45,16 @@ final class ValidateManifest
         return $type;
     }
 
+    /**
+     * Returns a human-readable error when an extension root violates its type contract, or null on pass.
+     *
+     * Enforces which provider files (routes_panel.php, routes_public.php, shortcodes.php,
+     * fields.php) each extension type is permitted to declare.
+     *
+     * @param string $extensionRoot Absolute extension directory path.
+     * @param string $type Normalized extension type token.
+     * @return string|null Contract violation message, or null when the extension passes.
+     */
     public function typeContractError(string $extensionRoot, string $type): ?string
     {
         $hasPanelRoutes = Resolver::hasProvider($extensionRoot, 'routes_panel.php');
@@ -51,13 +82,16 @@ final class ValidateManifest
     }
 
     /**
-     * @return array{
-     *   name: string,
-     *   type: string,
-     *   panel_path: string,
-     *   panel_section: string,
-     *   system_extension: bool
-     * }|null
+     * Reads and lightly normalizes one extension manifest from disk.
+     *
+     * Returns null when the manifest is missing, malformed, or fails type-contract validation.
+     * Callers that need a richer validation payload (e.g. the panel extension catalog) should
+     * use `Manager::readManifest()`, which adds permission levels and human-facing metadata.
+     *
+     * @param string $root Absolute project root path.
+     * @param string $directoryName Extension directory name (slug).
+     * @return array{name: string, type: string, panel_path: string, panel_section: string, system_extension: bool}|null
+     *         Normalized manifest array, or null on validation failure.
      */
     public function readManifest(string $root, string $directoryName): ?array
     {

@@ -86,11 +86,16 @@ final class StateRead
     }
 
     /**
+     * Loads and normalizes the full extension state payload from disk.
+     *
+     * Clears OPcache before reading so the file reflects the most recent write even
+     * under long-lived PHP-FPM processes.
+     *
      * @return array{
      *   enabled: array<string, bool>,
      *   permissions: array<string, int>,
      *   permission_bits: array<string, array<string, int>>
-     * }
+     * } Normalized state payload with empty maps when the state file is absent or unreadable.
      */
     public function loadStateData(): array
     {
@@ -125,7 +130,9 @@ final class StateRead
     }
 
     /**
-     * @return array<string, bool>
+     * Returns only the enabled-extension map from the persisted state.
+     *
+     * @return array<string, bool> Enabled map keyed by extension directory slug.
      */
     public function loadEnabledMap(): array
     {
@@ -133,7 +140,9 @@ final class StateRead
     }
 
     /**
-     * @return array<string, int>
+     * Returns only the permission-bit map from the persisted state.
+     *
+     * @return array<string, int> Permission map keyed by extension directory slug.
      */
     public function loadPermissionMap(): array
     {
@@ -141,7 +150,9 @@ final class StateRead
     }
 
     /**
-     * @return array<string, array<string, int>>
+     * Returns only the level-to-bit map from the persisted state.
+     *
+     * @return array<string, array<string, int>> Level-to-bit map keyed by extension directory slug.
      */
     public function loadPermissionBitsMap(): array
     {
@@ -149,7 +160,10 @@ final class StateRead
     }
 
     /**
-     * @param array<string, bool> $enabledMap
+     * Persists an updated enabled-extension map, preserving existing permission state.
+     *
+     * @param array<string, bool> $enabledMap New enabled map to persist.
+     * @return void
      */
     public function saveEnabledMap(array $enabledMap): void
     {
@@ -158,7 +172,10 @@ final class StateRead
     }
 
     /**
-     * @param array<string, int> $permissionMap
+     * Persists an updated permission-bit map, preserving existing enabled and bits state.
+     *
+     * @param array<string, int> $permissionMap New permission map to persist.
+     * @return void
      */
     public function savePermissionMap(array $permissionMap): void
     {
@@ -167,7 +184,10 @@ final class StateRead
     }
 
     /**
-     * @param array<string, array<string, int>> $permissionBitsMap
+     * Persists an updated level-to-bit map, preserving existing enabled and permission state.
+     *
+     * @param array<string, array<string, int>> $permissionBitsMap New bits map to persist.
+     * @return void
      */
     public function savePermissionBitsMap(array $permissionBitsMap): void
     {
@@ -176,9 +196,14 @@ final class StateRead
     }
 
     /**
-     * @param array<string, bool> $enabledMap
-     * @param array<string, int> $permissionMap
-     * @param array<string, array<string, int>> $permissionBitsMap
+     * Persists the full extension state map in one atomic write.
+     *
+     * When `$permissionBitsMap` is omitted the currently persisted bits map is preserved.
+     *
+     * @param array<string, bool> $enabledMap Enabled-extension map to persist.
+     * @param array<string, int> $permissionMap Permission-bit map to persist.
+     * @param array<string, array<string, int>> $permissionBitsMap Level-to-bit map to persist; omit to keep existing.
+     * @return void
      */
     public function saveState(array $enabledMap, array $permissionMap, array $permissionBitsMap = []): void
     {
@@ -194,7 +219,7 @@ final class StateRead
         );
     }
 
-    private function isSafeExtensionDirectoryName(string $name): bool
+    private function isSafeDirectoryName(string $name): bool
     {
         return (bool) preg_match('/^[A-Za-z0-9][A-Za-z0-9_-]{0,119}$/', $name);
     }
@@ -224,7 +249,7 @@ final class StateRead
         $normalized = [];
         foreach ($enabledMap as $name => $isEnabled) {
             $directory = (string) $name;
-            if ($this->isSafeExtensionDirectoryName($directory) && (bool) $isEnabled) {
+            if ($this->isSafeDirectoryName($directory) && (bool) $isEnabled) {
                 $normalized[$directory] = true;
             }
         }
@@ -243,7 +268,7 @@ final class StateRead
         foreach ($permissionMap as $name => $rawBit) {
             $directory = (string) $name;
             $bit = (int) $rawBit;
-            if ($this->isSafeExtensionDirectoryName($directory) && $bit > 0) {
+            if ($this->isSafeDirectoryName($directory) && $bit > 0) {
                 $normalized[$directory] = $bit;
             }
         }
@@ -261,7 +286,7 @@ final class StateRead
         $normalized = [];
         foreach ($permissionBitsMap as $name => $levelsRaw) {
             $directory = (string) $name;
-            if (!$this->isSafeExtensionDirectoryName($directory) || !is_array($levelsRaw)) {
+            if (!$this->isSafeDirectoryName($directory) || !is_array($levelsRaw)) {
                 continue;
             }
 

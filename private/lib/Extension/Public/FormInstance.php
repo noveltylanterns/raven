@@ -202,10 +202,12 @@ final class FormInstance
      * Content runtimes receive a simple context (slug, raw_args) and are rendered directly.
      *
      * @param array<string, Shortcodes|FormRuntime> $runtimes
+     * @param string $requestUri Raw request URI used to derive a safe return path.
+     * @param string $csrfField Rendered CSRF hidden-input HTML.
      * @param callable(): string $captchaMarkup Returns rendered captcha widget HTML.
      * @return string HTML with all shortcodes resolved.
      */
-    public function renderShortcodesForPublicRoute(
+    public function renderPublicShortcodes(
         string $html,
         array $runtimes,
         string $requestUri,
@@ -261,7 +263,7 @@ final class FormInstance
             return null;
         }
 
-        $lookup = $this->formDefinitionLookupByType($type, $runtimes);
+        $lookup = $this->formDefinitionLookup($type, $runtimes);
         $definition = $lookup[$slug] ?? null;
         return is_array($definition) ? $definition : null;
     }
@@ -272,7 +274,7 @@ final class FormInstance
      * @param array<string, Shortcodes|FormRuntime> $runtimes
      * @return array<string, array<string, mixed>>
      */
-    private function formDefinitionLookupByType(string $type, array $runtimes): array
+    private function formDefinitionLookup(string $type, array $runtimes): array
     {
         if (isset($this->embeddedFormLookupCache[$type])) {
             return $this->embeddedFormLookupCache[$type];

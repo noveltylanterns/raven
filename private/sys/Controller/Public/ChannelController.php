@@ -358,7 +358,7 @@ final class ChannelController
      */
     private function renderEmbeddedExtensionFormInstance(string $html): string
     {
-        return $this->formInstance()->renderShortcodesForPublicRoute(
+        return $this->formInstance()->renderPublicShortcodes(
             $html,
             $this->shortcodeRuntimes(),
             (string) ($_SERVER['REQUEST_URI'] ?? '/'),

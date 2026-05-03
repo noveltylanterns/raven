@@ -88,7 +88,7 @@ final class Scaffold
         $schemaContent = $this->renderExtensionSchemaSkeleton($meta);
         $shortcodesContent = $this->renderExtensionShortcodesSkeleton($meta);
         $fieldsContent = $this->renderExtensionFieldsSkeleton($meta);
-        $publicViewContent = $this->renderExtensionPublicViewSkeleton($meta);
+        $publicViewContent = $this->renderPublicViewSkeleton($meta);
         $agentsContent = $this->renderExtensionAgentsSkeleton($meta);
         $composerContent = $this->renderExtensionComposerSkeleton($meta);
 
@@ -118,7 +118,7 @@ final class Scaffold
 
         if ($generatesPanelRoutes) {
             $routesContent = $this->renderExtensionRoutesSkeleton($meta);
-            $viewContent = $this->renderExtensionPanelViewSkeleton($meta);
+            $viewContent = $this->renderPanelViewSkeleton($meta);
 
             if (file_put_contents($routesPath, $routesContent, LOCK_EX) === false) {
                 throw new \RuntimeException('Failed to write routes_panel.php.');
@@ -129,7 +129,7 @@ final class Scaffold
             }
         }
         if ($generatesPublicRoutes) {
-            $publicRoutesContent = $this->renderExtensionPublicRoutesSkeleton($meta);
+            $publicRoutesContent = $this->renderPublicRoutesSkeleton($meta);
             if (file_put_contents($publicRoutesPath, $publicRoutesContent, LOCK_EX) === false) {
                 throw new \RuntimeException('Failed to write routes_public.php.');
             }
@@ -542,7 +542,7 @@ PHP;
      *   name: string
      * } $meta
      */
-    private function renderExtensionPublicRoutesSkeleton(array $meta): string
+    private function renderPublicRoutesSkeleton(array $meta): string
     {
         $nameForDoc = str_replace(["\r", "\n", '*/'], [' ', ' ', '* /'], $meta['name']);
         $content = <<<'PHP'
@@ -757,7 +757,7 @@ PHP;
      *   directory: string
      * } $meta
      */
-    private function renderExtensionPublicViewSkeleton(array $meta): string
+    private function renderPublicViewSkeleton(array $meta): string
     {
         $nameForDoc = str_replace(["\r", "\n", '*/'], [' ', ' ', '* /'], $meta['name']);
         $content = <<<'PHP'
@@ -801,7 +801,7 @@ PHP;
      *   type: string
      * } $meta
      */
-    private function renderExtensionPanelViewSkeleton(array $meta): string
+    private function renderPanelViewSkeleton(array $meta): string
     {
         $nameForDoc = str_replace(["\r", "\n", '*/'], [' ', ' ', '* /'], $meta['name']);
         $type = strtolower(trim((string) ($meta['type'] ?? 'content')));

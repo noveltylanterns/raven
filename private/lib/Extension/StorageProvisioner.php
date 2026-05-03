@@ -21,27 +21,65 @@ final class StorageProvisioner
     private string $projectRoot;
     private ValidateManifest $manifestValidator;
 
+    /**
+     * Prepares the storage provisioner for one project tree.
+     *
+     * @param string $projectRoot Absolute project root path.
+     * @param ValidateManifest|null $manifestValidator Optional validator; defaults to a fresh instance.
+     */
     public function __construct(string $projectRoot, ?ValidateManifest $manifestValidator = null)
     {
         $this->projectRoot = rtrim($projectRoot, '/\\');
         $this->manifestValidator = $manifestValidator ?? new ValidateManifest();
     }
 
+    /**
+     * Ensures the local extension data directory exists and returns its absolute path.
+     *
+     * @param string $directoryName Extension directory name (slug).
+     * @return string Absolute path to the created or existing `private/dat/ext/{slug}` directory.
+     *
+     * @throws RuntimeException When the directory cannot be created.
+     */
     public function ensureLocalStorageDirectory(string $directoryName): string
     {
         return $this->ensureDirectory($this->projectRoot . '/private/dat/ext', $directoryName, 'private/dat/ext');
     }
 
+    /**
+     * Ensures the panel asset directory exists and returns its absolute path.
+     *
+     * @param string $directoryName Extension directory name (slug).
+     * @return string Absolute path to the created or existing `panel/ext/{slug}` directory.
+     *
+     * @throws RuntimeException When the directory cannot be created.
+     */
     public function ensurePanelStorageDirectory(string $directoryName): string
     {
         return $this->ensureDirectory($this->projectRoot . '/panel/ext', $directoryName, 'panel/ext');
     }
 
+    /**
+     * Ensures the public uploads directory exists and returns its absolute path.
+     *
+     * @param string $directoryName Extension directory name (slug).
+     * @return string Absolute path to the created or existing `public/uploads/ext/{slug}` directory.
+     *
+     * @throws RuntimeException When the directory cannot be created.
+     */
     public function ensurePublicStorageDirectory(string $directoryName): string
     {
         return $this->ensureDirectory($this->projectRoot . '/public/uploads/ext', $directoryName, 'public/uploads/ext');
     }
 
+    /**
+     * Ensures a root-level aux directory exists and returns its absolute path.
+     *
+     * @param string $directoryName Aux root directory name (slug); must be safe and non-reserved.
+     * @return string Absolute path to the created or existing aux directory.
+     *
+     * @throws RuntimeException When the name is invalid, reserved, blocked by a file, or cannot be created.
+     */
     public function ensureAuxStorageDirectory(string $directoryName): string
     {
         if (preg_match('/^[a-z0-9][a-z0-9_-]{0,119}$/', $directoryName) !== 1) {
@@ -122,6 +160,13 @@ final class StorageProvisioner
     }
 
     /**
+     * Provisions all storage declared in one extension bootstrap contract.
+     *
+     * Creates local data directories, aux directories, panel/public asset directories,
+     * and bin symlinks as specified. Does not run database schema migrations — those
+     * are handled separately via the extension schema provider.
+     *
+     * @param string $directoryName Extension directory name (slug).
      * @param array{
      *   local?: bool,
      *   table?: bool,
@@ -130,7 +175,10 @@ final class StorageProvisioner
      *   panel?: bool,
      *   public?: bool,
      *   bin?: bool
-     * } $storage
+     * } $storage Storage contract flags from Bootstrap::resolve().
+     * @return void
+     *
+     * @throws RuntimeException When any storage directory or symlink cannot be provisioned.
      */
     public function provision(string $directoryName, array $storage): void
     {
@@ -165,6 +213,16 @@ final class StorageProvisioner
         }
     }
 
+    /**
+     * Ensures a subdirectory under `$basePath` exists and returns its path.
+     *
+     * @param string $basePath Absolute parent directory path.
+     * @param string $directoryName Extension slug to append as the subdirectory name.
+     * @param string $label Human-readable base-path label used in exception messages.
+     * @return string Absolute path to the provisioned subdirectory.
+     *
+     * @throws RuntimeException When the name is invalid or the directory cannot be created.
+     */
     private function ensureDirectory(string $basePath, string $directoryName, string $label): string
     {
         if (!$this->manifestValidator->isSafeDirectoryName($directoryName)) {
@@ -183,6 +241,19 @@ final class StorageProvisioner
         return $targetPath;
     }
 
+    /**
+     * Copies bundled extension assets from `assets/{scope}/` into the provisioned storage directory.
+     *
+     * The source is `private/ext/{slug}/assets/{scope}/`; files and subdirectories are mirrored
+     * recursively into `$targetRoot`. No-ops silently when the source directory does not exist.
+     *
+     * @param string $directoryName Extension directory name (slug).
+     * @param string $scope Asset scope token: `panel` or `public`.
+     * @param string $targetRoot Absolute target directory path to copy files into.
+     * @return void
+     *
+     * @throws RuntimeException When an asset directory or file cannot be created or copied.
+     */
     private function syncBundledAssets(string $directoryName, string $scope, string $targetRoot): void
     {
         $sourceRoot = $this->projectRoot . '/private/ext/' . $directoryName . '/assets/' . $scope;

@@ -92,7 +92,7 @@ final class PageEditController
     private EditorMCE $editorMce;
     private EditorMDE $editorMde;
     private StateRead $extensionStateStore;
-    private ExtensionManager $extensionCatalogService;
+    private ExtensionManager $extensionManager;
     private ExtensionContent $extensionContent;
     /** @var array<string, array{label: string, editor: string}>|null */
     private ?array $pageBodyBlockTypeDefinitionsCache = null;
@@ -119,7 +119,7 @@ final class PageEditController
      * @param EditorMCE $editorMce TinyMCE-specific helpers for asset URL and gallery-item payload building.
      * @param EditorMDE $editorMde EasyMDE-specific helpers for asset URLs and JS fallback path lists.
      * @param StateRead $extensionStateStore Shared extension state store for enabled-extension reads.
-     * @param ExtensionManager $extensionCatalogService Shared extension catalog for manifest validation reads.
+     * @param ExtensionManager $extensionManager Shared extension catalog for manifest validation reads.
      * @param ExtensionContent $extensionContent Shared editor catalog for extension body blocks and shortcode menus.
      * @param callable $extensionServicesFor Extension services resolver used to load per-extension shortcode and body-block contributions.
      * @return void
@@ -146,7 +146,7 @@ final class PageEditController
         EditorMCE $editorMce,
         EditorMDE $editorMde,
         StateRead $extensionStateStore,
-        ExtensionManager $extensionCatalogService,
+        ExtensionManager $extensionManager,
         ExtensionContent $extensionContent,
         callable $extensionServicesFor
     ) {
@@ -171,7 +171,7 @@ final class PageEditController
         $this->editorMce = $editorMce;
         $this->editorMde = $editorMde;
         $this->extensionStateStore = $extensionStateStore;
-        $this->extensionCatalogService = $extensionCatalogService;
+        $this->extensionManager = $extensionManager;
         $this->extensionContent = $extensionContent;
         $this->extensionServicesFor = Closure::fromCallable($extensionServicesFor);
     }
@@ -1057,7 +1057,7 @@ final class PageEditController
         return $this->extensionContent->panelBodyBlockDefinitions(
             $enabledMap,
             $this->extensionStateStore->basePath(),
-            fn (string $extensionPath): array => $this->extensionCatalogService->readManifest(
+            fn (string $extensionPath): array => $this->extensionManager->readManifest(
                 $extensionPath,
                 fn (string $extensionKey): array => $this->listEnabledExtensionForms($extensionKey)
             )
@@ -1074,7 +1074,7 @@ final class PageEditController
         return $this->extensionContent->panelInsertableShortcodes(
             $this->extensionStateStore->loadEnabledMap(),
             $this->extensionStateStore->basePath(),
-            fn (string $extensionPath): array => $this->extensionCatalogService->readManifest(
+            fn (string $extensionPath): array => $this->extensionManager->readManifest(
                 $extensionPath,
                 fn (string $extensionKey): array => $this->listEnabledExtensionForms($extensionKey)
             ),

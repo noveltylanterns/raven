@@ -39,13 +39,13 @@ final class ExtensionController
     /** @var Closure(string): array<string, mixed> */
     private Closure $extensionServicesFor;
     private StateRead $extensionStateStore;
-    private ExtensionManager $extensionCatalogService;
+    private ExtensionManager $extensionManager;
     private ?ArchivePackage $archivePackages = null;
     private ?ArchiveInstall $packageInstallWorkflowService = null;
     private ?ArchiveDelete $directoryTreeService = null;
-    private ?Scaffold $extensionScaffoldService = null;
+    private ?Scaffold $extensionScaffold = null;
     private ?StorageProvisioner $extensionStorageProvisioner = null;
-    private ?Bootstrap $extensionBootstrapContractResolver = null;
+    private ?Bootstrap $extensionBootstrap = null;
 
     /**
      * @param SharedController $context Shared panel request context.
@@ -53,7 +53,7 @@ final class ExtensionController
      * @param InputSanitizer $input Shared request input sanitizer.
      * @param string $root Project root path for filesystem-backed admin workflows.
      * @param StateRead $extensionStateStore Shared extension state store for panel extension reads/writes.
-     * @param ExtensionManager $extensionCatalogService Shared extension catalog for manifest and stock-extension reads.
+     * @param ExtensionManager $extensionManager Shared extension catalog for manifest and stock-extension reads.
      * @param callable(string): array<string, mixed> $extensionServicesFor Lazy per-extension services resolver.
      * @return void
      */
@@ -63,7 +63,7 @@ final class ExtensionController
         InputSanitizer $input,
         string $root,
         StateRead $extensionStateStore,
-        ExtensionManager $extensionCatalogService,
+        ExtensionManager $extensionManagerService,
         callable $extensionServicesFor
     ) {
         $this->context = $context;
@@ -71,7 +71,7 @@ final class ExtensionController
         $this->input = $input;
         $this->root = rtrim($root, '/\\');
         $this->extensionStateStore = $extensionStateStore;
-        $this->extensionCatalogService = $extensionCatalogService;
+        $this->extensionManagerService = $extensionManagerService;
         $this->extensionServicesFor = Closure::fromCallable($extensionServicesFor);
     }
 
@@ -88,7 +88,7 @@ final class ExtensionController
         }
 
         try {
-            $extensions = $this->extensionCatalogService->listForPanel(
+            $extensions = $this->extensionManagerService->listForPanel(
                 fn (string $extensionKey): array => $this->listEnabledExtensionForms($extensionKey)
             );
         } catch (\RuntimeException $exception) {
@@ -129,7 +129,7 @@ final class ExtensionController
         }
 
         $extensionName = $this->input->text($post['extension'] ?? null, 120);
-        if (!$this->extensionCatalogService->isSafeExtensionDirectoryName((string) $extensionName)) {
+        if (!$this->extensionManagerService->isSafeDirectoryName((string) $extensionName)) {
             $this->context->flash('error', 'Invalid extension identifier.');
             Redirect::redirect($this->context->panelUrl('/extensions'));
         }
@@ -140,7 +140,7 @@ final class ExtensionController
             Redirect::redirect($this->context->panelUrl('/extensions'));
         }
 
-        $manifest = $this->extensionCatalogService->readManifest(
+        $manifest = $this->extensionManagerService->readManifest(
             $extensionPath,
             fn (string $extensionKey): array => $this->listEnabledExtensionForms($extensionKey)
         );
@@ -227,7 +227,7 @@ final class ExtensionController
         }
 
         $extensionName = $this->input->text($post['extension'] ?? null, 120);
-        if (!$this->extensionCatalogService->isSafeExtensionDirectoryName((string) $extensionName)) {
+        if (!$this->extensionManagerService->isSafeDirectoryName((string) $extensionName)) {
             $this->context->flash('error', 'Invalid extension identifier.');
             Redirect::redirect($this->context->panelUrl('/extensions'));
         }
@@ -238,11 +238,11 @@ final class ExtensionController
             Redirect::redirect($this->context->panelUrl('/extensions'));
         }
 
-        $manifest = $this->extensionCatalogService->readManifest(
+        $manifest = $this->extensionManagerService->readManifest(
             $extensionPath,
             fn (string $extensionKey): array => $this->listEnabledExtensionForms($extensionKey)
         );
-        $isStockExtension = $this->extensionCatalogService->isStockExtensionDirectory((string) $extensionName);
+        $isStockExtension = $this->extensionManagerService->isStockExtensionDirectory((string) $extensionName);
 
         $state = $this->extensionStateStore->loadStateData();
         $enabledMap = $state['enabled'];
@@ -326,8 +326,8 @@ final class ExtensionController
             (string) ($post['upload_slug'] ?? ''),
             $archiveName,
             fn (string $name): ?string => $derivedExtensionSlug,
-            fn (string $name): bool => $this->extensionCatalogService->isSafeExtensionDirectoryName($name),
-            fn (string $name): bool => $this->extensionCatalogService->isStockExtensionDirectory($name),
+            fn (string $name): bool => $this->extensionManagerService->isSafeDirectoryName($name),
+            fn (string $name): bool => $this->extensionManagerService->isStockExtensionDirectory($name),
             fn (string $name): ?string => $this->nextAvailableExtensionDirectoryName($name),
             fn (string $name): bool => file_exists($this->extensionStateStore->basePath() . '/' . $name),
             'Extension',
@@ -377,7 +377,7 @@ final class ExtensionController
             Redirect::redirect($this->context->panelUrl('/extensions'));
         }
 
-        $manifest = $this->extensionCatalogService->readManifest(
+        $manifest = $this->extensionManagerService->readManifest(
             $targetDirectory,
             fn (string $extensionKey): array => $this->listEnabledExtensionForms($extensionKey)
         );
@@ -430,7 +430,7 @@ final class ExtensionController
         }
 
         $extensionName = strtolower(trim((string) $this->input->text($query['extension'] ?? null, 120)));
-        if (!$this->extensionCatalogService->isSafeExtensionDirectoryName($extensionName)) {
+        if (!$this->extensionManagerService->isSafeDirectoryName($extensionName)) {
             $this->context->flash('error', 'Invalid extension identifier.');
             Redirect::redirect($this->context->panelUrl('/extensions'));
         }
@@ -482,7 +482,7 @@ final class ExtensionController
             Redirect::redirect($this->context->panelUrl('/extensions'));
         }
 
-        if ($this->extensionCatalogService->isStockExtensionDirectory($extensionName)) {
+        if ($this->extensionManagerService->isStockExtensionDirectory($extensionName)) {
             $this->context->flash('error', 'That extension directory name is reserved by a stock extension.');
             Redirect::redirect($this->context->panelUrl('/extensions'));
         }
@@ -553,7 +553,7 @@ final class ExtensionController
         }
 
         try {
-            $this->extensionScaffoldService()->createSkeleton(
+            $this->extensionScaffold()->createSkeleton(
                 $extensionPath,
                 [
                     'directory' => $extensionName,
@@ -638,7 +638,7 @@ final class ExtensionController
     private function nextAvailableExtensionDirectoryName(string $baseName): ?string
     {
         $normalizedBase = strtolower(trim($baseName));
-        if (!$this->extensionCatalogService->isSafeExtensionDirectoryName($normalizedBase)) {
+        if (!$this->extensionManagerService->isSafeDirectoryName($normalizedBase)) {
             return null;
         }
 
@@ -658,7 +658,7 @@ final class ExtensionController
             }
 
             $candidate = $trimmedBase . $suffix;
-            if (!$this->extensionCatalogService->isSafeExtensionDirectoryName($candidate)) {
+            if (!$this->extensionManagerService->isSafeDirectoryName($candidate)) {
                 continue;
             }
 
@@ -731,13 +731,13 @@ final class ExtensionController
     /**
      * Returns the extension bootstrap-contract resolver on first use.
      */
-    private function extensionBootstrapContractResolver(): Bootstrap
+    private function extensionBootstrap(): Bootstrap
     {
-        if (!$this->extensionBootstrapContractResolver instanceof Bootstrap) {
-            $this->extensionBootstrapContractResolver = new Bootstrap();
+        if (!$this->extensionBootstrap instanceof Bootstrap) {
+            $this->extensionBootstrap = new Bootstrap();
         }
 
-        return $this->extensionBootstrapContractResolver;
+        return $this->extensionBootstrap;
     }
 
     /**
@@ -749,7 +749,7 @@ final class ExtensionController
      */
     private function provisionEnabledExtensionStorage(string $extensionName, array $manifest): void
     {
-        $contract = $this->extensionBootstrapContractResolver()->resolve($this->root, $extensionName, $manifest);
+        $contract = $this->extensionBootstrap()->resolve($this->root, $extensionName, $manifest);
         if (!$contract['valid']) {
             throw new \RuntimeException((string) ($contract['error'] ?? 'Invalid extension bootstrap contract.'));
         }
@@ -769,7 +769,7 @@ final class ExtensionController
      */
     private function deleteExtensionStorage(string $extensionName, array $manifest): void
     {
-        $contract = $this->extensionBootstrapContractResolver()->resolve($this->root, $extensionName, $manifest);
+        $contract = $this->extensionBootstrap()->resolve($this->root, $extensionName, $manifest);
         if (!$contract['valid']) {
             throw new \RuntimeException((string) ($contract['error'] ?? 'Invalid extension bootstrap contract.'));
         }
@@ -801,13 +801,13 @@ final class ExtensionController
     /**
      * Returns the extension-scaffold service on first use.
      */
-    private function extensionScaffoldService(): Scaffold
+    private function extensionScaffold(): Scaffold
     {
-        if (!$this->extensionScaffoldService instanceof Scaffold) {
-            $this->extensionScaffoldService = new Scaffold();
+        if (!$this->extensionScaffold instanceof Scaffold) {
+            $this->extensionScaffold = new Scaffold();
         }
 
-        return $this->extensionScaffoldService;
+        return $this->extensionScaffold;
     }
 
     /**

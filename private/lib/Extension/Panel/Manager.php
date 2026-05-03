@@ -107,7 +107,7 @@ final class Manager
                 continue;
             }
 
-            if (!$this->isSafeExtensionDirectoryName($entry)) {
+            if (!$this->isSafeDirectoryName($entry)) {
                 continue;
             }
 
@@ -201,7 +201,7 @@ final class Manager
         $defaultPermissionLevels = $this->defaultPermissionLevels('Extension');
         $defaultPermissionLevel = (string) ($defaultPermissionLevels[0]['key'] ?? 'access');
         $directorySlug = trim((string) basename($extensionPath));
-        if (!$this->isSafeExtensionDirectoryName($directorySlug)) {
+        if (!$this->isSafeDirectoryName($directorySlug)) {
             $directorySlug = '';
         }
 
@@ -463,11 +463,11 @@ final class Manager
      *   type: string,
      *   default_level: string,
      *   levels: array<int, array{key: string, label: string, bit: int}>
-     * }>
+     * }> Permission map keyed by extension directory slug.
      */
-    public function panelPermissionMapForDirectories(array $directoryFilter, callable $manifestReader): array
+    public function extensionPermissionMap(array $directoryFilter, callable $manifestReader): array
     {
-        return $this->permissionCatalog->panelPermissionMapForDirectories($directoryFilter, $manifestReader);
+        return $this->permissionCatalog->extensionPermissionMap($directoryFilter, $manifestReader);
     }
 
     /**
@@ -501,7 +501,7 @@ final class Manager
      * @param string $name Candidate directory name to validate.
      * @return bool True when the name passes the safe-name pattern.
      */
-    public function isSafeExtensionDirectoryName(string $name): bool
+    public function isSafeDirectoryName(string $name): bool
     {
         return (bool) preg_match('/^[A-Za-z0-9][A-Za-z0-9_-]{0,119}$/', $name);
     }
@@ -514,13 +514,13 @@ final class Manager
      * @param string $archiveName Original archive filename (e.g. "my-extension.zip").
      * @return string|null Normalized slug, or null when no valid slug can be derived.
      */
-    public function extensionNameFromArchiveFilename(string $archiveName): ?string
+    public function nameFromArchive(string $archiveName): ?string
     {
         $base = strtolower($this->input->text((string) pathinfo($archiveName, PATHINFO_FILENAME), 120));
         $base = preg_replace('/[^a-z0-9_-]+/', '-', $base) ?? '';
         $base = trim($base, '-_');
 
-        if ($base === '' || !$this->isSafeExtensionDirectoryName($base)) {
+        if ($base === '' || !$this->isSafeDirectoryName($base)) {
             return null;
         }
 
