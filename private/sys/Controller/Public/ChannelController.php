@@ -125,7 +125,7 @@ final class ChannelController
                 $requestedSlug,
                 $this->publicThemesRoot(),
                 $this->currentPublicThemeSlug(),
-                dirname(__DIR__, 4) . '/private/tpl'
+                dirname(__DIR__, 4) . '/private/tpl/public'
             );
 
             $site = $this->siteDataWithPageMeta($page);
@@ -190,7 +190,7 @@ final class ChannelController
             null,
             $this->publicThemesRoot(),
             $this->currentPublicThemeSlug(),
-            dirname(__DIR__, 4) . '/private/tpl'
+            dirname(__DIR__, 4) . '/private/tpl/public'
         );
 
         $this->context->renderPublic($pageTemplate, [

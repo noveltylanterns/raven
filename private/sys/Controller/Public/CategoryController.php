@@ -101,7 +101,7 @@ final class CategoryController
             $categorySlug,
             $this->publicThemesRoot(),
             $this->currentPublicThemeSlug(),
-            dirname(__DIR__, 4) . '/private/tpl'
+            dirname(__DIR__, 4) . '/private/tpl/public'
         );
 
         $this->context->renderPublic($categoryTemplate, [

@@ -32,12 +32,6 @@ This is the default Build Mode backlog file. If the user asks about goals, unpat
 
 # Misc Bugs & Tweaks
 **Do not delete this heading!**
-- [ ] Fold Scribe/UserMediaScribe.php into UserScribe.php
-- [ ] Move Scribe/AuthThrottleScribe.php to lib/Auth/LoginThrottle.php
-- [ ] Put all public-route tpl/ templates in tpl/public/, so tpl/ has just public/ and panel/ folders.
-- [ ] Our six `*Factories.php` files should be renamed `*Factory.php`
-- [ ] Move lib/Database/Schema/ and lib/Database/Connection/ classes right into lib/Database/ and delete empty folders.
-- [ ] sys/Logger.php says its for writing "panel event log entries" when thats ultimately just one category of things that will be piping to this Logger, which should be route-agnostic. This way extension authors & other things can pipe into the Logger later.
 
 # Postmaster Service
 - [ ] We need a dedicated set of mail delivery primitives in sys/Postmaster.php

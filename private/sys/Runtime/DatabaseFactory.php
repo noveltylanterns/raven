@@ -13,10 +13,10 @@ namespace Raven\Core\Runtime;
 
 use PDO;
 use Raven\Core\Debug\RequestProfilerAdapter;
-use Raven\Lib\Database\Connection\DriverConfigNormalizer;
-use Raven\Lib\Database\Connection\DsnBuilder;
-use Raven\Lib\Database\Connection\SqliteConnectionBootstrap;
-use Raven\Lib\Database\Connection\SqlitePathResolver;
+use Raven\Lib\Database\DriverConfigNormalizer;
+use Raven\Lib\Database\DsnBuilder;
+use Raven\Lib\Database\SqliteConnectionBootstrap;
+use Raven\Lib\Database\SqlitePathResolver;
 use Raven\Lib\Database\ProfiledPDO;
 use Raven\Lib\Database\QueryProfilerInterface;
 

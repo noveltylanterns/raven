@@ -20,7 +20,7 @@ use Raven\Lib\Auth\Panel\Service as PanelAuthService;
 use Raven\Lib\Auth\Public\Service as PublicAuthService;
 use Raven\Lib\Database\TableNameResolver;
 use Raven\Lib\Scribe\AuthProfileScribe;
-use Raven\Lib\Scribe\AuthThrottleScribe;
+use Raven\Lib\Auth\LoginThrottle;
 use Raven\Lib\Security\RecoveryPhrase;
 use Raven\Lib\Security\Totp;
 use RuntimeException;
@@ -45,7 +45,7 @@ final class AuthService
 
     /** Delight Auth instance. */
     private mixed $auth;
-    private AuthThrottleScribe $authThrottleScribe;
+    private LoginThrottle $loginThrottle;
     private AuthPayloadCodec $authPayloadCodec;
     private PanelAuthService $panelAuthService;
     private PublicAuthService $publicAuthService;
@@ -84,7 +84,7 @@ final class AuthService
         $this->rvnDb = $rvnDb;
         $this->driver = $driver;
         $this->prefix = preg_replace('/[^a-zA-Z0-9_]/', '', $prefix) ?? '';
-        $this->authThrottleScribe = new AuthThrottleScribe($rvnDb, $driver, $this->prefix);
+        $this->loginThrottle = new LoginThrottle($rvnDb, $driver, $this->prefix);
         $this->authPayloadCodec = new AuthPayloadCodec();
         $panelPermissionMaskService = new Panel\PermissionMaskService();
         $publicPermissionMaskService = new Public\PermissionMaskService($rvnDb, $this->prefix);
@@ -180,7 +180,7 @@ final class AuthService
     public function isLoginTemporarilyLocked(string $username, string $ipAddress, int $windowSeconds): bool
     {
         $windowSeconds = max(1, $windowSeconds);
-        $this->authThrottleScribe->pruneExpiredRows($windowSeconds, $windowSeconds);
+        $this->loginThrottle->pruneExpiredRows($windowSeconds, $windowSeconds);
 
         $bucketHash = $this->throttleBucketHash($username, $ipAddress);
         $row = $this->throttleLoadRow($bucketHash);
@@ -197,7 +197,7 @@ final class AuthService
         // Bucket exists but lock expired; clean it up if the window has also passed.
         $firstFailedAt = (int) ($row['first_failed'] ?? 0);
         if ($firstFailedAt === 0 || ($now - $firstFailedAt) > $windowSeconds) {
-            $this->authThrottleScribe->deleteRow($bucketHash);
+            $this->loginThrottle->deleteRow($bucketHash);
         }
 
         return false;
@@ -225,7 +225,7 @@ final class AuthService
         $maxAttempts = max(1, $maxAttempts);
         $windowSeconds = max(1, $windowSeconds);
         $lockSeconds = max(1, $lockSeconds);
-        $this->authThrottleScribe->pruneExpiredRows($windowSeconds, $lockSeconds);
+        $this->loginThrottle->pruneExpiredRows($windowSeconds, $lockSeconds);
 
         $bucketHash = $this->throttleBucketHash($username, $ipAddress);
         $existing = $this->throttleLoadRow($bucketHash);
@@ -245,7 +245,7 @@ final class AuthService
             ? ($now + $lockSeconds)
             : 0;
 
-        $this->authThrottleScribe->upsertRow(
+        $this->loginThrottle->upsertRow(
             $bucketHash,
             $this->throttleNormalizeIdentifier($username),
             $this->throttleNormalizeIp($ipAddress),
@@ -265,7 +265,7 @@ final class AuthService
     public function clearFailedLoginAttempts(string $username, string $ipAddress): void
     {
         $bucketHash = $this->throttleBucketHash($username, $ipAddress);
-        $this->authThrottleScribe->deleteRow($bucketHash);
+        $this->loginThrottle->deleteRow($bucketHash);
     }
 
     /**

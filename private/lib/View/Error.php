@@ -138,7 +138,7 @@ final class Error
         http_response_code($status);
 
         $themesRoot = $this->root . '/public/theme';
-        $coreFallbackRoot = $this->root . '/private/tpl';
+        $coreFallbackRoot = $this->root . '/private/tpl/public';
         $activeTheme = $this->resolveActiveTheme($themesRoot);
         $themeBrace = new ThemeBrace($this->root . '/.tmp/template_tag_cache');
         $templateFile = $this->resolveTemplateFile($template, $themesRoot, $coreFallbackRoot, $activeTheme);

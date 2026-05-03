@@ -282,7 +282,7 @@ final class SharedController
             fn (string $file, array $payload): string => $this->themeBrace->renderFile($file, $payload),
             $this->publicThemesRoot(),
             $this->currentPublicThemeSlug(),
-            dirname(__DIR__, 4) . '/private/tpl'
+            dirname(__DIR__, 4) . '/private/tpl/public'
         );
 
         echo $output;
@@ -308,7 +308,7 @@ final class SharedController
         $roots = $themeTemplate->lookupRoots(
             $this->publicThemesRoot(),
             $this->currentPublicThemeSlug(),
-            dirname(__DIR__, 4) . '/private/tpl'
+            dirname(__DIR__, 4) . '/private/tpl/public'
         );
 
         // Keep theme overrides first while still allowing extensions to ship

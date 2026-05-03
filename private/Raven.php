@@ -14,7 +14,7 @@ namespace Raven;
 use PDO;
 use Raven\Core\Config;
 use Raven\Core\Runtime\DatabaseFactory;
-use Raven\Lib\Database\Schema\SchemaManager;
+use Raven\Lib\Database\SchemaManager;
 use Raven\Core\Logger;
 use Raven\Lib\Parser\PageRepoParser;
 use Raven\Lib\Auth\AuthService;

@@ -13,9 +13,9 @@ namespace Raven\Core\Runtime\Panel;
 
 use Closure;
 use PDO;
-use Raven\Core\Runtime\Panel\ControllerFactories;
-use Raven\Core\Runtime\Panel\DomainFactories;
-use Raven\Core\Runtime\Panel\RepoFactories;
+use Raven\Core\Runtime\Panel\ControllerFactory;
+use Raven\Core\Runtime\Panel\DomainFactory;
+use Raven\Core\Runtime\Panel\RepoFactory;
 use Raven\Core\Runtime\Panel\RuntimeInitializer;
 use Raven\Core\Logger;
 use Raven\Core\Renderer;
@@ -149,7 +149,7 @@ final class RuntimeBuilder
         $rvn['panel_editor_mde'] = $memoize(static fn (): EditorMDE => new EditorMDE());
 
         /** @var array<string, Closure> $repoFactories */
-        $repoFactories = RepoFactories::build($rvn, $memoize, $resolveAuthDb, $categoryEnabled, $tagEnabled);
+        $repoFactories = RepoFactory::build($rvn, $memoize, $resolveAuthDb, $categoryEnabled, $tagEnabled);
         $channelReadFactory = $repoFactories['channel_read'];
         $channelWriteFactory = $repoFactories['channel_write'];
         $groupReadFactory = $repoFactories['group_read'];
@@ -207,7 +207,7 @@ final class RuntimeBuilder
         });
 
         /** @var array<string, Closure> $domainFactories */
-        $domainFactories = DomainFactories::build(
+        $domainFactories = DomainFactory::build(
             $memoize,
             $channelReadFactory,
             $channelWriteFactory,
@@ -383,7 +383,7 @@ final class RuntimeBuilder
             return $themeCatalogService;
         });
 
-        ControllerFactories::registerBase(
+        ControllerFactory::registerBase(
             $rvn,
             $resolveAuth,
             $extensionManagerFactory,
@@ -392,7 +392,7 @@ final class RuntimeBuilder
             $tagEnabled
         );
 
-        ControllerFactories::registerContentTaxonomyControllers(
+        ControllerFactory::registerContentTaxonomyControllers(
             $rvn,
             $panelContentDomain,
             $panelTaxonomyDomain,
@@ -401,7 +401,7 @@ final class RuntimeBuilder
             $extensionContentFactory
         );
 
-        ControllerFactories::registerUserAdminControllers(
+        ControllerFactory::registerUserAdminControllers(
             $rvn,
             $panelUserDomain,
             $panelSystemDomain,

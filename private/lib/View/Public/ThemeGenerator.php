@@ -283,7 +283,7 @@ final class ThemeGenerator
         $content .= "- `css/style.css`\n";
         $content .= "\n## Safety Rules\n";
         $content .= "- Keep customizations inside this theme directory.\n";
-        $content .= "- Do not edit core templates under `private/tpl/` for theme-only changes.\n";
+        $content .= "- Do not edit core templates under `private/tpl/public/` for public theme-only changes.\n";
         $content .= "- Use escaped brace tags by default; reserve `{raw:...}` for trusted HTML only.\n";
 
         return $content;

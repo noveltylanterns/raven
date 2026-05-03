@@ -7,7 +7,11 @@ namespace Raven\Core;
 use PDO;
 
 /**
- * Writes panel event log entries to the event_log database table.
+ * Writes event log entries to the event_log database table.
+ *
+ * Route-agnostic: controllers, repositories, extension providers, and the global
+ * PHP error handler may all call in. Panel event logs are one category of entries,
+ * not the sole purpose of this service.
  *
  * Severity levels (error/warn/info) are individually toggled in the debug tab of the
  * config editor under the logging.* key group. Errors are enabled by default; warnings

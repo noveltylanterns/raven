@@ -18,7 +18,7 @@ use Raven\Lib\Auth\LoginIdentifier;
 use Raven\Lib\Media\Panel\AvatarValidationPolicy;
 use Raven\Lib\Media\Panel\AvatarValidator;
 use Raven\Lib\Media\Panel\UserMediaPathService;
-use Raven\Lib\Scribe\UserMediaScribe;
+use Raven\Lib\Scribe\UserScribe;
 use Raven\Lib\Security\PasswordValidator;
 use Raven\Lib\View\Qr;
 use Raven\Lib\View\Form2fa;
@@ -51,7 +51,7 @@ final class PreferencesController
     private MediaConfigService $panelMediaConfigService;
     private UserProfileParser $profileContactService;
     private Form2fa $form2fa;
-    private UserMediaScribe $userMediaScribe;
+    private UserScribe $userMediaScribe;
     private UserMediaPathService $userMediaPathService;
     private PasswordValidator $passwordValidator;
 
@@ -67,7 +67,7 @@ final class PreferencesController
      * @param MediaConfigService $panelMediaConfigService Shared media-limit helper.
      * @param UserProfileParser $profileContactService Shared profile-contact normalizer.
      * @param Form2fa $form2fa Shared 2FA helper set.
-     * @param UserMediaScribe $userMediaScribe Shared user-media write helper.
+     * @param UserScribe $userMediaScribe Shared user-media write helper.
      * @param UserMediaPathService $userMediaPathService Shared user-media path resolver.
      * @param PasswordValidator $passwordValidator Shared password validation policy.
      * @return void
@@ -84,7 +84,7 @@ final class PreferencesController
         MediaConfigService $panelMediaConfigService,
         UserProfileParser $profileContactService,
         Form2fa $form2fa,
-        UserMediaScribe $userMediaScribe,
+        UserScribe $userMediaScribe,
         UserMediaPathService $userMediaPathService,
         PasswordValidator $passwordValidator
     ) {

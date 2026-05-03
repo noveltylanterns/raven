@@ -2,6 +2,15 @@
 
 *The machine is supposed to be logging patches & mods to this file. Sometimes it does, sometimes it doesn't. It might be useful for historical architectural context to your Agent at one point.*
 
+### May 3, 2026 — Misc bugs & tweaks batch
+
+- Merged `Scribe/UserMediaScribe` into `UserScribe`: constructor now accepts optional `$projectRoot`; all avatar/cover filesystem methods absorbed. Updated callers: `Panel/ControllerFactory`, `PreferencesController`, `UserEditController`. Deleted `UserMediaScribe.php`.
+- Moved `Scribe/AuthThrottleScribe` → `lib/Auth/LoginThrottle` (class renamed, namespace changed to `Raven\Lib\Auth`). Updated `AuthService` use statement and property name. Deleted `AuthThrottleScribe.php`.
+- Renamed all six `*Factories.php` runtime files to `*Factory.php` (Panel + Public: `ControllerFactory`, `DomainFactory`, `RepoFactory`). Updated class names and `use` statements in both `RuntimeBuilder` files.
+- Flattened `lib/Database/Schema/` (10 classes) and `lib/Database/Connection/` (4 classes) directly into `lib/Database/`. Updated namespaces in all moved files; updated `use` statements in `DatabaseFactory`, `Raven.php`, `Extension/StateWrite`, `Archive/Update`. Deleted empty subdirectories.
+- Moved all public-route core templates from `private/tpl/` into `private/tpl/public/` (auth/, category/, channel/, feeds/, group/, home.php, page/, profile/, status/, tag/, wrapper.php). Updated template fallback root in all public rendering paths: `Public/SharedController`, `CategoryController`, `TagController`, `ChannelController`, `PageController`, `lib/View/Error`. Updated `RoutePreview` direct channel path check. Updated public `RuntimeBuilder` Renderer root to `tpl/public`. Panel templates remain at `tpl/panel/` unchanged.
+- Fixed `sys/Logger.php` class docblock: was "panel event log entries", now route-agnostic description noting it accepts entries from controllers, repos, extensions, and the PHP error handler.
+
 ### May 3, 2026 — Extension refactor follow-up: bug fix, method renames, PHPDoc sweep, and variable naming pass
 
 - **Variable naming pass** — swept all `sys/` callers of `lib/Extension/` classes for variable names echoing stale class names:

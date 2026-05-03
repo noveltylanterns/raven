@@ -13,9 +13,9 @@ namespace Raven\Core\Runtime\Public;
 
 use Closure;
 use PDO;
-use Raven\Core\Runtime\Public\ControllerFactories;
-use Raven\Core\Runtime\Public\DomainFactories;
-use Raven\Core\Runtime\Public\RepoFactories;
+use Raven\Core\Runtime\Public\ControllerFactory;
+use Raven\Core\Runtime\Public\DomainFactory;
+use Raven\Core\Runtime\Public\RepoFactory;
 use Raven\Core\Runtime\Public\RuntimeInitializer;
 use Raven\Core\Renderer;
 use Raven\Lib\Auth\AuthService;
@@ -47,13 +47,13 @@ final class RuntimeBuilder
 
         // These three are captured by reference in memoize closures below so they must be
         // declared here; all other null-init scaffolding from earlier extraction passes has
-        // been removed since controller and repo wiring now lives in ControllerFactories and
-        // RepoFactories respectively.
+        // been removed since controller and repo wiring now lives in ControllerFactory and
+        // RepoFactory respectively.
         $extensionServices = null;
         $extensionContent = null;
         $themeCatalogService = null;
 
-        $rvn['view'] = new Renderer((string) $rvn['root'] . '/private/tpl');
+        $rvn['view'] = new Renderer((string) $rvn['root'] . '/private/tpl/public');
         $categoryEnabled = ConfigParser::bool($rvn['config']->get('category.enabled', false), false);
         $tagEnabled = ConfigParser::bool($rvn['config']->get('tag.enabled', false), false);
 
@@ -124,7 +124,7 @@ final class RuntimeBuilder
         };
 
         /** @var array<string, Closure> $repoFactories */
-        $repoFactories = RepoFactories::build($rvn, $memoize, $resolveAuthDb, $categoryEnabled, $tagEnabled);
+        $repoFactories = RepoFactory::build($rvn, $memoize, $resolveAuthDb, $categoryEnabled, $tagEnabled);
         $channelReadFactory = $repoFactories['channel_read'];
         $groupReadFactory = $repoFactories['group_read'];
         $mediaReadFactory = $repoFactories['media_read'];
@@ -197,7 +197,7 @@ final class RuntimeBuilder
         });
 
         /** @var array<string, Closure> $domainFactories */
-        $domainFactories = DomainFactories::build(
+        $domainFactories = DomainFactory::build(
             $memoize,
             $channelReadFactory,
             $categoryLookupRepository,
@@ -227,7 +227,7 @@ final class RuntimeBuilder
         $rvn['public_domain_tag'] = $publicContentDomain;
         $rvn['public_domain_form'] = $publicFormDomain;
 
-        ControllerFactories::register(
+        ControllerFactory::register(
             $rvn,
             $resolveAuth,
             $themeCatalogFactory,

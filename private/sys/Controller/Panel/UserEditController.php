@@ -22,7 +22,7 @@ use Raven\Lib\Media\Panel\AvatarValidator;
 use Raven\Lib\Media\Panel\UserMediaPathService;
 use Raven\Lib\Parser\GroupRouteParser;
 use Raven\Lib\Parser\UserProfileParser;
-use Raven\Lib\Scribe\UserMediaScribe;
+use Raven\Lib\Scribe\UserScribe;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\Transport\Redirect;
 use Raven\Lib\View\Form2fa;
@@ -54,7 +54,7 @@ final class UserEditController
     private MediaConfigService $panelMediaConfigService;
     private UserProfileParser $profileContactService;
     private Form2fa $form2fa;
-    private UserMediaScribe $userMediaScribe;
+    private UserScribe $userMediaScribe;
     private UserMediaPathService $userMediaPathService;
 
     /**
@@ -73,7 +73,7 @@ final class UserEditController
      * @param MediaConfigService $panelMediaConfigService Shared media-limit helper.
      * @param UserProfileParser $profileContactService Shared profile-contact normalizer.
      * @param Form2fa $form2fa Shared 2FA list normalizer.
-     * @param UserMediaScribe $userMediaScribe Shared user-media write helper.
+     * @param UserScribe $userMediaScribe Shared user-media write helper.
      * @param UserMediaPathService $userMediaPathService Shared user-media path resolver.
      * @return void
      */
@@ -93,7 +93,7 @@ final class UserEditController
         MediaConfigService $panelMediaConfigService,
         UserProfileParser $profileContactService,
         Form2fa $form2fa,
-        UserMediaScribe $userMediaScribe,
+        UserScribe $userMediaScribe,
         UserMediaPathService $userMediaPathService
     ) {
         $this->context = $context;

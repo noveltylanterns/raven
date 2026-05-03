@@ -173,7 +173,7 @@ final class RoutePreview
             }
         }
 
-        return is_file($this->projectRoot . '/private/tpl/channel/index.php');
+        return is_file($this->projectRoot . '/private/tpl/public/channel/index.php');
     }
 
     /**
