@@ -95,6 +95,7 @@ Lingering issues & reorganization tasks. Make a plan to deal with them all in on
 - [ ] Scan the whole Auth/ directory for legacy aliases, compatability shims, and thin wrappers that don't add any extra logic. Purge all of them. Update all callers to use actual source functions.
 - [ ] A lot of the functions in our Auth/ classes have really long & unclear names. Do a sweep of every class and make sure the function/variable names are concise+accurate.
 - [ ] Do a sweep of all classes in Auth/ making sure PHPdoc blocks are present+accurate for ALL headings, classes & functions.
+- [ ] Update release-notes.md, clear completed section out of todo.md, and commit.
 
 
 
@@ -114,6 +115,7 @@ Lingering issues & reorganization tasks. Make a plan to deal with them all in on
 - [ ] Scan the whole Database/ directory for legacy aliases, compatability shims, and thin wrappers that don't add any extra logic. Purge all of them. Update all callers to use actual source functions.
 - [ ] A lot of classes+functions in Database/ have really long & unclear names. Do a sweep of everything in Database/ and make sure all the class/function/variable names are concise+accurate.
 - [ ] Do a sweep of all classes in Database/ making sure PHPdoc blocks are present+accurate for ALL headings, classes & functions.
+- [ ] Update release-notes.md, clear completed section out of todo.md, and commit.
 
 
 
@@ -178,6 +180,7 @@ Lingering issues & reorganization tasks. Make a plan to deal with them all in on
 - [ ] Re-scan the whole lib/Media/ directory for legacy shims and thin wrappers that don't add any extra logic. Purge all of them. Update all callers to use actual source functions.
 - [ ] A lot of the functions in our Media/ classes have really long & unclear names. Do a sweep of every class and make sure the function/variable names are concise+accurate.
 - [ ] Do a sweep of all classes in Media/ making sure PHPdoc blocks are present+accurate for ALL headings, classes & functions.
+- [ ] Update release-notes.md, clear completed section out of todo.md, and commit.
 
 
 
@@ -193,6 +196,7 @@ Lingering issues & reorganization tasks. Make a plan to deal with them all in on
 - [ ] Scan the whole Security/ directory for legacy aliases, compatability shims, and thin wrappers that don't add any extra logic. Purge all of them. Update all callers to use actual source functions.
 - [ ] A lot of the functions in our Security/ classes have really long & unclear names. Do a sweep of every class and make sure the function/variable names are concise+accurate.
 - [ ] Do a sweep of all classes in lib/Security/ making sure PHPdoc blocks are present+accurate for ALL headings, classes & functions.
+- [ ] Update release-notes.md, clear completed section out of todo.md, and commit.
 
 
 
@@ -211,6 +215,7 @@ Lingering issues & reorganization tasks. Make a plan to deal with them all in on
 - [ ] Scan the whole Transport/ directory for legacy aliases, compatability shims, and thin wrappers that don't add any extra logic. Purge all of them. Update all callers to use actual source functions.
 - [ ] Some of the functions in our Transport/ classes have really long & unclear names. Do a sweep of every class and make sure the function/variable names are concise+accurate.
 - [ ] Do a sweep of all classes in lib/Transport/ making sure PHPdoc blocks are present+accurate for ALL headings, classes & functions.
+- [ ] Update release-notes.md, clear completed section out of todo.md, and commit.
 
 
 
@@ -226,6 +231,7 @@ Lingering issues & reorganization tasks. Make a plan to deal with them all in on
 - [ ] Scan the whole View/ directory for legacy aliases, compatability shims, and thin wrappers that don't add any extra logic. Purge all of them. Update all callers to use actual source functions.
 - [ ] A lot of the functions in our View/ classes have really long & unclear names. Do a sweep of every class and make sure the function/variable names are concise+accurate.
 - [ ] Do a sweep of all classes in lib/View/ making sure PHPdoc blocks are present+accurate for ALL headings, classes & functions.
+- [ ] Update release-notes.md, clear completed section out of todo.md, and commit.
 
 
 
@@ -248,6 +254,7 @@ Lingering issues & reorganization tasks. Make a plan to deal with them all in on
 - [ ] Scan the whole Parser/ directory for legacy aliases, compatability shims, and thin wrappers that don't add any extra logic. Purge all of them. Update all callers to use actual source functions.
 - [ ] A lot of the functions in our Parser/ classes have really long & unclear names. Do a sweep of every class and make sure the function/variable names are concise+accurate.
 - [ ] Do a sweep of all classes in Parser/ making sure PHPdoc blocks are present+accurate for ALL headings, classes & functions.
+- [ ] Update release-notes.md, clear completed section out of todo.md, and commit.
 
 ## lib/Scribe/ Refactor
 Lingering issues & reorganization tasks. Make a plan to deal with them all in one clean sweep. Append it as a detailed checklist to this section in case we lose session or we have to bounce between agents:
@@ -258,6 +265,7 @@ Lingering issues & reorganization tasks. Make a plan to deal with them all in on
 - [ ] Scan the whole Scribe/ directory for legacy aliases, compatability shims, and thin wrappers that don't add any extra logic. Purge all of them. Update all callers to use actual source functions.
 - [ ] A lot of the functions in our Scribe/ classes have really long & unclear names. Do a sweep of every class and make sure the function/variable names are concise+accurate.
 - [ ] Do a sweep of all classes in Scribe/ making sure PHPdoc blocks are present+accurate for ALL headings, classes & functions.
+- [ ] Update release-notes.md, clear completed section out of todo.md, and commit.
 
 ## sys/Repository/ Refactor
 Lingering issues & reorganization tasks. Make a plan to deal with them all in one clean sweep. Append it as a detailed checklist to this section in case we lose session or we have to bounce between agents:
@@ -271,6 +279,7 @@ Lingering issues & reorganization tasks. Make a plan to deal with them all in on
 - [ ] Scan the whole Repository/ directory for legacy aliases, compatability shims, and thin wrappers that don't add any extra logic. Purge all of them. Update all callers to use actual source functions.
 - [ ] A lot of the functions in our Repository/ classes have really long & unclear names. Do a sweep of every class and make sure the function/variable names are concise+accurate.
 - [ ] Do a sweep of all classes in Repository/ making sure PHPdoc blocks are present+accurate for ALL headings, classes & functions.
+- [ ] Update release-notes.md, clear completed section out of todo.md, and commit.
 
 
 # Future Refactor Cleanups (Pending Plans, DO NOT PROCEED)
@@ -285,6 +294,7 @@ Lingering issues & reorganization tasks. Make a plan to deal with them all in on
 - [ ] Scan the whole Controller/ directory for legacy aliases, compatability shims, and thin wrappers that don't add any extra logic. Purge all of them. Update all callers to use actual source functions.
 - [ ] A lot of the functions in our Controller/ classes have really long & unclear names. Do a sweep of every class and make sure the function/variable names are concise+accurate.
 - [ ] Do a sweep of all classes in Controller/ making sure PHPdoc blocks are present+accurate for ALL headings, classes & functions.
+- [ ] Update release-notes.md, clear completed section out of todo.md, and commit.
 
 ## sys/Debug/ Refactor Cleanup
 Lingering issues & reorganization tasks. Make a plan to deal with them all in one clean sweep. Append it as a detailed checklist to this section in case we lose session or we have to bounce between agents:
@@ -292,14 +302,16 @@ Lingering issues & reorganization tasks. Make a plan to deal with them all in on
 - [ ] Scan the whole Debug/ directory for legacy aliases, compatability shims, and thin wrappers that don't add any extra logic. Purge all of them. Update all callers to use actual source functions.
 - [ ] A lot of the functions in our Debug/ classes have really long & unclear names. Do a sweep of every class and make sure the function/variable names are concise+accurate.
 - [ ] Do a sweep of all classes in Debug/ making sure PHPdoc blocks are present+accurate for ALL headings, classes & functions.
+- [ ] Update release-notes.md, clear completed section out of todo.md, and commit.
 
 ## sys/Router/ Refactor
 Lingering issues & reorganization tasks. Make a plan to deal with them all in one clean sweep. Append it as a detailed checklist to this section in case we lose session or we have to bounce between agents:
 ### sys/Router/ Cleanup
-- [ ] Make sure no Router is pulling up dead function/class/dependency weight irrelevant to the route being loaded.
+- [ ] Make sure no Router is pulling up dead function/class/dependency weight irrelevant to route being loaded.
 - [ ] Scan the whole Router/ directory for legacy aliases, compatability shims, and thin wrappers that don't add any extra logic. Purge all of them. Update all callers to use actual source functions.
 - [ ] A lot of the functions in our Router/ classes have really long & unclear names. Do a sweep of every class and make sure the function/variable names are concise+accurate.
 - [ ] Do a sweep of all classes in Router/ making sure PHPdoc blocks are present+accurate for ALL headings, classes & functions.
+- [ ] Update release-notes.md, clear completed section out of todo.md, and commit.
 
 ## sys/Runtime/ Refactor Cleanup
 Lingering issues & reorganization tasks. Make a plan to deal with them all in one clean sweep. Append it as a detailed checklist to this section in case we lose session or we have to bounce between agents:
@@ -307,6 +319,7 @@ Lingering issues & reorganization tasks. Make a plan to deal with them all in on
 - [ ] Scan the whole Runtime/ directory for legacy aliases, compatability shims, and thin wrappers that don't add any extra logic. Purge all of them. Update all callers to use actual source functions.
 - [ ] A lot of the functions in our Runtime/ classes have really long & unclear names. Do a sweep of every class and make sure the function/variable names are concise+accurate.
 - [ ] Do a sweep of all classes in Runtime/ making sure PHPdoc blocks are present+accurate for ALL headings, classes & functions.
+- [ ] Update release-notes.md, clear completed section out of todo.md, and commit.
 
 ## Core & Library Refactor Cleanup
 Lingering issues & reorganization tasks. Make a plan to deal with them all in one clean sweep. Append it as a detailed checklist to this section in case we lose session or we have to bounce between agents:
@@ -319,7 +332,7 @@ Lingering issues & reorganization tasks. Make a plan to deal with them all in on
 - [ ] Make sure all callers of these classes are using accurate variable names, as some may be legacy vernacular.
 - [ ] Do a sweep of all classes in lib/ & sys/ making sure PHPdoc blocks are present+accurate for ALL headings, classes & functions.
 - [ ] Finally, everything cleaned up & documented, do a full sweep over every class in lib/sys for redundant logic that can be merged/flattened (so long as it doesnt reintroduce dependency bloat or load dependencies from unrelated routes again), itemize them out in a checklist, clarify anything uncertain with me, and then run through this final optimization pass.
-
+- [ ] Update release-notes.md, clear completed section out of todo.md, and commit.
 
 
 
