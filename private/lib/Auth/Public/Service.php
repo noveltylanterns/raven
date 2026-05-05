@@ -11,7 +11,7 @@ declare(strict_types=1);
 
 namespace Raven\Lib\Auth\Public;
 
-use Raven\Lib\Auth\Panel\Mask as PanelMask;
+use Raven\Lib\Auth\Panel\PermissionBase as PanelMask;
 use Raven\Lib\Auth\Panel\Service as PanelService;
 
 /**
@@ -19,7 +19,7 @@ use Raven\Lib\Auth\Panel\Service as PanelService;
  */
 final class Service
 {
-    private PermissionMaskService $permissionMaskService;
+    private PermissionMask $permissionMaskService;
     private PanelService $panelService;
 
     /** @var callable(): int|null */
@@ -29,13 +29,13 @@ final class Service
     private $isLoggedInResolver;
 
     /**
-     * @param PermissionMaskService $permissionMaskService Guest permission-mask service.
+     * @param PermissionMask $permissionMaskService Guest permission-mask service.
      * @param PanelService $panelService Panel authorization service for authenticated user masks.
      * @param callable(): int|null $userIdResolver Callback returning current authenticated user id.
      * @param callable(): bool $isLoggedInResolver Callback returning current authentication state.
      */
     public function __construct(
-        PermissionMaskService $permissionMaskService,
+        PermissionMask $permissionMaskService,
         PanelService $panelService,
         callable $userIdResolver,
         callable $isLoggedInResolver

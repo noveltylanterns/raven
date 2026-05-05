@@ -2,7 +2,7 @@
 
 /**
  * RAVEN CMS
- * ~/private/lib/Auth/Public/PermissionMaskService.php
+ * ~/private/lib/Auth/Public/PermissionMask.php
  * Public permission-mask lookup and per-request cache for anonymous visitors.
  * Docs: https://raven.lanterns.io
  */
@@ -16,7 +16,7 @@ use PDO;
 /**
  * Resolves and caches guest-group permission masks for public-route checks.
  */
-final class PermissionMaskService
+final class PermissionMask
 {
     private PDO $rvnDb;
     private string $prefix;

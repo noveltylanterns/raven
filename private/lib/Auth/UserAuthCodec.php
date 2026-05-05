@@ -2,7 +2,7 @@
 
 /**
  * RAVEN CMS
- * ~/private/lib/Auth/AuthPayloadCodec.php
+ * ~/private/lib/Auth/UserAuthCodec.php
  * Encode/decode helpers for auth-adjacent JSON column payloads.
  * Docs: https://raven.lanterns.io
  */
@@ -22,7 +22,7 @@ use Raven\Lib\Security\TotpCipher;
  * encryption on writes and decryption on reads. Contact-profile normalization is
  * handled internally; callers no longer inject a separate normalizer.
  */
-final class AuthPayloadCodec
+final class UserAuthCodec
 {
     private const MAX_CONTACT_PROFILES = 20;
 

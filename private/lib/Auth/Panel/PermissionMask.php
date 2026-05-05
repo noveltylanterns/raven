@@ -2,7 +2,7 @@
 
 /**
  * RAVEN CMS
- * ~/private/lib/Auth/Panel/PermissionMaskService.php
+ * ~/private/lib/Auth/Panel/PermissionMask.php
  * Panel permission-mask composition and per-request cache for authenticated users.
  * Docs: https://raven.lanterns.io
  */
@@ -14,7 +14,7 @@ namespace Raven\Lib\Auth\Panel;
 /**
  * Computes and caches combined permission masks for authenticated users.
  */
-final class PermissionMaskService
+final class PermissionMask
 {
     /** @var array<int, int> Per-request cache of userId -> combined permission mask. */
     private array $permissionMaskForUserCache = [];

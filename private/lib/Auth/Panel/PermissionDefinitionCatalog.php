@@ -11,7 +11,7 @@ declare(strict_types=1);
 
 namespace Raven\Lib\Auth\Panel;
 
-use Raven\Lib\Auth\Public\Mask as PublicMask;
+use Raven\Lib\Auth\Public\PermissionBase as PublicMask;
 
 /**
  * Builds panel permission-definition rows from stock and extension sources for group edit UI.
@@ -30,10 +30,10 @@ final class PermissionDefinitionCatalog
             ['bit' => PublicMask::VIEW_PUBLIC_SITE, 'label' => 'View Public Site', 'section' => 'public', 'group' => 'Site', 'action' => 'view_public'],
             ['bit' => PublicMask::VIEW_PRIVATE_SITE, 'label' => 'View Private Site', 'section' => 'public', 'group' => 'Site', 'action' => 'view_private'],
             ['bit' => PublicMask::VIEW_DISABLED_SITE, 'label' => 'View Disabled Site', 'section' => 'public', 'group' => 'Site', 'action' => 'view_disabled'],
-            ['bit' => Mask::PANEL_LOGIN, 'label' => 'Access Dashboard', 'section' => 'panel', 'group' => 'Panel', 'action' => 'login'],
+            ['bit' => PermissionBase::PANEL_LOGIN, 'label' => 'Access Dashboard', 'section' => 'panel', 'group' => 'Panel', 'action' => 'login'],
         ];
 
-        foreach (Mask::stockPanelRoutePermissions() as $routeKey => $routeDefinition) {
+        foreach (PermissionBase::stockPanelRoutePermissions() as $routeKey => $routeDefinition) {
             $groupLabel = (string) ($routeDefinition['label'] ?? ucfirst((string) $routeKey));
             foreach (['view', 'create', 'edit', 'delete', 'uninstall'] as $action) {
                 $bit = (int) ($routeDefinition[$action] ?? 0);

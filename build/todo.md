@@ -13,49 +13,6 @@ This is the default Build Mode backlog file. If the user asks about goals, unpat
 
 
 
-# Postmaster Service
-
-**Context:** Two places currently send mail independently — `lib/Auth/LoginEmail.php::sendCode()` (2FA codes, uses `mail()` only) and `ext/contact/lib/ContactPublicFormRuntime.php::sendContactMail()` (form submissions, tries sendmail binary first then falls back to `mail()`). Both duplicate: address normalization, domain extraction for headers, no-reply fallback generation, header sanitization, and Message-ID generation. Postmaster lifts the working contact-ext sendmail+fallback delivery into a shared service; lib/Mail/ houses the reusable primitives both it and extensions need.
-
-### Phase 1 — lib/Mail/ primitives (new files)
-- [x] `lib/Mail/Address.php` — static utility class: `normalize(string): ?string`, `mask(string): string`, `headerDomain(string): string`, `defaultNoReply(string): string`, `sanitizeHeader(string, int): string`
-- [x] `lib/Mail/Message.php` — immutable value object: `to`, `cc`, `bcc`, `replyTo`, `subject`, `body`, `customHeaders`; fluent builder: `withReplyTo`, `withCc`, `withBcc`, `withHeader`
-
-### Phase 2 — sys/Postmaster.php (new file)
-- [x] `__construct(Config $config)` — reads `mail.agent`, `mail.sender_address`, `mail.sender_name`, `site.domain`
-- [x] `send(Message $message): array{ok, message?}` — tries sendmail binary first (lifted from contact ext), falls back to `mail()`
-- [x] `senderAddress(): string` and `senderName(): string` — expose configured sender metadata
-- [x] Private: `sendmailBinary(): ?string`, `viaSendmail(...)`, `buildBaseHeaders(...)`, `buildMessageId(string): string`
-
-### Phase 3 — Wire Postmaster into container
-- [x] Add `'postmaster' => new Postmaster($config)` to `$rvn` in `private/Raven.php` (after Config is ready, before extension boot)
-
-### Phase 4 — Refactor lib/Auth/LoginEmail.php
-- [x] `sendCode()` signature: drop `$siteDomain`, `$senderAddress`, `$senderName`, `$mailAgent` params; add `Postmaster $postmaster`; use `Address::` helpers and build a `Message`, call `$postmaster->send()`
-- [x] `maskEmail()` → thin wrapper around `Address::mask()`
-- [x] Remove private helpers now owned by Address/Postmaster: `sanitizeText`, `defaultNoReplyAddress`, `mailHeaderDomain`
-
-### Phase 5 — Refactor lib/Auth/LoginChallenge.php
-- [x] Add `Postmaster $postmaster` to constructor; remove mail config reads from `sendCode()` call site
-
-### Phase 6 — Update LoginChallenge instantiation sites (2 files)
-- [x] `sys/Controller/Public/AuthController.php::loginChallengeWorkflow()` — pass `new Postmaster($this->context->config())`
-- [x] `sys/Controller/Panel/AuthController.php::loginChallengeWorkflow()` — pass `new Postmaster($this->config)`
-
-### Phase 7 — Refactor ext/contact/lib/ContactPublicFormRuntime.php
-- [x] Add `Postmaster $postmaster` to constructor
-- [x] `sendContactMail()` — build a `Message`, call `$this->postmaster->send()`; remove thrown RuntimeException style (return error instead, or keep throw — decide at implementation time)
-- [x] Remove private helpers now owned by Postmaster/Address: `sendContactMailViaSendmail`, `sendmailBinaryPath`, `configuredMailSenderAddress`, `configuredMailSenderName`, `mailHeaderDomain`, `defaultNoReplyEmail`
-
-### Phase 8 — Update ext/contact/ext.php
-- [x] Pass `$rvn['postmaster']` when constructing `ContactPublicFormRuntime`
-
-### Phase 9 — PHPDoc sweep & release notes
-- [x] PHPDoc all new and changed methods (lib/Mail/*, sys/Postmaster.php, LoginEmail, LoginChallenge)
-- [x] Append to release-notes.md
-
-
-
 # lib/Auth/ Refactor
 Lingering issues & reorganization tasks. Make a plan to deal with them all in one clean sweep. Append it as a detailed checklist to this section in case we lose session or we have to bounce between agents:
 - [ ] All root Auth/ classes (EXCLUDE Auth/Panel/*.php & Auth/Public/*.php classes) should be public/panel-agnostic primitives. Doublecheck them all to make sure that is functionally the case.
@@ -89,6 +46,167 @@ Lingering issues & reorganization tasks. Make a plan to deal with them all in on
 	- Functions for building User preferences forms should be extracted to View/Preferences.php, and made public/panel/extension-agnostic. Update callers to use new class directly.
 	- Function maskEmail should be extracted to new class Security/EmailObfuscate.php
 - [ ] LoginEmail.php should be condensed & simplified, with many of its primitive functions extracted out to Security/EmailValidate.php and Security/EmailGenerate.php 
+
+### lib/Auth/ Refactor — Execution Plan
+
+Survey complete. All 23 files characterized. Execute in phases below. Each phase is self-contained; commit after each phase so a broken session can resume cleanly.
+
+**Before starting:** Run `grep -rn "use Raven\\Lib\\Auth" /home/dev/app/private --include="*.php" | sort` to get a full caller map. Reference it throughout.
+
+---
+
+#### Phase 1 — Pure Renames (no logic changes)
+
+Rename each file, update class name inside, update all `use` import lines in callers. Do not change any method logic. Delete old file after confirming callers updated.
+
+**1a. `LoginThrottle.php` → `ThrottleUser.php`**
+- [ ] Rename file, update class declaration: `class LoginThrottle` → `class ThrottleUser`
+- [ ] Update namespace: stays `Raven\Lib\Auth`
+- [ ] Callers to update: `AuthService.php` (use + property type + constructor arg)
+- [ ] Verify: `grep -rn "LoginThrottle" /home/dev/app/private --include="*.php"` returns zero hits
+
+**1b. `AuthPayloadCodec.php` → `UserAuthCodec.php`**
+- [ ] Rename file, update class declaration: `class AuthPayloadCodec` → `class UserAuthCodec`
+- [ ] Callers to update: `sys/Repository/UserWrite.php`, `sys/Repository/UserRead.php`, `AuthService.php`
+- [ ] Verify: `grep -rn "AuthPayloadCodec" /home/dev/app/private --include="*.php"` returns zero hits
+
+**1c. `Panel/Mask.php` → `Panel/PermissionBase.php`**
+- [ ] Rename file, update class declaration: `class Mask` → `class PermissionBase`
+- [ ] Callers to update (grep for `Auth\\Panel\\Mask` and `use.*Panel\\Mask`):
+  - `AuthService.php`, `Panel/PermissionMaskService.php`, `Panel/RolePolicy.php`, `Panel/PermissionDefinitionCatalog.php`, `Public/Mask.php`, `Public/Service.php`
+  - `sys/Shell.php`, `sys/Controller/Panel/UserEditController.php`, `sys/Controller/Panel/RoutingController.php`, `sys/Controller/Panel/SharedController.php`, `sys/Controller/Panel/LogsController.php`, `sys/Controller/Panel/GroupEditController.php`
+  - `lib/Extension/Panel/Permissions.php`, `lib/Extension/Panel/Routes.php`
+  - `lib/Database/SeedInstaller.php`
+  - `tpl/panel/user/edit.php`, `tpl/panel/user/list.php`, `tpl/panel/group/edit.php`
+- [ ] Verify: `grep -rn "Panel\\\\Mask\b\|Auth\\\\Panel\\\\Mask" /home/dev/app/private --include="*.php"` returns zero hits
+
+**1d. `Panel/PermissionMaskService.php` → `Panel/PermissionMask.php`**
+- [ ] Rename file, update class declaration: `class PermissionMaskService` → `class PermissionMask`
+- [ ] Callers to update (grep for `Panel\\PermissionMaskService`):
+  - `AuthService.php`, `Panel/Service.php`, and any ControllerFactory wiring
+- [ ] Verify: `grep -rn "PermissionMaskService" /home/dev/app/private --include="*.php"` returns zero hits
+
+**1e. `Public/Mask.php` → `Public/PermissionBase.php`**
+- [ ] Rename file, update class declaration: `class Mask` → `class PermissionBase`
+- [ ] Callers to update (grep for `Auth\\Public\\Mask\b`):
+  - `Panel/PermissionDefinitionCatalog.php`, `Panel/RolePolicy.php`, `AuthService.php`, `Public/Service.php`
+- [ ] Verify: `grep -rn "Public\\\\Mask\b\|Auth\\\\Public\\\\Mask" /home/dev/app/private --include="*.php"` returns zero hits
+
+**1f. `Public/PermissionMaskService.php` → `Public/PermissionMask.php`**
+- [ ] Rename file, update class declaration: `class PermissionMaskService` → `class PermissionMask`
+- [ ] Callers to update: `AuthService.php`, `Public/Service.php`, and any ControllerFactory wiring
+- [ ] Verify: `grep -rn "Public\\\\PermissionMaskService" /home/dev/app/private --include="*.php"` returns zero hits
+
+- [ ] Commit: `git commit -m "refactor(Auth): rename 6 lib/Auth/ files to accurate names"`
+
+---
+
+#### Phase 2 — Move Panel/PermissionDefinitionCatalog → lib/View/Panel/EditorPermissions.php
+
+- [ ] Create `private/lib/View/Panel/EditorPermissions.php` with new class name `EditorPermissions` and namespace `Raven\Lib\View\Panel`; copy all method logic from `PermissionDefinitionCatalog.php` into it verbatim
+- [ ] Update all `use` imports to reference `PermissionBase` (from Phase 1c rename) instead of old `Mask`
+- [ ] Callers to update:
+  - `sys/Controller/Panel/GroupEditController.php` — update use + instantiation
+  - `sys/Runtime/Panel/ControllerFactory.php` — update use + instantiation/injection
+- [ ] Delete `Panel/PermissionDefinitionCatalog.php`
+- [ ] Verify: `grep -rn "PermissionDefinitionCatalog" /home/dev/app/private --include="*.php"` returns zero hits
+- [ ] Update `docs/filetree.md` to reflect the new `View/Panel/EditorPermissions.php` location
+- [ ] Commit: `git commit -m "refactor(Auth/View): move PermissionDefinitionCatalog to View/Panel/EditorPermissions"`
+
+---
+
+#### Phase 3 — Audit and reduce Panel/RolePolicy.php
+
+- [ ] Read `Panel/RolePolicy.php` in full. Categorize every method:
+  - **Thin wrapper / no-op** (delegates without adding logic): flag for deletion
+  - **Slug/string normalizer** (works on raw strings, no auth dependency): candidate for inline at call site or move to a Parser class
+  - **Mask/permission logic** (works with permission bits): candidate for merge into `Panel/PermissionBase.php`
+- [ ] Callers: `sys/Repository/GroupRead.php`, `lib/Scribe/GroupScribe.php`
+  - For each thin wrapper removed: update those callers to call the source directly
+  - For anything merged into PermissionBase: update callers to use PermissionBase
+- [ ] If RolePolicy is empty after the purge, delete the file; if substantive logic remains, document what it owns
+- [ ] Verify: `grep -rn "RolePolicy" /home/dev/app/private --include="*.php"` either returns zero hits or only the retained file
+- [ ] Commit: `git commit -m "refactor(Auth): audit and reduce Panel/RolePolicy, update callers"`
+
+---
+
+#### Phase 4 — AuthService.php cleanup (largest phase — do in sub-steps, commit each)
+
+**4a. Remove permission delegate methods (delegates that just call Panel/Service or Public/Service)**
+
+Methods to remove from `AuthService.php`:
+- `canAccessPanel()`, `hasPanelPermissionBit()`, `hasAnyPanelPermissionBit()`, `panelPermissionMask()`
+- `canManageUsers()`, `canManageGroups()`, `canManageContent()`, `canManageConfiguration()`, `canManageTaxonomy()`
+- `canViewPublicSite()`, `canViewPrivateSite()`, `canViewDisabledSite()`, `isAdmin()`
+
+Before removing each, grep for all call sites:
+`grep -rn "->canManageConfiguration\(\|->canAccessPanel\(\|->hasPanelPermissionBit\(\|->panelPermissionMask\(\|->canManageUsers\(\|->canManageGroups\(\|->canManageContent\(\|->canManageTaxonomy\(\|->canViewPublicSite\(\|->canViewPrivateSite\(\|->canViewDisabledSite\(\|->isAdmin\(" /home/dev/app/private --include="*.php"`
+
+- [ ] For each call site: determine whether caller is panel-context or public-context, then route it to `Panel/Service` or `Public/Service` directly (check how caller currently gets Panel/Service — may need to add it as an injected dependency in controllers, or surface it through the request context object)
+- [ ] Update callers one file at a time; verify each file compiles before moving on
+- [ ] Known call sites from survey: `RoutingController`, `SharedController`, `AuthController`, `LogsController`, `UserEditController`, `GroupEditController`, `DashboardController`, `ConfigController`, `UpdateController`, `Panel/SessionGuard`, `Extension/Panel/Routes`, `ext/database/routes_panel.php`
+- [ ] Remove the 13 delegate methods from AuthService
+- [ ] Commit: `git commit -m "refactor(AuthService): remove permission delegates, route callers to Panel/Service and Public/Service directly"`
+
+**4b. Extract security verification methods**
+
+- [ ] `verifyPendingRecoveryCode()` + `matchRecoveryMethod()` → `lib/Security/PhraseValidate.php`
+  - Note: `lib/Security/RecoveryPhrase.php` exists and is planned to split into `PhraseGenerate` + `PhraseValidate` in the Security refactor — coordinate: if `PhraseValidate.php` doesn't exist yet, create it here; if it does, merge into it
+  - Grep callers: `grep -rn "verifyPendingRecoveryCode\|matchRecoveryMethod" /home/dev/app/private --include="*.php"`
+- [ ] `verifyPendingEmailCode()` → `lib/Security/EmailValidate.php` (create if absent)
+  - Grep callers: `grep -rn "verifyPendingEmailCode" /home/dev/app/private --include="*.php"`
+- [ ] `verifyTotpCode()` + `verifyPendingTotpCode()` → `lib/Security/TotpVerify.php` (create if absent)
+  - Grep callers: `grep -rn "verifyPendingTotpCode\|verifyTotpCode" /home/dev/app/private --include="*.php"`
+- [ ] Commit: `git commit -m "refactor(AuthService): extract security verification methods to lib/Security/"`
+
+**4c. Extract throttle logic**
+
+Current throttle methods in AuthService:
+- Read: `throttleLoadRow()`, `throttleNormalizeIdentifier()`, `throttleNormalizeIp()`, `throttleBucketHash()`
+- Write: the upsert logic inside login-flow methods (inline, not named methods) that calls `loginThrottle->upsertRow()`
+- Clear: the `deleteRow()` call path inside login success flow
+
+- [ ] Create `lib/Auth/ThrottleReturn.php` — move read methods + write upsert logic into it (ThrottleUser handles DB access, ThrottleReturn handles read/write orchestration)
+- [ ] Create `lib/Auth/ThrottleClear.php` — move delete/clear logic into it
+- [ ] Update AuthService to call ThrottleReturn and ThrottleClear instead of holding the logic inline
+- [ ] Grep callers: `grep -rn "ThrottleReturn\|ThrottleClear\|throttleLoad\|throttleBucket\|throttleNormalize" /home/dev/app/private --include="*.php"`
+- [ ] Commit: `git commit -m "refactor(AuthService): extract throttle logic to ThrottleReturn and ThrottleClear"`
+
+**4d. Extract user preferences form builder**
+
+- [ ] Read the preference-related methods in AuthService: `userPreferences()`, `updateUserPreferences()`, `decodeUserPreferencesRow()`, `normalizePreferenceUpdatePayload()`, `validatePreferenceUpdate()`, `interactiveTwoFactorMethods()`
+  - Determine which are DB-access (stay in AuthService or move to a repository), which are form-building/normalization (move to `lib/View/Preferences.php`)
+- [ ] Create `lib/View/Preferences.php` with namespace `Raven\Lib\View` — move form-building and normalization methods
+- [ ] Pure DB read/write stays in AuthService (or in a dedicated repository if one already owns this)
+- [ ] Update callers: `grep -rn "userPreferences\|updateUserPreferences\|decodeUserPreferencesRow\|normalizePreferenceUpdatePayload\|validatePreferenceUpdate" /home/dev/app/private --include="*.php"`
+- [ ] Commit: `git commit -m "refactor(AuthService): extract user preference form builder to lib/View/Preferences"`
+
+---
+
+#### Phase 5 — maskEmail extraction + LoginEmail.php condensation
+
+- [ ] `LoginEmail::maskEmail()` → `lib/Security/EmailObfuscate.php` (new class, single public static method or instance method — keep simple)
+  - Callers: `LoginChallenge.php` (line 93)
+  - `grep -rn "maskEmail" /home/dev/app/private --include="*.php"` to catch any others
+- [ ] Read `LoginEmail.php` in full; categorize every method:
+  - **Primitive email validation** (format, domain, syntax checks) → `lib/Security/EmailValidate.php` (merge with Phase 4b output if it exists)
+  - **Email generation** (token generation, link building, mailer calls) → `lib/Security/EmailGenerate.php`
+  - **Core login-email flow orchestration** (the actual send-login-email logic) → stays in LoginEmail.php
+- [ ] Move identified methods to EmailValidate and EmailGenerate; update callers
+- [ ] What remains in LoginEmail.php should be just the thin orchestration shell; verify it is actually smaller and more focused
+- [ ] Commit: `git commit -m "refactor(Auth/Security): extract LoginEmail primitives to EmailValidate and EmailGenerate"`
+
+---
+
+#### Phase 6 — Root Auth/ class agnosticism check
+
+- [ ] For every file directly in `lib/Auth/` (not in Panel/ or Public/ subdirs): read it and confirm zero panel-only or public-only logic
+  - Files to check: `AuthService.php`, `AuthPayloadCodec→UserAuthCodec.php`, `Login2fa.php`, `LoginAttempt.php`, `LoginChallenge.php`, `LoginEmail.php`, `LoginIdentifier.php`, `LoginThrottle→ThrottleUser.php`, `LoginUiState.php`, `Membership.php`, `SessionCookie.php`, `SessionFlash.php`, `SessionToken.php`, `ThrottleReturn.php`, `ThrottleClear.php`
+- [ ] Flag and extract any route-specific logic found; note what to do with it before proceeding
+- [ ] Commit any fixes found in this pass
+
+---
+
 ### lib/Auth/ Cleanup
 - [ ] Make sure no Auth class is pulling up dead function/class/dependency weight irrelevant to the auth method/helper that class handles.
 - [ ] At this point, rescan all of lib/Auth/, and look for redundant functions that can be merged/flattened. Optimize the hell out of this whole folder. After that, re-scan all Auth/ classes for dead dependency weight again before moving on.

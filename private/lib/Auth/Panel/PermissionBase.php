@@ -2,7 +2,7 @@
 
 /**
  * RAVEN CMS
- * ~/private/lib/Auth/Panel/Mask.php
+ * ~/private/lib/Auth/Panel/PermissionBase.php
  * Canonical panel permission bitmask constants, route maps, and capability helpers.
  * Docs: https://raven.lanterns.io
  */
@@ -16,7 +16,7 @@ namespace Raven\Lib\Auth\Panel;
  *
  * This class is the long-term home for panel permission rules and stock route maps.
  */
-final class Mask
+final class PermissionBase
 {
     /** Allows access to public-site mode frontend routes/content. */
     public const VIEW_PUBLIC_SITE = 128;

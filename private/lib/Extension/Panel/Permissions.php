@@ -11,7 +11,7 @@ declare(strict_types=1);
 
 namespace Raven\Lib\Extension\Panel;
 
-use Raven\Lib\Auth\Panel\Mask as PanelAccess;
+use Raven\Lib\Auth\Panel\PermissionBase as PanelAccess;
 use Raven\Lib\Extension\Resolver;
 use Raven\Lib\Extension\StateRead;
 use Raven\Lib\Security\InputSanitizer;

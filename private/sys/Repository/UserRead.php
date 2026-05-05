@@ -11,7 +11,7 @@ declare(strict_types=1);
 namespace Raven\Core\Repository;
 
 use PDO;
-use Raven\Lib\Auth\AuthPayloadCodec;
+use Raven\Lib\Auth\UserAuthCodec;
 use Raven\Lib\Database\TableNameResolver;
 
 /**
@@ -26,7 +26,7 @@ class UserRead
     private PDO $rvnDb;
     private string $driver;
     private string $prefix;
-    private AuthPayloadCodec $authPayloadCodec;
+    private UserAuthCodec $authPayloadCodec;
 
     /**
      * @param PDO    $authDb Auth-database connection (users/passwords).
@@ -41,7 +41,7 @@ class UserRead
         $this->rvnDb = $rvnDb;
         $this->driver = $driver;
         $this->prefix = preg_replace('/[^a-zA-Z0-9_]/', '', $prefix) ?? '';
-        $this->authPayloadCodec = new AuthPayloadCodec();
+        $this->authPayloadCodec = new UserAuthCodec();
     }
 
     /**

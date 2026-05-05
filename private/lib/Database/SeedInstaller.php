@@ -12,7 +12,7 @@ declare(strict_types=1);
 namespace Raven\Lib\Database;
 
 use PDO;
-use Raven\Lib\Auth\Panel\Mask as PanelAccess;
+use Raven\Lib\Auth\Panel\PermissionBase as PanelAccess;
 use Raven\Lib\Database\TableNameResolver;
 
 /**

@@ -12,7 +12,7 @@ declare(strict_types=1);
 namespace Raven\Lib\Auth;
 
 use PDO;
-use Raven\Lib\Auth\AuthPayloadCodec;
+use Raven\Lib\Auth\UserAuthCodec;
 use Raven\Lib\Auth\LoginEmail;
 use Raven\Lib\Auth\Login2fa;
 use Raven\Lib\Auth\Membership;
@@ -20,7 +20,7 @@ use Raven\Lib\Auth\Panel\Service as PanelAuthService;
 use Raven\Lib\Auth\Public\Service as PublicAuthService;
 use Raven\Lib\Database\TableNameResolver;
 use Raven\Lib\Scribe\AuthProfileScribe;
-use Raven\Lib\Auth\LoginThrottle;
+use Raven\Lib\Auth\ThrottleUser;
 use Raven\Lib\Security\RecoveryPhrase;
 use Raven\Lib\Security\Totp;
 use RuntimeException;
@@ -45,8 +45,8 @@ final class AuthService
 
     /** Delight Auth instance. */
     private mixed $auth;
-    private LoginThrottle $loginThrottle;
-    private AuthPayloadCodec $authPayloadCodec;
+    private ThrottleUser $loginThrottle;
+    private UserAuthCodec $authPayloadCodec;
     private PanelAuthService $panelAuthService;
     private PublicAuthService $publicAuthService;
     private LoginEmail $loginEmail;
@@ -84,10 +84,10 @@ final class AuthService
         $this->rvnDb = $rvnDb;
         $this->driver = $driver;
         $this->prefix = preg_replace('/[^a-zA-Z0-9_]/', '', $prefix) ?? '';
-        $this->loginThrottle = new LoginThrottle($rvnDb, $driver, $this->prefix);
-        $this->authPayloadCodec = new AuthPayloadCodec();
-        $panelPermissionMaskService = new Panel\PermissionMaskService();
-        $publicPermissionMaskService = new Public\PermissionMaskService($rvnDb, $this->prefix);
+        $this->loginThrottle = new ThrottleUser($rvnDb, $driver, $this->prefix);
+        $this->authPayloadCodec = new UserAuthCodec();
+        $panelPermissionMaskService = new Panel\PermissionMask();
+        $publicPermissionMaskService = new Public\PermissionMask($rvnDb, $this->prefix);
         $groupMembership = new Membership($rvnDb, $driver, $prefix);
         $this->panelAuthService = new PanelAuthService(
             $panelPermissionMaskService,

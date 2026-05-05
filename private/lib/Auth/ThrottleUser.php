@@ -2,7 +2,7 @@
 
 /**
  * RAVEN CMS
- * ~/private/lib/Auth/LoginThrottle.php
+ * ~/private/lib/Auth/ThrottleUser.php
  * Write-side persistence helper for auth-throttle buckets.
  * Docs: https://raven.lanterns.io
  */
@@ -20,7 +20,7 @@ use PDO;
  * while this class centralizes the mutation SQL for bucket upserts, deletes,
  * and stale-row pruning.
  */
-final class LoginThrottle
+final class ThrottleUser
 {
     private PDO $rvnDb;
     private string $driver;

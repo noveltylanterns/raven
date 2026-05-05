@@ -11,7 +11,7 @@ declare(strict_types=1);
 
 namespace Raven\Lib\Auth\Panel;
 
-use Raven\Lib\Auth\Public\Mask as PublicMask;
+use Raven\Lib\Auth\Public\PermissionBase as PublicMask;
 
 /**
  * Group role slug normalizer and stock-role permission constraint policy.
@@ -143,13 +143,13 @@ final class RolePolicy
                 PublicMask::VIEW_PUBLIC_SITE
                 | PublicMask::VIEW_PRIVATE_SITE
                 | PublicMask::VIEW_DISABLED_SITE
-                | Mask::PANEL_LOGIN
-                | Mask::MANAGE_CONTENT
-                | Mask::MANAGE_TAXONOMY
-                | Mask::MANAGE_USERS
-                | Mask::MANAGE_GROUPS
-                | Mask::MANAGE_CONFIGURATION
-                | Mask::allStockPanelBitsMask()
+                | PermissionBase::PANEL_LOGIN
+                | PermissionBase::MANAGE_CONTENT
+                | PermissionBase::MANAGE_TAXONOMY
+                | PermissionBase::MANAGE_USERS
+                | PermissionBase::MANAGE_GROUPS
+                | PermissionBase::MANAGE_CONFIGURATION
+                | PermissionBase::allStockPanelBitsMask()
             );
         }
 
@@ -168,8 +168,8 @@ final class RolePolicy
     public function normalizeMaskForPanelAccess(int $mask): int
     {
         $resolvedMask = $mask;
-        if (($resolvedMask & Mask::PANEL_LOGIN) !== Mask::PANEL_LOGIN) {
-            $resolvedMask &= ~Mask::allStockPanelBitsMask();
+        if (($resolvedMask & PermissionBase::PANEL_LOGIN) !== PermissionBase::PANEL_LOGIN) {
+            $resolvedMask &= ~PermissionBase::allStockPanelBitsMask();
             $resolvedMask &= ~PublicMask::VIEW_DISABLED_SITE;
         }
 

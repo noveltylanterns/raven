@@ -14,7 +14,7 @@ namespace Raven\Core\Controller\Panel;
 use Raven\Core\Config;
 use Raven\Core\Renderer;
 use Raven\Lib\Auth\AuthService;
-use Raven\Lib\Auth\Panel\Mask as PanelAccess;
+use Raven\Lib\Auth\Panel\PermissionBase as PanelAccess;
 use Raven\Lib\Auth\Panel\SessionGuard;
 use Raven\Lib\Auth\SessionFlash;
 use Raven\Lib\Extension\Resolver;

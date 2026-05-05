@@ -18,19 +18,19 @@ use Raven\Lib\Auth\Membership;
  */
 final class Service
 {
-    private PermissionMaskService $permissionMaskService;
+    private PermissionMask $permissionMaskService;
     private Membership $groupMembership;
 
     /** @var callable(): int|null */
     private $userIdResolver;
 
     /**
-     * @param PermissionMaskService $permissionMaskService Panel permission-mask cache/computation service.
+     * @param PermissionMask $permissionMaskService Panel permission-mask cache/computation service.
      * @param Membership $groupMembership Shared group-membership read/write service.
      * @param callable(): int|null $userIdResolver Callback returning current authenticated user id.
      */
     public function __construct(
-        PermissionMaskService $permissionMaskService,
+        PermissionMask $permissionMaskService,
         Membership $groupMembership,
         callable $userIdResolver
     ) {
@@ -52,7 +52,7 @@ final class Service
             return false;
         }
 
-        return Mask::canLoginPanel($mask);
+        return PermissionBase::canLoginPanel($mask);
     }
 
     /**
@@ -74,7 +74,7 @@ final class Service
         }
 
         $mask = $this->permissionMaskForUser($userId);
-        if (!Mask::canLoginPanel($mask)) {
+        if (!PermissionBase::canLoginPanel($mask)) {
             return false;
         }
 
@@ -82,7 +82,7 @@ final class Service
             return true;
         }
 
-        return Mask::hasPanelPermissionBit($mask, $bit);
+        return PermissionBase::hasPanelPermissionBit($mask, $bit);
     }
 
     /**
@@ -116,7 +116,7 @@ final class Service
         }
 
         $mask = $this->permissionMaskForUser($userId);
-        if (!Mask::canLoginPanel($mask)) {
+        if (!PermissionBase::canLoginPanel($mask)) {
             return false;
         }
 
@@ -124,7 +124,7 @@ final class Service
             return true;
         }
 
-        return Mask::hasAnyPanelPermissionBit($mask, $bits);
+        return PermissionBase::hasAnyPanelPermissionBit($mask, $bits);
     }
 
     /**
@@ -140,7 +140,7 @@ final class Service
             return false;
         }
 
-        return Mask::canManageUsers($mask);
+        return PermissionBase::canManageUsers($mask);
     }
 
     /**
@@ -156,7 +156,7 @@ final class Service
             return false;
         }
 
-        return Mask::canManageGroups($mask);
+        return PermissionBase::canManageGroups($mask);
     }
 
     /**
@@ -172,7 +172,7 @@ final class Service
             return false;
         }
 
-        return Mask::canManageContent($mask);
+        return PermissionBase::canManageContent($mask);
     }
 
     /**
@@ -188,7 +188,7 @@ final class Service
             return false;
         }
 
-        return Mask::canManageConfiguration($mask);
+        return PermissionBase::canManageConfiguration($mask);
     }
 
     /**
@@ -204,7 +204,7 @@ final class Service
             return false;
         }
 
-        return Mask::canManageTaxonomy($mask);
+        return PermissionBase::canManageTaxonomy($mask);
     }
 
     /**

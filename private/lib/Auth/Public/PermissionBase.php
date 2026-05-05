@@ -2,7 +2,7 @@
 
 /**
  * RAVEN CMS
- * ~/private/lib/Auth/Public/Mask.php
+ * ~/private/lib/Auth/Public/PermissionBase.php
  * Canonical public-route permission bitmask helpers for site-visibility access checks.
  * Docs: https://raven.lanterns.io
  */
@@ -11,12 +11,12 @@ declare(strict_types=1);
 
 namespace Raven\Lib\Auth\Public;
 
-use Raven\Lib\Auth\Panel\Mask as PanelMask;
+use Raven\Lib\Auth\Panel\PermissionBase as PanelMask;
 
 /**
  * Canonical public-route permission helpers.
  */
-final class Mask
+final class PermissionBase
 {
     /** Allows access to public-site mode frontend routes/content. */
     public const VIEW_PUBLIC_SITE = PanelMask::VIEW_PUBLIC_SITE;

@@ -14,7 +14,7 @@ namespace Raven\Core\Controller\Panel;
 use Closure;
 use Raven\Core\Repository\GroupRead;
 use Raven\Core\Repository\GroupWrite;
-use Raven\Lib\Auth\Panel\Mask as PanelAccess;
+use Raven\Lib\Auth\Panel\PermissionBase as PanelAccess;
 use Raven\Lib\Auth\Panel\PermissionDefinitionCatalog;
 use Raven\Lib\Media\Panel\TaxonomyImageService;
 use Raven\Lib\Parser\GroupRouteParser;
