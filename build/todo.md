@@ -131,7 +131,9 @@ Lingering issues & reorganization tasks. Make a plan to deal with them all in on
 - [ ] Do a sweep on our newly consolidated lib/Media/ folder to make sure that, in practice & function, all of our lib/Media/ classes are truly public/panel/extension-agnostic.
 
 ### Refactor Avatar Libraries
+- [ ] **Crossed dependency to fix first:** `lib/Scribe/UserScribe.php` now imports and eagerly instantiates `lib/Media/Panel/AvatarUploadService` in its constructor. This means every `sys/Repository/UserWrite` construction (which happens on user-write routes and anywhere UserWrite is touched) pulls in AvatarUploadService and its Media/Panel dependencies — load weight that has no business in the Scribe/DB layer. Once `AvatarUpload.php` exists in `lib/Media/`, remove the `AvatarUploadService` dependency from `UserScribe` entirely and inject the new `AvatarUpload` only in the callers that actually do avatar I/O (`sys/Runtime/Panel/ControllerFactory.php` lines 574 and 686).
 - [ ] AvatarUploadService, AvatarValidationPolicy, and AvatarValidator, can all be merged into two new condensed classes: AvatarUpload.php and AvatarValidator.php. Distribute the avatar functions from the three original classes within the two new ones however makes the most sense (shoot for processing efficiency). Update all callers of the original three classes to use the two new ones.
+- [ ] All avatar components must live in `lib/Media/Avatar*.php` — load only when the caller actually needs avatar I/O, not as an implicit dependency of every user-write operation.
 - [ ] Does our new AvatarUpload.php use Transport/Upload.php? Should it for consistency?
 - [ ] Split up MediaConfigService.php:
 	- [ ] Extract all avatar-related functions and place them in new Media/AvatarConfig.php class
@@ -264,6 +266,14 @@ Root causes identified during investigation:
 - [x] Update all 6 (or however many) paths to their correct flattened locations.
   - Removed `/Schema` prefix from all 6 paths: `SchemaBootstrap`, `SchemaBuilder`, `AuthSchemaBuilder`, `SchemaEnsurePipeline`, `ExtensionSchemaRunner`, `SeedInstaller`.
 - [ ] Confirm `isDirty()` returns the correct result after the fix on a steady-state install.
+
+**Root Cause 2b — SchemaManager dirname depth off-by-one (the real per-request regression)**
+- `lib/Database/SchemaManager.php` was moved from `lib/Database/Schema/SchemaManager.php` during the refactor flatten.
+- The old file was 4 levels deep from project root → `dirname(__DIR__, 4)` was correct.
+- The new flat location is only 3 levels deep → `dirname(__DIR__, 4)` returned the parent of the project root (`/home/dev` instead of `/home/dev/app`).
+- This made the state store path wrong: `is_file($stateFile)` always returned `false`, so `isDirty()` always returned `true`.
+- Result: the full schema pipeline (~30 queries, multiple CREATE TABLE IF NOT EXISTS + column introspection) ran on EVERY SINGLE REQUEST — both app and auth side.
+- [x] Fix `dirname(__DIR__, 4)` → `dirname(__DIR__, 3)` in SchemaManager.php. Verified state file is now reachable.
 
 **Root Cause 3 — 10+ filesystem stat calls per request in isDirty() fast path**
 - `isDirty()` performs at minimum: 2 file-existence checks + 2 mtime reads + 6 schema file stat calls on every bootstrap, even when nothing has changed.

@@ -36,7 +36,7 @@ final class ExtensionSchemaRunner
 
     public function ensureEnabledExtensionSchemas(PDO $db, string $driver, string $prefix): void
     {
-        $root = dirname(__DIR__, 4);
+        $root = dirname(__DIR__, 3);
         foreach (Registry::enabledDirectories($root, true) as $directory) {
             $manifest = Registry::readManifest($root, $directory);
             if (!is_array($manifest)) {

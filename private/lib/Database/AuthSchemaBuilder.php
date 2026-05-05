@@ -256,7 +256,7 @@ final class AuthSchemaBuilder
      */
     private function loadDelightSchema(string $driver): ?string
     {
-        $root = dirname(__DIR__, 4);
+        $root = dirname(__DIR__, 3);
         $dir = $root . '/composer/delight-im/auth/Database';
 
         if (!is_dir($dir)) {

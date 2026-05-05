@@ -28,7 +28,7 @@ final class SchemaManager
     )
     {
         $this->pipeline = $pipeline ?? new SchemaEnsurePipeline();
-        $root = dirname(__DIR__, 4);
+        $root = dirname(__DIR__, 3);
         $this->appStateStore = $appStateStore ?? new SchemaEnsureStateStore($root);
         $this->authStateStore = $authStateStore ?? new SchemaEnsureStateStore(
             $root,
