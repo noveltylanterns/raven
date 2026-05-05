@@ -57,16 +57,6 @@ final class RuntimeBuilder
         $categoryEnabled = ConfigParser::bool($rvn['config']->get('category.enabled', false), false);
         $tagEnabled = ConfigParser::bool($rvn['config']->get('tag.enabled', false), false);
 
-        // Public entry closures ($canRenderPublicProfiler) capture $rvn by value and call
-        // $rvn['auth']->method() directly, so auth must be a concrete AuthService before
-        // build() returns — resolve both lazy DB and service handles now.
-        if (is_callable($rvn['auth_db'])) {
-            $rvn['auth_db'] = ($rvn['auth_db'])();
-        }
-        if (is_callable($rvn['auth'])) {
-            $rvn['auth'] = ($rvn['auth'])();
-        }
-
         /**
          * Resolves the lazy auth DB handle only for public factories that truly need it.
          */

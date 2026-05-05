@@ -2,6 +2,13 @@
 
 *The machine is supposed to be logging patches & mods to this file. Sometimes it does, sometimes it doesn't. It might be useful for historical architectural context to your Agent at one point.*
 
+### May 5, 2026 — Public runtime performance fixes: deferred auth DB, corrected schema state paths
+
+- **sys/Runtime/Public/RuntimeBuilder** — removed eager `auth_db` and `auth` closure resolution that was forcing a second DB connection and `AuthService` construction on every anonymous public page request. Auth now resolves lazily only when a controller or auth-dependent route actually needs it.
+- **public/index.php** — updated `$canRenderPublicProfiler` to resolve `$rvn['auth']` lazily within its own closure scope, removing the only runtime dependency that required auth to be pre-resolved before route dispatch.
+- **sys/Runtime/Public/RuntimeInitializer** — removed `$publicAuthDomain()` pre-warm from the public runtime initializer. Content domain is still pre-warmed; auth domain now resolves on first controller use, avoiding an unnecessary auth DB open on all category, feed, tag, and other auth-free public routes.
+- **lib/Database/SchemaEnsureStateStore** — fixed six hardcoded schema source file paths in `latestSchemaSourceMtime()` that still referenced the now-deleted `lib/Database/Schema/` subdirectory. All six paths now correctly point to the flattened `lib/Database/` location, restoring the schema-change detection guard that had been silently broken since the Database library was flattened.
+
 ### May 5, 2026 — Postmaster service wired into login 2FA and contact extension
 
 - **lib/Auth/LoginEmail** — `sendCode()` now accepts `Postmaster $postmaster` instead of the four individual mail-config params (`$siteDomain`, `$senderAddress`, `$senderName`, `$mailAgent`); builds a `Message` value object and delegates transport to Postmaster. `maskEmail()` thinned to a one-line wrapper around `Address::mask()`. Private helpers `sanitizeText`, `defaultNoReplyAddress`, and `mailHeaderDomain` removed (all logic lives in `lib/Mail/Address`).

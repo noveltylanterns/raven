@@ -97,16 +97,26 @@ $isPublicAuthHelperPath = static function (string $path) use ($requestPath): boo
     ], true);
 };
 $canRenderPublicProfiler = static function () use ($rvn, $isPublicAuthHelperPath, $requestPath): bool {
-    if (!isset($rvn['auth']) || $isPublicAuthHelperPath($requestPath)) {
+    if ($isPublicAuthHelperPath($requestPath)) {
         return false;
     }
 
-    $userId = $rvn['auth']->userId();
-    if ($userId === null || !$rvn['auth']->canManageConfiguration($userId)) {
+    // Resolve the auth service lazily — the container may hold a closure until first use.
+    $auth = $rvn['auth'] ?? null;
+    if (is_callable($auth)) {
+        $auth = $auth();
+    }
+
+    if (!$auth instanceof \Raven\Lib\Auth\AuthService) {
         return false;
     }
 
-    return $rvn['auth']->isTwoFactorVerifiedForUser($userId);
+    $userId = $auth->userId();
+    if ($userId === null || !$auth->canManageConfiguration($userId)) {
+        return false;
+    }
+
+    return $auth->isTwoFactorVerifiedForUser($userId);
 };
 
 OutputProfiler::arm(

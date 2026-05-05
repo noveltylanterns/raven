@@ -240,6 +240,59 @@ Lingering issues & reorganization tasks. Make a plan to deal with them all in on
 **Do not delete this heading!**
 - [ ] Since making recent progress on the library refactor, Raven's average response times have shot up from 15-40ms, to 50-180ms. Memory consumption & database queries seems to have increased a bit too. Lets figure out what's crosswired wrong to be calling all this new dead weight. Make a checklist plan for solving this, and a second checklist for a follow-up optimization pass.
 
+### Lag Diagnosis & Fix Checklist
+Root causes identified during investigation:
+
+**Root Cause 1 — Auth DB opened on every anonymous public request**
+- `sys/Runtime/Public/RuntimeBuilder.php` lines 63–68 eagerly resolve both `auth_db` and `auth` closures unconditionally on every public request, even for fully anonymous pages.
+- This defeats the lazy auth design in `Raven.php` and opens a second DB connection + `schema.ensureAuth()` on every page load regardless of whether auth is actually needed.
+- Fix: audit whether the comment's claimed reason ("needed for `$canRenderPublicProfiler`") is accurate. If the profiler flag only needs auth for debug-mode panel users, wrap the forced resolution in a debug/profiler guard instead of doing it unconditionally.
+- [x] Read `sys/Runtime/Public/RuntimeBuilder.php` fully and confirm the exact reason for the forced eager resolve.
+- [x] Determine whether `$canRenderPublicProfiler` is the only real caller that needs `$rvn['auth']` pre-resolved, and whether it can be deferred to inside the profiler code path.
+  - Confirmed: `$canRenderPublicProfiler` in `public/index.php` was the only caller, and only fires when `show_on_public` profiler flag is true. Changed closure to resolve auth lazily from its local `$rvn` copy. Removed eager resolve block from RuntimeBuilder entirely.
+- [x] If safe, wrap the eager resolve block (lines 63–68) in a condition so it only fires when the request actually needs it (e.g. debug mode active, profiler enabled).
+  - Opted for full removal: eager block deleted, `$canRenderPublicProfiler` handles its own lazy auth resolution now.
+- [ ] Verify anonymous public page requests no longer open a second DB connection after the fix.
+
+**Root Cause 2 — SchemaEnsureStateStore dead paths (permanently broken mtime guard)**
+- `lib/Database/SchemaEnsureStateStore.php::latestSchemaSourceMtime()` checks 6 hardcoded file paths under `lib/Database/Schema/` (e.g. `Schema/SchemaBootstrap.php`).
+- The `lib/Database/Schema/` subdirectory was flattened into `lib/Database/` in a prior refactor; all 6 paths no longer exist and return `false`/`0` from `filemtime`.
+- This means the schema-source-mtime guard is permanently dead: `isDirty()` cannot correctly detect actual schema file changes and likely forces schema re-ensures more often than intended (or never marks dirty correctly — both outcomes are wrong).
+- [x] Read `lib/Database/SchemaEnsureStateStore.php` and confirm exact hardcoded paths in `latestSchemaSourceMtime()`.
+- [x] Map each broken path to its actual current location under `lib/Database/`.
+  - All 6 files exist in `private/lib/Database/` directly; `Schema/` subdir was removed in a prior refactor.
+- [x] Update all 6 (or however many) paths to their correct flattened locations.
+  - Removed `/Schema` prefix from all 6 paths: `SchemaBootstrap`, `SchemaBuilder`, `AuthSchemaBuilder`, `SchemaEnsurePipeline`, `ExtensionSchemaRunner`, `SeedInstaller`.
+- [ ] Confirm `isDirty()` returns the correct result after the fix on a steady-state install.
+
+**Root Cause 3 — 10+ filesystem stat calls per request in isDirty() fast path**
+- `isDirty()` performs at minimum: 2 file-existence checks + 2 mtime reads + 6 schema file stat calls on every bootstrap, even when nothing has changed.
+- This is ~10 filesystem ops per request on the hot path, compounded across extension directories.
+- [ ] After fixing Root Cause 2, assess whether a per-process static or APCu-backed result cache on `isDirty()` would eliminate redundant stat calls within a single request.
+- [ ] If the schema state file mtime is stable between requests, consider caching the "not dirty" result in a `static` variable for the lifetime of the process.
+
+**Root Cause 4 — RuntimeInitializer auth domain warm-up**
+- `sys/Runtime/Public/RuntimeInitializer.php::initialize_public_runtime` warms `$publicAuthDomain()` on first call, which can pull `$resolveAuthDb()` and open the auth DB connection.
+- [x] After fixing Root Cause 1, re-check whether `RuntimeInitializer` still forces a premature auth connection via `$publicAuthDomain()`.
+  - Confirmed: `RuntimeInitializer` was calling `$publicAuthDomain()` unconditionally during init warm-up, opening auth DB on every non-auth-helper request.
+- [x] If so, defer or guard the `$publicAuthDomain()` warm-up to only fire when the request actually accesses an auth-dependent route.
+  - Removed `$publicAuthDomain()` warm-up from RuntimeInitializer. Only `$publicContentDomain()` is pre-warmed. Auth domain now resolves lazily on first controller use.
+
+**Verification steps (run after each fix)**
+- [ ] Enable the request profiler (`sys/Debug/RequestProfiler.php`) and baseline the query count and memory delta before applying any fix.
+- [ ] Re-measure after each root cause fix and confirm the metric improves.
+- [ ] Confirm response times return to the expected 15–40ms range on anonymous public page loads.
+
+---
+
+### Follow-Up Optimization Pass (do after lag fixes are confirmed)
+- [ ] Opcache tuning: verify `opcache.revalidate_freq` is not set to 0 in the server config; a value of 0 forces a stat check on every request for every included file.
+- [ ] Consider adding a `static $result` cache inside `SchemaEnsureStateStore::isDirty()` so repeated calls within one process (e.g. multiple schema ensure calls during one bootstrap) skip redundant filesystem stats.
+- [ ] Profile the extension autoloader loop: `foreach ($enabledExtensionDirectories as $directory)` calls `is_dir()` + `is_file()` on every class autoload miss. Confirm whether this scales poorly with many enabled extensions.
+- [ ] Audit memory increase: check if any refactor introduced new eager property initialization (e.g. large arrays or service objects instantiated at container-boot time that were previously lazy-closures).
+- [ ] Check whether `sys/Runtime/Public/RepoFactory.php` memoized closures are all consistently lazy (confirmed in investigation, but re-verify after any RuntimeBuilder changes).
+- [ ] After all optimizations, run a full profiler pass across public + panel routes and document the new baseline in a comment at the top of the profiler or in the debug notes.
+
 
 
 

@@ -59,10 +59,14 @@ final class RuntimeInitializer
                 return $rvn + $publicRuntime;
             }
 
-            // Warm domain aggregates so the first controller dispatch does not pay
-            // the full lazy-build cost — matches the panel's init warm-up pattern.
+            // Warm only the content domain aggregate upfront — content repos are needed
+            // on virtually every public page request so pre-resolving avoids repeated
+            // lazy-build overhead in the hot dispatch path.
+            // Auth domain is intentionally NOT warmed here: it opens a second DB
+            // connection, and many public requests (categories, feeds, tags, static
+            // pages) never need auth services at all. Auth domain warms itself on
+            // first use inside whichever controller actually needs it.
             $contentDomain = $publicContentDomain();
-            $authDomain    = $publicAuthDomain();
 
             // Prime the extension services cache once for the whole request so every
             // public controller that calls $extensionServicesProvider() gets the
@@ -90,8 +94,8 @@ final class RuntimeInitializer
                 'tag_enabled'      => $tagEnabled,
             ];
 
-            // Release domain aggregate references after init — same hygiene as panel.
-            unset($contentDomain, $authDomain);
+            // Release content domain reference after init.
+            unset($contentDomain);
 
             return $rvn + $publicRuntime;
         };

@@ -139,12 +139,12 @@ final class SchemaEnsureStateStore
     private function latestSchemaSourceMtime(): int
     {
         $files = [
-            $this->root . '/private/lib/Database/Schema/SchemaBootstrap.php',
-            $this->root . '/private/lib/Database/Schema/SchemaBuilder.php',
-            $this->root . '/private/lib/Database/Schema/AuthSchemaBuilder.php',
-            $this->root . '/private/lib/Database/Schema/SchemaEnsurePipeline.php',
-            $this->root . '/private/lib/Database/Schema/ExtensionSchemaRunner.php',
-            $this->root . '/private/lib/Database/Schema/SeedInstaller.php',
+            $this->root . '/private/lib/Database/SchemaBootstrap.php',
+            $this->root . '/private/lib/Database/SchemaBuilder.php',
+            $this->root . '/private/lib/Database/AuthSchemaBuilder.php',
+            $this->root . '/private/lib/Database/SchemaEnsurePipeline.php',
+            $this->root . '/private/lib/Database/ExtensionSchemaRunner.php',
+            $this->root . '/private/lib/Database/SeedInstaller.php',
         ];
 
         $latest = 0;
