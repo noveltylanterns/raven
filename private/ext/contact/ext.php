@@ -9,6 +9,7 @@
 
 declare(strict_types=1);
 
+use Raven\Core\Postmaster;
 use Raven\Ext\ContactFormRepository;
 use Raven\Ext\ContactPublicFormRuntime;
 use Raven\Ext\ContactSubmissionRepository;
@@ -63,9 +64,11 @@ return [
         $services = is_callable($resolver) ? $resolver('contact') : [];
         $formsRepository = $services['forms'] ?? null;
         $submissionsRepository = $services['submissions'] ?? null;
+        $postmaster = $rvn['postmaster'] ?? null;
         if (
             !$formsRepository instanceof ContactFormRepository
             || !$submissionsRepository instanceof ContactSubmissionRepository
+            || !$postmaster instanceof Postmaster
         ) {
             throw new RuntimeException('Contact extension services are unavailable.');
         }
@@ -75,7 +78,8 @@ return [
             $rvn['csrf'],
             $rvn['config'],
             $formsRepository,
-            $submissionsRepository
+            $submissionsRepository,
+            $postmaster
         );
     };
     $rawContactServices['shortcode_runtimes'] = $rawEmbeddedRuntimes;

@@ -12,12 +12,14 @@ declare(strict_types=1);
 namespace Raven\Ext;
 
 use Raven\Core\Config;
+use Raven\Core\Postmaster;
 use Raven\Ext\ContactFormRepository;
 use Raven\Ext\ContactSubmissionRepository;
 use Raven\Lib\Extension\Public\FormRuntime as ExtensionFormRuntime;
+use Raven\Lib\Mail\Address;
+use Raven\Lib\Mail\Message;
 use Raven\Lib\Security\Csrf;
 use Raven\Lib\Security\InputSanitizer;
-
 use Raven\Lib\Transport\Redirect;
 
 /**
@@ -30,19 +32,32 @@ final class ContactPublicFormRuntime implements ExtensionFormRuntime
     private Config $config;
     private ContactFormRepository $forms;
     private ContactSubmissionRepository $submissions;
+    private Postmaster $postmaster;
 
+    /**
+     * Wires up the contact form runtime with its storage, security, and mail dependencies.
+     *
+     * @param InputSanitizer              $input       Shared input sanitizer for form field normalization.
+     * @param Csrf                        $csrf        CSRF validator for form submission protection.
+     * @param Config                      $config      Site configuration for subject prefix fallback.
+     * @param ContactFormRepository       $forms       Contact form definition storage.
+     * @param ContactSubmissionRepository $submissions Contact submission local storage.
+     * @param Postmaster                  $postmaster  Shared mail delivery service for contact notifications.
+     */
     public function __construct(
         InputSanitizer $input,
         Csrf $csrf,
         Config $config,
         ContactFormRepository $forms,
-        ContactSubmissionRepository $submissions
+        ContactSubmissionRepository $submissions,
+        Postmaster $postmaster
     ) {
         $this->input = $input;
         $this->csrf = $csrf;
         $this->config = $config;
         $this->forms = $forms;
         $this->submissions = $submissions;
+        $this->postmaster = $postmaster;
     }
 
     public function type(): string
@@ -837,13 +852,19 @@ final class ContactPublicFormRuntime implements ExtensionFormRuntime
     }
 
     /**
-     * Sends contact mail using configured global mail agent.
+     * Sends a contact form notification via the shared Postmaster service.
      *
-     * @param array<int, string> $destinations
-     * @param array<int, string> $ccRecipients
-     * @param array<int, string> $bccRecipients
+     * Builds a Message value object from the submission data and delegates all transport,
+     * sender-config, sendmail/php_mail selection, and header assembly to Postmaster.
      *
-     * @throws \RuntimeException
+     * @param array<int, string> $destinations  Primary `To:` recipient addresses.
+     * @param array<int, string> $ccRecipients  `Cc:` recipient addresses.
+     * @param array<int, string> $bccRecipients `Bcc:` recipient addresses.
+     * @param string             $subject        Message subject line.
+     * @param string             $body           Plain-text message body.
+     * @param string             $replyToEmail   Submitter email address for the Reply-To header.
+     * @param string             $formSlug       Form slug for the `X-Raven-Contact-Form` header.
+     * @throws \RuntimeException When Postmaster reports a delivery failure.
      */
     private function sendContactMail(
         array $destinations,
@@ -854,251 +875,16 @@ final class ContactPublicFormRuntime implements ExtensionFormRuntime
         string $replyToEmail,
         string $formSlug
     ): void {
-        $agent = strtolower($this->input->text((string) $this->config->get('mail.agent', 'php_mail'), 40));
-        if ($agent !== 'php_mail') {
-            throw new \RuntimeException('The configured mail agent is not supported yet.');
+        $message = (new Message($destinations, $subject, $body))
+            ->withCc($ccRecipients)
+            ->withBcc($bccRecipients)
+            ->withReplyTo($replyToEmail)
+            ->withHeader('X-Raven-Contact-Form: ' . Address::sanitizeHeader($formSlug, 120));
+
+        $result = $this->postmaster->send($message);
+        if (!(bool) ($result['ok'] ?? false)) {
+            throw new \RuntimeException((string) ($result['message'] ?? 'Failed to send contact email.'));
         }
-
-        $destinationMap = array_fill_keys($destinations, true);
-        $ccRecipients = array_values(array_filter($ccRecipients, static fn (string $email): bool => !isset($destinationMap[$email])));
-        $toAndCcMap = $destinationMap;
-        foreach ($ccRecipients as $ccEmail) {
-            $toAndCcMap[$ccEmail] = true;
-        }
-        $bccRecipients = array_values(array_filter($bccRecipients, static fn (string $email): bool => !isset($toAndCcMap[$email])));
-
-        $fromAddress = $this->configuredMailSenderAddress();
-        $fromName = $this->configuredMailSenderName();
-        $fromHeader = $fromName !== ''
-            ? ($fromName . ' <' . $fromAddress . '>')
-            : $fromAddress;
-        $subject = str_replace(["\r", "\n"], ' ', $subject);
-        $messageId = '<raven-contact-' . bin2hex(random_bytes(12)) . '@' . $this->mailHeaderDomain() . '>';
-        $headers = [
-            'MIME-Version: 1.0',
-            'Content-Type: text/plain; charset=UTF-8',
-            'From: ' . $fromHeader,
-            'Reply-To: ' . $replyToEmail,
-            'Message-ID: ' . $messageId,
-            'X-Raven-Contact-Form: ' . $formSlug,
-        ];
-        $envelopeRecipients = array_values(array_unique(array_merge($destinations, $ccRecipients, $bccRecipients)));
-
-        $transportError = '';
-        $sendmailBinary = $this->sendmailBinaryPath();
-        if ($sendmailBinary !== null) {
-            if (
-                $this->sendContactMailViaSendmail(
-                    $sendmailBinary,
-                    $envelopeRecipients,
-                    $destinations,
-                    $ccRecipients,
-                    $subject,
-                    $body,
-                    $headers,
-                    $fromAddress,
-                    $transportError
-                )
-            ) {
-                return;
-            }
-        }
-
-        // Fallback for environments where direct sendmail execution is unavailable.
-        if ($ccRecipients !== []) {
-            $headers[] = 'Cc: ' . implode(', ', $ccRecipients);
-        }
-        if ($bccRecipients !== []) {
-            $headers[] = 'Bcc: ' . implode(', ', $bccRecipients);
-        }
-        $headerString = implode("\r\n", $headers);
-        $toRecipients = implode(', ', $destinations);
-        $ok = @\mail($toRecipients, $subject, $body, $headerString);
-        if ($ok !== true) {
-            $suffix = $transportError !== '' ? (' ' . $transportError) : '';
-            throw new \RuntimeException('Failed to send contact email via php_mail.' . $suffix);
-        }
-    }
-
-    /**
-     * Returns sendmail binary path from `sendmail_path` ini setting when executable.
-     */
-    private function sendmailBinaryPath(): ?string
-    {
-        $rawPath = trim((string) ini_get('sendmail_path'));
-        if ($rawPath === '') {
-            return null;
-        }
-
-        $binary = '';
-        if (preg_match('/^(?:"([^"]+)"|\'([^\']+)\'|(\S+))/', $rawPath, $matches) !== 1) {
-            return null;
-        }
-
-        $binary = (string) ($matches[1] ?? $matches[2] ?? $matches[3] ?? '');
-        if ($binary === '' || !is_file($binary) || !is_executable($binary)) {
-            return null;
-        }
-
-        return $binary;
-    }
-
-    /**
-     * Sends one contact mail by invoking sendmail directly without `-t`.
-     *
-     * @param array<int, string> $envelopeRecipients
-     * @param array<int, string> $toRecipients
-     * @param array<int, string> $ccRecipients
-     * @param array<int, string> $baseHeaders
-     */
-    private function sendContactMailViaSendmail(
-        string $sendmailBinary,
-        array $envelopeRecipients,
-        array $toRecipients,
-        array $ccRecipients,
-        string $subject,
-        string $body,
-        array $baseHeaders,
-        string $fromAddress,
-        string &$error
-    ): bool {
-        $error = '';
-        if ($envelopeRecipients === [] || $toRecipients === []) {
-            $error = 'No valid recipients available for sendmail delivery.';
-            return false;
-        }
-
-        $command = array_merge([$sendmailBinary, '-i', '-f', $fromAddress], $envelopeRecipients);
-        $descriptorSpec = [
-            0 => ['pipe', 'w'],
-            1 => ['pipe', 'w'],
-            2 => ['pipe', 'w'],
-        ];
-        $process = @proc_open($command, $descriptorSpec, $pipes);
-        if (!is_resource($process)) {
-            $error = 'Could not start sendmail process.';
-            return false;
-        }
-
-        $headers = [];
-        foreach ($baseHeaders as $headerLine) {
-            $line = trim((string) $headerLine);
-            if ($line === '') {
-                continue;
-            }
-
-            $headers[] = str_replace(["\r", "\n"], '', $line);
-        }
-        $headers[] = 'To: ' . implode(', ', $toRecipients);
-        if ($ccRecipients !== []) {
-            $headers[] = 'Cc: ' . implode(', ', $ccRecipients);
-        }
-        $headers[] = 'Subject: ' . str_replace(["\r", "\n"], ' ', $subject);
-
-        $normalizedBody = str_replace(["\r\n", "\r"], "\n", $body);
-        $message = implode("\r\n", $headers) . "\r\n\r\n" . str_replace("\n", "\r\n", $normalizedBody);
-
-        if (isset($pipes[0]) && is_resource($pipes[0])) {
-            fwrite($pipes[0], $message);
-            fclose($pipes[0]);
-        }
-
-        $stdout = '';
-        if (isset($pipes[1]) && is_resource($pipes[1])) {
-            $stdout = (string) stream_get_contents($pipes[1]);
-            fclose($pipes[1]);
-        }
-
-        $stderr = '';
-        if (isset($pipes[2]) && is_resource($pipes[2])) {
-            $stderr = (string) stream_get_contents($pipes[2]);
-            fclose($pipes[2]);
-        }
-
-        $exitCode = proc_close($process);
-        if ($exitCode !== 0) {
-            $combined = trim(trim($stdout) . PHP_EOL . trim($stderr));
-            $error = $combined !== '' ? ('sendmail exited with status ' . $exitCode . ': ' . $combined) : ('sendmail exited with status ' . $exitCode . '.');
-            return false;
-        }
-
-        return true;
-    }
-
-    /**
-     * Returns a safe domain token for RFC Message-ID header generation.
-     */
-    private function mailHeaderDomain(): string
-    {
-        $rawDomain = strtolower(trim((string) $this->config->get('site.domain', 'localhost')));
-        $host = '';
-        if ($rawDomain !== '') {
-            $host = (string) parse_url('//' . $rawDomain, PHP_URL_HOST);
-            if ($host === '') {
-                $host = $rawDomain;
-            }
-        }
-
-        $host = preg_replace('/[^a-z0-9.-]+/i', '', $host) ?? '';
-        $host = trim($host, '.-');
-        if ($host === '' || !str_contains($host, '.')) {
-            $host = 'localhost.localdomain';
-        }
-
-        return $host;
-    }
-
-    /**
-     * Builds one safe no-reply sender using configured site domain.
-     */
-    private function defaultNoReplyEmail(): string
-    {
-        $rawDomain = strtolower(trim((string) $this->config->get('site.domain', 'localhost')));
-        $host = '';
-
-        if ($rawDomain !== '') {
-            $host = (string) parse_url('//' . $rawDomain, PHP_URL_HOST);
-            if ($host === '') {
-                $host = $rawDomain;
-            }
-        }
-
-        $host = preg_replace('/[^a-z0-9.-]+/i', '', $host) ?? '';
-        $host = trim($host, '.-');
-        if ($host === '' || !str_contains($host, '.')) {
-            $host = 'localhost';
-        }
-
-        return 'no-reply@' . $host;
-    }
-
-    /**
-     * Returns configured sender address or fallback.
-     */
-    private function configuredMailSenderAddress(): string
-    {
-        $configured = trim((string) $this->config->get('mail.sender_address', ''));
-        if ($configured !== '') {
-            $normalized = $this->input->email($configured);
-            if ($normalized !== null) {
-                return $normalized;
-            }
-        }
-
-        return $this->defaultNoReplyEmail();
-    }
-
-    /**
-     * Returns configured sender display name for outgoing contact mail.
-     */
-    private function configuredMailSenderName(): string
-    {
-        $name = $this->input->text((string) $this->config->get('mail.sender_name', 'Postmaster'), 120);
-        if ($name === '') {
-            $name = 'Postmaster';
-        }
-
-        return trim(str_replace(["\r", "\n"], ' ', $name));
     }
 
     /**

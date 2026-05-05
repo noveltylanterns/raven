@@ -31,28 +31,28 @@ This is the default Build Mode backlog file. If the user asks about goals, unpat
 - [x] Add `'postmaster' => new Postmaster($config)` to `$rvn` in `private/Raven.php` (after Config is ready, before extension boot)
 
 ### Phase 4 — Refactor lib/Auth/LoginEmail.php
-- [ ] `sendCode()` signature: drop `$siteDomain`, `$senderAddress`, `$senderName`, `$mailAgent` params; add `Postmaster $postmaster`; use `Address::` helpers and build a `Message`, call `$postmaster->send()`
-- [ ] `maskEmail()` → thin wrapper around `Address::mask()`
-- [ ] Remove private helpers now owned by Address/Postmaster: `sanitizeText`, `defaultNoReplyAddress`, `mailHeaderDomain`
+- [x] `sendCode()` signature: drop `$siteDomain`, `$senderAddress`, `$senderName`, `$mailAgent` params; add `Postmaster $postmaster`; use `Address::` helpers and build a `Message`, call `$postmaster->send()`
+- [x] `maskEmail()` → thin wrapper around `Address::mask()`
+- [x] Remove private helpers now owned by Address/Postmaster: `sanitizeText`, `defaultNoReplyAddress`, `mailHeaderDomain`
 
 ### Phase 5 — Refactor lib/Auth/LoginChallenge.php
-- [ ] Add `Postmaster $postmaster` to constructor; remove mail config reads from `sendCode()` call site
+- [x] Add `Postmaster $postmaster` to constructor; remove mail config reads from `sendCode()` call site
 
 ### Phase 6 — Update LoginChallenge instantiation sites (2 files)
-- [ ] `sys/Controller/Public/AuthController.php::loginChallengeWorkflow()` — pass `new Postmaster($this->context->config())`
-- [ ] `sys/Controller/Panel/AuthController.php::loginChallengeWorkflow()` — pass `new Postmaster($this->config)`
+- [x] `sys/Controller/Public/AuthController.php::loginChallengeWorkflow()` — pass `new Postmaster($this->context->config())`
+- [x] `sys/Controller/Panel/AuthController.php::loginChallengeWorkflow()` — pass `new Postmaster($this->config)`
 
 ### Phase 7 — Refactor ext/contact/lib/ContactPublicFormRuntime.php
-- [ ] Add `Postmaster $postmaster` to constructor
-- [ ] `sendContactMail()` — build a `Message`, call `$this->postmaster->send()`; remove thrown RuntimeException style (return error instead, or keep throw — decide at implementation time)
-- [ ] Remove private helpers now owned by Postmaster/Address: `sendContactMailViaSendmail`, `sendmailBinaryPath`, `configuredMailSenderAddress`, `configuredMailSenderName`, `mailHeaderDomain`, `defaultNoReplyEmail`
+- [x] Add `Postmaster $postmaster` to constructor
+- [x] `sendContactMail()` — build a `Message`, call `$this->postmaster->send()`; remove thrown RuntimeException style (return error instead, or keep throw — decide at implementation time)
+- [x] Remove private helpers now owned by Postmaster/Address: `sendContactMailViaSendmail`, `sendmailBinaryPath`, `configuredMailSenderAddress`, `configuredMailSenderName`, `mailHeaderDomain`, `defaultNoReplyEmail`
 
 ### Phase 8 — Update ext/contact/ext.php
-- [ ] Pass `$rvn['postmaster']` when constructing `ContactPublicFormRuntime`
+- [x] Pass `$rvn['postmaster']` when constructing `ContactPublicFormRuntime`
 
 ### Phase 9 — PHPDoc sweep & release notes
-- [ ] PHPDoc all new and changed methods (lib/Mail/*, sys/Postmaster.php, LoginEmail, LoginChallenge)
-- [ ] Append to release-notes.md
+- [x] PHPDoc all new and changed methods (lib/Mail/*, sys/Postmaster.php, LoginEmail, LoginChallenge)
+- [x] Append to release-notes.md
 
 
 

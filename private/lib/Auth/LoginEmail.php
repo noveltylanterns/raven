@@ -11,7 +11,10 @@ declare(strict_types=1);
 
 namespace Raven\Lib\Auth;
 
+use Raven\Core\Postmaster;
 use Raven\Lib\Auth\Login2fa;
+use Raven\Lib\Mail\Address;
+use Raven\Lib\Mail\Message;
 
 /**
  * Shared helpers for login-time email-code 2FA challenges.
@@ -340,29 +343,23 @@ final class LoginEmail
     // -------------------------------------------------------------------------
 
     /**
-     * Formats and sends the login email-code message to the recipient.
+     * Formats and sends the login email-code message to the recipient via Postmaster.
      *
-     * Supports only the `php_mail` agent currently; additional transport agents
-     * can be wired in here when needed without changing callers.
+     * Builds the subject and body from site name and TTL, then delegates transport and
+     * sender configuration entirely to the shared Postmaster service.
      *
-     * @param string $recipientEmail  Destination email address.
-     * @param string $code            Eight-digit plaintext code to include in the message.
-     * @param string $siteName        Site display name for subject and body context.
-     * @param string $siteDomain      Site domain used to derive From address and Message-ID.
-     * @param string $senderAddress   Explicit From address; defaults to no-reply@siteDomain.
-     * @param string $senderName      From display name; defaults to 'Postmaster'.
-     * @param string $mailAgent       Mail transport to use; only 'php_mail' is supported.
-     * @param int    $ttlSeconds      Code lifetime in seconds, shown in the message body.
-     * @return array{ok: bool, message?: string}
+     * @param string     $recipientEmail Destination email address.
+     * @param string     $code           Eight-digit plaintext code to include in the message.
+     * @param string     $siteName       Site display name for the subject line.
+     * @param Postmaster $postmaster     Shared delivery service that owns sender config and transport.
+     * @param int        $ttlSeconds     Code lifetime in seconds, shown in the message body.
+     * @return array{ok: bool, message?: string} Delivery result; `message` is set on failure.
      */
     public function sendCode(
         string $recipientEmail,
         string $code,
         string $siteName,
-        string $siteDomain,
-        string $senderAddress = '',
-        string $senderName = 'Postmaster',
-        string $mailAgent = 'php_mail',
+        Postmaster $postmaster,
         int $ttlSeconds = 600
     ): array {
         $recipientEmail = $this->normalizeEmail($recipientEmail);
@@ -375,26 +372,9 @@ final class LoginEmail
             return ['ok' => false, 'message' => 'Email code payload is invalid.'];
         }
 
-        $mailAgent = strtolower(trim($mailAgent));
-        if ($mailAgent === '') {
-            $mailAgent = 'php_mail';
-        }
-        if ($mailAgent !== 'php_mail') {
-            return ['ok' => false, 'message' => 'Configured mail agent is not supported yet.'];
-        }
-
-        $safeSiteName = $this->sanitizeText($siteName, 120);
+        $safeSiteName = Address::sanitizeHeader($siteName, 120);
         if ($safeSiteName === '') {
             $safeSiteName = 'Raven CMS';
-        }
-
-        $subject = '[' . $safeSiteName . '] Your login verification code';
-        $subject = trim(str_replace(["\r", "\n"], ' ', $subject));
-
-        $fromAddress = $this->normalizeEmail($senderAddress) ?? $this->defaultNoReplyAddress($siteDomain);
-        $fromName = $this->sanitizeText($senderName, 120);
-        if ($fromName === '') {
-            $fromName = 'Postmaster';
         }
 
         $ttlSeconds = max(60, min(1800, $ttlSeconds));
@@ -408,65 +388,24 @@ final class LoginEmail
             'If you did not request this code, you can ignore this email.',
         ]);
 
-        $fromHeader = $fromName . ' <' . $fromAddress . '>';
-        try {
-            $messageEntropy = bin2hex(random_bytes(12));
-        } catch (\Throwable $exception) {
-            $messageEntropy = str_replace('.', '', uniqid('fallback', true));
-        }
+        $subject = '[' . $safeSiteName . '] Your login verification code';
+        $message = (new Message([$recipientEmail], $subject, $body))
+            ->withHeader('X-Raven-Auth-Flow: login-2fa-email-code');
 
-        $messageId = '<raven-2fa-' . $messageEntropy . '@' . $this->mailHeaderDomain($siteDomain) . '>';
-        $headers = [
-            'MIME-Version: 1.0',
-            'Content-Type: text/plain; charset=UTF-8',
-            'From: ' . $fromHeader,
-            'Message-ID: ' . $messageId,
-            'X-Raven-Auth-Flow: login-2fa-email-code',
-        ];
-
-        $ok = @mail($recipientEmail, $subject, $body, implode("\r\n", $headers));
-        if ($ok !== true) {
-            return ['ok' => false, 'message' => 'Failed to send verification email.'];
-        }
-
-        return ['ok' => true];
+        return $postmaster->send($message);
     }
 
     /**
      * Returns a privacy-masked version of an email address for display.
      *
-     * Masks most of the local part and the domain root so the address is recognizable
-     * to the owner but not fully exposed in the UI (e.g. `jo***n@g***.com`).
+     * Delegates to Address::mask() so masking logic stays in one canonical place.
      *
      * @param string $email Email address to mask.
-     * @return string Masked address, or empty string when the email is invalid.
+     * @return string Masked address (e.g. `jo***n@g***.com`), or empty string when invalid.
      */
     public function maskEmail(string $email): string
     {
-        $normalized = $this->normalizeEmail($email);
-        if ($normalized === null) {
-            return '';
-        }
-
-        $parts = explode('@', $normalized, 2);
-        $local = (string) ($parts[0] ?? '');
-        $domain = (string) ($parts[1] ?? '');
-        if ($local === '' || $domain === '') {
-            return '';
-        }
-
-        $localMasked = strlen($local) <= 2
-            ? substr($local, 0, 1) . str_repeat('*', max(1, strlen($local) - 1))
-            : substr($local, 0, 2) . '***' . substr($local, -1);
-
-        $domainParts = explode('.', $domain);
-        $domainRoot = (string) ($domainParts[0] ?? '');
-        $domainTld = count($domainParts) > 1 ? '.' . end($domainParts) : '';
-        $domainMasked = $domainRoot === ''
-            ? '***'
-            : substr($domainRoot, 0, 1) . '***' . $domainTld;
-
-        return $localMasked . '@' . $domainMasked;
+        return Address::mask($email);
     }
 
     // -------------------------------------------------------------------------
@@ -648,44 +587,5 @@ final class LoginEmail
         return $map;
     }
 
-    private function sanitizeText(string $value, int $maxLength): string
-    {
-        $value = trim($value);
-        $value = preg_replace('/[\x00-\x1F\x7F]/u', '', $value) ?? '';
-        if (strlen($value) > $maxLength) {
-            $value = substr($value, 0, $maxLength);
-        }
-
-        return trim(str_replace(["\r", "\n"], ' ', $value));
-    }
-
-    private function defaultNoReplyAddress(string $siteDomain): string
-    {
-        $domain = $this->mailHeaderDomain($siteDomain);
-        if (!str_contains($domain, '.')) {
-            $domain = 'localhost.localdomain';
-        }
-
-        return 'no-reply@' . $domain;
-    }
-
-    private function mailHeaderDomain(string $siteDomain): string
-    {
-        $siteDomain = strtolower(trim($siteDomain));
-        $host = '';
-        if ($siteDomain !== '') {
-            $host = (string) parse_url('//' . $siteDomain, PHP_URL_HOST);
-            if ($host === '') {
-                $host = $siteDomain;
-            }
-        }
-
-        $host = preg_replace('/[^a-z0-9.-]+/i', '', $host) ?? '';
-        $host = trim($host, '.-');
-        if ($host === '') {
-            $host = 'localhost.localdomain';
-        }
-
-        return $host;
-    }
 }
+

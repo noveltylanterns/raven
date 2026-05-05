@@ -12,6 +12,7 @@ declare(strict_types=1);
 namespace Raven\Core\Controller\Panel;
 
 use Raven\Core\Config;
+use Raven\Core\Postmaster;
 use Raven\Core\Renderer;
 use Raven\Lib\Auth\AuthService;
 use Raven\Lib\Auth\LoginAttempt;
@@ -44,6 +45,15 @@ final class AuthController
     private ?LoginAttempt $loginAttempt = null;
     private ?LoginChallenge $loginChallengeWorkflow = null;
 
+    /**
+     * Wires up the panel auth controller with its shared runtime dependencies.
+     *
+     * @param Renderer       $view   Panel template renderer.
+     * @param Config         $config Shared site and mail configuration.
+     * @param AuthService    $auth   Shared authentication and session service.
+     * @param InputSanitizer $input  Shared input sanitizer for form field normalization.
+     * @param Csrf           $csrf   CSRF token validator for form submissions.
+     */
     public function __construct(
         Renderer $view,
         Config $config,
@@ -359,6 +369,11 @@ final class AuthController
         return 'corp';
     }
 
+    /**
+     * Consumes and returns the stored post-login redirect path, falling back to the panel root.
+     *
+     * @return string Normalized post-login redirect path.
+     */
     private function consumePostLoginRedirectOrDefault(): string
     {
         $raw = $this->loginUiState()->consumePostLoginRedirect();
@@ -370,6 +385,12 @@ final class AuthController
         return $this->panelUrl('/');
     }
 
+    /**
+     * Normalizes one candidate post-login redirect path, rejecting absolute URLs and auth paths.
+     *
+     * @param string $value Candidate redirect path from form submission or session.
+     * @return string Safe relative path, or empty string when the value is rejected.
+     */
     private function normalizePostLoginRedirect(string $value): string
     {
         $value = trim($value);
@@ -418,6 +439,11 @@ final class AuthController
         return $this->identifierResolver->modeFromConfig($this->config);
     }
 
+    /**
+     * Returns the shared panel login UI state, initializing it on first use.
+     *
+     * @return LoginUiState Shared panel-scoped login UI state.
+     */
     private function loginUiState(): LoginUiState
     {
         if (!$this->loginUiState instanceof LoginUiState) {
@@ -427,6 +453,11 @@ final class AuthController
         return $this->loginUiState;
     }
 
+    /**
+     * Returns the shared panel login attempt workflow, initializing it on first use.
+     *
+     * @return LoginAttempt Shared login attempt workflow.
+     */
     private function loginAttempt(): LoginAttempt
     {
         if (!$this->loginAttempt instanceof LoginAttempt) {
@@ -441,13 +472,22 @@ final class AuthController
         return $this->loginAttempt;
     }
 
+    /**
+     * Returns the shared panel login challenge workflow, initializing it on first use.
+     *
+     * Postmaster is constructed here directly rather than pulled from the container so
+     * the panel auth controller remains decoupled from the full bootstrap array.
+     *
+     * @return LoginChallenge Shared login challenge workflow with email delivery wired.
+     */
     private function loginChallengeWorkflow(): LoginChallenge
     {
         if (!$this->loginChallengeWorkflow instanceof LoginChallenge) {
             $this->loginChallengeWorkflow = new LoginChallenge(
                 $this->config,
                 $this->input,
-                new LoginEmail()
+                new LoginEmail(),
+                new Postmaster($this->config)
             );
         }
 

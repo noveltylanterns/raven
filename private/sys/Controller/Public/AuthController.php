@@ -16,6 +16,7 @@ use Raven\Core\Repository\GroupRead;
 use Raven\Core\Repository\InviteRead;
 use Raven\Core\Repository\InviteWrite;
 use Raven\Core\Repository\UserWrite;
+use Raven\Core\Postmaster;
 use Raven\Lib\Auth\LoginAttempt;
 use Raven\Lib\Auth\LoginChallenge;
 use Raven\Lib\Auth\LoginEmail;
@@ -550,9 +551,12 @@ final class AuthController
     }
 
     /**
-     * Returns the shared public login challenge workflow.
+     * Returns the shared public login challenge workflow, initializing it on first use.
      *
-     * @return LoginChallenge Shared login challenge workflow.
+     * Postmaster is constructed here directly so the public auth controller remains
+     * decoupled from the full bootstrap container.
+     *
+     * @return LoginChallenge Shared login challenge workflow with email delivery wired.
      */
     private function loginChallengeWorkflow(): LoginChallenge
     {
@@ -560,7 +564,8 @@ final class AuthController
             $this->loginChallengeWorkflow = new LoginChallenge(
                 $this->context->config(),
                 $this->context->input(),
-                new LoginEmail()
+                new LoginEmail(),
+                new Postmaster($this->context->config())
             );
         }
 

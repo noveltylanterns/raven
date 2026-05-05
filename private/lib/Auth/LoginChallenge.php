@@ -12,6 +12,7 @@ declare(strict_types=1);
 namespace Raven\Lib\Auth;
 
 use Raven\Core\Config;
+use Raven\Core\Postmaster;
 use Raven\Lib\Auth\AuthService;
 use Raven\Lib\Auth\Login2fa;
 use Raven\Lib\Auth\LoginEmail;
@@ -33,6 +34,7 @@ final class LoginChallenge
     private Config $config;
     private InputSanitizer $input;
     private LoginEmail $loginEmail;
+    private Postmaster $postmaster;
 
     /**
      * Prepares the challenge workflow with its configuration and delivery dependencies.
@@ -40,12 +42,14 @@ final class LoginChallenge
      * @param Config         $config     Shared configuration service for site name, domain, and mail settings.
      * @param InputSanitizer $input      Shared payload sanitizer for challenge form fields.
      * @param LoginEmail     $loginEmail Shared email challenge session manager and delivery helper.
+     * @param Postmaster     $postmaster Shared mail delivery service for email-code dispatch.
      */
-    public function __construct(Config $config, InputSanitizer $input, LoginEmail $loginEmail)
+    public function __construct(Config $config, InputSanitizer $input, LoginEmail $loginEmail, Postmaster $postmaster)
     {
         $this->config = $config;
         $this->input = $input;
         $this->loginEmail = $loginEmail;
+        $this->postmaster = $postmaster;
     }
 
     // -------------------------------------------------------------------------
@@ -213,10 +217,7 @@ final class LoginChallenge
                         $emailCodeTarget,
                         (string) ($issueResult['code'] ?? ''),
                         (string) $this->config->get('site.name', 'Raven CMS'),
-                        (string) $this->config->get('site.domain', ''),
-                        (string) $this->config->get('mail.sender_address', ''),
-                        (string) $this->config->get('mail.sender_name', 'Postmaster'),
-                        (string) $this->config->get('mail.agent', 'php_mail')
+                        $this->postmaster
                     );
 
                     if (!(bool) ($delivery['ok'] ?? false)) {

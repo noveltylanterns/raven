@@ -2,6 +2,15 @@
 
 *The machine is supposed to be logging patches & mods to this file. Sometimes it does, sometimes it doesn't. It might be useful for historical architectural context to your Agent at one point.*
 
+### May 5, 2026 — Postmaster service wired into login 2FA and contact extension
+
+- **lib/Auth/LoginEmail** — `sendCode()` now accepts `Postmaster $postmaster` instead of the four individual mail-config params (`$siteDomain`, `$senderAddress`, `$senderName`, `$mailAgent`); builds a `Message` value object and delegates transport to Postmaster. `maskEmail()` thinned to a one-line wrapper around `Address::mask()`. Private helpers `sanitizeText`, `defaultNoReplyAddress`, and `mailHeaderDomain` removed (all logic lives in `lib/Mail/Address`).
+- **lib/Auth/LoginChallenge** — `Postmaster $postmaster` added to constructor; the five config-read arguments previously passed to `LoginEmail::sendCode()` are now gone from the call site.
+- **sys/Controller/Public/AuthController** — `loginChallengeWorkflow()` passes `new Postmaster($this->context->config())` to `LoginChallenge`.
+- **sys/Controller/Panel/AuthController** — `loginChallengeWorkflow()` passes `new Postmaster($this->config)` to `LoginChallenge`; added missing PHPDoc blocks for constructor and several private methods.
+- **ext/contact/lib/ContactPublicFormRuntime** — `Postmaster $postmaster` added to constructor; `sendContactMail()` replaced with a lean Postmaster-delegating implementation; private helpers `sendContactMailViaSendmail`, `sendmailBinaryPath`, `configuredMailSenderAddress`, `configuredMailSenderName`, `mailHeaderDomain`, and `defaultNoReplyEmail` removed.
+- **ext/contact/ext.php** — shortcode runtime lazy closure now resolves and checks `$rvn['postmaster']` and passes it to `ContactPublicFormRuntime`.
+
 ### May 3, 2026 — Format library method naming pass
 
 - **Json.php** — `decodeAssocString` → `decode`; `decodeFileAssoc` → `decodeFile`; updated internal self-call in `decodeFile`; updated callers: `Auth/AuthPayloadCodec.php` (2 call sites).
