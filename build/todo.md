@@ -13,29 +13,51 @@ This is the default Build Mode backlog file. If the user asks about goals, unpat
 
 
 
-# lib/Auth/ Cleanup
-Phases 1–6 of the lib/Auth/ Refactor are complete (logged in release-notes.md). Remaining cleanup pass:
-- [x] Scan all Auth/ classes for any remaining legacy aliases, compat shims, or thin wrappers without real logic. Purge them and update callers.
-- [x] PHPDoc sweep: all classes in lib/Auth/ — every public/protected method must have a complete PHPDoc block.
-- [x] Naming sweep: check all method/variable names across lib/Auth/ for clarity and conciseness.
-
-
 # lib/Database/ Refactor
-Lingering issues & reorganization tasks. Make a plan to deal with them all in one clean sweep. Append it as a detailed checklist to this section in case we lose session or we have to bounce between agents:
-- [ ] I'm really not terribly sure what's happening in this folder:
-	- Near as I can tell, sys/Runtime/DatabaseFactory.php is our 'core' database connection service, and everything in lib/Database/ is a primitive to support database operations? Or are there other core components in lib/Database/ that should move back to sys/Runtime/?
-	- We'll have to go through these classes one by one when making our plan.
-	- Explain what each class here does, and what routes/functions/controllers/etc call them.
-	- I'll call where to put each class, what to name it, and what (if any) functions to extract towards different classes.
-	- Some of these classes have redundant-looking functions. I also see what looks like helper wrappers that don't add any real extra logic. Identify & note all of them.
-	- Purge all pointless helper wrappers, and update callers to use source functions directly.
-	- If you have more ideas how to consolidate our Database into something more sensible+efficient, let me know and I may consider.
-- [ ] All Database/ classes should be public/panel/extension-agnostic primitives. Doublecheck them all to make sure that is functionally the case.
-### lib/Database/ Cleanup
-- [ ] Make sure no Database class is pulling up dead function/class/dependency weight irrelevant to the database query that class handles.
-- [ ] Scan the whole Database/ directory for legacy aliases, compatability shims, and thin wrappers that don't add any extra logic. Purge all of them. Update all callers to use actual source functions.
-- [ ] A lot of classes+functions in Database/ have really long & unclear names. Do a sweep of everything in Database/ and make sure all the class/function/variable names are concise+accurate.
-- [ ] Do a sweep of all classes in Database/ making sure PHPdoc blocks are present+accurate for ALL headings, classes & functions.
+
+**Boundary verdict:** Everything in `lib/Database/` is correctly placed as a shared primitive library. `sys/Runtime/DatabaseFactory.php` is the right entrypoint — it assembles the PDO connection and hands off. Nothing needs to move to `sys/Runtime/`. All 19 classes are public/panel/extension-agnostic.
+
+### Thin Wrapper Purge
+
+- [ ] **SchemaIntrospector: consolidate column-check methods.** Three parallel sets exist (`auth*`, `app*`, and the dispatch `columnExists()`). The `authColumnExistsMySql` and `authColumnExistsPgSql` methods are byte-for-byte identical to their `app*` counterparts. `authColumnExistsSqlite` is slightly simpler (no schema-prefix guard) but auth tables in SQLite mode carry no schema prefix, so `columnExists()` dispatch is safe for them too. Plan:
+	- Make `appColumnExistsSqlite`, `appColumnExistsMySql`, `appColumnExistsPgSql` private.
+	- Delete `authColumnExistsSqlite`, `authColumnExistsMySql`, `authColumnExistsPgSql`.
+	- Update `AuthSchemaBuilder` to call `$this->introspector->columnExists($db, $driver, $table, $col)` everywhere it currently calls the `auth*` variants.
+	- Update `SchemaBuilder::ensureTaxonomyImageColumns()` and `ensureTaxonomySetColumns()` to call `$this->introspector->columnExists($db, 'sqlite', $table, $col)` instead of `appColumnExistsSqlite()` directly.
+- [ ] **SchemaIntrospector: remove `authUsersTableExists()`.** It is a thin wrapper around the same SQL as `tableExists()`, hardcoding `$prefix . 'users'`. Update `AuthSchemaBuilder::ensureAuthSchema()` to call `$this->introspector->tableExists($db, $driver, $prefix . 'users')` directly. Delete `authUsersTableExists()`.
+- [ ] **SchemaBuilder: remove private `taxonomyColumnExists()`.** It delegates to `$this->introspector->columnExists()` with no added logic. Update its two callers within SchemaBuilder to call `$this->introspector->columnExists()` directly.
+
+### Naming Sweep
+
+- [ ] `SqliteConnectionBootstrap::ensureDirectory()` → `ensureDir()` (matches Archive/Folder convention)
+- [ ] `DriverConfigNormalizer::sqliteBasePath()` → `sqlitePath()` (Base is redundant)
+- [ ] `ExtensionSchemaRunner::ensureEnabledExtensionSchemas()` → `ensureExtensionSchemas()` (Enabled implied by ensure)
+- [ ] `SeedInstaller::ensureStockGroups()` → `ensureGroups()`; `ensureSeedPages()` → `ensurePages()`
+- [ ] `SqlUpsertPolicy::idempotentInsertSql()` → `insertIgnoreSql()` (accurate and concise)
+- [ ] `SchemaIntrospector::isAlreadyExistsSchemaError()` → `isAlreadyExistsError()` (class name already implies schema)
+- [ ] `SchemaIntrospector::mySqlIndexExists()` / `pgSqlIndexExists()` → `indexExistsMySql()` / `indexExistsPgSql()` (consistent driver-suffix ordering with the column methods)
+- [ ] After all renames: grep callers of every renamed method and update all call sites.
+
+### File Header + PHPDoc Sweep
+
+Review each file below and add/complete as noted. All public and protected methods need a one-line summary + `@param`/`@return`/`@throws` where applicable. Files missing the standard Raven header need it added.
+
+- [ ] **ProfiledPDO.php** — missing file header; `__construct`, `prepare`, `exec`, `query` all undocumented
+- [ ] **ProfiledPDOStatement.php** — missing file header; `__construct` (protected), `bindValue`, `bindParam`, `execute` all undocumented
+- [ ] **QueryProfilerInterface.php** — missing file header; `isEnabled()` and `recordQuery()` undocumented
+- [ ] **DriverConfigNormalizer.php** — missing file header; `driver()`, `prefix()`, `mysql()`, `pgsql()`, `sqlitePath()` have `@param` tags but no one-line summary
+- [ ] **DsnBuilder.php** — missing file header; `mysql()`, `pgsql()` have `@param` but no one-line summary
+- [ ] **SqliteConnectionBootstrap.php** — missing file header; `ensureDir()` and `bootstrap()` undocumented
+- [ ] **SqlitePathResolver.php** — missing file header; `__construct` and `path()` undocumented; also has a formatting bug: `private function looksLikeFilePath` is butted up against the closing `}` of `corePath()` with no blank line
+- [ ] **SchemaManager.php** — missing file header; constructor missing one-line summary
+- [ ] **SchemaEnsureStateStore.php** — missing file header; constructor missing one-line summary
+- [ ] **SchemaComponentFactory.php** — has file header; constructor missing PHPDoc
+- [ ] **SchemaBuilder.php** — has file header; ALL 12+ public methods undocumented (`ensurePageScheduleColumns`, `ensurePageDescriptionColumn`, `ensurePageDisplayTitleColumn`, `ensurePageGalleryEnabledColumn`, `ensurePageSlugScopeUniqueness`, `ensureRootChannelScope`, `ensureGroupRoutingColumns`, `ensureTaxonomyImageColumns`, `ensureTaxonomyIconColumn`, `ensureTaxonomySetColumns`, `ensurePanelPerformanceIndexes`, `ensureRedirectDescriptionColumn`, `ensureEventLogTable`)
+- [ ] **SchemaIntrospector.php** — missing file header; `authUsersTableExists`, `columnExists`, `indexExists`, `tableExists`, `sqliteTableExists`, `mySqlIndexExists`, `pgSqlIndexExists`, `quotePgIdentifier`, `isAlreadyExistsError` all undocumented or only partially documented
+- [ ] **ExtensionSchemaRunner.php** — has file header; `ensureExtensionSchemas()` undocumented
+- [ ] **SeedInstaller.php** — has file header; `ensureGroups()` and `ensurePages()` undocumented
+- [ ] **SqlUpsertPolicy.php** — missing file header; `insertIgnoreSql()` missing one-line summary
+
 - [ ] Update release-notes.md, clear completed section out of todo.md, and commit.
 
 
@@ -107,25 +129,6 @@ Lingering issues & reorganization tasks. Make a plan to deal with them all in on
 
 
 
-
-
-
-# lib/Transport/ Refactor
-Lingering issues & reorganization tasks. Make a plan to deal with them all in one clean sweep. Append it as a detailed checklist to this section in case we lose session or we have to bounce between agents:
-- [x] Redirect.php has a function isAllowedHttpOrRootPath which is beyond the scope of this class. It was extracted out of Redirect.php and merged into lib/Parser/RedirectParser.php
-- [x] Request.php has a lot of functions in it that feel outside the scope of basic Request primitives:
-	- Most are missing PHPdoc blocks, obscuring the problem.
-	- Many have really long function/variable names that should be assessed for length & accuracy.
-	- resolveClientHostname & normalizeClientIp (and anything that records stuff like that about visitors) should be centralized in sys/Debug/ClientProfiler.php.
-	- Other functions look like basic config parsing & URL assembly that arent quite just request primitives, but I do not know where to put them.
-- [x] While you're in sys/Debug/, a new corresponding Debug/LocalProfiler.php (for getting debug/environment information of the localhost Raven is installed on) was added.
-- [x] It should go without saying but all lib/Transport/ classes are now public/panel/extension-agnostic primitives.
-### lib/Transport/ Cleanup
-- [x] Make sure no Transport class is pulling up dead function/class/dependency weight irrelevant to the transport type that class handles.
-- [x] Scan the whole Transport/ directory for legacy aliases, compatability shims, and thin wrappers that don't add any extra logic. Purge all of them. Update all callers to use actual source functions.
-- [x] Some of the functions in our Transport/ classes have really long & unclear names. Do a sweep of every class and make sure the function/variable names are concise+accurate.
-- [x] Do a sweep of all classes in lib/Transport/ making sure PHPdoc blocks are present+accurate for ALL headings, classes & functions.
-- [x] Update release-notes.md, clear completed section out of todo.md, and commit.
 
 
 
