@@ -2,6 +2,29 @@
 
 *The machine is supposed to be logging patches & mods to this file. Sometimes it does, sometimes it doesn't. It might be useful for historical architectural context to your Agent at one point.*
 
+### May 5, 2026 — lib/Auth/ refactor: permission renames, delegate removal, security extraction, throttle extraction
+
+- **lib/Auth/Panel/Mask → PermissionBase** — renamed class and file; all callers updated.
+- **lib/Auth/Panel/PermissionMaskService → PermissionMask** — renamed class and file; all callers updated.
+- **lib/Auth/Public/Mask → PermissionBase** — renamed class and file; all callers updated.
+- **lib/Auth/Public/PermissionMaskService → PermissionMask** — renamed class and file; all callers updated.
+- **lib/Auth/AuthPayloadCodec → UserAuthCodec** — renamed class and file; all callers updated.
+- **lib/Auth/LoginThrottle → ThrottleUser** — renamed class and file; gained `loadRow()` for DB-read parity with write methods; all callers updated.
+- **lib/Auth/Panel/PermissionDefinitionCatalog → lib/View/Panel/EditorPermissions** — moved to View layer; updated namespace, class name, and all callers.
+- **lib/Auth/Panel/PermissionBase** — added public static `normalizeMaskForPanelAccess()` (moved from `RolePolicy`); `RolePolicy` updated to call it; `GroupScribe` updated to call it directly.
+- **lib/Auth/Panel/RolePolicy** — removed four public methods (`isBannedRoleSlug`, `isUserRoleSlug`, `isAdminRoleSlug`, `isGuestLikeRoleSlug`) by inlining or privatizing; removed `normalizeMaskForPanelAccess` (moved to `PermissionBase`).
+- **lib/Auth/AuthService** — removed 15 panel-delegate methods (`canAccessPanel`, `hasPanelPermissionBit`, `panelPermissionMask`, `hasAnyPanelPermissionBit`, `canManage*`, `isAdmin`, `groupsForUser`, `assignUserToGroupByName`, `canView*`); added `panelService(): PanelAuthService` and `publicService(): PublicAuthService` accessors; all callers updated to chain through the new accessors.
+- **lib/Security/TotpVerify** — new class; `verifyTotpCode()` logic extracted from AuthService as public static `verify()`.
+- **lib/Security/PhraseValidate** — new class; `matchRecoveryMethod()` logic extracted from AuthService as public static `matchRecoveryMethod()`.
+- **lib/Auth/ThrottleReturn** — new class; `isLoginTemporarilyLocked()` and `recordFailedLoginAttempt()` orchestration extracted from AuthService as `isLocked()` / `record()`.
+- **lib/Auth/ThrottleClear** — new class; `clearFailedLoginAttempts()` orchestration extracted from AuthService as `clear()`.
+- **lib/View/Preferences** — new class; `interactiveTwoFactorMethods()` and `validatePreferenceUpdate()` extracted from AuthService as public static methods.
+- **lib/Security/EmailObfuscate** — new class; `maskEmail()` moved from LoginEmail as public static `mask()`; LoginChallenge caller updated to call it directly.
+- **lib/Security/EmailValidate** — new class; `normalizeEmail()` and `normalizeSubmittedCode()` moved from LoginEmail as public static `normalize()` / `normalizeCode()`.
+- **lib/Security/EmailGenerate** — new class; `generateCode()` moved from LoginEmail as public static `code()`.
+- **Panel controllers, SessionGuard, Extension/Panel/Routes, public/index.php, ext/database** — all callers updated for AuthService delegate removal and class renames.
+- **docs/filetree.md** — updated Auth/Panel, Auth/Public, and View/Panel sections to reflect all renames and additions.
+
 ### May 5, 2026 — Public runtime performance fixes: deferred auth DB, corrected schema state paths
 
 - **sys/Runtime/Public/RuntimeBuilder** — removed eager `auth_db` and `auth` closure resolution that was forcing a second DB connection and `AuthService` construction on every anonymous public page request. Auth now resolves lazily only when a controller or auth-dependent route actually needs it.

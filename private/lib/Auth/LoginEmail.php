@@ -15,6 +15,8 @@ use Raven\Core\Postmaster;
 use Raven\Lib\Auth\Login2fa;
 use Raven\Lib\Mail\Address;
 use Raven\Lib\Mail\Message;
+use Raven\Lib\Security\EmailGenerate;
+use Raven\Lib\Security\EmailValidate;
 
 /**
  * Shared helpers for login-time email-code 2FA challenges.
@@ -94,7 +96,7 @@ final class LoginEmail
 
             $methodKey = Login2fa::forEmailAddress($email);
         } else {
-            $email = $this->normalizeEmail((string) ($selectedMethod['email'] ?? ''));
+            $email = EmailValidate::normalize((string) ($selectedMethod['email'] ?? ''));
             if ($email === null) {
                 return ['ok' => false, 'message' => 'Email code target address is missing or invalid.'];
             }
@@ -117,7 +119,7 @@ final class LoginEmail
         }
 
         try {
-            $code = $this->generateCode();
+            $code = EmailGenerate::code();
         } catch (\Throwable $exception) {
             return ['ok' => false, 'message' => 'Unable to generate an email verification challenge.'];
         }
@@ -164,7 +166,7 @@ final class LoginEmail
         }
 
         if (Login2fa::isEmailPool($selectedMethodKey)) {
-            $normalizedEmail = $this->normalizeEmail($submittedEmail);
+            $normalizedEmail = EmailValidate::normalize($submittedEmail);
             if ($normalizedEmail === null) {
                 return false;
             }
@@ -186,7 +188,7 @@ final class LoginEmail
             return false;
         }
 
-        $normalizedCode = $this->normalizeSubmittedCode($submittedCode);
+        $normalizedCode = EmailValidate::normalizeCode($submittedCode);
         if ($normalizedCode === '') {
             return false;
         }
@@ -362,7 +364,7 @@ final class LoginEmail
         Postmaster $postmaster,
         int $ttlSeconds = 600
     ): array {
-        $recipientEmail = $this->normalizeEmail($recipientEmail);
+        $recipientEmail = EmailValidate::normalize($recipientEmail);
         if ($recipientEmail === null) {
             return ['ok' => false, 'message' => 'Email code recipient is invalid.'];
         }
@@ -395,43 +397,9 @@ final class LoginEmail
         return $postmaster->send($message);
     }
 
-    /**
-     * Returns a privacy-masked version of an email address for display.
-     *
-     * Delegates to Address::mask() so masking logic stays in one canonical place.
-     *
-     * @param string $email Email address to mask.
-     * @return string Masked address (e.g. `jo***n@g***.com`), or empty string when invalid.
-     */
-    public function maskEmail(string $email): string
-    {
-        return Address::mask($email);
-    }
-
     // -------------------------------------------------------------------------
     // Private helpers
     // -------------------------------------------------------------------------
-
-    private function generateCode(): string
-    {
-        return str_pad((string) random_int(0, 99999999), 8, '0', STR_PAD_LEFT);
-    }
-
-    private function normalizeSubmittedCode(string $submittedCode): string
-    {
-        $normalized = preg_replace('/\D+/', '', $submittedCode) ?? '';
-        return strlen($normalized) === 8 ? $normalized : '';
-    }
-
-    private function normalizeEmail(string $email): ?string
-    {
-        $email = strtolower(trim($email));
-        if ($email === '' || filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
-            return null;
-        }
-
-        return $email;
-    }
 
     private function normalizeTtlSeconds(int $ttlSeconds): int
     {
@@ -447,7 +415,7 @@ final class LoginEmail
      */
     private function resolvePooledEmailTarget(array $selectedMethod, string $submittedEmail): ?string
     {
-        $normalizedSubmitted = $this->normalizeEmail($submittedEmail);
+        $normalizedSubmitted = EmailValidate::normalize($submittedEmail);
         if ($normalizedSubmitted === null) {
             return null;
         }
@@ -458,7 +426,7 @@ final class LoginEmail
         }
 
         foreach ($allowedEmailsRaw as $rawEmail) {
-            if ($this->normalizeEmail((string) $rawEmail) === $normalizedSubmitted) {
+            if (EmailValidate::normalize((string) $rawEmail) === $normalizedSubmitted) {
                 return $normalizedSubmitted;
             }
         }

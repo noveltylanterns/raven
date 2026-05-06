@@ -3,7 +3,7 @@
 /**
  * RAVEN CMS
  * ~/private/lib/Auth/ThrottleUser.php
- * Write-side persistence helper for auth-throttle buckets.
+ * DB-layer persistence for auth-throttle buckets.
  * Docs: https://raven.lanterns.io
  */
 
@@ -14,11 +14,10 @@ namespace Raven\Lib\Auth;
 use PDO;
 
 /**
- * Owns write-side persistence for identifier+IP auth-throttle buckets.
+ * Owns DB-layer persistence for identifier+IP auth-throttle buckets.
  *
- * AuthService owns the read-side bucket lookup and throttle policy,
- * while this class centralizes the mutation SQL for bucket upserts, deletes,
- * and stale-row pruning.
+ * Covers all four bucket operations — load, upsert, delete, and prune — so
+ * orchestration classes above this layer need no direct DB access.
  */
 final class ThrottleUser
 {
@@ -39,6 +38,26 @@ final class ThrottleUser
         $this->rvnDb = $rvnDb;
         $this->driver = $driver;
         $this->prefix = preg_replace('/[^a-zA-Z0-9_]/', '', $prefix) ?? '';
+    }
+
+    /**
+     * Returns one throttle bucket row by its pre-computed hash, or null when absent.
+     *
+     * @param string $bucketHash SHA-256 bucket key for the identifier+IP pair.
+     * @return array{first_failed: int|string, failure_count: int|string, locked_until: int|string}|null Row on hit, null on miss.
+     */
+    public function loadRow(string $bucketHash): ?array
+    {
+        $stmt = $this->rvnDb->prepare(
+            'SELECT first_failed, failure_count, locked_until
+             FROM ' . $this->tableName() . '
+             WHERE bucket_hash = :bucket_hash
+             LIMIT 1'
+        );
+        $stmt->execute([':bucket_hash' => $bucketHash]);
+        $row = $stmt->fetch();
+
+        return is_array($row) ? $row : null;
     }
 
     /**

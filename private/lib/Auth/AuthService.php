@@ -20,9 +20,12 @@ use Raven\Lib\Auth\Panel\Service as PanelAuthService;
 use Raven\Lib\Auth\Public\Service as PublicAuthService;
 use Raven\Lib\Database\TableNameResolver;
 use Raven\Lib\Scribe\AuthProfileScribe;
+use Raven\Lib\Auth\ThrottleClear;
+use Raven\Lib\Auth\ThrottleReturn;
 use Raven\Lib\Auth\ThrottleUser;
-use Raven\Lib\Security\RecoveryPhrase;
-use Raven\Lib\Security\Totp;
+use Raven\Lib\Security\PhraseValidate;
+use Raven\Lib\Security\TotpVerify;
+use Raven\Lib\View\Preferences as PreferencesView;
 use RuntimeException;
 
 /**
@@ -45,7 +48,8 @@ final class AuthService
 
     /** Delight Auth instance. */
     private mixed $auth;
-    private ThrottleUser $loginThrottle;
+    private ThrottleReturn $throttleReturn;
+    private ThrottleClear $throttleClear;
     private UserAuthCodec $authPayloadCodec;
     private PanelAuthService $panelAuthService;
     private PublicAuthService $publicAuthService;
@@ -84,7 +88,9 @@ final class AuthService
         $this->rvnDb = $rvnDb;
         $this->driver = $driver;
         $this->prefix = preg_replace('/[^a-zA-Z0-9_]/', '', $prefix) ?? '';
-        $this->loginThrottle = new ThrottleUser($rvnDb, $driver, $this->prefix);
+        $throttleUser = new ThrottleUser($rvnDb, $driver, $this->prefix);
+        $this->throttleReturn = new ThrottleReturn($throttleUser);
+        $this->throttleClear = new ThrottleClear($throttleUser);
         $this->authPayloadCodec = new UserAuthCodec();
         $panelPermissionMaskService = new Panel\PermissionMask();
         $publicPermissionMaskService = new Public\PermissionMask($rvnDb, $this->prefix);
@@ -169,51 +175,25 @@ final class AuthService
     /**
      * Returns true when one identifier+IP bucket is currently locked out.
      *
-     * Prunes expired rows before checking so stale buckets do not block new attempts
-     * after the window has naturally elapsed.
-     *
-     * @param string $username  Login identifier submitted by the user.
-     * @param string $ipAddress Client IP address for the bucket key.
+     * @param string $username      Login identifier submitted by the user.
+     * @param string $ipAddress     Client IP address for the bucket key.
      * @param int    $windowSeconds Active failure-window length in seconds.
      * @return bool True when the bucket remains locked for this request.
      */
     public function isLoginTemporarilyLocked(string $username, string $ipAddress, int $windowSeconds): bool
     {
-        $windowSeconds = max(1, $windowSeconds);
-        $this->loginThrottle->pruneExpiredRows($windowSeconds, $windowSeconds);
-
-        $bucketHash = $this->throttleBucketHash($username, $ipAddress);
-        $row = $this->throttleLoadRow($bucketHash);
-        if ($row === null) {
-            return false;
-        }
-
-        $now = time();
-        $lockedUntil = (int) ($row['locked_until'] ?? 0);
-        if ($lockedUntil > $now) {
-            return true;
-        }
-
-        // Bucket exists but lock expired; clean it up if the window has also passed.
-        $firstFailedAt = (int) ($row['first_failed'] ?? 0);
-        if ($firstFailedAt === 0 || ($now - $firstFailedAt) > $windowSeconds) {
-            $this->loginThrottle->deleteRow($bucketHash);
-        }
-
-        return false;
+        return $this->throttleReturn->isLocked($username, $ipAddress, $windowSeconds);
     }
 
     /**
-     * Records one failed login attempt and applies a lockout when threshold is reached.
-     *
-     * Resets the failure window when the previous window has naturally expired before
-     * the new attempt, so isolated bursts do not permanently accumulate against a user.
+     * Records one failed login attempt and applies a lockout when the threshold is reached.
      *
      * @param string $username      Login identifier submitted by the user.
      * @param string $ipAddress     Client IP address for the bucket key.
      * @param int    $maxAttempts   Failure threshold before lockout starts.
      * @param int    $windowSeconds Active failure-window length in seconds.
-     * @param int    $lockSeconds   Lockout duration in seconds after threshold is reached.
+     * @param int    $lockSeconds   Lockout duration in seconds after the threshold is reached.
+     * @return void
      */
     public function recordFailedLoginAttempt(
         string $username,
@@ -222,38 +202,7 @@ final class AuthService
         int $windowSeconds,
         int $lockSeconds
     ): void {
-        $maxAttempts = max(1, $maxAttempts);
-        $windowSeconds = max(1, $windowSeconds);
-        $lockSeconds = max(1, $lockSeconds);
-        $this->loginThrottle->pruneExpiredRows($windowSeconds, $lockSeconds);
-
-        $bucketHash = $this->throttleBucketHash($username, $ipAddress);
-        $existing = $this->throttleLoadRow($bucketHash);
-
-        $now = time();
-        $firstFailedAt = (int) ($existing['first_failed'] ?? 0);
-        $failureCount = (int) ($existing['failure_count'] ?? 0);
-
-        // Reset window when no prior bucket exists or the previous window has expired.
-        if ($firstFailedAt === 0 || ($now - $firstFailedAt) > $windowSeconds) {
-            $firstFailedAt = $now;
-            $failureCount = 0;
-        }
-
-        $failureCount++;
-        $lockedUntil = $failureCount >= $maxAttempts
-            ? ($now + $lockSeconds)
-            : 0;
-
-        $this->loginThrottle->upsertRow(
-            $bucketHash,
-            $this->throttleNormalizeIdentifier($username),
-            $this->throttleNormalizeIp($ipAddress),
-            $firstFailedAt,
-            $now,
-            $failureCount,
-            $lockedUntil
-        );
+        $this->throttleReturn->record($username, $ipAddress, $maxAttempts, $windowSeconds, $lockSeconds);
     }
 
     /**
@@ -261,11 +210,11 @@ final class AuthService
      *
      * @param string $username  Login identifier submitted by the user.
      * @param string $ipAddress Client IP address for the bucket key.
+     * @return void
      */
     public function clearFailedLoginAttempts(string $username, string $ipAddress): void
     {
-        $bucketHash = $this->throttleBucketHash($username, $ipAddress);
-        $this->loginThrottle->deleteRow($bucketHash);
+        $this->throttleClear->clear($username, $ipAddress);
     }
 
     /**
@@ -436,7 +385,7 @@ final class AuthService
         $methods = is_array($preferences['two_factor'] ?? null)
             ? $preferences['two_factor']
             : [];
-        return $this->interactiveTwoFactorMethods($methods, (string) ($preferences['email'] ?? ''));
+        return PreferencesView::interactiveTwoFactorMethods($methods, (string) ($preferences['email'] ?? ''));
     }
 
     /**
@@ -468,6 +417,9 @@ final class AuthService
 
     /**
      * Verifies one submitted TOTP code for pending 2FA session.
+     *
+     * @param string $submittedCode Six-digit TOTP code from the login form.
+     * @return bool True when the code matches any confirmed TOTP method for the pending user.
      */
     public function verifyPendingTotpCode(string $submittedCode): bool
     {
@@ -485,7 +437,7 @@ final class AuthService
             ? $preferences['two_factor']
             : [];
 
-        return $this->verifyTotpCode($methods, $submittedCode, 'Raven CMS');
+        return TotpVerify::verify($methods, $submittedCode, 'Raven CMS');
     }
 
     /**
@@ -508,7 +460,7 @@ final class AuthService
         $methods = is_array($preferences['two_factor'] ?? null)
             ? array_values($preferences['two_factor'])
             : [];
-        $matched = $this->matchRecoveryMethod($methods, $submittedPhrase, $selectedMethodKey);
+        $matched = PhraseValidate::matchRecoveryMethod($methods, $submittedPhrase, $selectedMethodKey);
         if (!is_array($matched)) {
             return false;
         }
@@ -712,7 +664,7 @@ final class AuthService
         $avatarPath = $normalized['avatar_path'] ?? null;
         $coverImage = $normalized['cover_image'] ?? null;
 
-        $errors = $this->validatePreferenceUpdate(
+        $errors = PreferencesView::validatePreferenceUpdate(
             $email,
             is_string($password) ? $password : null,
             $username !== '' && $this->usernameExistsForOtherUser($userId, $username),
@@ -838,67 +790,6 @@ final class AuthService
     }
 
     /**
-     * Loads one throttle bucket row by its pre-computed hash.
-     *
-     * @param string $bucketHash SHA-256 bucket key.
-     * @return array{first_failed: int|string, failure_count: int|string, locked_until: int|string}|null
-     */
-    private function throttleLoadRow(string $bucketHash): ?array
-    {
-        $stmt = $this->rvnDb->prepare(
-            'SELECT first_failed, failure_count, locked_until
-             FROM ' . $this->prefix . 'auth_failures
-             WHERE bucket_hash = :bucket_hash
-             LIMIT 1'
-        );
-        $stmt->execute([':bucket_hash' => $bucketHash]);
-        $row = $stmt->fetch();
-
-        return is_array($row) ? $row : null;
-    }
-
-    /**
-     * Normalizes a login identifier for bucket keying.
-     *
-     * @param string $identifier Raw login identifier from the form.
-     * @return string Lowercase, trimmed, 100-character-max identifier.
-     */
-    private function throttleNormalizeIdentifier(string $identifier): string
-    {
-        $normalized = substr(strtolower(trim($identifier)), 0, 100);
-        return $normalized === '' ? 'unknown' : $normalized;
-    }
-
-    /**
-     * Normalizes a client IP address for bucket keying.
-     *
-     * @param string $ipAddress Raw IP address string.
-     * @return string Validated IP (max 64 chars), or 'unknown' when invalid.
-     */
-    private function throttleNormalizeIp(string $ipAddress): string
-    {
-        $candidate = trim($ipAddress);
-        return ($candidate !== '' && filter_var($candidate, FILTER_VALIDATE_IP) !== false)
-            ? substr($candidate, 0, 64)
-            : 'unknown';
-    }
-
-    /**
-     * Returns a SHA-256 bucket hash for one identifier+IP pair.
-     *
-     * @param string $identifier Raw login identifier.
-     * @param string $ipAddress  Raw client IP address.
-     * @return string Hex-encoded SHA-256 hash used as the bucket key.
-     */
-    private function throttleBucketHash(string $identifier, string $ipAddress): string
-    {
-        return hash(
-            'sha256',
-            $this->throttleNormalizeIdentifier($identifier) . '|' . $this->throttleNormalizeIp($ipAddress)
-        );
-    }
-
-    /**
      * Decodes one raw user preferences row from the DB into the typed preferences array.
      *
      * Delegates contact profile and 2FA method JSON decoding to the payload codec.
@@ -1006,212 +897,6 @@ final class AuthService
     }
 
     /**
-     * Filters a raw 2FA method list down to only interactive (challengeable) methods.
-     *
-     * Validates each method's status, secret/credential completeness, and type before
-     * including it. Appends a fallback email entry when the account email is provided
-     * and no explicit email method has been configured.
-     *
-     * @param array<int, array<string, mixed>> $methods Raw 2FA method rows from the user preferences row.
-     * @param string $fallbackEmail Account email address used when an email method omits its own address.
-     * @return array<int, array<string, mixed>> Interactive method rows with normalized keys and labels.
-     */
-    private function interactiveTwoFactorMethods(array $methods, string $fallbackEmail = ''): array
-    {
-        $interactive = [];
-        $fallbackEmail = strtolower(trim($fallbackEmail));
-        if ($fallbackEmail === '' || filter_var($fallbackEmail, FILTER_VALIDATE_EMAIL) === false) {
-            $fallbackEmail = '';
-        }
-
-        foreach ($methods as $method) {
-            if (!is_array($method)) {
-                continue;
-            }
-
-            $type = Login2fa::normalizeType((string) ($method['type'] ?? ''));
-            $status = Login2fa::normalizeStatus((string) ($method['status'] ?? ''), $type);
-            if ($type === 'totp') {
-                if ($status !== 'confirmed') {
-                    continue;
-                }
-
-                $secret = Totp::normalizeSecret((string) ($method['secret'] ?? ''));
-                if (!Totp::isValidSecret($secret)) {
-                    continue;
-                }
-
-                $interactive[] = [
-                    'type' => 'totp',
-                    'key' => Login2fa::forTotpSecret($secret),
-                    'label' => Login2fa::normalizeLabel((string) ($method['label'] ?? ''), 'totp'),
-                ];
-                continue;
-            }
-
-            if ($type === 'recovery') {
-                if ($status !== 'confirmed') {
-                    continue;
-                }
-
-                $recoveryHash = trim((string) ($method['recovery_hash'] ?? ''));
-                if (!RecoveryPhrase::isValidHash($recoveryHash)) {
-                    continue;
-                }
-
-                $interactive[] = [
-                    'type' => 'recovery',
-                    'key' => Login2fa::forRecoveryHash($recoveryHash),
-                    'label' => (bool) ($method['reusable'] ?? false)
-                        ? 'Recovery Phrase (Reusable)'
-                        : 'Recovery Phrase',
-                ];
-                continue;
-            }
-
-            if ($type === 'webauthn') {
-                if ($status !== 'confirmed') {
-                    continue;
-                }
-
-                $credentialId = trim((string) ($method['credential_id'] ?? ''));
-                $credentialPublicKey = trim((string) ($method['credential_public_key'] ?? ''));
-                if ($credentialId === '' || $credentialPublicKey === '') {
-                    continue;
-                }
-
-                $requireUv = (bool) ($method['require_uv'] ?? false);
-
-                $interactive[] = [
-                    'type' => 'webauthn',
-                    'key' => Login2fa::forWebauthnCredentialId($credentialId),
-                    'label' => Login2fa::normalizeLabel((string) ($method['label'] ?? ''), 'webauthn'),
-                    'credential_id' => $credentialId,
-                    'require_uv' => $requireUv,
-                ];
-                continue;
-            }
-
-            if ($type === 'email') {
-                $email = strtolower(trim((string) ($method['email'] ?? '')));
-                if ($email === '' && $fallbackEmail !== '') {
-                    $email = $fallbackEmail;
-                }
-
-                if ($email === '' || filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
-                    continue;
-                }
-
-                $interactive[] = [
-                    'type' => 'email',
-                    'key' => Login2fa::forEmailAddress($email),
-                    'label' => Login2fa::normalizeLabel((string) ($method['label'] ?? ''), 'email'),
-                    'email' => $email,
-                ];
-            }
-        }
-
-        return $interactive;
-    }
-
-    /**
-     * Verifies one submitted TOTP code against all confirmed TOTP methods for a user.
-     *
-     * Iterates all TOTP rows and returns true on the first match; the 1-step clock
-     * tolerance accounts for slight submission lag without opening large replay windows.
-     *
-     * @param array<int, array<string, mixed>> $methods 2FA method rows from the user preferences row.
-     * @param string $submittedCode Six-digit TOTP code submitted via the login form.
-     * @param string $issuer TOTP issuer label used when verifying the code window.
-     * @return bool True when any confirmed TOTP method verifies the submitted code.
-     */
-    private function verifyTotpCode(array $methods, string $submittedCode, string $issuer = 'Raven CMS'): bool
-    {
-        $submittedCode = Totp::normalizeCode($submittedCode);
-        if (!Totp::isValidCode($submittedCode)) {
-            return false;
-        }
-
-        foreach ($methods as $method) {
-            if (!is_array($method)) {
-                continue;
-            }
-
-            $type = Login2fa::normalizeType((string) ($method['type'] ?? ''));
-            $status = Login2fa::normalizeStatus((string) ($method['status'] ?? ''), $type);
-            $secret = Totp::normalizeSecret((string) ($method['secret'] ?? ''));
-            if ($type !== 'totp' || $status !== 'confirmed' || !Totp::isValidSecret($secret)) {
-                continue;
-            }
-
-            if (Totp::verifyCode($secret, $submittedCode, 1, $issuer)) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /**
-     * Matches one submitted recovery phrase against all confirmed recovery methods.
-     *
-     * When a specific method key is provided (not a pool key), only that single method
-     * is checked. Returns the method index and reusable flag on match so the caller can
-     * decide whether to remove the entry after use.
-     *
-     * @param array<int, array<string, mixed>> $methods 2FA method rows from the user preferences row.
-     * @param string $submittedPhrase Recovery phrase submitted via the login form.
-     * @param string $selectedMethodKey Specific method key to check, or recovery pool key to check all.
-     * @return array{index: int, reusable: bool}|null Match result, or null when no recovery method matched.
-     */
-    private function matchRecoveryMethod(array $methods, string $submittedPhrase, string $selectedMethodKey = ''): ?array
-    {
-        $normalizedSubmittedPhrase = RecoveryPhrase::normalize($submittedPhrase);
-        if (!RecoveryPhrase::isValid($normalizedSubmittedPhrase, 12)) {
-            return null;
-        }
-
-        $selectedMethodKey = trim($selectedMethodKey);
-
-        foreach ($methods as $index => $method) {
-            if (!is_array($method)) {
-                continue;
-            }
-
-            $type = Login2fa::normalizeType((string) ($method['type'] ?? ''));
-            $status = Login2fa::normalizeStatus((string) ($method['status'] ?? ''), $type);
-            if ($type !== 'recovery' || $status !== 'confirmed') {
-                continue;
-            }
-
-            $recoveryHash = trim((string) ($method['recovery_hash'] ?? ''));
-            if (!RecoveryPhrase::isValidHash($recoveryHash)) {
-                continue;
-            }
-
-            // Skip methods whose derived key does not match the selected key (unless using pool key).
-            if (
-                $selectedMethodKey !== ''
-                && !Login2fa::isRecoveryPool($selectedMethodKey)
-                && $selectedMethodKey !== Login2fa::forRecoveryHash($recoveryHash)
-            ) {
-                continue;
-            }
-
-            if (!RecoveryPhrase::verify($normalizedSubmittedPhrase, $recoveryHash, 12)) {
-                continue;
-            }
-
-            return [
-                'index' => (int) $index,
-                'reusable' => (bool) ($method['reusable'] ?? false),
-            ];
-        }
-
-        return null;
-    }
-
-    /**
      * Returns an updated method list with the WebAuthn signature counter incremented.
      *
      * WebAuthn authenticators increment their signature counter on each assertion;
@@ -1251,41 +936,6 @@ final class AuthService
             'methods' => array_values($methods),
             'updated' => $updated,
         ];
-    }
-
-    /**
-     * Validates preference update fields and returns an error list.
-     *
-     * @param string  $email         Proposed new email address.
-     * @param ?string $password      Proposed new password, or null to keep the existing one.
-     * @param bool    $usernameTaken Whether another user already holds the proposed username.
-     * @param bool    $emailTaken    Whether another user already holds the proposed email.
-     * @return array<int, string> Validation error messages; empty on success.
-     */
-    private function validatePreferenceUpdate(
-        string $email,
-        ?string $password,
-        bool $usernameTaken,
-        bool $emailTaken
-    ): array {
-        $errors = [];
-        if ($email === '') {
-            $errors[] = 'Email is required.';
-        }
-
-        if ($password !== null && $password !== '' && strlen($password) < 8) {
-            $errors[] = 'Password must be at least 8 characters.';
-        }
-
-        if ($usernameTaken) {
-            $errors[] = 'Username is already in use.';
-        }
-
-        if ($emailTaken) {
-            $errors[] = 'Email is already in use.';
-        }
-
-        return $errors;
     }
 
     /**
