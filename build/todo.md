@@ -17,7 +17,7 @@ This is the default Build Mode backlog file. If the user asks about goals, unpat
 
 
 
-# Data Access Layer Refactor Cleanup (Pending Plan, DO NOT PROCEED)
+# Data Access Layer Refactor Cleanup
 
 ## 1) lib/Database/ Refactor & Cleanup
 
@@ -58,15 +58,12 @@ This is the default Build Mode backlog file. If the user asks about goals, unpat
 
 - [ ] **TableNameResolver.php** — Applies the table prefix. Has instance `resolve()` (used by injected services) and static `appTable()` / `authTable()` (for callers without an instance). All three currently just return `$prefix . $table` — the driver parameter is reserved for future per-driver quoting. **FLAG: `authTable()` is byte-for-byte identical to `appTable()` — dead distinction that never materialized.**
 
-### Known Issues to Resolve
-
-- [x] **SchemaBootstrap duplication** — injected SchemaIntrospector; deleted private `tableExists()` and `quotePgIdentifier()` copies; updated SchemaComponentFactory to pass the shared introspector instance.
-- [x] **TableNameResolver::authTable()** — kept. Has real callers in UserRead, UserWrite, InviteRead, InviteWrite, AuthService, AuthProfileScribe. Provides a named semantic lane for auth-table access that is worth preserving even though the implementation is currently identical to `appTable()` — if per-driver quoting or auth-DB prefix separation is ever needed, the distinction is already in place.
-- [x] **renameLegacyMediaTables() in SchemaBootstrap** — logged in Legacy Fallback Log below; leaving in place until safe to prune.
+### Cleanup
 
 - [ ] Update release-notes.md, clear completed section out of todo.md, and commit.
 
-## 2) sys/Repository/ Refactor & Cleanup
+
+## 2) sys/Repository/ Refactor & Cleanup (Pending Plan, DO NOT PROCEED)
 Lingering issues & reorganization tasks. Make a plan to deal with them all in one clean sweep. Append it as a detailed checklist to this section in case we lose session or we have to bounce between agents:
 - [ ] All Repository/ classes should be public/panel/extension/library/scribe/cli-agnostic primitives. Doublecheck them all to make sure that is functionally the case:
 	- Repositories are the canonical base data access+manipulation layer.
@@ -79,7 +76,7 @@ Lingering issues & reorganization tasks. Make a plan to deal with them all in on
 - [ ] Do a sweep of all classes in Repository/ making sure PHPdoc blocks are present+accurate for ALL headings, classes & functions.
 - [ ] Update release-notes.md, clear completed section out of todo.md, and commit.
 
-## 3) lib/Parser/ Refactor & Cleanup
+## 3) lib/Parser/ Refactor & Cleanup (Pending Plan, DO NOT PROCEED)
 Lingering issues & reorganization tasks. Make a plan to deal with them all in one clean sweep. Append it as a detailed checklist to this section in case we lose session or we have to bounce between agents:
 - [ ] Parser/ classes are designated data access points for novice Extension authors who have no reason to use Repositories directly.
 - [ ] Parser/ classes SHOULD NOT be the primitives for Repositories. Repositories are the primitives for Parser/ classes. (Exception for *RepoParser.php classes, so Repositories have a designated safe zone for bare essential read primitives that would also be useful to give to Extension authors.)
@@ -89,7 +86,7 @@ Lingering issues & reorganization tasks. Make a plan to deal with them all in on
 - [ ] Do a sweep of all classes in Parser/ making sure PHPdoc blocks are present+accurate for ALL headings, classes & functions.
 - [ ] Update release-notes.md, clear completed section out of todo.md, and commit.
 
-## 4) lib/Scribe/ Refactor & Cleanup
+## 4) lib/Scribe/ Refactor & Cleanup (Pending Plan, DO NOT PROCEED)
 Lingering issues & reorganization tasks. Make a plan to deal with them all in one clean sweep. Append it as a detailed checklist to this section in case we lose session or we have to bounce between agents:
 - [ ] Scribe/ classes are designated easy entry points for novice Extension authors who have no reason to use Repositories directly.
 - [ ] Scribe/ classes SHOULD NOT be the primitives for Repositories. Repositories are the primitives for Scribe/ classes. (The last agent had trouble finishing this as you can see, so clarify anything uncertain.)
