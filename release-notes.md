@@ -9,6 +9,12 @@
 - **Panel theme primitive** — added `private/lib/View/Panel/Theme.php` and routed duplicated panel-theme normalization/default/effective-theme logic in `Panel/SharedController`, `Panel/AuthController`, and `Extension/Panel/Routes` through this class.
 - **Dead dependency cleanup in panel controllers** — `PreferencesController` and `UserEditController` no longer inject `EditorWrapper` solely for theme normalization; constructor wiring in `Runtime/Panel/ControllerFactory` was trimmed accordingly.
 - **View docs sweep** — added the missing Raven file header and expanded public-method PHPDoc summaries in `private/lib/View/Pagination.php`; updated `docs/filetree.md` View ownership notes for `ThemeDiscovery`, `View/Public/Error`, and `View/Panel/Theme`.
+- **Public runtime availability guard optimization** — `Controller/Public/SharedController` now accepts a lazy auth resolver plus `Public\PermissionMask`; for `site.visibility=public` with no active auth session, availability checks use guest permission bits directly and skip `AuthService` construction/auth DB resolution. Verified with runtime check (`before_auth=callable`, `after_auth=callable`).
+- **Schema ensure hot-path optimization** — `lib/Database/SchemaEnsureStateStore::isDirty()` now caches request-local dirty state and re-checks uncached inside the ensure lock to remain race-safe; steady-state verification confirmed (`ensure_calls=1` across two sequential `ensureIfChanged()` calls after invalidation).
+- **Extension autoloader miss optimization** — `private/Raven.php` now precomputes existing extension class roots once at boot and memoizes `Raven\Ext\*` hit/miss lookups per relative path, eliminating repeated `is_dir` scans and repeated miss-path filesystem probes.
+- **Ops verification** — confirmed `opcache.revalidate_freq=2` (not `0`) and `opcache.validate_timestamps=On`.
+- **Profiler tooling refresh + baseline run** — updated `debug/util/profile-public-pages.php` and `debug/util/profile-panel-lists.php` for current runtime/controller contracts and reran both passes. Public baseline: `public.home queries=5 total_ms=14.2 sql_ms=0.3 mem_peak_kb=6144.0`; `public.not_found queries=1 total_ms=1.4`.
+- **Panel 404 regression fix** — `panel/index.php` fallback renderer now uses `Raven\Lib\View\Public\Error`; removed stale reference to deleted `Raven\Lib\View\Error`.
 
 ### May 5, 2026 — lib/Security/ refactor cleanup
 

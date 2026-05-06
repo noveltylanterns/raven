@@ -14,6 +14,8 @@ namespace Raven\Core\Controller\Public;
 use Raven\Core\Config;
 use Raven\Core\Debug\ClientProfiler;
 use Raven\Lib\Auth\AuthService;
+use Raven\Lib\Auth\Public\PermissionBase as PublicPermissionBase;
+use Raven\Lib\Auth\Public\PermissionMask as PublicPermissionMask;
 use Raven\Lib\Auth\Public\SessionGuard;
 use Raven\Lib\Transport\Response;
 use Raven\Lib\Transport\Request;
@@ -38,13 +40,16 @@ use Raven\Lib\View\Public\ThemeTemplate;
 final class SharedController
 {
     private Config $config;
-    private AuthService $auth;
+    /** @var callable(): AuthService */
+    private $authResolver;
+    private ?AuthService $auth = null;
     private InputSanitizer $input;
     private Csrf $csrf;
     private SessionFlash $flash;
     private ThemeBrace $themeBrace;
     private SessionGuard $sessionGuard;
     private bool $captchaScriptIncluded = false;
+    private PublicPermissionMask $guestPermissionMask;
     private ?Request $requestContextResolver = null;
     private ?ClientProfiler $clientProfiler = null;
     private ?FeedParser $feedParser = null;
@@ -58,24 +63,27 @@ final class SharedController
 
     /**
      * @param Config $config Runtime configuration reader.
-     * @param AuthService $auth Auth/session service for public requests.
+     * @param callable(): AuthService $authResolver Lazy auth/session resolver for public requests.
      * @param InputSanitizer $input Shared request input sanitizer.
      * @param Csrf $csrf CSRF helper for public forms and auth flows.
      * @param ThemeCatalog $themeCatalogService Shared public-theme catalog for wrapper/meta/template reads.
+     * @param PublicPermissionMask $guestPermissionMask Guest permission-mask service for public-mode availability checks.
      * @return void
      */
     public function __construct(
         Config $config,
-        AuthService $auth,
+        callable $authResolver,
         InputSanitizer $input,
         Csrf $csrf,
-        ThemeCatalog $themeCatalogService
+        ThemeCatalog $themeCatalogService,
+        PublicPermissionMask $guestPermissionMask
     ) {
         $this->config = $config;
-        $this->auth = $auth;
+        $this->authResolver = $authResolver;
         $this->input = $input;
         $this->csrf = $csrf;
         $this->themeCatalogService = $themeCatalogService;
+        $this->guestPermissionMask = $guestPermissionMask;
         $this->flash = new SessionFlash('_raven_public_flash');
         $this->themeBrace = new ThemeBrace(dirname(__DIR__, 4) . '/.tmp/template_tag_cache');
         $this->sessionGuard = new SessionGuard();
@@ -88,6 +96,12 @@ final class SharedController
      */
     public function auth(): AuthService
     {
+        if ($this->auth instanceof AuthService) {
+            return $this->auth;
+        }
+
+        $resolved = ($this->authResolver)();
+        $this->auth = $resolved;
         return $this->auth;
     }
 
@@ -267,10 +281,20 @@ final class SharedController
      */
     public function enforceSiteAvailability(): bool
     {
+        $visibilityMode = (string) $this->config->get('site.visibility', 'public');
+        if ($this->canSkipAuthAvailabilityGuard($visibilityMode)) {
+            if (!PublicPermissionBase::canViewPublicSite($this->guestPermissionMask->maskForGuest())) {
+                (new PublicError($this->config, dirname(__DIR__, 4)))->renderDenied();
+                return false;
+            }
+
+            return true;
+        }
+
         $error = new PublicError($this->config, dirname(__DIR__, 4));
         return $this->sessionGuard->enforceSiteAvailability(
-            $this->auth,
-            (string) $this->config->get('site.visibility', 'public'),
+            $this->auth(),
+            $visibilityMode,
             static function () use ($error): void {
                 $error->renderDisabled();
             },
@@ -278,6 +302,26 @@ final class SharedController
                 $error->renderDenied();
             }
         );
+    }
+
+    /**
+     * Returns true when public availability can be checked without constructing AuthService.
+     *
+     * Public mode for visitors without an active auth session only needs the guest
+     * permission bit from the app DB. Private/disabled modes still require the full
+     * auth service because they depend on authenticated-user policy checks.
+     *
+     * @param string $visibilityMode Raw `site.visibility` config value.
+     * @return bool True when guest-only public-mode checks are sufficient.
+     */
+    private function canSkipAuthAvailabilityGuard(string $visibilityMode): bool
+    {
+        $normalizedMode = strtolower(trim($visibilityMode));
+        if ($normalizedMode !== 'public') {
+            return false;
+        }
+
+        return !isset($_SESSION['auth_logged_in']) || $_SESSION['auth_logged_in'] !== true;
     }
 
     /**

@@ -9,10 +9,14 @@
 
 declare(strict_types=1);
 
-use Raven\Core\Controller\Public\ContentController;
+use Raven\Core\Controller\Public\CategoryController;
+use Raven\Core\Controller\Public\ChannelController;
 use Raven\Core\Controller\Public\FeedController;
-use Raven\Core\Controller\Public\ProfileController;
+use Raven\Core\Controller\Public\GroupController;
+use Raven\Core\Controller\Public\PageController;
 use Raven\Core\Controller\Public\SharedController;
+use Raven\Core\Controller\Public\TagController;
+use Raven\Core\Controller\Public\UserController;
 use Raven\Core\Debug\RequestProfiler;
 use Raven\Core\Repository\ChannelRead;
 use Raven\Core\Repository\GroupRead;
@@ -35,46 +39,50 @@ ini_set('display_errors', '0');
 final class PublicProfileControllerAdapter
 {
     public function __construct(
-        private readonly ContentController $content,
+        private readonly PageController $page,
+        private readonly ChannelController $channel,
         private readonly FeedController $feed,
-        private readonly ProfileController $profile,
+        private readonly CategoryController $category,
+        private readonly TagController $tag,
+        private readonly UserController $user,
+        private readonly GroupController $group,
         private readonly SharedController $requestContext
     ) {
     }
 
     public function home(): void
     {
-        $this->content->home();
+        $this->page->home();
     }
 
     public function channel(string $slug): void
     {
-        $this->content->channel($slug);
+        $this->channel->channel($slug);
     }
 
     public function page(string $slug, ?string $channel = null): void
     {
-        $this->content->page($slug, $channel);
+        $this->page->page($slug, $channel);
     }
 
     public function category(string $slug, int $page = 1): void
     {
-        $this->feed->category($slug, $page);
+        $this->category->category($slug, $page);
     }
 
     public function tag(string $slug, int $page = 1): void
     {
-        $this->feed->tag($slug, $page);
+        $this->tag->tag($slug, $page);
     }
 
     public function profile(string $username): void
     {
-        $this->profile->profile($username);
+        $this->user->profile($username);
     }
 
     public function group(string $slug): void
     {
-        $this->profile->group($slug);
+        $this->group->group($slug);
     }
 
     public function notFound(): void
@@ -123,12 +131,13 @@ final class PublicRouteProfilerRunner
         foreach ($scenarios as $scenario) {
             $result = $this->profileScenario($scenario);
             $this->events[] = sprintf(
-                'public.%s status=%d queries=%d total_ms=%.1f sql_ms=%.1f duplicates=%d body_bytes=%d',
+                'public.%s status=%d queries=%d total_ms=%.1f sql_ms=%.1f mem_peak_kb=%.1f duplicates=%d body_bytes=%d',
                 $scenario['key'],
                 $result['status'],
                 $result['queries'],
                 $result['total_ms'],
                 $result['sql_ms'],
+                $result['memory_peak_bytes'] / 1024,
                 $result['duplicate_count'],
                 $result['body_bytes']
             );
@@ -163,6 +172,15 @@ final class PublicRouteProfilerRunner
         $rvn = $this->bootstrapApp('/');
         /** @var array<string, mixed> $configSnapshot */
         $configSnapshot = $rvn['config']->all();
+        $authDb = $rvn['auth_db'] ?? null;
+        if (is_callable($authDb)) {
+            $authDb = $authDb();
+            $rvn['auth_db'] = $authDb;
+        }
+        if (!$authDb instanceof PDO) {
+            throw new RuntimeException('Profiler expected auth_db resolver to return PDO.');
+        }
+
         // Build repos directly; the shared bootstrap service map was removed.
         $channelRepo = new ChannelRead($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix'], (string) $rvn['root'] . '/private/dat/channel');
         $channelParser = new ChannelDataParser($rvn['config'], $rvn['input'], $channelRepo);
@@ -171,7 +189,7 @@ final class PublicRouteProfilerRunner
         /** @var PageRead $pages */
         $pages = new PageRead($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix'], $channelRepo, $categoryEnabled, $tagEnabled);
         /** @var UserRead $users */
-        $users = new UserRead($rvn['auth_db'], $rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix']);
+        $users = new UserRead($authDb, $rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix']);
         /** @var GroupRead $groups */
         $groups = new GroupRead($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix']);
 
@@ -387,6 +405,7 @@ final class PublicRouteProfilerRunner
      *   queries: int,
      *   total_ms: float,
      *   sql_ms: float,
+     *   memory_peak_bytes: int,
      *   duplicate_count: int,
      *   duplicate_sql: array<int, array{count: int, sql: string}>,
      *   sql: array<int, string>
@@ -466,6 +485,7 @@ final class PublicRouteProfilerRunner
             'queries' => (int) ($snapshot['query_count'] ?? 0),
             'total_ms' => (float) ($snapshot['duration_ms'] ?? 0.0),
             'sql_ms' => (float) ($snapshot['query_time_ms'] ?? 0.0),
+            'memory_peak_bytes' => (int) ($snapshot['memory_peak_bytes'] ?? 0),
             'duplicate_count' => count($duplicateSql),
             'duplicate_sql' => $duplicateSql,
             'sql' => $normalizedSql,
@@ -477,19 +497,31 @@ final class PublicRouteProfilerRunner
      */
     private function newPublicRouteAdapter(array $rvn): PublicProfileControllerAdapter
     {
-        /** @var callable(): ContentController $contentFactory */
-        $contentFactory = $rvn['public_content_controller'];
+        /** @var callable(): PageController $pageFactory */
+        $pageFactory = $rvn['public_page_controller'];
+        /** @var callable(): ChannelController $channelFactory */
+        $channelFactory = $rvn['public_channel_controller'];
         /** @var callable(): FeedController $feedFactory */
         $feedFactory = $rvn['public_feed_controller'];
-        /** @var callable(): ProfileController $profileFactory */
-        $profileFactory = $rvn['public_profile_controller'];
+        /** @var callable(): CategoryController $categoryFactory */
+        $categoryFactory = $rvn['public_category_controller'];
+        /** @var callable(): TagController $tagFactory */
+        $tagFactory = $rvn['public_tag_controller'];
+        /** @var callable(): UserController $userFactory */
+        $userFactory = $rvn['public_user_controller'];
+        /** @var callable(): GroupController $groupFactory */
+        $groupFactory = $rvn['public_group_controller'];
         /** @var callable(): SharedController $requestContextFactory */
         $requestContextFactory = $rvn['public_request_context'];
 
         return new PublicProfileControllerAdapter(
-            $contentFactory(),
+            $pageFactory(),
+            $channelFactory(),
             $feedFactory(),
-            $profileFactory(),
+            $categoryFactory(),
+            $tagFactory(),
+            $userFactory(),
+            $groupFactory(),
             $requestContextFactory()
         );
     }

@@ -22,6 +22,7 @@ use Raven\Lib\Auth\AuthService;
 use Raven\Lib\Auth\SessionCookie;
 use Raven\Lib\Parser\ConfigParser;
 use Raven\Lib\Extension\Registry;
+use Raven\Lib\Extension\Resolver;
 use Raven\Lib\Scheduler\Registry as SchedulerRegistry;
 use Raven\Lib\Security\Csrf;
 use Raven\Lib\Security\InputSanitizer;
@@ -52,6 +53,15 @@ final class Raven
     // Require it directly so it is available at that point.
     require_once $root . '/private/lib/Extension/StateWrite.php';
     $enabledExtensionDirectories = Registry::enabledDirectories($root, true);
+    $enabledExtensionClassRoots = [];
+    foreach ($enabledExtensionDirectories as $directory) {
+        $extensionRoot = $root . '/private/ext/' . $directory;
+        foreach (Resolver::classRoots($extensionRoot) as $classRoot) {
+            if (is_dir($classRoot)) {
+                $enabledExtensionClassRoots[] = rtrim($classRoot, '/\\');
+            }
+        }
+    }
 
     // Load per-package handlers instead of the full Composer autoloader.
     // Each handler registers a targeted PSR-4 autoloader for its package only.
@@ -65,7 +75,7 @@ final class Raven
     // Always provide local PSR-4 fallback.
     // Someone will probably want to build hooks with it.
     // Also lets app/lib/extension classes work before install.
-    spl_autoload_register(static function (string $class) use ($root, $enabledExtensionDirectories): void {
+    spl_autoload_register(static function (string $class) use ($root, $enabledExtensionClassRoots): void {
         $libPrefix = 'Raven\\Lib\\';
         if (str_starts_with($class, $libPrefix)) {
             $relativeLib = str_replace('\\', '/', substr($class, strlen($libPrefix)));
@@ -95,20 +105,27 @@ final class Raven
         }
 
         $relative = str_replace('\\', '/', substr($class, strlen($extPrefix)));
-        foreach ($enabledExtensionDirectories as $directory) {
-            $extensionRoot = $root . '/private/ext/' . $directory;
-            foreach (\Raven\Lib\Extension\Resolver::classRoots($extensionRoot) as $classRoot) {
-                if (!is_dir($classRoot)) {
-                    continue;
-                }
+        static $extClassFileCache = [];
+        if (array_key_exists($relative, $extClassFileCache)) {
+            $cached = $extClassFileCache[$relative];
+            if (is_string($cached) && $cached !== '') {
+                require_once $cached;
+            }
 
-                $file = $classRoot . '/' . $relative . '.php';
-                if (is_file($file)) {
-                    require_once $file;
-                    return;
-                }
+            return;
+        }
+
+        foreach ($enabledExtensionClassRoots as $classRoot) {
+            $file = $classRoot . '/' . $relative . '.php';
+            if (is_file($file)) {
+                $extClassFileCache[$relative] = $file;
+                require_once $file;
+                return;
             }
         }
+
+        // Cache misses so repeated unresolved extension classes do not re-scan all roots.
+        $extClassFileCache[$relative] = false;
     });
 
     // Load namespaced helper functions that PHP's autoloader cannot discover.

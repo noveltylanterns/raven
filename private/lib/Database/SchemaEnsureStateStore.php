@@ -17,6 +17,7 @@ final class SchemaEnsureStateStore
     private string $stateFile;
     private string $lockFile;
     private string $markerFile;
+    private ?bool $dirtyCache = null;
 
     /**
      * @param string $root Project root used to resolve schema and state paths.
@@ -66,7 +67,9 @@ final class SchemaEnsureStateStore
                 return;
             }
 
-            if (!$this->isDirty()) {
+            // Re-check after lock acquisition without using the request-local cache.
+            // Another request may have completed ensure while we were waiting.
+            if (!$this->isDirty(false)) {
                 return;
             }
 
@@ -87,6 +90,9 @@ final class SchemaEnsureStateStore
      */
     public function invalidate(): void
     {
+        // Invalidate request-local cache before mutating marker state.
+        $this->dirtyCache = null;
+
         $markerDirectory = dirname($this->markerFile);
         if (!is_dir($markerDirectory) && !mkdir($markerDirectory, 0775, true) && !is_dir($markerDirectory)) {
             return;
@@ -105,27 +111,34 @@ final class SchemaEnsureStateStore
      *
      * @return bool True when schema ensure should run again.
      */
-    private function isDirty(): bool
+    private function isDirty(bool $useCache = true): bool
     {
+        if ($useCache && $this->dirtyCache !== null) {
+            return $this->dirtyCache;
+        }
+
         if (!is_file($this->stateFile)) {
-            return true;
+            return $this->cacheDirtyResult(true, $useCache);
         }
 
         if (!is_file($this->markerFile)) {
-            return true;
+            return $this->cacheDirtyResult(true, $useCache);
         }
 
         $stateMtime = (int) (@filemtime($this->stateFile) ?: 0);
         $markerMtime = (int) (@filemtime($this->markerFile) ?: 0);
         if ($stateMtime <= 0 || $markerMtime <= 0) {
-            return true;
+            return $this->cacheDirtyResult(true, $useCache);
         }
 
         if ($markerMtime > $stateMtime) {
-            return true;
+            return $this->cacheDirtyResult(true, $useCache);
         }
 
-        return $this->latestSchemaSourceMtime() > $stateMtime;
+        return $this->cacheDirtyResult(
+            $this->latestSchemaSourceMtime() > $stateMtime,
+            $useCache
+        );
     }
 
     /**
@@ -170,6 +183,10 @@ final class SchemaEnsureStateStore
      */
     private function writeState(string $driver, string $prefix): void
     {
+        // Reset request-local cache before and after writing so future checks in this
+        // request observe the new marker/state mtimes.
+        $this->dirtyCache = null;
+
         $stateDirectory = dirname($this->stateFile);
         if (!is_dir($stateDirectory) && !mkdir($stateDirectory, 0775, true) && !is_dir($stateDirectory)) {
             return;
@@ -189,5 +206,22 @@ final class SchemaEnsureStateStore
 
         @chmod($this->stateFile, 0600);
         clearstatcache(true, $this->stateFile);
+        $this->dirtyCache = false;
+    }
+
+    /**
+     * Caches one dirty-check result when caching is enabled for this call.
+     *
+     * @param bool $dirty Computed dirty-state result.
+     * @param bool $useCache Whether request-local caching is enabled for this call.
+     * @return bool Dirty-state result.
+     */
+    private function cacheDirtyResult(bool $dirty, bool $useCache): bool
+    {
+        if ($useCache) {
+            $this->dirtyCache = $dirty;
+        }
+
+        return $dirty;
     }
 }

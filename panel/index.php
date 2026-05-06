@@ -22,7 +22,7 @@ use Raven\Core\Router\Panel\PanelPayload;
 use Raven\Lib\Parser\ConfigParser;
 use Raven\Lib\Parser\PanelParser;
 use Raven\Lib\Scheduler\Cron;
-use Raven\Lib\View\Error as ViewError;
+use Raven\Lib\View\Public\Error as PublicError;
 
 $root = dirname(__DIR__);
 require_once $root . '/private/Raven.php';
@@ -177,7 +177,7 @@ $renderNotFound = static function () use ($panelRequestContext): void {
 };
 
 $renderPublicNotFound = static function () use ($rvn, $root): void {
-    (new ViewError($rvn['config'], $root))->render404();
+    (new PublicError($rvn['config'], $root))->render404();
 };
 
 $router = new PanelRouter();

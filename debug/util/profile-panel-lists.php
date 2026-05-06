@@ -91,7 +91,6 @@ final class PanelListProfilerRunner
         try {
             $this->loginPanel();
             $this->captureHttpPanelListTraces($rvn);
-            $this->captureFlowComparisons($rvn);
             $this->events[] = 'profile_result=PASS';
         } finally {
             $this->cleanupTempUser();
@@ -345,7 +344,7 @@ final class PanelListProfilerRunner
             }
         }
 
-        $pageRows = $pageRepo->listForPanel(1, 0);
+        $pageRows = $pageRepo->listPage(1, 0);
         if ($pageRows !== []) {
             $firstPageId = (int) ($pageRows[0]['id'] ?? 0);
             if ($firstPageId > 0) {
@@ -353,7 +352,7 @@ final class PanelListProfilerRunner
             }
         }
 
-        $redirectRows = $redirectRepo->listForPanel(1, 0);
+        $redirectRows = $redirectRepo->listPage(1, 0);
         if ($redirectRows !== []) {
             $firstRedirectId = (int) ($redirectRows[0]['id'] ?? 0);
             if ($firstRedirectId > 0) {
@@ -369,7 +368,7 @@ final class PanelListProfilerRunner
             }
         }
 
-        $userRows = $userRepo->listForPanel(1, 0, null);
+        $userRows = $userRepo->listPage(1, 0, null);
         if ($userRows !== []) {
             $firstUserId = (int) ($userRows[0]['id'] ?? 0);
             if ($firstUserId > 0) {
@@ -477,7 +476,7 @@ final class PanelListProfilerRunner
 
         $legacyFlows = [
             'pages' => static function () use ($pageRepo): void {
-                $rows = $pageRepo->listForPanel(100, 0);
+                $rows = $pageRepo->listPage(100, 0);
                 $pageIds = array_values(array_map(static fn (array $row): int => (int) ($row['id'] ?? 0), $rows));
                 $pageRepo->taxonomyAssignmentIdsByPage($pageIds);
             },
@@ -496,7 +495,7 @@ final class PanelListProfilerRunner
 
         if ($channelSlug !== null || $categoryId !== null || $tagId !== null) {
             $legacyFlows['pages_prefiltered'] = static function () use ($pageRepo): void {
-                $rows = $pageRepo->listForPanel(1000, 0);
+                $rows = $pageRepo->listPage(1000, 0);
                 $pageIds = array_values(array_map(static fn (array $row): int => (int) ($row['id'] ?? 0), $rows));
                 $pageRepo->taxonomyAssignmentIdsByPage($pageIds);
             };
@@ -508,7 +507,7 @@ final class PanelListProfilerRunner
         $currentFlows = [
             'pages' => static function () use ($pageRepo): void {
                 $pageRepo->countForPanel();
-                $rows = $pageRepo->listForPanel(50, 0);
+                $rows = $pageRepo->listPage(50, 0);
                 $pageIds = array_values(array_map(static fn (array $row): int => (int) ($row['id'] ?? 0), $rows));
                 $pageRepo->taxonomyAssignmentIdsByPage($pageIds);
             },
@@ -517,35 +516,35 @@ final class PanelListProfilerRunner
             },
             'redirects' => static function () use ($redirectRepo): void {
                 $redirectRepo->countForPanel();
-                $redirectRepo->listForPanel(50, 0);
+                $redirectRepo->listPage(50, 0);
             },
             'groups' => static function () use ($groupRepo): void {
                 $groupRepo->countForPanel();
-                $groupRepo->listForPanel(50, 0);
+                $groupRepo->listPage(50, 0);
             },
             'users' => static function () use ($userRepo): void {
                 $userRepo->countForPanel(null);
-                $userRepo->listForPanel(50, 0, null);
+                $userRepo->listPage(50, 0, null);
             },
         ];
 
         if ($categoryRepo instanceof CategoryRead) {
             $currentFlows['categories'] = static function () use ($categoryRepo): void {
                 $categoryRepo->countForPanel();
-                $categoryRepo->listForPanel(50, 0);
+                $categoryRepo->listPage(50, 0);
             };
         }
         if ($tagRepo instanceof TagRead) {
             $currentFlows['tags'] = static function () use ($tagRepo): void {
                 $tagRepo->countForPanel();
-                $tagRepo->listForPanel(50, 0);
+                $tagRepo->listPage(50, 0);
             };
         }
 
         if ($channelSlug !== null || $categoryId !== null || $tagId !== null) {
             $currentFlows['pages_prefiltered'] = static function () use ($pageRepo, $channelSlug, $categoryId, $tagId): void {
                 $pageRepo->countForPanel($channelSlug, $categoryId, $tagId);
-                $rows = $pageRepo->listForPanel(50, 0, $channelSlug, $categoryId, $tagId);
+                $rows = $pageRepo->listPage(50, 0, $channelSlug, $categoryId, $tagId);
                 $pageIds = array_values(array_map(static fn (array $row): int => (int) ($row['id'] ?? 0), $rows));
                 $pageRepo->taxonomyAssignmentIdsByPage($pageIds);
             };
@@ -553,7 +552,7 @@ final class PanelListProfilerRunner
         if ($groupName !== null) {
             $currentFlows['users_prefiltered'] = static function () use ($userRepo, $groupName): void {
                 $userRepo->countForPanel($groupName);
-                $userRepo->listForPanel(50, 0, $groupName);
+                $userRepo->listPage(50, 0, $groupName);
             };
         }
 

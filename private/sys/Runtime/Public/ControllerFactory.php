@@ -22,6 +22,7 @@ use Raven\Core\Controller\Public\SharedController;
 use Raven\Core\Controller\Public\TagController as PublicTagController;
 use Raven\Core\Controller\Public\UserController as PublicUserController;
 use Raven\Lib\Auth\AuthService;
+use Raven\Lib\Auth\Public\PermissionMask as PublicPermissionMask;
 use Raven\Lib\View\Public\ThemeCatalog;
 
 /**
@@ -72,10 +73,11 @@ final class ControllerFactory
 
             $publicSharedController = new SharedController(
                 $rvn['config'],
-                $resolveAuth(),
+                $resolveAuth,
                 $rvn['input'],
                 $rvn['csrf'],
-                $themeCatalogFactory()
+                $themeCatalogFactory(),
+                new PublicPermissionMask($rvn['db'], (string) $rvn['prefix'])
             );
 
             return $publicSharedController;
