@@ -14,11 +14,12 @@ namespace Raven\Core\Runtime;
 use PDO;
 use Raven\Core\Debug\RequestProfilerAdapter;
 use Raven\Lib\Database\DriverConfigNormalizer;
-use Raven\Lib\Database\DsnBuilder;
+use Raven\Lib\Database\MysqlConfig;
+use Raven\Lib\Database\PgsqlConfig;
 use Raven\Lib\Database\ProfiledPDO;
 use Raven\Lib\Database\QueryProfilerInterface;
 use Raven\Lib\Database\SqliteBootstrap;
-use Raven\Lib\Database\SqlitePath;
+use Raven\Lib\Database\SqliteConfig;
 
 /**
  * Builds profiled PDO connections for Raven database backends.
@@ -33,9 +34,8 @@ final class DatabaseFactory
     private array $config;
     private QueryProfilerInterface $queryProfiler;
     private DriverConfigNormalizer $configNormalizer;
-    private DsnBuilder $dsnBuilder;
     private SqliteBootstrap $sqliteBootstrap;
-    private ?SqlitePath $sqlitePaths = null;
+    private ?SqliteConfig $sqlitePaths = null;
 
     /**
      * @param array<string, mixed> $databaseConfig Raven database configuration array (from config.php).
@@ -46,7 +46,6 @@ final class DatabaseFactory
         $this->config = $databaseConfig;
         $this->queryProfiler = $queryProfiler ?? new RequestProfilerAdapter();
         $this->configNormalizer = new DriverConfigNormalizer();
-        $this->dsnBuilder = new DsnBuilder();
         $this->sqliteBootstrap = new SqliteBootstrap();
     }
 
@@ -135,24 +134,24 @@ final class DatabaseFactory
     private function newServerConnection(string $driver, string $connectionLabel = 'app'): PDO
     {
         if ($driver === 'mysql') {
-            $mysql = $this->configNormalizer->mysql($this->config);
+            $mysql = MysqlConfig::fromConfig($this->config);
 
             return new ProfiledPDO(
-                $this->dsnBuilder->mysql($mysql),
-                (string) ($mysql['user'] ?? ''),
-                (string) ($mysql['pass'] ?? ''),
+                $mysql->dsn(),
+                $mysql->username(),
+                $mysql->password(),
                 $this->defaultPdoOptions(),
                 $connectionLabel,
                 $this->queryProfiler
             );
         }
 
-        $pgsql = $this->configNormalizer->pgsql($this->config);
+        $pgsql = PgsqlConfig::fromConfig($this->config);
 
         return new ProfiledPDO(
-            $this->dsnBuilder->pgsql($pgsql),
-            (string) ($pgsql['user'] ?? ''),
-            (string) ($pgsql['pass'] ?? ''),
+            $pgsql->dsn(),
+            $pgsql->username(),
+            $pgsql->password(),
             $this->defaultPdoOptions(),
             $connectionLabel,
             $this->queryProfiler
@@ -186,12 +185,12 @@ final class DatabaseFactory
     /**
      * Returns the lazy-initialized SQLite path resolver.
      *
-     * @return SqlitePath Resolver initialized from the database config base path.
+     * @return SqliteConfig Resolver initialized from the database config base path.
      */
-    private function sqlitePaths(): SqlitePath
+    private function sqlitePaths(): SqliteConfig
     {
         if ($this->sqlitePaths === null) {
-            $this->sqlitePaths = SqlitePath::fromConfig($this->config);
+            $this->sqlitePaths = SqliteConfig::fromConfig($this->config);
         }
 
         return $this->sqlitePaths;

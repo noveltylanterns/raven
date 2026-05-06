@@ -47,39 +47,4 @@ final class DriverConfigNormalizer
         return preg_replace('/[^a-zA-Z0-9_]/', '', $prefix) ?? '';
     }
 
-    /**
-     * Returns the MySQL-specific config section from the database config array.
-     *
-     * @param array<string, mixed> $config Raven database configuration array.
-     * @return array<string, mixed> MySQL connection parameters.
-     */
-    public function mysql(array $config): array
-    {
-        return $this->section($config, 'mysql');
-    }
-
-    /**
-     * Returns the PostgreSQL-specific config section from the database config array.
-     *
-     * @param array<string, mixed> $config Raven database configuration array.
-     * @return array<string, mixed> PostgreSQL connection parameters.
-     */
-    public function pgsql(array $config): array
-    {
-        return $this->section($config, 'pgsql');
-    }
-
-    /**
-     * Extracts a named subsection from the config array, defaulting to an empty array.
-     *
-     * @param array<string, mixed> $config Raven database configuration array.
-     * @param string               $key    Section key to extract (e.g., 'mysql', 'pgsql').
-     * @return array<string, mixed> Config sub-array for the named driver or section.
-     */
-    private function section(array $config, string $key): array
-    {
-        /** @var array<string, mixed> $section */
-        $section = (array) ($config[$key] ?? []);
-        return $section;
-    }
 }

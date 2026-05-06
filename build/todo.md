@@ -22,9 +22,10 @@ This is the default Build Mode backlog file. If the user asks about goals, unpat
 ## 1) lib/Database/ Refactor & Cleanup (Pending Plan, DO NOT PROCEED)
 
 ### Class inventory + purpose baseline
-- [ ] `DriverConfigNormalizer.php` — normalize/validate database driver config payloads (`driver`, `prefix`, driver-specific config arrays).
-- [ ] `DsnBuilder.php` — build backend DSN strings from normalized MySQL/PostgreSQL config.
-- [ ] `SqlitePath.php` — extract SQLite base path from config and resolve canonical SQLite file path by DB key.
+- [ ] `DriverConfigNormalizer.php` — normalize/validate shared database config payloads (`driver`, `prefix`).
+- [ ] `MysqlConfig.php` — extract MySQL config from the runtime payload and expose DSN/credential primitives.
+- [ ] `PgsqlConfig.php` — extract PostgreSQL config from the runtime payload and expose DSN/credential primitives.
+- [ ] `SqliteConfig.php` — extract SQLite base path from config and resolve canonical SQLite file path by DB key.
 - [ ] `SqliteBootstrap.php` — ensure SQLite filesystem path exists and apply connection PRAGMAs.
 - [ ] `TableNameResolver.php` — resolve prefixed app/auth table names for SQL call sites.
 - [ ] `SqlUpsertPolicy.php` — emit driver-appropriate duplicate-safe insert SQL.
@@ -33,7 +34,7 @@ This is the default Build Mode backlog file. If the user asks about goals, unpat
 - [ ] `ProfiledPDOStatement.php` — statement wrapper that records binds + execute timing into query profiler.
 
 ### Dependency-boundary pass by lane
-- [ ] Config lane (`DriverConfigNormalizer`, `DsnBuilder`, `SqlitePath`) stays pure config/path logic and does not absorb runtime PDO/bootstrap orchestration.
+- [ ] Config lane (`DriverConfigNormalizer`, `MysqlConfig`, `PgsqlConfig`, `SqliteConfig`) stays pure config/path logic and does not absorb runtime PDO/bootstrap orchestration.
 - [ ] Runtime lane (`SqliteBootstrap`, `TableNameResolver`, `SqlUpsertPolicy`) stays focused on SQL/runtime helpers and does not absorb config parsing.
 - [ ] Profiling lane (`QueryProfilerInterface`, `ProfiledPDO`, `ProfiledPDOStatement`) stays profiling-only and does not absorb unrelated query helper behavior.
 

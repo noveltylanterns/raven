@@ -2,7 +2,7 @@
 
 /**
  * RAVEN CMS
- * ~/private/lib/Database/SqlitePath.php
+ * ~/private/lib/Database/SqliteConfig.php
  * Extracts configured SQLite base paths and resolves canonical DB file paths.
  * Docs: https://raven.lanterns.io
  */
@@ -16,7 +16,7 @@ use RuntimeException;
 /**
  * Extracts configured SQLite base paths and resolves canonical DB file paths.
  */
-final class SqlitePath
+final class SqliteConfig
 {
     private string $configuredPath;
 

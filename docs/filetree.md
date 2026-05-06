@@ -229,7 +229,7 @@ This file is the fast system map for Raven CMS. Use it to quickly understand the
   - `ProfiledPDO` and `ProfiledPDOStatement` wrap PDO for query-level profiling; `QueryProfilerInterface` is the shared contract.
   - `TableNameResolver` — resolves logical table names to physical prefixed names for both app-db and auth-db contexts; available to extensions.
   - `SqlUpsertPolicy.php` — driver-aware upsert helper available to extensions.
-  - `Connection/` — low-level DSN builders and driver-specific connection bootstrapping (`DsnBuilder`, `DriverConfigNormalizer`, `SqliteConnectionBootstrap`, `SqlitePathResolver`). Used by `DatabaseFactory` in `sys/Runtime/`; not for direct extension use.
+  - Connection primitives — driver-specific connection config/bootstrap helpers (`DriverConfigNormalizer`, `MysqlConfig`, `PgsqlConfig`, `SqliteConfig`, `SqliteBootstrap`). Used by `DatabaseFactory` in `sys/Runtime/`; not for direct extension use.
   - `Schema/` — schema ensure pipeline, schema builders, introspector, state store, seed installer, and extension schema runner. All schema orchestration lives here; `sys/Runtime/DatabaseFactory` is the sole core caller.
 - `private/lib/Scheduler/`
   - Shared scheduler runtime for core and extensions.
