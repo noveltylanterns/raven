@@ -33,6 +33,7 @@ class UserRead
      * @param PDO    $rvnDb  App-database connection (group memberships, routing data).
      * @param string $driver Database driver string ('mysql', 'sqlite', 'pgsql').
      * @param string $prefix Table name prefix for this Raven installation.
+     * @return void
      */
     public function __construct(PDO $authDb, PDO $rvnDb, string $driver, string $prefix)
     {

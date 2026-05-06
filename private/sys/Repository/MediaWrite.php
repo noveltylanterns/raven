@@ -27,6 +27,7 @@ final class MediaWrite
      * @param PDO    $db     Active database connection.
      * @param string $driver Database driver string ('mysql', 'sqlite', 'pgsql').
      * @param string $prefix Table name prefix for this Raven installation.
+     * @return void
      */
     public function __construct(PDO $db, string $driver, string $prefix)
     {
@@ -51,6 +52,7 @@ final class MediaWrite
      * @param int   $pageId       Page whose gallery settings to update.
      * @param bool  $enabled      Whether the gallery block should be rendered publicly.
      * @param array<int, array<string, scalar|null>> $imageUpdates Per-image metadata fields keyed by sequential index.
+     * @return void
      */
     public function updateGalleryForPage(int $pageId, bool $enabled, array $imageUpdates): void
     {

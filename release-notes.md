@@ -2,6 +2,14 @@
 
 *The machine is supposed to be logging patches & mods to this file. Sometimes it does, sometimes it doesn't. It might be useful for historical architectural context to your Agent at one point.*
 
+### May 6, 2026 — sys/Repository refactor cleanup
+
+- **Repository parser-boundary correction** — added `lib/Parser/SetRepoParser` and moved `SetRead`/`SetWrite` to it so repositories no longer depend on non-repository parser primitives; extended `PageRepoParser` with content-block encode/decode/normalize helpers and moved `PageRead`/`PageWrite` off direct `PageBlockParser` usage.
+- **Thin-wrapper and dead-weight purge** — removed `ChannelRead::idFromSlug()` (callers switched to `idBySlug()`), removed unused `ChannelRead::findPathById()`, and removed unused `UserWrite::appAuthTable()`.
+- **Repository naming/architecture sweep** — audited repository call surface for concise and domain-accurate naming; no additional compatibility aliases or legacy shims were retained in `sys/Repository`.
+- **Repository PHPDoc sweep closeout** — filled missing method-level `@return` tags (including constructors and write-side `void` methods) across all repository classes in `sys/Repository`.
+- **Checklist/docs sync** — completed and checked off section 3 (`sys/Repository Refactor & Cleanup`) in `build/todo.md`.
+
 ### May 6, 2026 — sys/Debug refactor cleanup
 
 - **PDO profiler class rename completed** — renamed `PdoQueryProfiler` to `QueryProfilerPdo` and `PdoStmtProfiler` to `QueryProfilerStatement` in `sys/Debug`, updated statement-class injection in the PDO wrapper, and rewired all runtime callers/imports (including `sys/Runtime/DatabaseFactory`).

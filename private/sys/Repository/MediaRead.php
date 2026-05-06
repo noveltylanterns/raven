@@ -29,6 +29,7 @@ class MediaRead
      * @param PDO    $db     Active database connection.
      * @param string $driver Database driver string ('mysql', 'sqlite', 'pgsql').
      * @param string $prefix Table name prefix for this Raven installation.
+     * @return void
      */
     public function __construct(PDO $db, string $driver, string $prefix)
     {

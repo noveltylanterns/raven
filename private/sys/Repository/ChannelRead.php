@@ -39,6 +39,7 @@ class ChannelRead
      * @param string      $driver           Database driver string ('mysql', 'sqlite', 'pgsql').
      * @param string      $prefix           Table name prefix for this Raven installation.
      * @param string|null $channelDirectory Absolute path to the channel file directory; defaults to private/dat/channel.
+     * @return void
      */
     public function __construct(PDO $db, string $driver, string $prefix, ?string $channelDirectory = null)
     {
@@ -162,17 +163,6 @@ class ChannelRead
     public function clearCache(): void
     {
         $this->channelsCache = null;
-    }
-
-    /**
-     * Resolves one channel id by slug, returning 0 when not found.
-     *
-     * @param string $slug Slug to resolve.
-     * @return int Channel id, or 0 when no matching channel exists.
-     */
-    public function idFromSlug(string $slug): int
-    {
-        return (int) ($this->idBySlug($slug) ?? 0);
     }
 
     /**
@@ -707,18 +697,6 @@ class ChannelRead
         }
 
         return array_values(array_unique($paths));
-    }
-
-    /**
-     * Finds the first file path for a channel by id, or null if none exists.
-     *
-     * @param int $id Channel id.
-     * @return string|null First matching path, or null.
-     */
-    private function findPathById(int $id): ?string
-    {
-        $paths = $this->candidatePathsForId($id);
-        return $paths === [] ? null : $paths[0];
     }
 
     /**

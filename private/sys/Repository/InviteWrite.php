@@ -33,6 +33,7 @@ final class InviteWrite
      * @param string     $driver PDO driver name used for table resolution and duplicate handling.
      * @param string     $prefix Configured table prefix for auth tables.
      * @param InviteRead $read   Read-side instance for normalization and generation helpers.
+     * @return void
      */
     public function __construct(PDO $authDb, string $driver, string $prefix, InviteRead $read)
     {

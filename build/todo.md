@@ -72,21 +72,20 @@ This is the default Build Mode backlog file. If the user asks about goals, unpat
 - [x] Ran caller-surface sweep after refactors across runtime bootstrap, installer paths, and extension schema invocations.
 - [x] Updated release-notes.md and checked off list.
 
-
-## 3) sys/Repository/ Refactor & Cleanup (Pending Plan, DO NOT PROCEED)
+## 3) sys/Repository/ Refactor & Cleanup
 Lingering issues & reorganization tasks. Make a plan to deal with them all in one clean sweep. Append it as a detailed checklist to this section in case we lose session or we have to bounce between agents:
-- [ ] All Repository/ classes should be public/panel/extension/library/scribe/cli-agnostic primitives. Doublecheck them all to make sure that is functionally the case:
+- [x] All Repository/ classes should be public/panel/extension/library/scribe/cli-agnostic primitives. Doublecheck them all to make sure that is functionally the case:
 	- Repositories are the canonical base data access+manipulation layer.
 	- Parser/Scribe classes, Controllers & the CLI all access data through Repositories.
 	- Repositories DO NOT access data through Parser/Scribe classes, as the Repositories ARE the primitives FOR those classes.
 	- The only Parser primitives Repositories are allowed to call directly is our focused *RepoParser.php classes.
-- [ ] Make sure no Repository is pulling up dead function/class/dependency weight irrelevant to the data type that Repository handles.
-- [ ] Scan the whole Repository/ directory for legacy aliases, compatability shims, and thin wrappers that don't add any extra logic. Purge all of them. Update all callers to use actual source functions.
-- [ ] A lot of the functions in our Repository/ classes have really long & unclear names. Do a sweep of every class and make sure the function/variable names are concise+accurate.
-- [ ] Do a sweep of all classes in Repository/ making sure PHPdoc blocks are present+accurate for ALL headings, classes & functions.
-- [ ] Update release-notes.md and check off list.
+- [x] Make sure no Repository is pulling up dead function/class/dependency weight irrelevant to the data type that Repository handles.
+- [x] Scan the whole Repository/ directory for legacy aliases, compatability shims, and thin wrappers that don't add any extra logic. Purge all of them. Update all callers to use actual source functions.
+- [x] A lot of the functions in our Repository/ classes have really long & unclear names. Do a sweep of every class and make sure the function/variable names are concise+accurate.
+- [x] Do a sweep of all classes in Repository/ making sure PHPdoc blocks are present+accurate for ALL headings, classes & functions.
+- [x] Update release-notes.md and check off list.
 
-## 4) lib/Parser/ Refactor & Cleanup (Pending Plan, DO NOT PROCEED)
+## 4) lib/Parser/ Refactor & Cleanup
 Lingering issues & reorganization tasks. Make a plan to deal with them all in one clean sweep. Append it as a detailed checklist to this section in case we lose session or we have to bounce between agents:
 - [ ] Parser/ classes are designated data access points for novice Extension authors who have no reason to use Repositories directly.
 - [ ] Parser/ classes SHOULD NOT be the primitives for Repositories. Repositories are the primitives for Parser/ classes. (Exception for *RepoParser.php classes, so Repositories have a designated safe zone for bare essential read primitives that would also be useful to give to Extension authors.)
@@ -96,7 +95,7 @@ Lingering issues & reorganization tasks. Make a plan to deal with them all in on
 - [ ] Do a sweep of all classes in Parser/ making sure PHPdoc blocks are present+accurate for ALL headings, classes & functions.
 - [ ] Update release-notes.md and check off list.
 
-## 5) lib/Scribe/ Refactor & Cleanup (Pending Plan, DO NOT PROCEED)
+## 5) lib/Scribe/ Refactor & Cleanup
 Lingering issues & reorganization tasks. Make a plan to deal with them all in one clean sweep. Append it as a detailed checklist to this section in case we lose session or we have to bounce between agents:
 - [ ] Scribe/ classes are designated easy entry points for novice Extension authors who have no reason to use Repositories directly.
 - [ ] Scribe/ classes SHOULD NOT be the primitives for Repositories. Repositories are the primitives for Scribe/ classes. (The last agent had trouble finishing this as you can see, so clarify anything uncertain.)

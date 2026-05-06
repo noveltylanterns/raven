@@ -30,6 +30,7 @@ class InviteRead
      * @param PDO    $authDb Auth-database connection for invite-token reads.
      * @param string $driver PDO driver name used for table resolution.
      * @param string $prefix Configured table prefix for auth tables.
+     * @return void
      */
     public function __construct(PDO $authDb, string $driver, string $prefix)
     {

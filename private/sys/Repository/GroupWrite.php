@@ -29,6 +29,7 @@ final class GroupWrite
      * @param string    $driver Database driver string ('mysql', 'sqlite', 'pgsql').
      * @param string    $prefix Table name prefix for this Raven installation.
      * @param GroupRead $read   Read-side instance used for existence lookups during validation.
+     * @return void
      */
     public function __construct(PDO $db, string $driver, string $prefix, GroupRead $read)
     {
@@ -60,6 +61,7 @@ final class GroupWrite
      *   cover_image?: string|null,
      *   icon_image?: string|null
      * } $files Image path strings keyed by image role.
+     * @return void
      */
     public function updateImageFiles(int $id, array $files): void
     {
@@ -71,6 +73,7 @@ final class GroupWrite
      * when they would otherwise have zero memberships.
      *
      * @param int $id Group id to delete.
+     * @return void
      */
     public function deleteById(int $id): void
     {

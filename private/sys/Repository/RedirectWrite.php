@@ -28,6 +28,7 @@ final class RedirectWrite
      * @param string      $driver      Database driver string ('mysql', 'sqlite', 'pgsql').
      * @param string      $prefix      Table name prefix for this Raven installation.
      * @param ChannelRead $channelRepo Channel read instance passed through to RedirectScribe for slug resolution.
+     * @return void
      */
     public function __construct(PDO $db, string $driver, string $prefix, ChannelRead $channelRepo)
     {
@@ -57,6 +58,7 @@ final class RedirectWrite
      * Deletes one redirect record by id.
      *
      * @param int $id Redirect id to delete.
+     * @return void
      */
     public function deleteById(int $id): void
     {

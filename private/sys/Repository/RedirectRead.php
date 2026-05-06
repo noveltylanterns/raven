@@ -33,6 +33,7 @@ class RedirectRead
      * @param string      $driver      Database driver string ('mysql', 'sqlite', 'pgsql').
      * @param string      $prefix      Table name prefix for this Raven installation.
      * @param ChannelRead $channelRepo Channel read instance for slug/id resolution and context hydration.
+     * @return void
      */
     public function __construct(PDO $db, string $driver, string $prefix, ChannelRead $channelRepo)
     {
@@ -229,8 +230,8 @@ class RedirectRead
         $params = [':slug' => $slug];
 
         if (is_string($channel)) {
-            $channelId = $this->channelRepo->idFromSlug($channel);
-            if ($channelId < 1) {
+            $channelId = $this->channelRepo->idBySlug($channel);
+            if ($channelId === null || $channelId < 1) {
                 return null;
             }
 
@@ -272,8 +273,8 @@ class RedirectRead
         $params = [':slug' => $slug];
 
         if (is_string($channel)) {
-            $channelId = $this->channelRepo->idFromSlug($channel);
-            if ($channelId < 1) {
+            $channelId = $this->channelRepo->idBySlug($channel);
+            if ($channelId === null || $channelId < 1) {
                 return null;
             }
             $sql .= ' AND r.channel = :channel';

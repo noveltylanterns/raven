@@ -34,6 +34,7 @@ class GroupRead
      * @param PDO    $db     Active database connection.
      * @param string $driver Database driver string ('mysql', 'sqlite', 'pgsql').
      * @param string $prefix Table name prefix for this Raven installation.
+     * @return void
      */
     public function __construct(PDO $db, string $driver, string $prefix)
     {
@@ -345,7 +346,7 @@ class GroupRead
      * @param string $slug Group slug to resolve.
      * @return array{
      *   group: array<string, mixed>,
-      *   members: array<int, array{id: int, username: string, name: string, avatar: string|null}>
+     *   members: array<int, array{id: int, username: string, name: string, avatar: string|null}>
      * }|null Group with member list, or null when the group is not found or not route-enabled.
      */
     public function findRoutedBySlugWithMembers(string $slug): ?array

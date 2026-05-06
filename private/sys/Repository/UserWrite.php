@@ -36,6 +36,7 @@ final class UserWrite
      * @param PDO    $rvnDb  App-database connection (group memberships).
      * @param string $driver Database driver string ('mysql', 'sqlite', 'pgsql').
      * @param string $prefix Table name prefix for this Raven installation.
+     * @return void
      */
     public function __construct(PDO $authDb, PDO $rvnDb, string $driver, string $prefix)
     {
@@ -242,17 +243,6 @@ final class UserWrite
      * @return string Physical table name for the active driver/prefix.
      */
     private function authTable(string $table): string
-    {
-        return SqlTable::appTable($this->driver, $this->prefix, $table);
-    }
-
-    /**
-     * Maps auth table names for usage through the app database connection.
-     *
-     * @param string $table Logical auth-table name.
-     * @return string Physical table name via app-table resolver.
-     */
-    private function appAuthTable(string $table): string
     {
         return SqlTable::appTable($this->driver, $this->prefix, $table);
     }

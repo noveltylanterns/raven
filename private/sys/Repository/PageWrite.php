@@ -13,7 +13,6 @@ namespace Raven\Core\Repository;
 use PDO;
 use RuntimeException;
 use Raven\Lib\Parser\ChannelRepoParser;
-use Raven\Lib\Parser\PageBlockParser;
 use Raven\Core\Debug\UniquenessProfiler;
 use Raven\Lib\Parser\PageRepoParser;
 use Raven\Lib\Scribe\PageScribe;
@@ -35,7 +34,6 @@ final class PageWrite
     private ChannelRead $channelRepo;
     private bool $categoryEnabled;
     private bool $tagEnabled;
-    private PageBlockParser $pageBlockParser;
     private PageScribe $pageScribe;
 
     /**
@@ -45,6 +43,7 @@ final class PageWrite
      * @param ChannelRead $channelRepo      Channel read-side repository for channel slug resolution.
      * @param bool        $categoryEnabled  Whether category taxonomy support is active.
      * @param bool        $tagEnabled       Whether tag taxonomy support is active.
+     * @return void
      */
     public function __construct(
         PDO $db,
@@ -60,7 +59,6 @@ final class PageWrite
         $this->channelRepo = $channelRepo;
         $this->categoryEnabled = $categoryEnabled;
         $this->tagEnabled = $tagEnabled;
-        $this->pageBlockParser = new PageBlockParser();
         $this->pageScribe = new PageScribe($db, $driver, $prefix, $categoryEnabled, $tagEnabled);
     }
 
@@ -208,7 +206,7 @@ final class PageWrite
      */
     private function normalizeContentBlocks(mixed $raw): array
     {
-        return $this->pageBlockParser->normalizeStoredBlocks($raw);
+        return PageRepoParser::normalizeStoredBlocks($raw);
     }
 
     /**
@@ -219,7 +217,7 @@ final class PageWrite
      */
     private function encodeContentBlocks(array $blocks): string
     {
-        return $this->pageBlockParser->encodeStoredBlocks($blocks);
+        return PageRepoParser::encodeStoredBlocks($blocks);
     }
 
     /**

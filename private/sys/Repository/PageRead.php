@@ -12,7 +12,6 @@ namespace Raven\Core\Repository;
 
 use PDO;
 use Raven\Lib\Parser\ChannelRepoParser;
-use Raven\Lib\Parser\PageBlockParser;
 use Raven\Lib\Parser\PageRepoParser;
 use Raven\Lib\Database\SqlTable;
 
@@ -31,7 +30,6 @@ class PageRead
     private ChannelRead $channelRepo;
     private bool $categoryEnabled;
     private bool $tagEnabled;
-    private PageBlockParser $pageBlockParser;
 
     /**
      * @param PDO         $db               Active database connection.
@@ -40,6 +38,7 @@ class PageRead
      * @param ChannelRead $channelRepo      Channel read-side repository for channel resolution.
      * @param bool        $categoryEnabled  Whether category taxonomy support is active.
      * @param bool        $tagEnabled       Whether tag taxonomy support is active.
+     * @return void
      */
     public function __construct(
         PDO $db,
@@ -55,7 +54,6 @@ class PageRead
         $this->channelRepo = $channelRepo;
         $this->categoryEnabled = $categoryEnabled;
         $this->tagEnabled = $tagEnabled;
-        $this->pageBlockParser = new PageBlockParser();
     }
 
     /**
@@ -258,8 +256,8 @@ class PageRead
         $params = [':slug' => $pageSlug];
 
         if (is_string($channel)) {
-            $channelId = $this->channelRepo->idFromSlug($channel);
-            if ($channelId < 1) {
+            $channelId = $this->channelRepo->idBySlug($channel);
+            if ($channelId === null || $channelId < 1) {
                 return null;
             }
             $sql .= ' AND p.channel = :channel';
@@ -296,8 +294,8 @@ class PageRead
         $params = [':slug' => $pageSlug];
 
         if (is_string($channel)) {
-            $channelId = $this->channelRepo->idFromSlug($channel);
-            if ($channelId < 1) {
+            $channelId = $this->channelRepo->idBySlug($channel);
+            if ($channelId === null || $channelId < 1) {
                 return null;
             }
             $sql .= ' AND p.channel = :channel';
@@ -1280,7 +1278,7 @@ class PageRead
      */
     private function decodeContentBlocks(string $raw): array
     {
-        return $this->pageBlockParser->decodeStoredBlocks($raw);
+        return PageRepoParser::decodeStoredBlocks($raw);
     }
 
     /**

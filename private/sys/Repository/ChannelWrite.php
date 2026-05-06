@@ -37,6 +37,7 @@ final class ChannelWrite
      * @param string      $prefix           Table name prefix for this Raven installation.
      * @param ChannelRead $read             Read-side instance for existence lookups and cache invalidation.
      * @param string|null $channelDirectory Absolute path to the channel file directory; defaults to private/dat/channel.
+     * @return void
      */
     public function __construct(PDO $db, string $driver, string $prefix, ChannelRead $read, ?string $channelDirectory = null)
     {
@@ -155,6 +156,7 @@ final class ChannelWrite
      *   preview_image_md_path: string|null,
      *   preview_image_lg_path: string|null
      * } $paths Image path strings keyed by size variant.
+     * @return void
      */
     public function updateImagePaths(int $id, array $paths): void
     {
@@ -212,6 +214,7 @@ final class ChannelWrite
      *
      * @param int $id Channel id to delete.
      * @throws \RuntimeException When the channel has associated pages or cannot be removed.
+     * @return void
      */
     public function deleteById(int $id): void
     {

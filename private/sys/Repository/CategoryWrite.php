@@ -29,6 +29,7 @@ final class CategoryWrite
      * @param string       $driver Database driver string ('mysql', 'sqlite', 'pgsql').
      * @param string       $prefix Table name prefix for this Raven installation.
      * @param CategoryRead $read   Read-side instance used for existence lookups during validation.
+     * @return void
      */
     public function __construct(PDO $db, string $driver, string $prefix, CategoryRead $read)
     {
@@ -56,6 +57,7 @@ final class CategoryWrite
      *   preview_image?: string|null,
      *   icon_image?: string|null
      * } $files Image path strings keyed by image role.
+     * @return void
      */
     public function updateImageFiles(int $id, array $files): void
     {
@@ -70,6 +72,7 @@ final class CategoryWrite
      *
      * @param int $fromSetId    Taxonomy set id being removed.
      * @param int $defaultSetId Taxonomy set id to reassign orphaned categories to.
+     * @return void
      */
     public function reassignSetToDefault(int $fromSetId, int $defaultSetId): void
     {
@@ -80,6 +83,7 @@ final class CategoryWrite
      * Deletes one category and removes its page assignment rows.
      *
      * @param int $id Category id to delete.
+     * @return void
      */
     public function deleteById(int $id): void
     {

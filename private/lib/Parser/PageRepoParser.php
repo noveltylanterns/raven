@@ -24,6 +24,8 @@ use Raven\Lib\Database\SqlTable;
  */
 final class PageRepoParser
 {
+    private static ?PageBlockParser $pageBlockParser = null;
+
     /**
      * Normalizes an id list into unique positive integers.
      *
@@ -88,5 +90,52 @@ final class PageRepoParser
                AND expires IS NOT NULL
                AND expires <= :now2'
         )->execute([':now' => $now, ':now2' => $now]);
+    }
+
+    /**
+     * Normalizes one mixed content-block payload into typed rows ready for storage.
+     *
+     * @param mixed $raw Raw content-block payload from repository/controller input.
+     * @return array<int, array{type: string, content: string, css_id: string, css_class: string}> Normalized block rows.
+     */
+    public static function normalizeStoredBlocks(mixed $raw): array
+    {
+        return self::pageBlockParser()->normalizeStoredBlocks($raw);
+    }
+
+    /**
+     * Decodes stored page-content JSON into normalized block rows.
+     *
+     * @param string $raw Raw JSON string from the page `content` column.
+     * @return array<int, array{type: string, content: string, css_id: string, css_class: string}> Normalized block rows.
+     */
+    public static function decodeStoredBlocks(string $raw): array
+    {
+        return self::pageBlockParser()->decodeStoredBlocks($raw);
+    }
+
+    /**
+     * Encodes normalized block rows as a JSON payload for page persistence.
+     *
+     * @param array<int, array{type: string, content: string, css_id: string, css_class: string}> $blocks Normalized content blocks.
+     * @return string JSON-encoded payload for the page `content` column.
+     */
+    public static function encodeStoredBlocks(array $blocks): string
+    {
+        return self::pageBlockParser()->encodeStoredBlocks($blocks);
+    }
+
+    /**
+     * Returns the shared page-block parser used by repository-facing block helpers.
+     *
+     * @return PageBlockParser Shared block parser instance.
+     */
+    private static function pageBlockParser(): PageBlockParser
+    {
+        if (self::$pageBlockParser === null) {
+            self::$pageBlockParser = new PageBlockParser();
+        }
+
+        return self::$pageBlockParser;
     }
 }
