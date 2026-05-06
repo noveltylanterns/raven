@@ -20,7 +20,7 @@ use RuntimeException;
 /**
  * Owns group mutation rules, writes, and guarded delete behavior.
  *
- * GroupRepository keeps the read-heavy list/lookup/public-route queries, while
+ * GroupRead keeps the read-heavy list/lookup/public-route queries, while
  * this class centralizes the stock-role policy, custom-id allocation, image
  * filename persistence, and non-stock delete safeguards for group writes.
  */
@@ -40,6 +40,7 @@ final class GroupScribe
      * @param PDO    $db     App database connection used for group writes.
      * @param string $driver Active PDO driver name for table resolution.
      * @param string $prefix Application table prefix before sanitization.
+     * @return void
      */
     public function __construct(PDO $db, string $driver, string $prefix)
     {

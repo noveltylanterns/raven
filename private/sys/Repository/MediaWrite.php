@@ -47,16 +47,15 @@ final class MediaWrite
     }
 
     /**
-     * Updates one page's gallery toggle and per-image metadata.
+     * Updates one page's cover-image selection and per-image metadata.
      *
-     * @param int   $pageId       Page whose gallery settings to update.
-     * @param bool  $enabled      Whether the gallery block should be rendered publicly.
+     * @param int                                    $pageId       Page whose gallery metadata to update.
      * @param array<int, array<string, scalar|null>> $imageUpdates Per-image metadata fields keyed by sequential index.
      * @return void
      */
-    public function updateGalleryForPage(int $pageId, bool $enabled, array $imageUpdates): void
+    public function updateGalleryForPage(int $pageId, array $imageUpdates): void
     {
-        $this->mediaScribe->updateGalleryForPage($pageId, $enabled, $imageUpdates);
+        $this->mediaScribe->updateGalleryForPage($pageId, $imageUpdates);
     }
 
     /**

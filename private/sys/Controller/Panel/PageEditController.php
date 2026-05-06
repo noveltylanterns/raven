@@ -444,10 +444,9 @@ final class PageEditController
                 'expires' => $expireAt !== '' ? $expireAt : null,
             ]);
 
-            // Keep Media tab metadata and page-level gallery toggle in sync with save.
+            // Persist Media tab metadata and cover-image selection after the page save.
             $this->mediaWrite->updateGalleryForPage(
                 $savedId,
-                $galleryEnabled,
                 $galleryImageUpdates
             );
         } catch (\Throwable $exception) {

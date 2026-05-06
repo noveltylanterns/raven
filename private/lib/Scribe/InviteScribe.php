@@ -26,6 +26,7 @@ final class InviteScribe
 
     /**
      * @param InviteWrite $inviteRepo Invite-token write side for all token create/consume/delete operations.
+     * @return void
      */
     public function __construct(InviteWrite $inviteRepo)
     {

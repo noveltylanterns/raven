@@ -34,6 +34,7 @@ final class SetScribe
      *
      * @param string $setDirectory Absolute path to the directory containing set PHP files.
      * @param string $taxonomyType Taxonomy type label (e.g. 'category' or 'tag').
+     * @return void
      */
     public function __construct(string $setDirectory, string $taxonomyType)
     {

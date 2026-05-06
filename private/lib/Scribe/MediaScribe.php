@@ -161,20 +161,16 @@ final class MediaScribe
     /**
      * Updates one page's cover image selection and per-image metadata.
      *
-     * The `enabled` parameter remains for controller/repository compatibility.
      * The current schema stores no page-level gallery toggle, so this write path
-     * only persists cover-image pointers and image-row metadata.
+     * persists cover-image pointers and image-row metadata only.
      *
-     * @param int                                          $pageId       Page whose gallery metadata is being updated.
-     * @param bool                                         $enabled      Unused gallery-enabled flag retained for compatibility.
-     * @param array<int, array<string, scalar|null>>       $imageUpdates Per-image metadata and cover selection payload.
+     * @param int                                    $pageId       Page whose gallery metadata is being updated.
+     * @param array<int, array<string, scalar|null>> $imageUpdates Per-image metadata and cover selection payload.
      * @return void
      * @throws \Throwable Re-throws database failures after rolling back the transaction.
      */
-    public function updateGalleryForPage(int $pageId, bool $enabled, array $imageUpdates): void
+    public function updateGalleryForPage(int $pageId, array $imageUpdates): void
     {
-        unset($enabled);
-
         $pages = $this->table('pages');
         $images = $this->table('media');
         $now = gmdate('Y-m-d H:i:s');

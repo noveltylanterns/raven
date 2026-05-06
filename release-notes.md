@@ -2,6 +2,13 @@
 
 *The machine is supposed to be logging patches & mods to this file. Sometimes it does, sometimes it doesn't. It might be useful for historical architectural context to your Agent at one point.*
 
+### May 6, 2026 — lib/Scribe refactor cleanup
+
+- **Dead compatibility-path removal** — removed the unused gallery-toggle argument from the media metadata write path (`MediaScribe::updateGalleryForPage`, `MediaWrite::updateGalleryForPage`, and the `PageEditController` call site). The write path now models actual persisted behavior (cover-image selection + image metadata only).
+- **Scribe naming/documentation alignment** — updated stale class references in scribe docs (`UserRepository`/`GroupRepository`/`RedirectRepository` -> `UserRead`/`GroupRead`/`RedirectRead`) so comments match current repository naming.
+- **Scribe PHPDoc sweep closeout** — filled missing constructor `@return void` tags across the remaining scribe classes (`ChannelScribe`, `SetScribe`, `TaxonomyScribe`, `InviteScribe`, `GroupScribe`, `RedirectScribe`, `UserScribe`).
+- **Checklist/docs sync** — completed and checked off section 5 (`lib/Scribe Refactor & Cleanup`) in `build/todo.md`.
+
 ### May 6, 2026 — lib/Parser refactor cleanup
 
 - **Repository-boundary verification** — re-audited repository imports to confirm repositories now only consume focused `*RepoParser` primitives (`ChannelRepoParser`, `PageRepoParser`, `SetRepoParser`) and do not depend on broader parser classes.

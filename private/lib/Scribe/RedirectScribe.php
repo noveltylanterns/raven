@@ -21,7 +21,7 @@ use RuntimeException;
 /**
  * Owns redirect mutation writes and redirect-path uniqueness enforcement.
  *
- * RedirectRepository keeps the read/listing side for panel and public routing,
+ * RedirectRead keeps the read/listing side for panel and public routing,
  * while this class centralizes the write path that validates channel scope,
  * enforces `(channel, slug)` uniqueness, and persists redirect rows.
  */
@@ -39,6 +39,7 @@ final class RedirectScribe
      * @param string            $driver      Active PDO driver name for table resolution.
      * @param string            $prefix      Application table prefix before sanitization.
      * @param ChannelRead $channelRepo Channel repository used to resolve channel slugs to ids.
+     * @return void
      */
     public function __construct(PDO $db, string $driver, string $prefix, ChannelRead $channelRepo)
     {

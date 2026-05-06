@@ -31,6 +31,7 @@ final class ChannelScribe
      * Prepares the scribe for one channel directory.
      *
      * @param string $channelDirectory Absolute path to the directory containing channel PHP files.
+     * @return void
      */
     public function __construct(string $channelDirectory)
     {

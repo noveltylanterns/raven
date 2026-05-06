@@ -19,7 +19,7 @@ use RuntimeException;
 /**
  * Owns user mutation writes across the auth/app databases and the user-media filesystem.
  *
- * UserRepository keeps the read/list/profile queries, while this class centralizes
+ * UserRead keeps the read/list/profile queries, while this class centralizes
  * create/update/delete persistence, uniqueness checks, user-string generation, and
  * membership replacement for user writes.
  *
@@ -41,6 +41,7 @@ final class UserScribe
      *
      * @param string $projectRoot Project root path for user-media filesystem writes; may be empty for DB-only callers.
      * @param AvatarUpload|null $avatarUpload Optional upload sanitizer override for media-aware callers.
+     * @return void
      */
     public function __construct(string $projectRoot = '', ?AvatarUpload $avatarUpload = null)
     {

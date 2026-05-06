@@ -32,6 +32,7 @@ abstract class TaxonomyScribe
      * @param PDO    $db     App database connection used for taxonomy writes.
      * @param string $driver Active PDO driver name used when quoting reserved columns.
      * @param string $prefix Application table prefix before resolver sanitization.
+     * @return void
      */
     public function __construct(PDO $db, string $driver, string $prefix)
     {
