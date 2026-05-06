@@ -39,7 +39,7 @@ use Raven\Core\Controller\Panel\UserInviteController;
 use Raven\Core\Controller\Panel\UserListController;
 use Raven\Lib\Auth\AuthService;
 use Raven\Lib\Auth\LoginIdentifier;
-use Raven\Lib\Auth\Panel\PermissionDefinitionCatalog;
+use Raven\Lib\View\Panel\EditorPermissions;
 use Raven\Lib\Auth\SessionFlash;
 use Raven\Lib\Extension\Panel\Manager as ExtensionManager;
 use Raven\Lib\Media\Panel\TaxonomyImageService;
@@ -645,7 +645,7 @@ final class ControllerFactory
                 $rvn['panel_editor'](),
                 new TaxonomyImageService($rvn['config']),
                 new MediaScribe($rvn['db'], $rvn['driver'], $rvn['prefix'], $rvn['config'], (string) $rvn['root']),
-                new PermissionDefinitionCatalog(),
+                new EditorPermissions(),
                 new Upload(),
                 static function () use (&$rvn): array {
                     $provider = $rvn['panel_permission_map_provider'] ?? null;

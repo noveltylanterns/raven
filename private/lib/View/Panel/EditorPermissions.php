@@ -2,21 +2,22 @@
 
 /**
  * RAVEN CMS
- * ~/private/lib/Auth/Panel/PermissionDefinitionCatalog.php
- * Builds panel permission-definition rows from stock and extension sources.
+ * ~/private/lib/View/Panel/EditorPermissions.php
+ * Builds panel permission-definition rows from stock and extension sources for group edit UI.
  * Docs: https://raven.lanterns.io
  */
 
 declare(strict_types=1);
 
-namespace Raven\Lib\Auth\Panel;
+namespace Raven\Lib\View\Panel;
 
+use Raven\Lib\Auth\Panel\PermissionBase;
 use Raven\Lib\Auth\Public\PermissionBase as PublicMask;
 
 /**
  * Builds panel permission-definition rows from stock and extension sources for group edit UI.
  */
-final class PermissionDefinitionCatalog
+final class EditorPermissions
 {
     /**
      * Returns the full list of panel permission definitions, combining stock bits and extension-provided bits.

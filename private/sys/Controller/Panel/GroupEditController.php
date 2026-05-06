@@ -15,7 +15,7 @@ use Closure;
 use Raven\Core\Repository\GroupRead;
 use Raven\Core\Repository\GroupWrite;
 use Raven\Lib\Auth\Panel\PermissionBase as PanelAccess;
-use Raven\Lib\Auth\Panel\PermissionDefinitionCatalog;
+use Raven\Lib\View\Panel\EditorPermissions;
 use Raven\Lib\Media\Panel\TaxonomyImageService;
 use Raven\Lib\Parser\GroupRouteParser;
 use Raven\Lib\Security\InputSanitizer;
@@ -42,7 +42,7 @@ final class GroupEditController
     private EditorWrapper $editor;
     private TaxonomyImageService $taxonomyImageService;
     private MediaScribe $mediaScribe;
-    private PermissionDefinitionCatalog $permissionDefinitionCatalog;
+    private EditorPermissions $permissionDefinitionCatalog;
     private Upload $uploadFileSetNormalizer;
     private Closure $panelPermissionMapProvider;
 
@@ -56,7 +56,7 @@ final class GroupEditController
      * @param EditorWrapper $editor Shared panel editor utility methods.
      * @param TaxonomyImageService $taxonomyImageService Read-side taxonomy image config and path helper.
      * @param MediaScribe $mediaScribe Write-side meta-image upload and cleanup helper.
-     * @param PermissionDefinitionCatalog $permissionDefinitionCatalog Shared panel permission-definition catalog.
+     * @param EditorPermissions $permissionDefinitionCatalog Shared panel permission-definition catalog.
      * @param Upload $uploadFileSetNormalizer Shared upload payload flattener.
      * @param callable(): array<string, array<string, mixed>> $panelPermissionMapProvider Session-scoped extension permission map provider.
      * @return void
@@ -71,7 +71,7 @@ final class GroupEditController
         EditorWrapper $editor,
         TaxonomyImageService $taxonomyImageService,
         MediaScribe $mediaScribe,
-        PermissionDefinitionCatalog $permissionDefinitionCatalog,
+        EditorPermissions $permissionDefinitionCatalog,
         Upload $uploadFileSetNormalizer,
         callable $panelPermissionMapProvider
     ) {
