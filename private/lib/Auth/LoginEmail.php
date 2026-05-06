@@ -332,7 +332,7 @@ final class LoginEmail
     /**
      * Clears all pending email-code challenges from the session regardless of method key.
      *
-     * Called by AuthService when a 2FA challenge begins or the session is fully cleared,
+     * Called by Gatekeeper when a 2FA challenge begins or the session is fully cleared,
      * so stale email challenges from prior challenge rounds cannot survive.
      */
     public function clearAllEmailChallenges(): void

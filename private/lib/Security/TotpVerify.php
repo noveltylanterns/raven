@@ -16,7 +16,7 @@ use Raven\Lib\Auth\Login2fa;
 /**
  * Verifies a submitted TOTP code against confirmed TOTP methods.
  *
- * Extracted from AuthService so callers that hold a method list can verify a
+ * Extracted from Gatekeeper so callers that hold a method list can verify a
  * TOTP code without depending on the full authentication facade.
  */
 final class TotpVerify

@@ -18,7 +18,7 @@ use Raven\Core\Schema\SchemaManager;
 use Raven\Core\Logger;
 use Raven\Core\Postmaster;
 use Raven\Lib\Parser\PageRepoParser;
-use Raven\Lib\Auth\AuthService;
+use Raven\Core\Gatekeeper;
 use Raven\Lib\Auth\SessionCookie;
 use Raven\Lib\Parser\ConfigParser;
 use Raven\Lib\Extension\Registry;
@@ -150,7 +150,7 @@ final class Raven
     $schema = new SchemaManager();
     $schema->ensureApp($rvnDb, $driver, $prefix);
 
-    // Auth DB and AuthService are lazy: many public routes (anonymous pages, feed,
+    // Auth DB and Gatekeeper are lazy: many public routes (anonymous pages, feed,
     // category listings) never touch auth at all. Deferring the auth connection and
     // schema-ensure avoids a full DB open + migration check on every request that
     // has nothing to do with login or sessions.
@@ -168,14 +168,14 @@ final class Raven
     };
 
     $auth = null;
-    $authResolver = static function () use (&$auth, $authDbResolver, $rvnDb, $driver, $prefix): AuthService {
+    $authResolver = static function () use (&$auth, $authDbResolver, $rvnDb, $driver, $prefix): Gatekeeper {
         // Same singleton guard: the auth service wraps the delight-im Auth object
         // which itself keeps session state, so only one instance per request is safe.
-        if ($auth instanceof AuthService) {
+        if ($auth instanceof Gatekeeper) {
             return $auth;
         }
 
-        $auth = new AuthService($authDbResolver(), $rvnDb, $driver, $prefix);
+        $auth = new Gatekeeper($authDbResolver(), $rvnDb, $driver, $prefix);
         return $auth;
     };
 

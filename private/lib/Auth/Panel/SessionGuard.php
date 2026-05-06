@@ -11,7 +11,7 @@ declare(strict_types=1);
 
 namespace Raven\Lib\Auth\Panel;
 
-use Raven\Lib\Auth\AuthService;
+use Raven\Core\Gatekeeper;
 use Raven\Lib\Transport\Redirect;
 
 /**
@@ -24,7 +24,7 @@ final class SessionGuard
      * Enforces panel login, panel-access permission, and 2FA verification, then syncs session identity.
      * Redirects to the login or 2FA URL, or renders a public 404, based on the request state.
      *
-     * @param AuthService    $auth                    Shared auth service.
+     * @param Gatekeeper    $auth                    Shared auth service.
      * @param bool           $isGuestLoginEntryRequest True when the request path is a login/2fa entry page (should redirect rather than 404).
      * @param string         $loginUrl                Absolute URL of the panel login page.
      * @param string         $twoFactorUrl            Absolute URL of the panel 2FA challenge page.
@@ -32,7 +32,7 @@ final class SessionGuard
      * @return void
      */
     public function requirePanelLogin(
-        AuthService $auth,
+        Gatekeeper $auth,
         bool $isGuestLoginEntryRequest,
         string $loginUrl,
         string $twoFactorUrl,
@@ -116,10 +116,10 @@ final class SessionGuard
      * Writes or clears the panel identity and capability flags in the session.
      * Called after every successful panel login gate check to keep session data current.
      *
-     * @param AuthService $auth Shared auth service.
+     * @param Gatekeeper $auth Shared auth service.
      * @return void
      */
-    public function syncPanelIdentityInSession(AuthService $auth): void
+    public function syncPanelIdentityInSession(Gatekeeper $auth): void
     {
         $userId = $auth->userId();
         if ($userId === null) {

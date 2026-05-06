@@ -17,7 +17,7 @@ use Raven\Lib\Database\SqlTable;
 /**
  * Owns auth-table profile and security-field writes for existing users.
  *
- * AuthService keeps the login/session/read facade, while this class
+ * Gatekeeper keeps the login/session/read facade, while this class
  * centralizes the SQL mutation paths for current-user preference updates,
  * password changes, avatar/cover references, and stored 2FA payload writes.
  */

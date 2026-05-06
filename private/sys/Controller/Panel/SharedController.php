@@ -13,7 +13,7 @@ namespace Raven\Core\Controller\Panel;
 
 use Raven\Core\Config;
 use Raven\Core\Renderer;
-use Raven\Lib\Auth\AuthService;
+use Raven\Core\Gatekeeper;
 use Raven\Lib\Auth\Panel\PermissionBase as PanelAccess;
 use Raven\Lib\Auth\Panel\SessionGuard;
 use Raven\Lib\Auth\SessionFlash;
@@ -31,7 +31,7 @@ final class SharedController
 {
     private Renderer $view;
     private Config $config;
-    private AuthService $auth;
+    private Gatekeeper $auth;
     private Csrf $csrf;
     private SessionFlash $flash;
     private SessionGuard $sessionGuard;
@@ -46,7 +46,7 @@ final class SharedController
     /**
      * @param Renderer $view Shared panel view renderer.
      * @param Config $config Runtime configuration reader.
-     * @param AuthService $auth Auth/session service for panel requests.
+     * @param Gatekeeper $auth Auth/session service for panel requests.
      * @param Csrf $csrf CSRF helper for panel forms and actions.
      * @param SessionFlash $flash Shared panel flash-message store.
      * @param bool $categoryEnabled Whether category routes are enabled in runtime config.
@@ -57,7 +57,7 @@ final class SharedController
     public function __construct(
         Renderer $view,
         Config $config,
-        AuthService $auth,
+        Gatekeeper $auth,
         Csrf $csrf,
         SessionFlash $flash,
         bool $categoryEnabled,
@@ -79,7 +79,7 @@ final class SharedController
     /**
      * Returns the shared auth service.
      */
-    public function auth(): AuthService
+    public function auth(): Gatekeeper
     {
         return $this->auth;
     }

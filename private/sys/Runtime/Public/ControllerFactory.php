@@ -21,7 +21,7 @@ use Raven\Core\Controller\Public\PageController as PublicPageController;
 use Raven\Core\Controller\Public\SharedController;
 use Raven\Core\Controller\Public\TagController as PublicTagController;
 use Raven\Core\Controller\Public\UserController as PublicUserController;
-use Raven\Lib\Auth\AuthService;
+use Raven\Core\Gatekeeper;
 use Raven\Lib\Auth\Public\PermissionMask as PublicPermissionMask;
 use Raven\Lib\View\Public\ThemeCatalog;
 
@@ -34,7 +34,7 @@ final class ControllerFactory
      * Registers public request-context and controller factory closures.
      *
      * @param array<string, mixed> $rvn Shared runtime container, mutated in-place.
-     * @param callable(): AuthService $resolveAuth Lazy auth-service resolver.
+     * @param callable(): Gatekeeper $resolveAuth Lazy auth-service resolver.
      * @param Closure $themeCatalogFactory Theme catalog factory closure.
      * @param Closure $extensionContentFactory Extension editor catalog factory closure.
      * @param Closure $publicContentDomain Public content domain aggregate factory closure.

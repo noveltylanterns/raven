@@ -15,7 +15,7 @@ use Raven\Core\Config;
 use Raven\Core\Debug\ClientProfiler;
 use Raven\Core\Postmaster;
 use Raven\Core\Renderer;
-use Raven\Lib\Auth\AuthService;
+use Raven\Core\Gatekeeper;
 use Raven\Lib\Auth\LoginAttempt;
 use Raven\Lib\Auth\LoginChallenge;
 use Raven\Lib\Auth\LoginEmail;
@@ -38,7 +38,7 @@ final class AuthController
 {
     private Renderer $view;
     private Config $config;
-    private AuthService $auth;
+    private Gatekeeper $auth;
     private InputSanitizer $input;
     private Csrf $csrf;
     private SessionFlash $flash;
@@ -53,14 +53,14 @@ final class AuthController
      *
      * @param Renderer       $view   Panel template renderer.
      * @param Config         $config Shared site and mail configuration.
-     * @param AuthService    $auth   Shared authentication and session service.
+     * @param Gatekeeper    $auth   Shared authentication and session service.
      * @param InputSanitizer $input  Shared input sanitizer for form field normalization.
      * @param Csrf           $csrf   CSRF token validator for form submissions.
      */
     public function __construct(
         Renderer $view,
         Config $config,
-        AuthService $auth,
+        Gatekeeper $auth,
         InputSanitizer $input,
         Csrf $csrf
     ) {
@@ -124,7 +124,7 @@ final class AuthController
             $post,
             $this->loginAttemptClientIpAddress(),
             $this->loginUiState(),
-            static function (AuthService $auth, int $userId): array {
+            static function (Gatekeeper $auth, int $userId): array {
                 return [
                     'ok' => $auth->panelService()->canAccessPanel($userId),
                     'message' => 'Panel access requires Access Dashboard permission.',

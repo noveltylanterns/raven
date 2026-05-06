@@ -13,7 +13,7 @@ namespace Raven\Core\Controller\Public;
 
 use Raven\Core\Config;
 use Raven\Core\Debug\ClientProfiler;
-use Raven\Lib\Auth\AuthService;
+use Raven\Core\Gatekeeper;
 use Raven\Lib\Auth\Public\PermissionBase as PublicPermissionBase;
 use Raven\Lib\Auth\Public\PermissionMask as PublicPermissionMask;
 use Raven\Lib\Auth\Public\SessionGuard;
@@ -40,9 +40,9 @@ use Raven\Lib\View\Public\ThemeTemplate;
 final class SharedController
 {
     private Config $config;
-    /** @var callable(): AuthService */
+    /** @var callable(): Gatekeeper */
     private $authResolver;
-    private ?AuthService $auth = null;
+    private ?Gatekeeper $auth = null;
     private InputSanitizer $input;
     private Csrf $csrf;
     private SessionFlash $flash;
@@ -63,7 +63,7 @@ final class SharedController
 
     /**
      * @param Config $config Runtime configuration reader.
-     * @param callable(): AuthService $authResolver Lazy auth/session resolver for public requests.
+     * @param callable(): Gatekeeper $authResolver Lazy auth/session resolver for public requests.
      * @param InputSanitizer $input Shared request input sanitizer.
      * @param Csrf $csrf CSRF helper for public forms and auth flows.
      * @param ThemeCatalog $themeCatalogService Shared public-theme catalog for wrapper/meta/template reads.
@@ -92,11 +92,11 @@ final class SharedController
     /**
      * Returns the shared auth service.
      *
-     * @return AuthService Public auth/session service.
+     * @return Gatekeeper Public auth/session service.
      */
-    public function auth(): AuthService
+    public function auth(): Gatekeeper
     {
-        if ($this->auth instanceof AuthService) {
+        if ($this->auth instanceof Gatekeeper) {
             return $this->auth;
         }
 
@@ -305,7 +305,7 @@ final class SharedController
     }
 
     /**
-     * Returns true when public availability can be checked without constructing AuthService.
+     * Returns true when public availability can be checked without constructing Gatekeeper.
      *
      * Public mode for visitors without an active auth session only needs the guest
      * permission bit from the app DB. Private/disabled modes still require the full

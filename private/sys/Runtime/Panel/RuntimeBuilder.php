@@ -19,7 +19,7 @@ use Raven\Core\Runtime\Panel\RepoFactory;
 use Raven\Core\Runtime\Panel\RuntimeInitializer;
 use Raven\Core\Logger;
 use Raven\Core\Renderer;
-use Raven\Lib\Auth\AuthService;
+use Raven\Core\Gatekeeper;
 use Raven\Lib\Extension\Panel\Content as ExtensionContent;
 use Raven\Lib\Extension\Panel\Manager as ExtensionManager;
 use Raven\Lib\Extension\Panel\Permissions as ExtensionPermissions;
@@ -57,7 +57,7 @@ final class RuntimeBuilder
 
         // Panel entry closures ($hasPanelPermissionBit, $canRenderPanelProfiler) capture
         // $rvn by value and call $rvn['auth']->method() directly, so auth must be a concrete
-        // AuthService before build() returns — resolve both lazy DB and service handles now.
+        // Gatekeeper before build() returns — resolve both lazy DB and service handles now.
         if (is_callable($rvn['auth_db'])) {
             $rvn['auth_db'] = ($rvn['auth_db'])();
         }
@@ -98,14 +98,14 @@ final class RuntimeBuilder
         /**
          * Resolves the lazy auth service only for panel factories that truly need it.
          */
-        $resolveAuth = static function () use (&$rvn): AuthService {
+        $resolveAuth = static function () use (&$rvn): Gatekeeper {
             $auth = $rvn['auth'] ?? null;
             if (is_callable($auth)) {
                 $auth = $auth();
                 $rvn['auth'] = $auth;
             }
 
-            if (!$auth instanceof AuthService) {
+            if (!$auth instanceof Gatekeeper) {
                 throw new RuntimeException('Panel runtime auth service resolver is unavailable.');
             }
 

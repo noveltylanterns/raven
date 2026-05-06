@@ -11,7 +11,7 @@ declare(strict_types=1);
 
 namespace Raven\Lib\Auth\Public;
 
-use Raven\Lib\Auth\AuthService;
+use Raven\Core\Gatekeeper;
 
 /**
  * Public-route access guard for site visibility modes.
@@ -24,14 +24,14 @@ final class SessionGuard
      * Calls the disabled/denied renderer callback when access should be blocked and
      * returns false. Returns true without side effects when the request may continue.
      *
-     * @param AuthService $auth Shared auth/session service.
+     * @param Gatekeeper $auth Shared auth/session service.
      * @param string $visibilityMode Raw `site.visibility` config value.
      * @param callable(): void $renderDisabled Callback that renders the disabled-site response.
      * @param callable(): void $renderDenied Callback that renders the denied response.
      * @return bool True when the request may proceed.
      */
     public function enforceSiteAvailability(
-        AuthService $auth,
+        Gatekeeper $auth,
         string $visibilityMode,
         callable $renderDisabled,
         callable $renderDenied

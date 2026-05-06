@@ -13,7 +13,7 @@ namespace Raven\Lib\Auth;
 
 use Raven\Core\Config;
 use Raven\Core\Postmaster;
-use Raven\Lib\Auth\AuthService;
+use Raven\Core\Gatekeeper;
 use Raven\Lib\Auth\Login2fa;
 use Raven\Lib\Auth\LoginEmail;
 use Raven\Lib\Auth\LoginUiState;
@@ -64,11 +64,11 @@ final class LoginChallenge
      * Reads pending session state, resolves the selected method, and returns all
      * flags and data the challenge template needs to render correctly.
      *
-     * @param AuthService  $auth    Shared authentication service.
+     * @param Gatekeeper  $auth    Shared authentication service.
      * @param LoginUiState $uiState Surface-specific login UI state.
      * @return array<string, mixed> View state payload, or an error array when the session is expired.
      */
-    public function buildViewState(AuthService $auth, LoginUiState $uiState): array
+    public function buildViewState(Gatekeeper $auth, LoginUiState $uiState): array
     {
         $challenge = $this->requirePendingChallenge($auth);
         if (!(bool) ($challenge['ok'] ?? false)) {
@@ -125,12 +125,12 @@ final class LoginChallenge
      * For email codes, issues and sends a code when the user requests one, or verifies
      * a previously issued code when one is submitted.
      *
-     * @param AuthService  $auth    Shared authentication service.
+     * @param Gatekeeper  $auth    Shared authentication service.
      * @param LoginUiState $uiState Surface-specific login UI state.
      * @param array<string, mixed> $post Submitted challenge form payload.
      * @return array<string, mixed> Result payload with `ok`, `status`, and optional `message`.
      */
-    public function verifyCodeChallenge(AuthService $auth, LoginUiState $uiState, array $post): array
+    public function verifyCodeChallenge(Gatekeeper $auth, LoginUiState $uiState, array $post): array
     {
         $challenge = $this->requirePendingChallenge($auth);
         if (!(bool) ($challenge['ok'] ?? false)) {
@@ -273,12 +273,12 @@ final class LoginChallenge
      * Updates UI state to reflect the newly selected method and clears any
      * stale per-method state (e.g. WebAuthn failure flag when switching away).
      *
-     * @param AuthService  $auth    Shared authentication service.
+     * @param Gatekeeper  $auth    Shared authentication service.
      * @param LoginUiState $uiState Surface-specific login UI state.
      * @param array<string, mixed> $post Submitted method-selection payload.
      * @return array<string, mixed> Result payload with `ok`, `status`, and optional `message`.
      */
-    public function selectMethod(AuthService $auth, LoginUiState $uiState, array $post): array
+    public function selectMethod(Gatekeeper $auth, LoginUiState $uiState, array $post): array
     {
         $challenge = $this->requirePendingChallenge($auth);
         if (!(bool) ($challenge['ok'] ?? false)) {
@@ -334,12 +334,12 @@ final class LoginChallenge
      * Validates the credential against stored user preferences, builds the WebAuthn
      * options object, and stores the challenge binary in UI state for later verification.
      *
-     * @param AuthService  $auth    Shared authentication service.
+     * @param Gatekeeper  $auth    Shared authentication service.
      * @param LoginUiState $uiState Surface-specific login UI state.
      * @param array<string, mixed> $server Server context for WebAuthn origin resolution.
      * @return array<string, mixed> Result payload with `ok`, `status`, `http_status`, and optional `payload`.
      */
-    public function webauthnOptions(AuthService $auth, LoginUiState $uiState, array $server): array
+    public function webauthnOptions(Gatekeeper $auth, LoginUiState $uiState, array $server): array
     {
         $challenge = $this->requirePendingChallenge($auth);
         if (!(bool) ($challenge['ok'] ?? false)) {
@@ -433,14 +433,14 @@ final class LoginChallenge
      * WebAuthn library verification, and on success updates the signature counter
      * and marks the session as 2FA-verified.
      *
-     * @param AuthService  $auth    Shared authentication service.
+     * @param Gatekeeper  $auth    Shared authentication service.
      * @param LoginUiState $uiState Surface-specific login UI state.
      * @param array<string, mixed> $post   Submitted WebAuthn assertion payload.
      * @param array<string, mixed> $server Server context for WebAuthn origin resolution.
      * @return array<string, mixed> Result payload with `ok`, `status`, and `http_status`.
      */
     public function verifyWebauthn(
-        AuthService $auth,
+        Gatekeeper $auth,
         LoginUiState $uiState,
         array $post,
         array $server
@@ -988,7 +988,7 @@ final class LoginChallenge
      * user's stored preferences, and returns the credential id and user-verification
      * requirement for the WebAuthn library call.
      *
-     * @param AuthService $auth           Shared authentication service.
+     * @param Gatekeeper $auth           Shared authentication service.
      * @param int         $userId         Pending 2FA user id.
      * @param array<int, array<string, mixed>> $pendingMethods Interactive method rows.
      * @param string      $selectedMethodKey Currently stored selected method key.
@@ -1002,7 +1002,7 @@ final class LoginChallenge
      * }
      */
     private function prepareWebauthnOptionsContext(
-        AuthService $auth,
+        Gatekeeper $auth,
         int $userId,
         array $pendingMethods,
         string $selectedMethodKey
@@ -1080,7 +1080,7 @@ final class LoginChallenge
      * Decodes the base64 fields from the client response, looks up the matching
      * credential in stored user preferences, and checks user-verification requirements.
      *
-     * @param AuthService $auth   Shared authentication service.
+     * @param Gatekeeper $auth   Shared authentication service.
      * @param int         $userId Pending 2FA user id.
      * @param array<string, mixed> $post Submitted WebAuthn assertion payload.
      * @return array{
@@ -1096,7 +1096,7 @@ final class LoginChallenge
      *   previous_signature_counter?: int
      * }
      */
-    private function prepareWebauthnVerifyContext(AuthService $auth, int $userId, array $post): array
+    private function prepareWebauthnVerifyContext(Gatekeeper $auth, int $userId, array $post): array
     {
         $credentialIdBinary = base64_decode((string) ($post['id'] ?? ''), true);
         $clientDataJSON = base64_decode((string) ($post['clientDataJSON'] ?? ''), true);
@@ -1192,11 +1192,11 @@ final class LoginChallenge
      * Returns an error array when the pending user id is missing or does not match the
      * logged-in user, which indicates the session expired or was tampered with.
      *
-     * @param AuthService $auth Shared authentication service.
+     * @param Gatekeeper $auth Shared authentication service.
      * @return array<string, mixed> Success payload with `ok`, `pending_user_id`, and `pending_methods`,
      *                              or an error payload with `ok: false` and a `message`.
      */
-    private function requirePendingChallenge(AuthService $auth): array
+    private function requirePendingChallenge(Gatekeeper $auth): array
     {
         $userId = $auth->userId();
         $pendingUserId = $auth->pendingTwoFactorUserId();

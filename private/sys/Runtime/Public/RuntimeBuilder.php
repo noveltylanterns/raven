@@ -18,7 +18,7 @@ use Raven\Core\Runtime\Public\DomainFactory;
 use Raven\Core\Runtime\Public\RepoFactory;
 use Raven\Core\Runtime\Public\RuntimeInitializer;
 use Raven\Core\Renderer;
-use Raven\Lib\Auth\AuthService;
+use Raven\Core\Gatekeeper;
 use Raven\Lib\Extension\Public\Content as ExtensionContent;
 use Raven\Lib\Parser\ConfigParser;
 use Raven\Lib\View\Public\ThemeCatalog;
@@ -77,14 +77,14 @@ final class RuntimeBuilder
         /**
          * Resolves the lazy auth service only for public factories that truly need it.
          */
-        $resolveAuth = static function () use (&$rvn): AuthService {
+        $resolveAuth = static function () use (&$rvn): Gatekeeper {
             $auth = $rvn['auth'] ?? null;
             if (is_callable($auth)) {
                 $auth = $auth();
                 $rvn['auth'] = $auth;
             }
 
-            if (!$auth instanceof AuthService) {
+            if (!$auth instanceof Gatekeeper) {
                 throw new RuntimeException('Public runtime auth service resolver is unavailable.');
             }
 

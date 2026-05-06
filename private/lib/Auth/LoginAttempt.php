@@ -12,6 +12,7 @@ declare(strict_types=1);
 namespace Raven\Lib\Auth;
 
 use Raven\Core\Config;
+use Raven\Core\Gatekeeper;
 use Raven\Lib\Auth\LoginChallenge;
 use Raven\Lib\Auth\LoginIdentifier;
 use Raven\Lib\Auth\LoginUiState;
@@ -49,11 +50,11 @@ final class LoginAttempt
     /**
      * Runs one full password-auth login attempt including lock checks and optional panel-access guard.
      *
-     * @param AuthService  $auth        Shared authentication service used for credential verification and lock bookkeeping.
+     * @param Gatekeeper  $auth        Shared authentication service used for credential verification and lock bookkeeping.
      * @param array<string, mixed> $post Submitted login payload containing identifier/email/username and password fields.
      * @param string $clientIpAddress Normalized client IP used for throttle tracking.
      * @param LoginUiState $uiState     Login UI state storage used for 2FA method selection and cleanup paths.
-     * @param callable(AuthService, int): array{ok: bool, message?: string}|null $accessGuard Optional post-auth access gate for route families like panel login.
+     * @param callable(Gatekeeper, int): array{ok: bool, message?: string}|null $accessGuard Optional post-auth access gate for route families like panel login.
      * @return array{
      *   status: string,
      *   message: string,
@@ -62,7 +63,7 @@ final class LoginAttempt
      * }
      */
     public function attempt(
-        AuthService $auth,
+        Gatekeeper $auth,
         array $post,
         string $clientIpAddress,
         LoginUiState $uiState,
@@ -189,12 +190,12 @@ final class LoginAttempt
     /**
      * Returns whether the identifier is currently locked by login-throttle policy.
      *
-     * @param AuthService $auth Shared authentication service.
+     * @param Gatekeeper $auth Shared authentication service.
      * @param string $identifier Normalized login identifier.
      * @param string $clientIpAddress Normalized client IP used for throttle tracking.
      * @return bool True when the identifier/IP pair is currently locked.
      */
-    private function isTemporarilyLocked(AuthService $auth, string $identifier, string $clientIpAddress): bool
+    private function isTemporarilyLocked(Gatekeeper $auth, string $identifier, string $clientIpAddress): bool
     {
         return $auth->isLoginTemporarilyLocked(
             $identifier,
@@ -206,12 +207,12 @@ final class LoginAttempt
     /**
      * Records one failed login attempt under current throttle policy settings.
      *
-     * @param AuthService $auth Shared authentication service.
+     * @param Gatekeeper $auth Shared authentication service.
      * @param string $identifier Normalized login identifier.
      * @param string $clientIpAddress Normalized client IP used for throttle tracking.
      * @return void
      */
-    private function recordFailure(AuthService $auth, string $identifier, string $clientIpAddress): void
+    private function recordFailure(Gatekeeper $auth, string $identifier, string $clientIpAddress): void
     {
         $auth->recordFailedLoginAttempt(
             $identifier,
@@ -225,12 +226,12 @@ final class LoginAttempt
     /**
      * Clears failure history for the identifier after successful authentication.
      *
-     * @param AuthService $auth Shared authentication service.
+     * @param Gatekeeper $auth Shared authentication service.
      * @param string $identifier Normalized login identifier.
      * @param string $clientIpAddress Normalized client IP used for throttle tracking.
      * @return void
      */
-    private function clearFailures(AuthService $auth, string $identifier, string $clientIpAddress): void
+    private function clearFailures(Gatekeeper $auth, string $identifier, string $clientIpAddress): void
     {
         $auth->clearFailedLoginAttempts(
             $identifier,

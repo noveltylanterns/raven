@@ -2,26 +2,28 @@
 
 /**
  * RAVEN CMS
- * ~/private/lib/Auth/AuthService.php
+ * ~/private/sys/Gatekeeper.php
  * Authentication and authorization core component.
  * Docs: https://raven.lanterns.io
  */
 
 declare(strict_types=1);
 
-namespace Raven\Lib\Auth;
+namespace Raven\Core;
 
 use PDO;
-use Raven\Lib\Auth\UserAuthCodec;
 use Raven\Lib\Auth\LoginEmail;
 use Raven\Lib\Auth\Login2fa;
 use Raven\Lib\Auth\Membership;
+use Raven\Lib\Auth\Panel\PermissionMask as PanelPermissionMask;
 use Raven\Lib\Auth\Panel\Service as PanelAuthService;
+use Raven\Lib\Auth\Public\PermissionMask as PublicPermissionMask;
 use Raven\Lib\Auth\Public\Service as PublicAuthService;
-use Raven\Lib\Database\SqlTable;
-use Raven\Lib\Scribe\AuthProfileScribe;
 use Raven\Lib\Auth\ThrottleReturn;
 use Raven\Lib\Auth\ThrottleUser;
+use Raven\Lib\Auth\UserAuthCodec;
+use Raven\Lib\Database\SqlTable;
+use Raven\Lib\Scribe\AuthProfileScribe;
 use Raven\Lib\Security\PhraseValidate;
 use Raven\Lib\Security\TotpVerify;
 use Raven\Lib\View\Preferences as PreferencesView;
@@ -31,7 +33,7 @@ use RuntimeException;
  * Authentication facade backed by Delight Auth, and exposes
  * Raven group/permission helpers used by panel authorization gates.
  */
-final class AuthService
+final class Gatekeeper
 {
     /** PDO connection for auth tables. */
     private PDO $authDb;
@@ -98,8 +100,8 @@ final class AuthService
         $throttleUser = new ThrottleUser($rvnDb, $driver, $this->prefix);
         $this->throttleReturn = new ThrottleReturn($throttleUser);
         $this->authPayloadCodec = new UserAuthCodec();
-        $panelPermissionMaskService = new Panel\PermissionMask();
-        $publicPermissionMaskService = new Public\PermissionMask($rvnDb, $this->prefix);
+        $panelPermissionMaskService = new PanelPermissionMask();
+        $publicPermissionMaskService = new PublicPermissionMask($rvnDb, $this->prefix);
         $groupMembership = new Membership($rvnDb, $driver, $prefix);
         $this->panelAuthService = new PanelAuthService(
             $panelPermissionMaskService,
@@ -726,7 +728,7 @@ final class AuthService
      * Returns the panel authorization service for direct permission checks.
      *
      * Callers on panel routes should call permission methods here rather than through
-     * AuthService delegates, which were removed to keep AuthService focused on login flows.
+     * Gatekeeper delegates, which were removed to keep Gatekeeper focused on login flows.
      *
      * @return PanelAuthService Panel authorization service instance.
      */
@@ -739,7 +741,7 @@ final class AuthService
      * Returns the public authorization service for direct visibility checks.
      *
      * Callers on public routes should call site-visibility methods here rather than
-     * through AuthService delegates.
+     * through Gatekeeper delegates.
      *
      * @return PublicAuthService Public authorization service instance.
      */

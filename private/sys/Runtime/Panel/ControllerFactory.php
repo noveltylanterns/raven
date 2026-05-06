@@ -37,7 +37,7 @@ use Raven\Core\Controller\Panel\UpdateController;
 use Raven\Core\Controller\Panel\UserEditController;
 use Raven\Core\Controller\Panel\UserInviteController;
 use Raven\Core\Controller\Panel\UserListController;
-use Raven\Lib\Auth\AuthService;
+use Raven\Core\Gatekeeper;
 use Raven\Lib\Auth\LoginIdentifier;
 use Raven\Lib\View\Panel\EditorPermissions;
 use Raven\Lib\Auth\SessionFlash;
@@ -67,7 +67,7 @@ final class ControllerFactory
      * Registers base panel closures used by entry orchestration and controller factories.
      *
      * @param array<string, mixed> $rvn Shared runtime container, mutated in-place.
-     * @param callable(): AuthService $resolveAuth Lazy auth-service resolver.
+     * @param callable(): Gatekeeper $resolveAuth Lazy auth-service resolver.
      * @param callable(): ExtensionManager $extensionManagerFactory Extension manager factory.
      * @param callable(string): array<int, array{name: string, slug: string}> $extensionFormsProvider Extension enabled-form resolver.
      * @param bool $categoryEnabled Whether category support is enabled for the current request.
