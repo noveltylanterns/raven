@@ -20,11 +20,50 @@ This is the default Build Mode backlog file. If the user asks about goals, unpat
 # Data Access Layer Refactor Cleanup (Pending Plan, DO NOT PROCEED)
 
 ## 1) lib/Database/ Refactor & Cleanup
-Lingering issues & reorganization tasks. Make a plan to deal with them all in one clean sweep. Append it as a detailed checklist to this section in case we lose session or we have to bounce between agents:
-- [ ] Make sure no Database class is pulling up dead function/class/dependency weight irrelevant to the database type or purpose that class handles.
-- [ ] Scan the whole Database/ directory for legacy aliases, compatability shims, and thin wrappers that don't add any extra logic. Purge all of them. Update all callers to use actual source functions.
-- [ ] A lot of the functions in our Database/ classes have really long & unclear names. Do a sweep of every class and make sure the function/variable names are concise+accurate.
-- [ ] Do a sweep of all classes in Database/ making sure PHPdoc blocks are present+accurate for ALL headings, classes & functions.
+
+### Connection Primitives
+
+- [ ] **ProfiledPDO.php** — PDO subclass. Wraps `exec()`, `query()`, and `prepare()` to time each call and pipe results into the profiler. Injected wherever a connection is needed; the rest of the app never sees a plain PDO.
+- [ ] **ProfiledPDOStatement.php** — PDOStatement subclass. Captures `bindValue()`/`bindParam()` values so the full parameter map is available to the profiler on `execute()`. Injected automatically via `ATTR_STATEMENT_CLASS` when ProfiledPDO prepares a statement.
+- [ ] **QueryProfilerInterface.php** — Contract for profiler implementations. One method to ask if recording is active, one to receive a query event. `RequestProfilerAdapter` in `sys/` is the live implementation; tests can inject a stub.
+
+### Connection Config & Setup
+
+- [ ] **DriverConfigNormalizer.php** — Reads the flat database config array and pulls out the driver slug, sanitized table prefix, and per-driver sub-arrays (mysql/pgsql/sqlite sections). Single source of truth for config interpretation.
+- [ ] **DsnBuilder.php** — Assembles the MySQL and PostgreSQL DSN strings from the already-normalized config sub-arrays.
+- [ ] **SqliteConnectionBootstrap.php** — Two jobs: `ensureDir()` creates the parent directory for the `.sqlite` file if it doesn't exist; `bootstrap()` fires `PRAGMA foreign_keys = ON` on the opened connection.
+- [ ] **SqlitePathResolver.php** — Maps Raven canonical key strings (`'core'`, `'pages'`, `'auth'`, `'taxonomy'`) to the actual `.sqlite` file path on disk. All four currently resolve to the same consolidated file.
+
+### Schema Orchestration
+
+- [ ] **SchemaManager.php** — The public entry point for the rest of the runtime. Has `ensure()`, `ensureApp()`, `ensureAuth()`. Gates all calls through the state stores so the pipeline only fires when something has actually changed.
+- [ ] **SchemaEnsurePipeline.php** — Executes the full ordered sequence: base tables → migrations → extension schemas → seed rows (app side), then auth tables + invite tokens (auth side). No state-tracking logic here — that's the manager's job.
+- [ ] **SchemaEnsureStateStore.php** — Skips redundant ensure passes by comparing file mtimes (marker file vs state file vs schema source files). Uses an exclusive lock to prevent a burst of concurrent requests from all running the pipeline at once. One instance per side (app / auth).
+- [ ] **SchemaComponentFactory.php** — Lazy wiring. Holds nullable slots for all schema components and constructs them on first use with shared introspector/resolver instances. Keeps the pipeline from having a 7-argument constructor.
+
+### Schema Work
+
+- [ ] **SchemaBootstrap.php** — Creates the base set of app tables from scratch across all three drivers: pages, categories, tags, redirects, media, media_variants, groups, user_groups, auth_failures. Also handles the legacy `page_images` → `media` table rename for old installs. First step in the pipeline. **FLAG: has private copies of `tableExists()` and `quotePgIdentifier()` that duplicate public methods on SchemaIntrospector — SchemaBootstrap doesn't accept an injected introspector.**
+- [ ] **SchemaBuilder.php** — Incremental migration and backfill helpers. Does not recreate tables — only adds missing columns, creates missing indexes, normalizes existing data (NULL channel → 0, slug deduplication, etc.). Called after SchemaBootstrap in the pipeline.
+- [ ] **AuthSchemaBuilder.php** — Manages the Delight Auth side. Loads and executes the Delight SQL schema file if the users table doesn't exist, applies the table prefix, then ensures all Raven-specific user profile columns (theme, avatar, bio, timezone, etc.) on every bootstrap.
+- [ ] **SchemaIntrospector.php** — Cross-driver introspection tools: `columnExists()`, `indexExists()`, `tableExists()`, `sqliteTableExists()`, `indexExistsMySql/PgSql()`, `quotePgIdentifier()`, `isAlreadyExistsError()`. Used by SchemaBuilder, AuthSchemaBuilder, and SchemaBootstrap.
+- [ ] **ExtensionSchemaRunner.php** — Iterates enabled extensions, reads each one's `schema.php` provider, and calls it with a standardized context payload (db connection, driver, prefix, table resolver closures, storage path map). Extensions that declare no storage are skipped.
+
+### Seed & Data Helpers
+
+- [ ] **SeedInstaller.php** — Fresh-install seeding. `ensureGroups()` inserts the five stock groups (admin/guest/validating/user/banned), normalizes their IDs to canonical positions 1–5, and syncs permission masks. `ensurePages()` inserts the starter home page only when no users and no root pages exist yet.
+- [ ] **SqlUpsertPolicy.php** — One method, `insertIgnoreSql()`. Returns a driver-appropriate INSERT that silently skips duplicates: `INSERT IGNORE` for MySQL, `ON CONFLICT DO NOTHING` for SQLite/PgSQL. Used by `PageScribe` for taxonomy join rows.
+
+### Shared Utility
+
+- [ ] **TableNameResolver.php** — Applies the table prefix. Has instance `resolve()` (used by injected services) and static `appTable()` / `authTable()` (for callers without an instance). All three currently just return `$prefix . $table` — the driver parameter is reserved for future per-driver quoting. **FLAG: `authTable()` is byte-for-byte identical to `appTable()` — dead distinction that never materialized.**
+
+### Known Issues to Resolve
+
+- [x] **SchemaBootstrap duplication** — injected SchemaIntrospector; deleted private `tableExists()` and `quotePgIdentifier()` copies; updated SchemaComponentFactory to pass the shared introspector instance.
+- [x] **TableNameResolver::authTable()** — kept. Has real callers in UserRead, UserWrite, InviteRead, InviteWrite, AuthService, AuthProfileScribe. Provides a named semantic lane for auth-table access that is worth preserving even though the implementation is currently identical to `appTable()` — if per-driver quoting or auth-DB prefix separation is ever needed, the distinction is already in place.
+- [x] **renameLegacyMediaTables() in SchemaBootstrap** — logged in Legacy Fallback Log below; leaving in place until safe to prune.
+
 - [ ] Update release-notes.md, clear completed section out of todo.md, and commit.
 
 ## 2) sys/Repository/ Refactor & Cleanup
@@ -126,6 +165,6 @@ Items below are the remaining classified legacy/compatibility lanes after the cu
 
 ---
 
-- None currently logged.
+- **SchemaBootstrap::renameLegacyMediaTables()** — migration shim that renames `{prefix}page_images` → `{prefix}media` and `{prefix}page_image_variants` → `{prefix}media_variants` on first bootstrap after the namespace rename. Safe to remove once all active installs have been through a bootstrap with the new table names. Check before pruning.
 
 ---

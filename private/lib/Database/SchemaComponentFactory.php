@@ -63,7 +63,7 @@ final class SchemaComponentFactory
     public function schemaBootstrap(): SchemaBootstrap
     {
         if ($this->schemaBootstrap === null) {
-            $this->schemaBootstrap = new SchemaBootstrap();
+            $this->schemaBootstrap = new SchemaBootstrap($this->schemaIntrospector());
         }
 
         return $this->schemaBootstrap;

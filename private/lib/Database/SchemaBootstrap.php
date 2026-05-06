@@ -18,6 +18,18 @@ use PDO;
  */
 final class SchemaBootstrap
 {
+    private SchemaIntrospector $introspector;
+
+    /**
+     * Accepts an optional introspector used for legacy-table rename checks.
+     *
+     * @param SchemaIntrospector|null $introspector Cross-driver schema inspection helper; defaults to a fresh instance.
+     */
+    public function __construct(?SchemaIntrospector $introspector = null)
+    {
+        $this->introspector = $introspector ?? new SchemaIntrospector();
+    }
+
     /**
      * Creates or normalizes the base Raven app schema for one database driver.
      *
@@ -533,7 +545,7 @@ final class SchemaBootstrap
      */
     private function renameLegacyTable(PDO $db, string $driver, string $fromName, string $toName): void
     {
-        if (!$this->tableExists($db, $driver, $fromName) || $this->tableExists($db, $driver, $toName)) {
+        if (!$this->introspector->tableExists($db, $driver, $fromName) || $this->introspector->tableExists($db, $driver, $toName)) {
             return;
         }
 
@@ -544,65 +556,13 @@ final class SchemaBootstrap
 
         if ($driver === 'pgsql') {
             $db->exec(
-                'ALTER TABLE ' . $this->quotePgIdentifier($fromName) . '
-                 RENAME TO ' . $this->quotePgIdentifier($toName)
+                'ALTER TABLE ' . $this->introspector->quotePgIdentifier($fromName) . '
+                 RENAME TO ' . $this->introspector->quotePgIdentifier($toName)
             );
             return;
         }
 
         $db->exec('ALTER TABLE ' . $fromName . ' RENAME TO ' . $toName);
-    }
-
-    /**
-     * Returns true when one physical table exists for the active driver.
-     *
-     * @param PDO    $db     App database connection.
-     * @param string $driver Active PDO driver name.
-     * @param string $table  Physical table name to test.
-     * @return bool True when the table exists.
-     */
-    private function tableExists(PDO $db, string $driver, string $table): bool
-    {
-        if ($driver === 'sqlite') {
-            $stmt = $db->prepare(
-                'SELECT 1 FROM sqlite_master WHERE type = :type AND name = :name LIMIT 1'
-            );
-            $stmt->execute([
-                ':type' => 'table',
-                ':name' => $table,
-            ]);
-
-            return $stmt->fetchColumn() !== false;
-        }
-
-        if ($driver === 'mysql') {
-            $stmt = $db->prepare(
-                'SELECT 1
-                 FROM information_schema.tables
-                 WHERE table_schema = DATABASE()
-                   AND table_name = :table_name
-                 LIMIT 1'
-            );
-            $stmt->execute([':table_name' => $table]);
-
-            return $stmt->fetchColumn() !== false;
-        }
-
-        $stmt = $db->prepare('SELECT to_regclass(:table_name)');
-        $stmt->execute([':table_name' => $table]);
-
-        return $stmt->fetchColumn() !== null;
-    }
-
-    /**
-     * Quotes one PostgreSQL identifier for DDL statements.
-     *
-     * @param string $identifier Physical table name to quote.
-     * @return string Double-quoted identifier.
-     */
-    private function quotePgIdentifier(string $identifier): string
-    {
-        return '"' . str_replace('"', '""', $identifier) . '"';
     }
 
 }
