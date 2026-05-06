@@ -22,6 +22,7 @@ use Raven\Lib\View\Pagination;
 use Raven\Lib\Parser\PanelParser;
 use Raven\Lib\Security\Csrf;
 use Raven\Lib\View\Panel\Footer;
+use Raven\Lib\View\Panel\Theme as PanelTheme;
 
 /**
  * Holds panel-request shared deps and helpers for split panel sub-controllers.
@@ -36,6 +37,7 @@ final class SharedController
     private SessionGuard $sessionGuard;
     private bool $categoryEnabled;
     private bool $tagEnabled;
+    private PanelTheme $panelTheme;
     /** @var array<string, bool> */
     private array $routePermissionDecisionCache = [];
     /** @var callable(): void */
@@ -70,6 +72,7 @@ final class SharedController
         $this->sessionGuard = new SessionGuard();
         $this->categoryEnabled = $categoryEnabled;
         $this->tagEnabled = $tagEnabled;
+        $this->panelTheme = new PanelTheme();
         $this->publicNotFoundRenderer = $publicNotFoundRenderer;
     }
 
@@ -724,19 +727,7 @@ final class SharedController
         }
 
         $preferences = $this->auth->userPreferences($userId);
-        $theme = is_array($preferences)
-            ? $this->normalizePanelThemeChoice((string) ($preferences['theme'] ?? 'default'), true)
-            : 'default';
-
-        if (!is_string($theme)) {
-            return $defaultTheme;
-        }
-
-        if ($theme === 'default') {
-            return $defaultTheme;
-        }
-
-        return $theme;
+        return $this->panelTheme->effectiveFromPreferences($preferences, $defaultTheme);
     }
 
     /**
@@ -762,46 +753,6 @@ final class SharedController
      */
     private function defaultPanelTheme(): string
     {
-        $theme = (string) $this->config->get('panel.theme', 'corp');
-        return $this->normalizePanelThemeChoice($theme, false) ?? 'corp';
-    }
-
-    /**
-     * Normalizes one panel-theme identifier to a valid Raven theme slug.
-     *
-     * Accepts Raven slugs (`corp`, `ice`, `midnight`) and Bootstrap data-bs-theme
-     * aliases (`default`→`corp`, `light`→`ice`, `dark`→`midnight`) so stored legacy
-     * preferences remain valid. Returns null for unrecognized non-empty values.
-     *
-     * @param string $theme Raw theme value from stored preference or config.
-     * @param bool $allowDefault Whether the `default` sentinel is permitted (user-level preference).
-     * @return string|null Canonical Raven theme slug, or null when the value is unrecognized.
-     */
-    private function normalizePanelThemeChoice(string $theme, bool $allowDefault): ?string
-    {
-        $normalized = strtolower(trim($theme));
-
-        if ($normalized === '') {
-            return $allowDefault ? 'default' : 'corp';
-        }
-
-        if ($allowDefault && $normalized === 'default') {
-            return 'default';
-        }
-
-        // Bootstrap data-bs-theme aliases: light→ice, dark→midnight, default→corp.
-        if ($normalized === 'light') {
-            return 'ice';
-        }
-
-        if ($normalized === 'dark') {
-            return 'midnight';
-        }
-
-        if (in_array($normalized, ['corp', 'ice', 'midnight'], true)) {
-            return $normalized;
-        }
-
-        return null;
+        return $this->panelTheme->defaultFromConfig($this->config);
     }
 }

@@ -1,5 +1,12 @@
 <?php
 
+/**
+ * RAVEN CMS
+ * ~/private/lib/View/Pagination.php
+ * Shared pagination state and panel/public pagination payload decorators.
+ * Docs: https://raven.lanterns.io
+ */
+
 declare(strict_types=1);
 
 namespace Raven\Lib\View;
@@ -10,6 +17,11 @@ namespace Raven\Lib\View;
 final class Pagination
 {
     /**
+     * Builds normalized pagination state from total count and requested page input.
+     *
+     * @param int $totalItems Total row count across the full result set.
+     * @param int $requestedPage Requested page number from route/query input.
+     * @param int $perPage Requested page-size value.
      * @return array{current: int, per_page: int, total_items: int, total_pages: int, offset: int}
      */
     public static function state(int $totalItems, int $requestedPage, int $perPage): array
@@ -29,6 +41,9 @@ final class Pagination
     }
 
     /**
+     * Builds panel-template pagination payload from normalized pagination state.
+     *
+     * @param string $basePath Base panel route path used when building page links.
      * @param array{current: int, per_page: int, total_items: int, total_pages: int, offset: int} $pagination
      * @param array<string, scalar|null> $query
      * @return array{current: int, per_page: int, total_items: int, total_pages: int, base_path: string, query: array<string, string>}
@@ -54,6 +69,8 @@ final class Pagination
     }
 
     /**
+     * Appends numbered link rows to one pagination payload for public templates.
+     *
      * @param array<string, mixed> $pagination
      * @return array<string, mixed>
      */

@@ -52,7 +52,7 @@ use Raven\Lib\Scribe\MediaScribe;
 use Raven\Lib\Scribe\UserScribe;
 use Raven\Lib\Security\PasswordValidator;
 use Raven\Lib\Transport\Upload;
-use Raven\Lib\View\Error as ViewError;
+use Raven\Lib\View\Public\Error as PublicError;
 use Raven\Lib\View\Form2fa;
 use Raven\Lib\Media\AvatarConfig;
 use Raven\Lib\Media\MediaConfig;
@@ -146,7 +146,7 @@ final class ControllerFactory
                 $categoryEnabled,
                 $tagEnabled,
                 static function () use (&$rvn): void {
-                    (new ViewError($rvn['config'], (string) $rvn['root']))->render404();
+                    (new PublicError($rvn['config'], (string) $rvn['root']))->render404();
                 }
             );
 
@@ -567,7 +567,6 @@ final class ControllerFactory
                 new GroupRouteParser($rvn['config'], $rvn['input']),
                 new LoginIdentifier(),
                 $rvn['panel_editor_tabs'](),
-                $rvn['panel_editor'](),
                 $rvn['panel_editor_blocks'](),
                 new AvatarConfig($rvn['config']),
                 new MediaConfig($rvn['config']),
@@ -679,7 +678,6 @@ final class ControllerFactory
                 $rvn['input'],
                 new LoginIdentifier(),
                 $rvn['panel_editor_tabs'](),
-                $rvn['panel_editor'](),
                 $rvn['panel_editor_blocks'](),
                 new AvatarConfig($rvn['config']),
                 new MediaConfig($rvn['config']),

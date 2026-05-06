@@ -27,6 +27,7 @@ use Raven\Lib\Parser\PanelParser;
 use Raven\Lib\Security\Csrf;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\View\Panel\Footer;
+use Raven\Lib\View\Panel\Theme as PanelTheme;
 
 use Raven\Lib\Transport\Redirect;
 
@@ -42,6 +43,7 @@ final class AuthController
     private Csrf $csrf;
     private SessionFlash $flash;
     private LoginIdentifier $identifierResolver;
+    private PanelTheme $panelTheme;
     private ?LoginUiState $loginUiState = null;
     private ?LoginAttempt $loginAttempt = null;
     private ?LoginChallenge $loginChallengeWorkflow = null;
@@ -69,6 +71,7 @@ final class AuthController
         $this->csrf = $csrf;
         $this->flash = new SessionFlash('_raven_flash');
         $this->identifierResolver = new LoginIdentifier();
+        $this->panelTheme = new PanelTheme();
     }
 
     /**
@@ -356,18 +359,7 @@ final class AuthController
      */
     private function defaultPanelTheme(): string
     {
-        $theme = strtolower($this->input->text((string) $this->config->get('panel.theme', 'corp'), 20));
-        if (in_array($theme, ['light', 'default', 'corp'], true)) {
-            return 'corp';
-        }
-        if (in_array($theme, ['dark', 'midnight'], true)) {
-            return 'midnight';
-        }
-        if ($theme === 'ice') {
-            return 'ice';
-        }
-
-        return 'corp';
+        return $this->panelTheme->defaultFromConfig($this->config);
     }
 
     /**

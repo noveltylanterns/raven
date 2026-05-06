@@ -22,9 +22,9 @@ use Raven\Lib\Scribe\UserScribe;
 use Raven\Lib\Security\PasswordValidator;
 use Raven\Lib\View\Qr;
 use Raven\Lib\View\Form2fa;
-use Raven\Lib\View\Panel\EditorWrapper;
 use Raven\Lib\View\Panel\EditorBlocks;
 use Raven\Lib\View\Panel\EditorTabs;
+use Raven\Lib\View\Panel\Theme as PanelTheme;
 use Raven\Lib\Media\MediaConfig;
 use Raven\Lib\Parser\UserProfileParser;
 use Raven\Lib\Security\InputSanitizer;
@@ -45,7 +45,7 @@ final class PreferencesController
     private InputSanitizer $input;
     private LoginIdentifier $loginIdentifierResolver;
     private EditorTabs $editorTabs;
-    private EditorWrapper $editor;
+    private PanelTheme $panelTheme;
     private EditorBlocks $editorBlocks;
     private AvatarConfig $avatarConfig;
     private MediaConfig $mediaConfig;
@@ -61,7 +61,6 @@ final class PreferencesController
      * @param InputSanitizer $input Shared request input sanitizer.
      * @param LoginIdentifier $loginIdentifierResolver Shared login-identifier normalization helper.
      * @param EditorTabs $editorTabs Shared editor-tab normalization helper.
-     * @param EditorWrapper $editor Shared panel editor utility methods (theme normalization).
      * @param EditorBlocks $editorBlocks Shared repeater-block view helper for modular panel rows.
      * @param AvatarConfig $avatarConfig Shared avatar-limit and template-data helper.
      * @param MediaConfig $mediaConfig Shared non-avatar media-limit helper.
@@ -78,7 +77,6 @@ final class PreferencesController
         InputSanitizer $input,
         LoginIdentifier $loginIdentifierResolver,
         EditorTabs $editorTabs,
-        EditorWrapper $editor,
         EditorBlocks $editorBlocks,
         AvatarConfig $avatarConfig,
         MediaConfig $mediaConfig,
@@ -93,7 +91,7 @@ final class PreferencesController
         $this->input = $input;
         $this->loginIdentifierResolver = $loginIdentifierResolver;
         $this->editorTabs = $editorTabs;
-        $this->editor = $editor;
+        $this->panelTheme = new PanelTheme();
         $this->editorBlocks = $editorBlocks;
         $this->avatarConfig = $avatarConfig;
         $this->mediaConfig = $mediaConfig;
@@ -125,7 +123,7 @@ final class PreferencesController
         }
 
         $activeTab = $this->editorTabs->normalizeEditorTab($_GET['tab'] ?? null, ['account', 'profile', 'security'], 'account');
-        $normalizedTheme = $this->editor->normalizePanelThemeChoice((string) ($preferences['theme'] ?? 'default'), true);
+        $normalizedTheme = $this->panelTheme->normalizeChoice((string) ($preferences['theme'] ?? 'default'), true);
         $preferences['theme'] = $normalizedTheme ?? 'default';
         $preferences['two_factor'] = $this->prepareTwoFactorMethodsForView(
             is_array($preferences['two_factor'] ?? null) ? $preferences['two_factor'] : [],
@@ -196,7 +194,7 @@ final class PreferencesController
         $bio = $this->input->text($post['bio'] ?? null, $bioMaxLength);
         $email = $this->input->email($post['email'] ?? null);
         $themeRaw = $this->input->text($post['theme'] ?? null, 50);
-        $theme = $this->editor->normalizePanelThemeChoice((string) $themeRaw, true);
+        $theme = $this->panelTheme->normalizeChoice((string) $themeRaw, true);
         $timezoneRaw = trim((string) $this->input->text($post['timezone'] ?? null, 64));
         $newPassword = $this->input->text($post['new_password'] ?? null, 255);
         $confirmNewPassword = $this->input->text($post['confirm_new_password'] ?? null, 255);

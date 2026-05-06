@@ -25,7 +25,7 @@ use Raven\Lib\Parser\UserProfileParser;
 use Raven\Lib\Security\Captcha;
 use Raven\Lib\Security\Csrf;
 use Raven\Lib\Security\InputSanitizer;
-use Raven\Lib\View\Error as ViewError;
+use Raven\Lib\View\Public\Error as PublicError;
 use Raven\Lib\View\Public\MetaService;
 use Raven\Lib\View\Public\TemplateDecorator;
 use Raven\Lib\View\Public\ThemeCatalog;
@@ -253,7 +253,7 @@ final class SharedController
      */
     public function notFound(): void
     {
-        (new ViewError($this->config, dirname(__DIR__, 4)))->render404();
+        (new PublicError($this->config, dirname(__DIR__, 4)))->render404();
     }
 
     /**
@@ -267,7 +267,7 @@ final class SharedController
      */
     public function enforceSiteAvailability(): bool
     {
-        $error = new ViewError($this->config, dirname(__DIR__, 4));
+        $error = new PublicError($this->config, dirname(__DIR__, 4));
         return $this->sessionGuard->enforceSiteAvailability(
             $this->auth,
             (string) $this->config->get('site.visibility', 'public'),

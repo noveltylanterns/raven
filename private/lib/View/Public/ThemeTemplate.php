@@ -12,7 +12,6 @@ declare(strict_types=1);
 namespace Raven\Lib\View\Public;
 
 use Raven\Lib\Security\InputSanitizer;
-use Raven\Lib\View\Theme;
 use RuntimeException;
 
 /**
@@ -365,7 +364,7 @@ final class ThemeTemplate
      */
     private function currentThemeInheritanceChain(string $themesRoot, string $themeSlug): array
     {
-        $chain = Theme::inheritanceChain(rtrim($themesRoot, '/\\'), $themeSlug);
+        $chain = ThemeDiscovery::inheritanceChain(rtrim($themesRoot, '/\\'), $themeSlug);
         if ($chain === []) {
             return [$themeSlug];
         }

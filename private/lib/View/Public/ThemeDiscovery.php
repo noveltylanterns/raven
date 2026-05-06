@@ -2,21 +2,19 @@
 
 /**
  * RAVEN CMS
- * ~/private/lib/View/Theme.php
- * Shared public-theme discovery, option, and inheritance helpers.
+ * ~/private/lib/View/Public/ThemeDiscovery.php
+ * Public-theme manifest discovery and inheritance-chain primitives.
  * Docs: https://raven.lanterns.io
  */
 
 declare(strict_types=1);
 
-namespace Raven\Lib\View;
-
-use Raven\Lib\View\Public\ThemeValidator;
+namespace Raven\Lib\View\Public;
 
 /**
  * Enumerates and resolves installed public themes from `public/theme/{slug}/theme.json`.
  */
-final class Theme
+final class ThemeDiscovery
 {
     private static ?ThemeValidator $validator = null;
 

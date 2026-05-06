@@ -23,6 +23,7 @@ use Raven\Lib\Scribe\ConfigScribe;
 use Raven\Lib\View\Panel\EditorWrapper;
 use Raven\Lib\View\Panel\EditorBlocks;
 use Raven\Lib\View\Panel\EditorTabs;
+use Raven\Lib\View\Panel\Theme as PanelTheme;
 use Raven\Lib\View\Public\ThemeCatalog;
 
 use Raven\Lib\Transport\Redirect;
@@ -141,6 +142,7 @@ final class ConfigController
     private UserProfileParser $profileContacts;
     private EditorTabs $editorTabs;
     private EditorWrapper $editor;
+    private PanelTheme $panelTheme;
     private EditorBlocks $editorBlocks;
     /** @var array<string, string>|null */
     private ?array $publicThemeOptionsCache = null;
@@ -160,7 +162,7 @@ final class ConfigController
      * @param callable(): SetRead $categorySetRepoResolver Lazy category-set read resolver.
      * @param callable(): SetRead $tagSetRepoResolver Lazy tag-set read resolver.
      * @param EditorTabs $editorTabs Shared panel editor-tab normalization and URL builder.
-     * @param EditorWrapper $editor Shared panel editor utility methods (body-text editor, theme normalization).
+     * @param EditorWrapper $editor Shared panel editor utility methods for editor fields.
      * @param EditorBlocks $editorBlocks Shared repeater-block view helper for modular panel rows.
      * @param ThemeCatalog $themeCatalogService Shared public-theme catalog for config theme options.
      * @return void
@@ -186,6 +188,7 @@ final class ConfigController
         $this->profileContacts = new UserProfileParser($input);
         $this->editorTabs = $editorTabs;
         $this->editor = $editor;
+        $this->panelTheme = new PanelTheme();
         $this->editorBlocks = $editorBlocks;
         $this->themeCatalogService = $themeCatalogService;
     }
@@ -208,7 +211,7 @@ final class ConfigController
         $configSnapshot = $this->applyDefaults(
             $configSnapshot,
             $publicThemeOptions,
-            fn (string $theme, bool $allowDefault): ?string => $this->editor->normalizePanelThemeChoice($theme, $allowDefault)
+            fn (string $theme, bool $allowDefault): ?string => $this->panelTheme->normalizeChoice($theme, $allowDefault)
         );
         $activeTab = $this->normalizeConfigTab($_GET['tab'] ?? 'basic');
 
@@ -276,7 +279,7 @@ final class ConfigController
         $currentConfig = $this->applyDefaults(
             $currentConfig,
             $publicThemeOptions,
-            fn (string $theme, bool $allowDefault): ?string => $this->editor->normalizePanelThemeChoice($theme, $allowDefault)
+            fn (string $theme, bool $allowDefault): ?string => $this->panelTheme->normalizeChoice($theme, $allowDefault)
         );
         $fields = $this->flattenFields($currentConfig);
         $nextConfig = $currentConfig;
@@ -311,7 +314,7 @@ final class ConfigController
                     $nextConfig,
                     fn (string $value): string => $this->editor->normalizeBodyTextEditorOption($value),
                     fn (string $value): string => ChannelRouteParser::normalizeGlobalSeparator($value),
-                    fn (string $theme, bool $allowDefault): ?string => $this->editor->normalizePanelThemeChoice($theme, $allowDefault),
+                    fn (string $theme, bool $allowDefault): ?string => $this->panelTheme->normalizeChoice($theme, $allowDefault),
                     $publicThemeOptions,
                     $channelRoutingOptions,
                     $categorySetOptions,
@@ -353,7 +356,7 @@ final class ConfigController
         $nextConfig = $this->applyDefaults(
             $nextConfig,
             $publicThemeOptions,
-            fn (string $theme, bool $allowDefault): ?string => $this->editor->normalizePanelThemeChoice($theme, $allowDefault)
+            fn (string $theme, bool $allowDefault): ?string => $this->panelTheme->normalizeChoice($theme, $allowDefault)
         );
         $nextConfig = $this->removeSqliteDatabaseFiles($nextConfig);
         $this->persistConfigSnapshot($nextConfig);

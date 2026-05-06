@@ -18,9 +18,9 @@ use Raven\Lib\Archive\Package as ArchivePackage;
 use Raven\Lib\Scribe\ConfigScribe;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\Transport\Upload;
-use Raven\Lib\View\Theme;
 use Raven\Lib\Transport\Redirect;
 use Raven\Lib\View\Public\ThemeCatalog;
+use Raven\Lib\View\Public\ThemeDiscovery;
 use Raven\Lib\View\Public\ThemeGenerator;
 
 /**
@@ -81,7 +81,7 @@ final class ThemeController
             'section' => 'themes',
             'themes' => $this->themeCatalogService->listForPanel(),
             'activeTheme' => $this->themeCatalogService->activeSlugFromConfig($this->config),
-            'themeOptions' => Theme::options($this->themeCatalogService->root()),
+            'themeOptions' => ThemeDiscovery::options($this->themeCatalogService->root()),
             'packageArchiveAcceptAttribute' => $archivePackages->accept(),
             'packageArchiveFormats' => $archivePackages->formatLabels(),
             'exportArchiveFormats' => $archivePackages->exportFormatOptions(),
@@ -173,8 +173,8 @@ final class ThemeController
         }
 
         $themesRoot = $this->themeCatalogService->root();
-        $themeOptions = Theme::options($themesRoot);
-        $themeManifests = Theme::manifests($themesRoot);
+        $themeOptions = ThemeDiscovery::options($themesRoot);
+        $themeManifests = ThemeDiscovery::manifests($themesRoot);
         if ($parentTheme !== '' && !isset($themeOptions[$parentTheme])) {
             $this->context->flash('error', 'Selected parent theme was not found.');
             Redirect::redirect($this->context->panelUrl('/themes'));
@@ -381,7 +381,7 @@ final class ThemeController
             Redirect::redirect($this->context->panelUrl('/themes'));
         }
 
-        $manifests = Theme::manifests($themesRoot);
+        $manifests = ThemeDiscovery::manifests($themesRoot);
         if (!isset($manifests[$themeSlug])) {
             $this->directoryTreeService()->removeTree($targetDirectory);
             $this->context->flash('error', 'Theme upload failed: theme.json is missing required/valid metadata.');

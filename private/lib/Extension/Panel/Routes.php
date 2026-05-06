@@ -15,6 +15,7 @@ use Raven\Lib\Auth\Panel\PermissionBase as PanelAccess;
 use Raven\Lib\Auth\Panel\SessionGuard;
 use Raven\Lib\Extension\Resolver;
 use Raven\Lib\Parser\PanelParser;
+use Raven\Lib\View\Panel\Theme as PanelTheme;
 use Raven\Core\Router\RouteHandler;
 
 /**
@@ -60,6 +61,8 @@ final class Routes
         $panelUrl = static function (string $suffix = '') use ($rvn): string {
             return PanelParser::fromConfig($rvn['config'], $suffix);
         };
+
+        $panelTheme = new PanelTheme();
 
         /**
          * Synchronizes the lightweight session identity used by panel chrome.
@@ -108,55 +111,12 @@ final class Routes
         };
 
         /**
-         * Normalizes one panel-theme value from config or user preferences.
-         *
-         * @param string $theme Raw stored theme value.
-         * @param bool $allowDefault Whether the `"default"` sentinel should remain distinct.
-         * @return string|null Canonical theme slug or null when invalid.
-         */
-        $normalizePanelTheme = static function (string $theme, bool $allowDefault): ?string {
-            $normalized = strtolower(trim($theme));
-            if ($normalized === '') {
-                return $allowDefault ? 'default' : 'corp';
-            }
-
-            if ($allowDefault && $normalized === 'default') {
-                return 'default';
-            }
-
-            if (in_array($normalized, ['corp', 'ice', 'midnight'], true)) {
-                return $normalized;
-            }
-
-            if (in_array($normalized, ['light', 'default'], true)) {
-                return 'corp';
-            }
-
-            if ($normalized === 'dark') {
-                return 'midnight';
-            }
-
-            return null;
-        };
-
-        /**
          * Resolves the site-default panel theme for the current installation.
          *
          * @return string Canonical default panel-theme slug.
          */
-        $defaultPanelTheme = static function () use ($rvn): string {
-            $theme = strtolower(trim((string) $rvn['config']->get('panel.theme', 'corp')));
-            if (in_array($theme, ['light', 'default', 'corp'], true)) {
-                return 'corp';
-            }
-            if (in_array($theme, ['dark', 'midnight'], true)) {
-                return 'midnight';
-            }
-            if ($theme === 'ice') {
-                return 'ice';
-            }
-
-            return 'corp';
+        $defaultPanelTheme = static function () use ($rvn, $panelTheme): string {
+            return $panelTheme->defaultFromConfig($rvn['config']);
         };
 
         /**
@@ -164,18 +124,14 @@ final class Routes
          *
          * @return string Canonical active panel-theme slug.
          */
-        $currentUserTheme = static function () use ($rvn, $defaultPanelTheme, $normalizePanelTheme): string {
-            $theme = $defaultPanelTheme();
+        $currentUserTheme = static function () use ($rvn, $defaultPanelTheme, $panelTheme): string {
+            $defaultTheme = $defaultPanelTheme();
             $userId = $rvn['auth']->userId();
-            if ($userId !== null) {
-                $prefs = $rvn['auth']->userPreferences($userId);
-                $candidate = $normalizePanelTheme((string) ($prefs['theme'] ?? 'default'), true);
-                if (is_string($candidate)) {
-                    $theme = $candidate === 'default' ? $defaultPanelTheme() : $candidate;
-                }
+            if ($userId === null) {
+                return $defaultTheme;
             }
 
-            return $theme;
+            return $panelTheme->effectiveFromPreferences($rvn['auth']->userPreferences($userId), $defaultTheme);
         };
 
         /**

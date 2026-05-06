@@ -13,7 +13,6 @@ namespace Raven\Lib\View\Public;
 
 use Raven\Core\Config;
 use Raven\Lib\Security\InputSanitizer;
-use Raven\Lib\View\Theme;
 
 /**
  * Shared public-theme catalog and slug policy helper.
@@ -55,7 +54,7 @@ final class ThemeCatalog
      */
     public function options(): array
     {
-        $options = Theme::options($this->themesRoot);
+        $options = ThemeDiscovery::options($this->themesRoot);
         if ($options === []) {
             return ['raven' => 'Raven Basic'];
         }
@@ -94,7 +93,7 @@ final class ThemeCatalog
      */
     public function inheritanceChain(string $themeSlug): array
     {
-        $chain = Theme::inheritanceChain($this->themesRoot, $themeSlug);
+        $chain = ThemeDiscovery::inheritanceChain($this->themesRoot, $themeSlug);
         if ($chain === []) {
             return [$themeSlug];
         }
@@ -136,7 +135,7 @@ final class ThemeCatalog
      */
     public function listForPanel(): array
     {
-        $manifests = Theme::manifests($this->themesRoot);
+        $manifests = ThemeDiscovery::manifests($this->themesRoot);
         $rows = [];
 
         foreach ($manifests as $slug => $manifest) {

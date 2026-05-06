@@ -26,9 +26,9 @@ use Raven\Lib\Scribe\UserScribe;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\Transport\Redirect;
 use Raven\Lib\View\Form2fa;
-use Raven\Lib\View\Panel\EditorWrapper;
 use Raven\Lib\View\Panel\EditorBlocks;
 use Raven\Lib\View\Panel\EditorTabs;
+use Raven\Lib\View\Panel\Theme as PanelTheme;
 use Raven\Lib\Media\MediaConfig;
 
 /**
@@ -48,7 +48,7 @@ final class UserEditController
     private GroupRouteParser $groupParser;
     private LoginIdentifier $loginIdentifierResolver;
     private EditorTabs $editorTabs;
-    private EditorWrapper $editor;
+    private PanelTheme $panelTheme;
     private EditorBlocks $editorBlocks;
     private AvatarConfig $avatarConfig;
     private MediaConfig $mediaConfig;
@@ -67,7 +67,6 @@ final class UserEditController
      * @param GroupRouteParser $groupParser Shared group/profile routing-policy parser.
      * @param LoginIdentifier $loginIdentifierResolver Shared login-identifier normalization helper.
      * @param EditorTabs $editorTabs Shared editor-tab normalization helper.
-     * @param EditorWrapper $editor Shared panel editor utility methods (theme normalization).
      * @param EditorBlocks $editorBlocks Shared repeater-block view helper for modular panel rows.
      * @param AvatarConfig $avatarConfig Shared avatar-limit and template-data helper.
      * @param MediaConfig $mediaConfig Shared non-avatar media-limit helper.
@@ -87,7 +86,6 @@ final class UserEditController
         GroupRouteParser $groupParser,
         LoginIdentifier $loginIdentifierResolver,
         EditorTabs $editorTabs,
-        EditorWrapper $editor,
         EditorBlocks $editorBlocks,
         AvatarConfig $avatarConfig,
         MediaConfig $mediaConfig,
@@ -105,7 +103,7 @@ final class UserEditController
         $this->groupParser = $groupParser;
         $this->loginIdentifierResolver = $loginIdentifierResolver;
         $this->editorTabs = $editorTabs;
-        $this->editor = $editor;
+        $this->panelTheme = new PanelTheme();
         $this->editorBlocks = $editorBlocks;
         $this->avatarConfig = $avatarConfig;
         $this->mediaConfig = $mediaConfig;
@@ -132,7 +130,7 @@ final class UserEditController
         $activeTab = $this->editorTabs->normalizeEditorTab($_GET['tab'] ?? null, ['account', 'permissions', 'profile', 'security'], 'account');
         $user = $id !== null ? $this->userRead->findById($id) : null;
         if (is_array($user)) {
-            $normalizedTheme = $this->editor->normalizePanelThemeChoice((string) ($user['theme'] ?? 'default'), true);
+            $normalizedTheme = $this->panelTheme->normalizeChoice((string) ($user['theme'] ?? 'default'), true);
             $user['theme'] = $normalizedTheme ?? 'default';
 
             if ($id !== null) {
@@ -228,7 +226,7 @@ final class UserEditController
         $bio = $this->input->text($post['bio'] ?? null, $bioMaxLength);
         $email = $this->input->email($post['email'] ?? null);
         $themeRaw = $this->input->text($post['theme'] ?? null, 50);
-        $theme = $this->editor->normalizePanelThemeChoice((string) $themeRaw, true);
+        $theme = $this->panelTheme->normalizeChoice((string) $themeRaw, true);
         $password = $this->input->text($post['password'] ?? null, 255);
         $passwordConfirm = $this->input->text($post['password_confirm'] ?? null, 255);
         $profileContactOptions = $this->profileContactOptions();

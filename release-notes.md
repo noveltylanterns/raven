@@ -2,6 +2,14 @@
 
 *The machine is supposed to be logging patches & mods to this file. Sometimes it does, sometimes it doesn't. It might be useful for historical architectural context to your Agent at one point.*
 
+### May 6, 2026 — lib/View refactor cleanup
+
+- **View error split** — removed `private/lib/View/Error.php`; added `private/lib/View/Public/Error.php` as the canonical public-themed status renderer used by both public route gates and panel guest fallback paths.
+- **Public theme discovery canonicalization** — removed `private/lib/View/Theme.php`; added `private/lib/View/Public/ThemeDiscovery.php`; updated all theme-manifest/inheritance callers (`ThemeCatalog`, `ThemeTemplate`, `ThemeController`, and CLI theme commands in `sys/Shell.php`) to use the new class directly.
+- **Panel theme primitive** — added `private/lib/View/Panel/Theme.php` and routed duplicated panel-theme normalization/default/effective-theme logic in `Panel/SharedController`, `Panel/AuthController`, and `Extension/Panel/Routes` through this class.
+- **Dead dependency cleanup in panel controllers** — `PreferencesController` and `UserEditController` no longer inject `EditorWrapper` solely for theme normalization; constructor wiring in `Runtime/Panel/ControllerFactory` was trimmed accordingly.
+- **View docs sweep** — added the missing Raven file header and expanded public-method PHPDoc summaries in `private/lib/View/Pagination.php`; updated `docs/filetree.md` View ownership notes for `ThemeDiscovery`, `View/Public/Error`, and `View/Panel/Theme`.
+
 ### May 5, 2026 — lib/Security/ refactor cleanup
 
 - **Captcha.php** — removed "public route" qualifier from class docblock and file header; renamed `publicMarkup()` → `markup()` so the method is not implying public-route-only scope; updated `SharedController` caller.

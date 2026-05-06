@@ -129,26 +129,6 @@ Lingering issues & reorganization tasks. Make a plan to deal with them all in on
 
 
 
-
-
-
-# lib/View/ Refactor
-Lingering issues & reorganization tasks. Make a plan to deal with them all in one clean sweep. Append it as a detailed checklist to this section in case we lose session or we have to bounce between agents:
-- [ ] Error.php has a few actual error functions, and the rest of it is theme parsing & other unrelated functions. Anything not related to actually serving errors needs to be moved to more appropriate lib/ classes.
-- [ ] Error.php has a lot of route-specific functions. This is Wrong. Error.php is supposed to be a generic panel/public/extension-agnostic primitive. Anything specific to routes should be handled in their respective controllers, routers & parsers. Alternatively, we can make dedicated focused View/Panel/Error.php & View/Public/Error.php files, and purge View/Error.php entirely
-- [ ] Theme.php looks like it has wrapper functions that dont do anything extra. These should be purged and all callers updated to the true source. The rest of lib/View/ should be purged of similar wrapper/aliases like this.
-- [ ] Theme.php's inline comments says it is a public theme helper class. I don't know if that is still true, or if this was made public/panel agnostic. It looks public-only, so it should probably be moved to View/Public/ThemeDiscovery.php, or merged/flattened into View/Public/ThemeCatalog.php entirely if that sounds more appropriate.
-- [ ] There are no View/Panel/Theme*.php classes, which makes sense because it uses a simpler template engine. I don't know if they're hiding in unrelated classes (like the Error.php issue) or if they just don't exist. We should probably have, at a minimum, a single View/Panel/Theme.php file for the bare theme psuedo-catalog switch & primitives.
-### lib/View/ Cleanup
-- [ ] Make sure no View class is pulling up dead function/class/dependency weight irrelevant to the UI element that class handles.
-- [ ] Scan the whole View/ directory for legacy aliases, compatability shims, and thin wrappers that don't add any extra logic. Purge all of them. Update all callers to use actual source functions.
-- [ ] A lot of the functions in our View/ classes have really long & unclear names. Do a sweep of every class and make sure the function/variable names are concise+accurate.
-- [ ] Do a sweep of all classes in lib/View/ making sure PHPdoc blocks are present+accurate for ALL headings, classes & functions.
-- [ ] Update release-notes.md, clear completed section out of todo.md, and commit.
-
-
-
-
 # Misc Bugs & Tweaks
 **Do not delete this heading!**
 - [ ] Since making recent progress on the library refactor, Raven's average response times have shot up from 15-40ms, to 50-180ms. Memory consumption & database queries seems to have increased a bit too. Lets figure out what's crosswired wrong to be calling all this new dead weight. Make a checklist plan for solving this, and a second checklist for a follow-up optimization pass.
