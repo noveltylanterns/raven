@@ -13,6 +13,7 @@ namespace Raven\Lib\Auth\Public;
 
 use Raven\Lib\Auth\Panel\PermissionBase as PanelMask;
 use Raven\Lib\Auth\Panel\Service as PanelService;
+use Raven\Lib\Auth\Public\PermissionBase as Mask;
 
 /**
  * Public authorization service.

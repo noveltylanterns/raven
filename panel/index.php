@@ -227,7 +227,7 @@ $canRenderPanelProfiler = static function () use ($rvn, $isPanelAuthHelperIntern
     }
 
     $userId = $rvn['auth']->userId();
-    if ($userId === null || !$rvn['auth']->canManageConfiguration($userId)) {
+    if ($userId === null || !$rvn['auth']->panelService()->canManageConfiguration($userId)) {
         return false;
     }
 
