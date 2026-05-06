@@ -1,13 +1,20 @@
 <?php
 
+/**
+ * RAVEN CMS
+ * ~/private/lib/View/Panel/EditorMedia.php
+ * Normalizes page-editor gallery payload rows from image/variant joins.
+ * Docs: https://raven.lanterns.io
+ */
+
 declare(strict_types=1);
 
-namespace Raven\Lib\Media\Panel;
+namespace Raven\Lib\View\Panel;
 
 /**
  * Normalizes combined page-image/variant result rows for page editor payloads.
  */
-final class PageEditorGalleryHydrator
+final class EditorMedia
 {
     /**
      * Drops image/variant join columns from a page editor row payload.

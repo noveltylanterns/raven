@@ -44,66 +44,66 @@ Lingering issues & reorganization tasks. Make a plan to deal with them all in on
 Lingering issues & reorganization tasks. Make a plan to deal with them all in one clean sweep. Append it as a detailed checklist to this section in case we lose session or we have to bounce between agents:
 
 ### Prep Work
-- [ ] There should not be a lib/Media/Panel/ folder:
-	- [ ] lib/Media/ should consist entirely of public/panel/extension-agnostic primitives.
-	- [ ] Move everything in lib/Media/Panel/ to lib/Media/ and delete the empty folder.
-- [ ] Scan the whole lib/Media/ directory for legacy shims and thin wrappers that don't add any extra logic. Purge all of them. Update all callers to use actual source functions.
-- [ ] Move PageEditorGalleryHydrator.php to lib/View/Panel/EditorMedia.php, update callers.
-- [ ] Do a sweep on our newly consolidated lib/Media/ folder to make sure that, in practice & function, all of our lib/Media/ classes are truly public/panel/extension-agnostic.
+- [x] There should not be a lib/Media/Panel/ folder:
+	- [x] lib/Media/ should consist entirely of public/panel/extension-agnostic primitives.
+	- [x] Move everything in lib/Media/Panel/ to lib/Media/ and delete the empty folder.
+- [x] Scan the whole lib/Media/ directory for legacy shims and thin wrappers that don't add any extra logic. Purge all of them. Update all callers to use actual source functions.
+- [x] Move PageEditorGalleryHydrator.php to lib/View/Panel/EditorMedia.php, update callers.
+- [x] Do a sweep on our newly consolidated lib/Media/ folder to make sure that, in practice & function, all of our lib/Media/ classes are truly public/panel/extension-agnostic.
 
 ### Refactor Avatar Libraries
-- [ ] **Crossed dependency to fix first:** `lib/Scribe/UserScribe.php` now imports and eagerly instantiates `lib/Media/Panel/AvatarUploadService` in its constructor. This means every `sys/Repository/UserWrite` construction (which happens on user-write routes and anywhere UserWrite is touched) pulls in AvatarUploadService and its Media/Panel dependencies — load weight that has no business in the Scribe/DB layer. Once `AvatarUpload.php` exists in `lib/Media/`, remove the `AvatarUploadService` dependency from `UserScribe` entirely and inject the new `AvatarUpload` only in the callers that actually do avatar I/O (`sys/Runtime/Panel/ControllerFactory.php` lines 574 and 686).
-- [ ] AvatarUploadService, AvatarValidationPolicy, and AvatarValidator, can all be merged into two new condensed classes: AvatarUpload.php and AvatarValidator.php. Distribute the avatar functions from the three original classes within the two new ones however makes the most sense (shoot for processing efficiency). Update all callers of the original three classes to use the two new ones.
-- [ ] All avatar components must live in `lib/Media/Avatar*.php` — load only when the caller actually needs avatar I/O, not as an implicit dependency of every user-write operation.
-- [ ] Does our new AvatarUpload.php use Transport/Upload.php? Should it for consistency?
-- [ ] Split up MediaConfigService.php:
-	- [ ] Extract all avatar-related functions and place them in new Media/AvatarConfig.php class
-	- [ ] Remaining functions go in new focused Media/MediaConfig.php class.
-	- [ ] Update all MediaConfigService callers to use AvatarConfig & MediaConfig (only use the one(s) that caller actually needs, DO NOT indiscriminately bundle both everywhere)
-	- [ ] Delete MediaConfigService.
+- [x] **Crossed dependency to fix first:** `lib/Scribe/UserScribe.php` now imports and eagerly instantiates `lib/Media/Panel/AvatarUploadService` in its constructor. This means every `sys/Repository/UserWrite` construction (which happens on user-write routes and anywhere UserWrite is touched) pulls in AvatarUploadService and its Media/Panel dependencies — load weight that has no business in the Scribe/DB layer. Once `AvatarUpload.php` exists in `lib/Media/`, remove the `AvatarUploadService` dependency from `UserScribe` entirely and inject the new `AvatarUpload` only in the callers that actually do avatar I/O (`sys/Runtime/Panel/ControllerFactory.php` lines 574 and 686).
+- [x] AvatarUploadService, AvatarValidationPolicy, and AvatarValidator, can all be merged into two new condensed classes: AvatarUpload.php and AvatarValidator.php. Distribute the avatar functions from the three original classes within the two new ones however makes the most sense (shoot for processing efficiency). Update all callers of the original three classes to use the two new ones.
+- [x] All avatar components must live in `lib/Media/Avatar*.php` — load only when the caller actually needs avatar I/O, not as an implicit dependency of every user-write operation.
+- [x] Does our new AvatarUpload.php use Transport/Upload.php? Should it for consistency?
+- [x] Split up MediaConfigService.php:
+	- [x] Extract all avatar-related functions and place them in new Media/AvatarConfig.php class
+	- [x] Remaining functions go in new focused Media/MediaConfig.php class.
+	- [x] Update all MediaConfigService callers to use AvatarConfig & MediaConfig (only use the one(s) that caller actually needs, DO NOT indiscriminately bundle both everywhere)
+	- [x] Delete MediaConfigService.
 
 ### Refactor Image Processors
-- [ ] ImageVariantProcessor.php:
-	- [ ] Extract all Exif-related functions to new ImageExifProcessor.php class.
-	- [ ] Update all callers to new source path. 
-	- [ ] Remaining functions in theory should just be related to variant processing.
+- [x] ImageVariantProcessor.php:
+	- [x] Extract all Exif-related functions to new ImageExifProcessor.php class.
+	- [x] Update all callers to new source path.
+	- [x] Remaining functions in theory should just be related to variant processing.
 
 ### Refactor Media Management Classes
-- [ ] Decommision MediaManager.php:
-	- [ ] Does MediaManager.php use Transport/Upload.php? Should it for consistency?
-	- [ ] All Imagemagick-related functions should be extracted and moved into Media/ImageImagickProcessor.php
-	- [ ] Remaining MediaManager functions in theory should all be upload logic, so put them in Media/MediaUpload.php.
-	- [ ] MediaUploadPolicy looks like something that could be folded into MediaUpload, unless you see a good reason not to.
-	- [ ] Update callers, and delete leftover MediaManager (and potentially MediaUploadPolicy).
-- [ ] MediaPathLayout.php:
+- [x] Decommision MediaManager.php:
+	- [x] Does MediaManager.php use Transport/Upload.php? Should it for consistency?
+	- [x] All Imagemagick-related functions should be extracted and moved into Media/ImageImagickProcessor.php
+	- [x] Remaining MediaManager functions in theory should all be upload logic, so put them in Media/MediaUpload.php.
+	- [x] MediaUploadPolicy looks like something that could be folded into MediaUpload, unless you see a good reason not to.
+	- [x] Update callers, and delete leftover MediaManager (and potentially MediaUploadPolicy).
+- [x] MediaPathLayout.php:
 	- removePageDirectoryIfEmpty looks like something that should use the lib/Archive/Folder.php primitive, and renamed to simply removePageDirectory.
 	- ensurePageDirectory looks like something that should use the lib/Archive/Folder.php primitive.
 	- rename MediaPathLayout to MediaStorage.php, update callers to use new source.
 
 ### Break Up Shared Taxonomy/User Image Processors
-- [ ] Refactor TaxonomyImageService.php & TaxonomyImagePathResolver:
-	- [ ] This shared Taxonomy* set is a monolith, but essentially just cover & preview images.
-	- [ ] Lets make them generic `Media/Cover*.php` & `Media/Preview*.php` classes, so they can eventually be used for more than just taxonomy routes:
+- [x] Refactor TaxonomyImageService.php & TaxonomyImagePathResolver:
+	- [x] This shared Taxonomy* set is a monolith, but essentially just cover & preview images.
+	- [x] Lets make them generic `Media/Cover*.php` & `Media/Preview*.php` classes, so they can eventually be used for more than just taxonomy routes:
 		- CoverConfig.php
 		- CoverUpload.php
 		- CoverValidator.php
 		- PreviewConfig.php
 		- PreviewUpload.php
 		- PreviewValidator.php
-	- [ ] Update callers and delete Media/Taxonomy*.php classes
-	- [ ] Anything still missing from above files after refactor will have to be clone from Avatar classes.
-- [ ] Split & decommission UserMediaPathService.php:
-	- [ ] Extract & migrate avatarTemplateData to AvatarConfig.php
-	- [ ] Extract & migrate coverPublicUrl to CoverConfig.php
-	- [ ] Extract & migrate thumbnailFilename to.... whatever Avatar*.php class is relevant.
-	- [ ] Update all callers and delete UserMediaPathService.php
+	- [x] Update callers and delete Media/Taxonomy*.php classes
+	- [x] Anything still missing from above files after refactor will have to be clone from Avatar classes.
+- [x] Split & decommission UserMediaPathService.php:
+	- [x] Extract & migrate avatarTemplateData to AvatarConfig.php
+	- [x] Extract & migrate coverPublicUrl to CoverConfig.php
+	- [x] Extract & migrate thumbnailFilename to.... whatever Avatar*.php class is relevant.
+	- [x] Update all callers and delete UserMediaPathService.php
 
 ### Final Cleanup
-- [ ] We have some scattered EXIF-processing logic throughout lib/Media/. Extract it all from whereever it is, compile into new dedicated Media/ImageExifProcessor.php, update callers as necessary (be careful, it won't be all of them).
-- [ ] Re-scan the whole lib/Media/ directory for legacy shims and thin wrappers that don't add any extra logic. Purge all of them. Update all callers to use actual source functions.
-- [ ] A lot of the functions in our Media/ classes have really long & unclear names. Do a sweep of every class and make sure the function/variable names are concise+accurate.
-- [ ] Do a sweep of all classes in Media/ making sure PHPdoc blocks are present+accurate for ALL headings, classes & functions.
-- [ ] Update release-notes.md, clear completed section out of todo.md, and commit.
+- [x] We have some scattered EXIF-processing logic throughout lib/Media/. Extract it all from whereever it is, compile into new dedicated Media/ImageExifProcessor.php, update callers as necessary (be careful, it won't be all of them).
+- [x] Re-scan the whole lib/Media/ directory for legacy shims and thin wrappers that don't add any extra logic. Purge all of them. Update all callers to use actual source functions.
+- [x] A lot of the functions in our Media/ classes have really long & unclear names. Do a sweep of every class and make sure the function/variable names are concise+accurate.
+- [x] Do a sweep of all classes in Media/ making sure PHPdoc blocks are present+accurate for ALL headings, classes & functions.
+- [x] Update release-notes.md, clear completed section out of todo.md, and commit.
 
 
 

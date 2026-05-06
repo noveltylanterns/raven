@@ -15,7 +15,7 @@ use Closure;
 use Raven\Core\Repository\ChannelRead;
 use Raven\Core\Repository\ChannelWrite;
 use Raven\Core\Repository\SetRead;
-use Raven\Lib\Media\Panel\TaxonomyImageService;
+use Raven\Lib\Media\PreviewConfig;
 use Raven\Lib\Parser\ChannelRouteParser;
 use Raven\Lib\Parser\FeedParser;
 use Raven\Lib\Parser\SetParser;
@@ -46,7 +46,7 @@ final class ChannelEditController
     private ?SetRead $tagSetRepo = null;
     private bool $categoryEnabled;
     private bool $tagEnabled;
-    private TaxonomyImageService $taxonomyImageService;
+    private PreviewConfig $taxonomyImageService;
     private MediaScribe $mediaScribe;
     private FeedParser $feedParser;
     private EditorTabs $editorTabs;
@@ -62,7 +62,7 @@ final class ChannelEditController
      * @param callable $tagSetRepoResolver Lazy tag-set repository resolver for channel set selection.
      * @param bool $categoryEnabled Whether category features are enabled in runtime config.
      * @param bool $tagEnabled Whether tag features are enabled in runtime config.
-     * @param TaxonomyImageService $taxonomyImageService Read-side taxonomy image config and path helper.
+     * @param PreviewConfig $taxonomyImageService Read-side taxonomy image config and path helper.
      * @param MediaScribe $mediaScribe Write-side meta-image upload and cleanup helper.
      * @param FeedParser $feedParser Feed route parser for RSS/Atom route settings.
      * @param EditorTabs $editorTabs Panel editor tab normalization and tab-preserving URL builder.
@@ -79,7 +79,7 @@ final class ChannelEditController
         callable $tagSetRepoResolver,
         bool $categoryEnabled,
         bool $tagEnabled,
-        TaxonomyImageService $taxonomyImageService,
+        PreviewConfig $taxonomyImageService,
         MediaScribe $mediaScribe,
         FeedParser $feedParser,
         EditorTabs $editorTabs,

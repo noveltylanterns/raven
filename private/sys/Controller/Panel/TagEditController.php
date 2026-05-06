@@ -17,7 +17,7 @@ use Raven\Core\Repository\SetRead;
 use Raven\Core\Repository\SetWrite;
 use Raven\Core\Repository\TagRead;
 use Raven\Core\Repository\TagWrite;
-use Raven\Lib\Media\Panel\TaxonomyImageService;
+use Raven\Lib\Media\PreviewConfig;
 use Raven\Lib\Parser\SetParser;
 use Raven\Lib\Parser\TagRouteParser;
 use Raven\Lib\Scribe\MediaScribe;
@@ -46,7 +46,7 @@ final class TagEditController
     private Closure $tagSetWriteResolver;
     private ?SetWrite $tagSetWrite = null;
     private bool $tagEnabled;
-    private TaxonomyImageService $taxonomyImageService;
+    private PreviewConfig $taxonomyImageService;
     private MediaScribe $mediaScribe;
     private ChannelRead $channelRead;
     private EditorTabs $editorTabs;
@@ -60,7 +60,7 @@ final class TagEditController
      * @param callable $tagSetRepoResolver Lazy tag-set read resolver; resolved for set validation on tag save.
      * @param callable $tagSetWriteResolver Lazy tag-set write resolver; resolved on tag-set save and delete routes.
      * @param bool $tagEnabled Whether tag features are enabled in runtime config.
-     * @param TaxonomyImageService $taxonomyImageService Read-side taxonomy image config and path helper.
+     * @param PreviewConfig $taxonomyImageService Read-side taxonomy image config and path helper.
      * @param MediaScribe $mediaScribe Write-side meta-image upload and cleanup helper.
      * @param ChannelRead $channelRead Channel repository for tag-set channel-assignment counts on delete.
      * @param EditorTabs $editorTabs Panel editor tab normalization and tab-preserving URL builder.
@@ -75,7 +75,7 @@ final class TagEditController
         callable $tagSetRepoResolver,
         callable $tagSetWriteResolver,
         bool $tagEnabled,
-        TaxonomyImageService $taxonomyImageService,
+        PreviewConfig $taxonomyImageService,
         MediaScribe $mediaScribe,
         ChannelRead $channelRead,
         EditorTabs $editorTabs,

@@ -24,6 +24,13 @@
 - **lib/Security/EmailGenerate** — new class; `generateCode()` moved from LoginEmail as public static `code()`.
 - **Panel controllers, SessionGuard, Extension/Panel/Routes, public/index.php, ext/database** — all callers updated for AuthService delegate removal and class renames.
 - **docs/filetree.md** — updated Auth/Panel, Auth/Public, and View/Panel sections to reflect all renames and additions.
+- **Media library cleanup (phase pass)** — removed `lib/Media/Panel/` entirely and moved all media primitives to `lib/Media/`; moved `PageEditorGalleryHydrator` to `lib/View/Panel/EditorMedia`; renamed `MediaManager` → `MediaUpload` and `MediaPathLayout` → `MediaStorage`; folded `MediaUploadPolicy` into `MediaUpload`; extracted EXIF orientation into `lib/Media/ImageExifProcessor`; extracted shared ImageMagick load/normalize flow into `lib/Media/ImageImagickProcessor`.
+- **Avatar/media config split** — replaced `MediaConfigService` with `AvatarConfig` and `MediaConfig`; replaced `UserMediaPathService` with `AvatarConfig::templateData()` + `CoverConfig::publicUrl()`; updated panel/public callers (`UserEditController`, `PreferencesController`, `TemplateDecorator`, `ControllerFactory`).
+- **Avatar validator consolidation** — merged `AvatarValidationPolicy` into canonical `AvatarValidator`; removed the compatibility adapter/service split.
+- **UserScribe load-weight fix** — `UserScribe` now resolves `AvatarUpload` lazily and only when avatar/cover filesystem methods are called; panel controller wiring now injects `AvatarUpload` explicitly only in user/preferences controller factories.
+- **Upload baseline consistency** — `AvatarUpload` and `MediaUpload` now route baseline `$_FILES` validation through `lib/Transport/Upload::validateSingleUpload()` before media-domain image processing, so upload error/HTTP-upload checks stay centralized.
+- **Taxonomy media split finalized** — taxonomy image config/path responsibilities are now consolidated on `PreviewConfig` with slot-specific `CoverUpload`/`PreviewUpload` and `CoverValidator`/`PreviewValidator`; legacy `Media/TaxonomyImageService.php` and `Media/TaxonomyImagePathResolver.php` were removed.
+- **Media docs/name cleanup pass** — completed media checklist cleanup by tightening method docs across new media classes and aligning `docs/filetree.md` media ownership notes with the new `Cover*`/`Preview*` layout.
 
 ### May 5, 2026 — Public runtime performance fixes: deferred auth DB, corrected schema state paths
 

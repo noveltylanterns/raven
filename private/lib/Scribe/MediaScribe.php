@@ -14,8 +14,14 @@ namespace Raven\Lib\Scribe;
 use PDO;
 use Raven\Core\Config;
 use Raven\Lib\Database\TableNameResolver;
-use Raven\Lib\Media\TaxonomyImagePathResolver;
-use Raven\Lib\Media\Panel\ImageVariantProcessor;
+use Raven\Lib\Media\CoverUpload;
+use Raven\Lib\Media\CoverValidator;
+use Raven\Lib\Media\ImageVariantProcessor;
+use Raven\Lib\Media\ImageExifProcessor;
+use Raven\Lib\Media\ImageImagickProcessor;
+use Raven\Lib\Media\PreviewConfig;
+use Raven\Lib\Media\PreviewUpload;
+use Raven\Lib\Media\PreviewValidator;
 
 /**
  * Owns page-media mutation writes plus panel meta-image filesystem workflows.
@@ -34,6 +40,11 @@ final class MediaScribe
     private ?Config $config;
     private ?string $projectRoot;
     private ?ImageVariantProcessor $variantProcessor = null;
+    private ?ImageExifProcessor $exifProcessor = null;
+    private ?ImageImagickProcessor $imagickProcessor = null;
+    private ?CoverValidator $coverValidator = null;
+    private ?PreviewValidator $previewValidator = null;
+    private ?CoverUpload $coverUpload = null;
 
     /**
      * Prepares the media scribe for page gallery writes and optional meta-image filesystem writes.
@@ -522,30 +533,18 @@ final class MediaScribe
             return ['ok' => false, 'error' => 'Only local image storage is supported in this build.'];
         }
 
-        $maxBytes = $this->resolveMetaImageMaxFilesizeBytes('images', 10485760);
-        $size = (int) ($upload['size'] ?? 0);
-        if ($size <= 0 || ($maxBytes > 0 && $size > $maxBytes)) {
-            return ['ok' => false, 'error' => 'Image exceeds configured max filesize.'];
+        $validation = $slot === 'cover'
+            ? $this->coverValidator()->validateUpload($upload)
+            : $this->previewValidator()->validateUpload($upload);
+        if (!(bool) ($validation['ok'] ?? false)) {
+            return ['ok' => false, 'error' => (string) ($validation['error'] ?? 'Image upload failed.')];
         }
 
-        $finfo = finfo_open(FILEINFO_MIME_TYPE);
-        $detectedMime = $finfo !== false ? (string) finfo_file($finfo, $tmpPath) : '';
-        if ($finfo !== false) {
-            finfo_close($finfo);
+        $canonicalExtension = strtolower((string) ($validation['extension'] ?? ''));
+        if ($canonicalExtension === 'jpeg') {
+            $canonicalExtension = 'jpg';
         }
-
-        $mimeToExt = [
-            'image/jpeg' => 'jpg',
-            'image/png' => 'png',
-            'image/gif' => 'gif',
-        ];
-        if (!isset($mimeToExt[$detectedMime])) {
-            return ['ok' => false, 'error' => 'Only gif/jpg/jpeg/png images are supported.'];
-        }
-        $canonicalExtension = $mimeToExt[$detectedMime];
-
-        $allowedExtensions = $this->allowedMetaImageExtensions();
-        if ($allowedExtensions === [] || !in_array($canonicalExtension, $allowedExtensions, true)) {
+        if (!in_array($canonicalExtension, ['jpg', 'png', 'gif'], true)) {
             return ['ok' => false, 'error' => 'Detected image format is not allowed by current configuration.'];
         }
 
@@ -581,19 +580,13 @@ final class MediaScribe
         $writtenPaths = [];
 
         try {
-            $source = new \Imagick();
-            $source->readImage($tmpPath);
-            $source->setIteratorIndex(0);
-            $this->metaImageVariantProcessor()->autoOrient($source);
-
-            if ((bool) $this->config->get('media.strip_exif', true)) {
-                $source->stripImage();
-            }
-
-            $source->setImageFormat($canonicalExtension === 'jpg' ? 'jpeg' : $canonicalExtension);
-            if ($canonicalExtension === 'jpg') {
-                $source->setImageCompressionQuality(85);
-            }
+            $source = $this->metaImageImagickProcessor()->readFirstFrame($tmpPath);
+            $this->metaImageImagickProcessor()->prepareForWrite(
+                $source,
+                $canonicalExtension,
+                (bool) $this->config->get('media.strip_exif', true),
+                $this->metaImageExifProcessor()
+            );
 
             if (!$source->writeImage($originalAbsolutePath)) {
                 throw new \RuntimeException('Failed to store processed source image.');
@@ -643,9 +636,7 @@ final class MediaScribe
                 $paths[$slot . '_image_' . $variantKey . '_path'] = $variantStoredPath;
             }
 
-            $record = TaxonomyImagePathResolver::supportsFilenameStorage($entityType)
-                ? [$slot . '_image' => $originalFilename]
-                : $paths;
+            $record = $this->uploadPolicyForSlot($slot)->recordPayload($entityType, $originalFilename, $paths);
 
             return [
                 'ok' => true,
@@ -779,62 +770,51 @@ final class MediaScribe
         return $imageId > 0 ? $imageId : null;
     }
 
-    /**
-     * Returns the configured meta-image extension allowlist.
-     *
-     * @return array<int, string> Normalized lower-case extension allowlist.
-     */
-    private function allowedMetaImageExtensions(): array
+    private function coverValidator(): CoverValidator
     {
+        if ($this->coverValidator instanceof CoverValidator) {
+            return $this->coverValidator;
+        }
+
         if ($this->config === null) {
-            return [];
+            throw new \RuntimeException('MediaScribe meta-image runtime is not initialized.');
         }
 
-        $raw = strtolower(trim((string) $this->config->get('media.allowed_extensions', 'gif,jpg,jpeg,png')));
-        if ($raw === '') {
-            return [];
-        }
-
-        $parts = array_map('trim', explode(',', $raw));
-        $allowed = [];
-        foreach ($parts as $part) {
-            if ($part === 'jpeg') {
-                $part = 'jpg';
-            }
-
-            if ($part === '' || preg_match('/^[a-z0-9]+$/', $part) !== 1) {
-                continue;
-            }
-
-            $allowed[$part] = $part;
-        }
-
-        return array_values($allowed);
+        $this->coverValidator = new CoverValidator($this->config);
+        return $this->coverValidator;
     }
 
-    /**
-     * Resolves the configured upload-size ceiling for meta images.
-     *
-     * @param string $target Logical media target family.
-     * @param int $defaultBytes Default byte ceiling when config is unset.
-     * @return int Maximum allowed bytes, or `0` when uploads are unlimited.
-     */
-    private function resolveMetaImageMaxFilesizeBytes(string $target, int $defaultBytes): int
+    private function previewValidator(): PreviewValidator
     {
+        if ($this->previewValidator instanceof PreviewValidator) {
+            return $this->previewValidator;
+        }
+
         if ($this->config === null) {
-            return max(1, $defaultBytes);
+            throw new \RuntimeException('MediaScribe meta-image runtime is not initialized.');
         }
 
-        $config = $this->config->all();
+        $this->previewValidator = new PreviewValidator($this->config);
+        return $this->previewValidator;
+    }
 
-        if ($target === 'images') {
-            $kb = (int) ($config['media']['max_filesize_kb'] ?? -1);
-            if ($kb >= 0) {
-                return $kb === 0 ? 0 : max(1, $kb * 1024);
-            }
+    private function coverUpload(): CoverUpload
+    {
+        if ($this->coverUpload instanceof CoverUpload) {
+            return $this->coverUpload;
         }
 
-        return max(1, $defaultBytes);
+        $this->coverUpload = new CoverUpload();
+        return $this->coverUpload;
+    }
+
+    private function uploadPolicyForSlot(string $slot): CoverUpload|PreviewUpload
+    {
+        if ($slot === 'cover') {
+            return $this->coverUpload();
+        }
+
+        return new PreviewUpload($slot);
     }
 
     /**
@@ -912,6 +892,36 @@ final class MediaScribe
 
         $this->variantProcessor = new ImageVariantProcessor($this->config);
         return $this->variantProcessor;
+    }
+
+    /**
+     * Returns the EXIF processor used by meta-image upload helpers.
+     *
+     * @return ImageExifProcessor Shared EXIF-orientation processor instance.
+     */
+    private function metaImageExifProcessor(): ImageExifProcessor
+    {
+        if ($this->exifProcessor instanceof ImageExifProcessor) {
+            return $this->exifProcessor;
+        }
+
+        $this->exifProcessor = new ImageExifProcessor();
+        return $this->exifProcessor;
+    }
+
+    /**
+     * Returns the ImageMagick processor used by meta-image upload helpers.
+     *
+     * @return ImageImagickProcessor Shared ImageMagick pipeline helper.
+     */
+    private function metaImageImagickProcessor(): ImageImagickProcessor
+    {
+        if ($this->imagickProcessor instanceof ImageImagickProcessor) {
+            return $this->imagickProcessor;
+        }
+
+        $this->imagickProcessor = new ImageImagickProcessor();
+        return $this->imagickProcessor;
     }
 
     /**

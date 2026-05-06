@@ -13,7 +13,7 @@ namespace Raven\Lib\Parser;
 
 use PDO;
 use Raven\Lib\Database\TableNameResolver;
-use Raven\Lib\Media\TaxonomyImagePathResolver;
+use Raven\Lib\Media\PreviewConfig;
 
 /**
  * Repository-backed parser for category lookup rows and routing option payloads.
@@ -117,12 +117,12 @@ final class CategoryRepoParser
     private function hydrateCategoryRow(array $row): array
     {
         $id = (int) ($row['id'] ?? 0);
-        $storage = TaxonomyImagePathResolver::storagePayloadFromRecord('category', $row);
-        if (TaxonomyImagePathResolver::supportsFilenameStorage('category')) {
+        $storage = PreviewConfig::storagePayloadFromRecord('category', $row);
+        if (PreviewConfig::supportsFilenameStorage('category')) {
             $row['cover_image'] = $storage['cover_image'] ?? null;
             $row['preview_image'] = $storage['preview_image'] ?? null;
         }
 
-        return array_merge($row, TaxonomyImagePathResolver::pathsFromStoragePayload('category', $id, $storage));
+        return array_merge($row, PreviewConfig::pathsFromStoragePayload('category', $id, $storage));
     }
 }

@@ -12,7 +12,7 @@ namespace Raven\Core\Repository;
 
 use PDO;
 use Raven\Lib\Database\TableNameResolver;
-use Raven\Lib\Media\TaxonomyImagePathResolver;
+use Raven\Lib\Media\PreviewConfig;
 
 /**
  * SELECT and lookup methods for page tags.
@@ -438,7 +438,7 @@ class TagRead
     private function hydrateRow(array $row): array
     {
         $id = (int) ($row['id'] ?? 0);
-        $storage = TaxonomyImagePathResolver::storagePayloadFromRecord('tags', $row);
+        $storage = PreviewConfig::storagePayloadFromRecord('tags', $row);
         $row['set'] = (int) ($row['set'] ?? 0);
         $row['cover_image'] = $storage['cover_image'] ?? null;
         $row['preview_image'] = $storage['preview_image'] ?? null;
@@ -446,7 +446,7 @@ class TagRead
 
         return array_merge(
             $row,
-            TaxonomyImagePathResolver::pathsFromStoragePayload('tags', $id, $storage)
+            PreviewConfig::pathsFromStoragePayload('tags', $id, $storage)
         );
     }
 

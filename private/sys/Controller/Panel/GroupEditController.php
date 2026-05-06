@@ -16,7 +16,7 @@ use Raven\Core\Repository\GroupRead;
 use Raven\Core\Repository\GroupWrite;
 use Raven\Lib\Auth\Panel\PermissionBase as PanelAccess;
 use Raven\Lib\View\Panel\EditorPermissions;
-use Raven\Lib\Media\Panel\TaxonomyImageService;
+use Raven\Lib\Media\PreviewConfig;
 use Raven\Lib\Parser\GroupRouteParser;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\Scribe\MediaScribe;
@@ -40,7 +40,7 @@ final class GroupEditController
     private GroupRouteParser $groupRouteParser;
     private EditorTabs $editorTabs;
     private EditorWrapper $editor;
-    private TaxonomyImageService $taxonomyImageService;
+    private PreviewConfig $taxonomyImageService;
     private MediaScribe $mediaScribe;
     private EditorPermissions $permissionDefinitionCatalog;
     private Upload $uploadFileSetNormalizer;
@@ -54,7 +54,7 @@ final class GroupEditController
      * @param GroupRouteParser $groupRouteParser Group route parser for routing-policy reads.
      * @param EditorTabs $editorTabs Panel editor tab normalization and tab-preserving URL builder.
      * @param EditorWrapper $editor Shared panel editor utility methods.
-     * @param TaxonomyImageService $taxonomyImageService Read-side taxonomy image config and path helper.
+     * @param PreviewConfig $taxonomyImageService Read-side taxonomy image config and path helper.
      * @param MediaScribe $mediaScribe Write-side meta-image upload and cleanup helper.
      * @param EditorPermissions $permissionDefinitionCatalog Shared panel permission-definition catalog.
      * @param Upload $uploadFileSetNormalizer Shared upload payload flattener.
@@ -69,7 +69,7 @@ final class GroupEditController
         GroupRouteParser $groupRouteParser,
         EditorTabs $editorTabs,
         EditorWrapper $editor,
-        TaxonomyImageService $taxonomyImageService,
+        PreviewConfig $taxonomyImageService,
         MediaScribe $mediaScribe,
         EditorPermissions $permissionDefinitionCatalog,
         Upload $uploadFileSetNormalizer,

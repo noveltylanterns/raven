@@ -17,7 +17,7 @@ use Raven\Core\Repository\CategoryWrite;
 use Raven\Core\Repository\ChannelRead;
 use Raven\Core\Repository\SetRead;
 use Raven\Core\Repository\SetWrite;
-use Raven\Lib\Media\Panel\TaxonomyImageService;
+use Raven\Lib\Media\PreviewConfig;
 use Raven\Lib\Parser\CategoryRouteParser;
 use Raven\Lib\Parser\SetParser;
 use Raven\Lib\Security\InputSanitizer;
@@ -46,7 +46,7 @@ final class CategoryEditController
     private Closure $categorySetWriteResolver;
     private ?SetWrite $categorySetWrite = null;
     private bool $categoryEnabled;
-    private TaxonomyImageService $taxonomyImageService;
+    private PreviewConfig $taxonomyImageService;
     private MediaScribe $mediaScribe;
     private ChannelRead $channelRead;
     private EditorTabs $editorTabs;
@@ -60,7 +60,7 @@ final class CategoryEditController
      * @param callable $categorySetRepoResolver Lazy category-set read resolver; resolved for set validation on category save.
      * @param callable $categorySetWriteResolver Lazy category-set write resolver; resolved on category-set save and delete routes.
      * @param bool $categoryEnabled Whether category features are enabled in runtime config.
-     * @param TaxonomyImageService $taxonomyImageService Read-side taxonomy image config and path helper.
+     * @param PreviewConfig $taxonomyImageService Read-side taxonomy image config and path helper.
      * @param MediaScribe $mediaScribe Write-side meta-image upload and cleanup helper.
      * @param ChannelRead $channelRead Channel repository for category-set channel-assignment counts on delete.
      * @param EditorTabs $editorTabs Panel editor tab normalization and tab-preserving URL builder.
@@ -75,7 +75,7 @@ final class CategoryEditController
         callable $categorySetRepoResolver,
         callable $categorySetWriteResolver,
         bool $categoryEnabled,
-        TaxonomyImageService $taxonomyImageService,
+        PreviewConfig $taxonomyImageService,
         MediaScribe $mediaScribe,
         ChannelRead $channelRead,
         EditorTabs $editorTabs,

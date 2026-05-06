@@ -42,8 +42,9 @@ use Raven\Lib\Auth\LoginIdentifier;
 use Raven\Lib\View\Panel\EditorPermissions;
 use Raven\Lib\Auth\SessionFlash;
 use Raven\Lib\Extension\Panel\Manager as ExtensionManager;
-use Raven\Lib\Media\Panel\TaxonomyImageService;
-use Raven\Lib\Media\Panel\UserMediaPathService;
+use Raven\Lib\Media\PreviewConfig;
+use Raven\Lib\Media\CoverConfig;
+use Raven\Lib\Media\AvatarUpload;
 use Raven\Lib\Parser\FeedParser;
 use Raven\Lib\Parser\GroupRouteParser;
 use Raven\Lib\Parser\UserProfileParser;
@@ -53,7 +54,8 @@ use Raven\Lib\Security\PasswordValidator;
 use Raven\Lib\Transport\Upload;
 use Raven\Lib\View\Error as ViewError;
 use Raven\Lib\View\Form2fa;
-use Raven\Lib\Media\Panel\MediaConfigService;
+use Raven\Lib\Media\AvatarConfig;
+use Raven\Lib\Media\MediaConfig;
 use Raven\Lib\View\Public\ThemeCatalog;
 
 /**
@@ -318,7 +320,7 @@ final class ControllerFactory
                 $taxonomyDomain['tag_set'],
                 $taxonomyDomain['category_enabled'],
                 $taxonomyDomain['tag_enabled'],
-                new TaxonomyImageService($rvn['config']),
+                new PreviewConfig($rvn['config']),
                 new MediaScribe($rvn['db'], $rvn['driver'], $rvn['prefix'], $rvn['config'], (string) $rvn['root']),
                 new FeedParser($rvn['config'], $rvn['input']),
                 $rvn['panel_editor_tabs'](),
@@ -373,7 +375,7 @@ final class ControllerFactory
                 $taxonomyDomain['category_set'],
                 $taxonomyDomain['category_set_write'],
                 $taxonomyDomain['category_enabled'],
-                new TaxonomyImageService($rvn['config']),
+                new PreviewConfig($rvn['config']),
                 new MediaScribe($rvn['db'], $rvn['driver'], $rvn['prefix'], $rvn['config'], (string) $rvn['root']),
                 $taxonomyDomain['channel_read'],
                 $rvn['panel_editor_tabs'](),
@@ -471,7 +473,7 @@ final class ControllerFactory
                 $taxonomyDomain['tag_set'],
                 $taxonomyDomain['tag_set_write'],
                 $taxonomyDomain['tag_enabled'],
-                new TaxonomyImageService($rvn['config']),
+                new PreviewConfig($rvn['config']),
                 new MediaScribe($rvn['db'], $rvn['driver'], $rvn['prefix'], $rvn['config'], (string) $rvn['root']),
                 $taxonomyDomain['channel_read'],
                 $rvn['panel_editor_tabs'](),
@@ -559,7 +561,6 @@ final class ControllerFactory
                 $requestContextFactory(),
                 $rvn['config'],
                 $rvn['input'],
-                (string) $rvn['root'],
                 $userDomain['group_read'],
                 $userDomain['user_read'],
                 $userDomain['user_write'],
@@ -568,11 +569,12 @@ final class ControllerFactory
                 $rvn['panel_editor_tabs'](),
                 $rvn['panel_editor'](),
                 $rvn['panel_editor_blocks'](),
-                new MediaConfigService($rvn['config']),
+                new AvatarConfig($rvn['config']),
+                new MediaConfig($rvn['config']),
                 new UserProfileParser($rvn['input']),
                 new Form2fa($rvn['input']),
-                new UserScribe((string) $rvn['root']),
-                new UserMediaPathService()
+                new UserScribe((string) $rvn['root'], new AvatarUpload()),
+                new CoverConfig()
             );
 
             return $userEditController;
@@ -643,7 +645,7 @@ final class ControllerFactory
                 new GroupRouteParser($rvn['config'], $rvn['input']),
                 $rvn['panel_editor_tabs'](),
                 $rvn['panel_editor'](),
-                new TaxonomyImageService($rvn['config']),
+                new PreviewConfig($rvn['config']),
                 new MediaScribe($rvn['db'], $rvn['driver'], $rvn['prefix'], $rvn['config'], (string) $rvn['root']),
                 new EditorPermissions(),
                 new Upload(),
@@ -675,16 +677,16 @@ final class ControllerFactory
                 $requestContextFactory(),
                 $rvn['config'],
                 $rvn['input'],
-                (string) $rvn['root'],
                 new LoginIdentifier(),
                 $rvn['panel_editor_tabs'](),
                 $rvn['panel_editor'](),
                 $rvn['panel_editor_blocks'](),
-                new MediaConfigService($rvn['config']),
+                new AvatarConfig($rvn['config']),
+                new MediaConfig($rvn['config']),
                 new UserProfileParser($rvn['input']),
                 new Form2fa($rvn['input']),
-                new UserScribe((string) $rvn['root']),
-                new UserMediaPathService(),
+                new UserScribe((string) $rvn['root'], new AvatarUpload()),
+                new CoverConfig(),
                 new PasswordValidator()
             );
 

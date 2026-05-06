@@ -2,40 +2,40 @@
 
 /**
  * RAVEN CMS
- * ~/private/lib/Media/Panel/MediaManager.php
+ * ~/private/lib/Media/MediaUpload.php
  * ImageMagick-backed service for page-scoped media upload processing.
  * Docs: https://raven.lanterns.io
  */
 
 declare(strict_types=1);
 
-namespace Raven\Lib\Media\Panel;
+namespace Raven\Lib\Media;
 
 use Imagick;
 use Raven\Core\Config;
 use Raven\Core\Repository\MediaRead;
 use Raven\Core\Repository\MediaWrite;
-use Raven\Lib\Media\Panel\ImageVariantProcessor;
-use Raven\Lib\Media\Panel\MediaPathLayout;
-use Raven\Lib\Media\Panel\MediaUploadPolicy;
 use Raven\Lib\Security\InputSanitizer;
+use Raven\Lib\Transport\Upload;
 
 /**
  * Handles upload validation, variant generation, and filesystem cleanup for page galleries.
  */
-final class MediaManager
+final class MediaUpload
 {
     private Config $config;
     private InputSanitizer $input;
     private MediaRead $mediaRead;
     private MediaWrite $mediaWrite;
     private string $projectRoot;
-    private ?MediaUploadPolicy $uploadPolicy = null;
+    private ?ImageExifProcessor $exifProcessor = null;
+    private ?ImageImagickProcessor $imagickProcessor = null;
     private ?ImageVariantProcessor $variantProcessor = null;
-    private ?MediaPathLayout $pathLayout = null;
+    private ?MediaStorage $storage = null;
+    private ?Upload $uploadTransport = null;
 
     /**
-     * Prepares the panel media manager with split read/write gallery persistence seams.
+     * Prepares the panel media upload service with split read/write gallery persistence seams.
      *
      * @param Config         $config      Runtime config used for upload-policy and variant settings.
      * @param InputSanitizer $input       Input normalizer used for stored image metadata fields.
@@ -80,36 +80,33 @@ final class MediaManager
             ];
         }
 
-        $uploadError = (int) ($upload['error'] ?? UPLOAD_ERR_NO_FILE);
-        if ($uploadError !== UPLOAD_ERR_OK) {
+        $validatedUpload = $this->uploadTransport()->validateSingleUpload($upload, 'image', [
+            'max_bytes' => $this->maxUploadFilesizeBytes(),
+            'empty_error' => 'Image appears empty.',
+            'too_large_error' => 'Image exceeds configured max filesize.',
+        ]);
+        if (!(bool) ($validatedUpload['ok'] ?? false)) {
             return [
                 'ok' => false,
-                'error' => $this->uploadErrorMessage($uploadError),
+                'error' => (string) ($validatedUpload['error'] ?? 'Image upload failed.'),
             ];
         }
-
+        $validated = $validatedUpload['upload'] ?? null;
+        if (!is_array($validated)) {
+            return [
+                'ok' => false,
+                'error' => 'Image upload failed.',
+            ];
+        }
+        $upload = $validated;
         $tmpPath = (string) ($upload['tmp_name'] ?? '');
-        if ($tmpPath === '' || !is_uploaded_file($tmpPath) || !is_file($tmpPath)) {
-            return [
-                'ok' => false,
-                'error' => 'Uploaded image could not be validated as an upload.',
-            ];
-        }
+        $size = (int) ($validatedUpload['size'] ?? 0);
 
         $uploadTarget = strtolower((string) $this->config->get('media.upload_target', 'local'));
         if ($uploadTarget !== 'local') {
             return [
                 'ok' => false,
                 'error' => 'Only local gallery storage is supported in this build.',
-            ];
-        }
-
-        $maxBytes = $this->maxUploadFilesizeBytes();
-        $size = (int) ($upload['size'] ?? 0);
-        if ($size <= 0 || ($maxBytes > 0 && $size > $maxBytes)) {
-            return [
-                'ok' => false,
-                'error' => 'Image exceeds configured max filesize.',
             ];
         }
 
@@ -177,7 +174,7 @@ final class MediaManager
             ];
         }
 
-        if (!$this->pathLayout()->ensurePageDirectory($pageId)) {
+        if (!$this->storage()->ensurePageDirectory($pageId)) {
             return [
                 'ok' => false,
                 'error' => 'Failed to create page media directory.',
@@ -187,29 +184,19 @@ final class MediaManager
         $token = bin2hex(random_bytes(16));
         $baseFilename = 'img_' . $token;
         $originalFilename = $baseFilename . '.' . $canonicalExtension;
-        $originalStoredPath = $this->pathLayout()->storedPathForFilename($pageId, $originalFilename);
-        $originalAbsolutePath = $this->pathLayout()->absolutePublicPath($originalStoredPath);
+        $originalStoredPath = $this->storage()->storedPathForFilename($pageId, $originalFilename);
+        $originalAbsolutePath = $this->storage()->absolutePublicPath($originalStoredPath);
 
         $writtenPaths = [];
 
         try {
-            $source = new Imagick();
-            $source->readImage($tmpPath);
-
-            // Normalize multi-frame inputs by using the first frame only.
-            $source->setIteratorIndex(0);
-            $this->autoOrient($source);
-
-            $stripExif = (bool) $this->config->get('media.strip_exif', true);
-            if ($stripExif) {
-                $source->stripImage();
-            }
-
-            $source->setImageFormat($canonicalExtension === 'jpg' ? 'jpeg' : $canonicalExtension);
-            if ($canonicalExtension === 'jpg') {
-                // Keep JPEG quality high while still reducing payload size.
-                $source->setImageCompressionQuality(85);
-            }
+            $source = $this->imagickProcessor()->readFirstFrame($tmpPath);
+            $this->imagickProcessor()->prepareForWrite(
+                $source,
+                $canonicalExtension,
+                (bool) $this->config->get('media.strip_exif', true),
+                $this->exifProcessor()
+            );
 
             if (!$source->writeImage($originalAbsolutePath)) {
                 throw new \RuntimeException('Failed to store processed source image.');
@@ -248,8 +235,8 @@ final class MediaManager
                 }
 
                 $variantFilename = $baseFilename . '_' . $variantKey . '.' . $canonicalExtension;
-                $variantStoredPath = $this->pathLayout()->storedPathForFilename($pageId, $variantFilename);
-                $variantAbsolutePath = $this->pathLayout()->absolutePublicPath($variantStoredPath);
+                $variantStoredPath = $this->storage()->storedPathForFilename($pageId, $variantFilename);
+                $variantAbsolutePath = $this->storage()->absolutePublicPath($variantStoredPath);
 
                 if (!$variant->writeImage($variantAbsolutePath)) {
                     throw new \RuntimeException('Failed to store generated ' . $variantKey . ' variant.');
@@ -330,7 +317,7 @@ final class MediaManager
             $this->deleteStoredPath($storedPath);
         }
 
-        $this->removePageDirectoryIfEmpty($pageId);
+        $this->removePageDirectory($pageId);
 
         return true;
     }
@@ -346,7 +333,7 @@ final class MediaManager
             $this->deleteStoredPath($storedPath);
         }
 
-        $this->removePageDirectoryIfEmpty($pageId);
+        $this->removePageDirectory($pageId);
     }
 
     /**
@@ -356,7 +343,23 @@ final class MediaManager
      */
     private function allowedExtensions(): array
     {
-        return $this->uploadPolicy()->allowedExtensions();
+        $raw = strtolower((string) $this->config->get('media.allowed_extensions', 'gif,jpg,jpeg,png'));
+        $parts = array_map('trim', explode(',', $raw));
+
+        $allowed = [];
+        foreach ($parts as $part) {
+            if ($part === 'jpeg') {
+                $part = 'jpg';
+            }
+
+            if ($part === '' || preg_match('/^[a-z0-9]+$/', $part) !== 1) {
+                continue;
+            }
+
+            $allowed[$part] = $part;
+        }
+
+        return array_values($allowed);
     }
 
     /**
@@ -364,7 +367,12 @@ final class MediaManager
      */
     private function maxUploadFilesizeBytes(): int
     {
-        return $this->uploadPolicy()->maxUploadFilesizeBytes();
+        $kilobytes = (int) $this->config->get('media.max_filesize_kb', -1);
+        if ($kilobytes >= 0) {
+            return $kilobytes === 0 ? 0 : max(1, $kilobytes * 1024);
+        }
+
+        return 10485760;
     }
 
     /**
@@ -397,46 +405,49 @@ final class MediaManager
     }
 
     /**
-     * Converts EXIF orientation into pixel-space rotation/flip changes.
-     */
-    private function autoOrient(Imagick $image): void
-    {
-        $this->variantProcessor()->autoOrient($image);
-    }
-
-    /**
      * Deletes one stored relative file path if it resolves inside gallery storage.
      */
     private function deleteStoredPath(string $storedPath): void
     {
-        $this->pathLayout()->deleteStoredPath($storedPath);
+        $this->storage()->deleteStoredPath($storedPath);
     }
 
     /**
      * Removes now-empty page directory after image deletion.
      */
-    private function removePageDirectoryIfEmpty(int $pageId): void
+    private function removePageDirectory(int $pageId): void
     {
-        $this->pathLayout()->removePageDirectoryIfEmpty($pageId);
+        $this->storage()->removePageDirectory($pageId);
+    }
+
+    private function exifProcessor(): ImageExifProcessor
+    {
+        if (!$this->exifProcessor instanceof ImageExifProcessor) {
+            $this->exifProcessor = new ImageExifProcessor();
+        }
+
+        return $this->exifProcessor;
     }
 
     /**
-     * Maps PHP upload error codes into user-facing messages.
+     * Returns the shared ImageMagick processing helper.
+     *
+     * @return ImageImagickProcessor
      */
-    private function uploadErrorMessage(int $code): string
+    private function imagickProcessor(): ImageImagickProcessor
     {
-        return $this->uploadPolicy()->uploadErrorMessage($code);
-    }
-
-    private function uploadPolicy(): MediaUploadPolicy
-    {
-        if (!$this->uploadPolicy instanceof MediaUploadPolicy) {
-            $this->uploadPolicy = new MediaUploadPolicy($this->config);
+        if (!$this->imagickProcessor instanceof ImageImagickProcessor) {
+            $this->imagickProcessor = new ImageImagickProcessor();
         }
 
-        return $this->uploadPolicy;
+        return $this->imagickProcessor;
     }
 
+    /**
+     * Returns the gallery variant config/resize helper.
+     *
+     * @return ImageVariantProcessor
+     */
     private function variantProcessor(): ImageVariantProcessor
     {
         if (!$this->variantProcessor instanceof ImageVariantProcessor) {
@@ -446,12 +457,32 @@ final class MediaManager
         return $this->variantProcessor;
     }
 
-    private function pathLayout(): MediaPathLayout
+    /**
+     * Returns the gallery storage/path helper.
+     *
+     * @return MediaStorage
+     */
+    private function storage(): MediaStorage
     {
-        if (!$this->pathLayout instanceof MediaPathLayout) {
-            $this->pathLayout = new MediaPathLayout($this->projectRoot);
+        if (!$this->storage instanceof MediaStorage) {
+            $this->storage = new MediaStorage($this->projectRoot);
         }
 
-        return $this->pathLayout;
+        return $this->storage;
+    }
+
+    /**
+     * Returns the shared upload baseline validator.
+     *
+     * @return Upload
+     */
+    private function uploadTransport(): Upload
+    {
+        if ($this->uploadTransport instanceof Upload) {
+            return $this->uploadTransport;
+        }
+
+        $this->uploadTransport = new Upload();
+        return $this->uploadTransport;
     }
 }

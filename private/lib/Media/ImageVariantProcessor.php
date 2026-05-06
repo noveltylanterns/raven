@@ -1,14 +1,20 @@
 <?php
 
+/**
+ * RAVEN CMS
+ * ~/private/lib/Media/ImageVariantProcessor.php
+ * Shared variant-dimension resolver for page and taxonomy image pipelines.
+ * Docs: https://raven.lanterns.io
+ */
+
 declare(strict_types=1);
 
-namespace Raven\Lib\Media\Panel;
+namespace Raven\Lib\Media;
 
-use Imagick;
 use Raven\Core\Config;
 
 /**
- * Shared page-image variant sizing and EXIF-orientation helpers.
+ * Shared page-image variant sizing helpers.
  */
 final class ImageVariantProcessor
 {
@@ -83,43 +89,4 @@ final class ImageVariantProcessor
         ];
     }
 
-    /**
-     * Converts EXIF orientation into pixel-space rotation/flip changes.
-     */
-    public function autoOrient(Imagick $image): void
-    {
-        $orientation = $image->getImageOrientation();
-
-        switch ($orientation) {
-            case Imagick::ORIENTATION_TOPRIGHT:
-                $image->flopImage();
-                break;
-            case Imagick::ORIENTATION_BOTTOMRIGHT:
-                $image->rotateImage('#000', 180);
-                break;
-            case Imagick::ORIENTATION_BOTTOMLEFT:
-                $image->flipImage();
-                break;
-            case Imagick::ORIENTATION_LEFTTOP:
-                $image->flopImage();
-                $image->rotateImage('#000', 90);
-                break;
-            case Imagick::ORIENTATION_RIGHTTOP:
-                $image->rotateImage('#000', 90);
-                break;
-            case Imagick::ORIENTATION_RIGHTBOTTOM:
-                $image->flopImage();
-                $image->rotateImage('#000', -90);
-                break;
-            case Imagick::ORIENTATION_LEFTBOTTOM:
-                $image->rotateImage('#000', -90);
-                break;
-            default:
-                break;
-        }
-
-        // Reset orientation tag to canonical top-left after transform.
-        $image->setImageOrientation(Imagick::ORIENTATION_TOPLEFT);
-    }
 }
-

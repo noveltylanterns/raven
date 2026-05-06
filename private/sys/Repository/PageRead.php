@@ -801,7 +801,7 @@ class PageRead
      * Returns the hydrated page row and raw image/variant join rows for the page editor.
      *
      * Gallery image hydration is the caller's responsibility; pass `gallery_rows` to
-     * `PageEditorGalleryHydrator::hydrate()` to produce the final `gallery_images` array.
+     * `EditorMedia::hydrate()` to produce the final `gallery_images` array.
      *
      * @param int $id Page id to load.
      * @return array{page: array<string, mixed>, gallery_rows: array<int, array<string, mixed>>}|null Null when not found.

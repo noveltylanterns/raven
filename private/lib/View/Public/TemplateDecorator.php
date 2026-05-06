@@ -12,7 +12,7 @@ declare(strict_types=1);
 namespace Raven\Lib\View\Public;
 
 use Raven\Core\Config;
-use Raven\Lib\Media\Panel\UserMediaPathService;
+use Raven\Lib\Media\AvatarConfig;
 use Raven\Lib\View\Pagination;
 use Raven\Lib\Security\InputSanitizer;
 
@@ -23,8 +23,7 @@ final class TemplateDecorator
 {
     private Config $config;
     private InputSanitizer $input;
-    private string $projectRoot;
-    private UserMediaPathService $userMediaPathService;
+    private AvatarConfig $avatarConfig;
 
     /**
      * @param Config $config Runtime configuration reader.
@@ -34,10 +33,10 @@ final class TemplateDecorator
      */
     public function __construct(Config $config, InputSanitizer $input, string $projectRoot)
     {
+        unset($projectRoot);
         $this->config = $config;
         $this->input = $input;
-        $this->projectRoot = rtrim($projectRoot, '/\\');
-        $this->userMediaPathService = new UserMediaPathService();
+        $this->avatarConfig = new AvatarConfig($config);
     }
 
     /**
@@ -494,7 +493,7 @@ final class TemplateDecorator
      */
     private function avatarTemplateDataFromPath(string $avatarPath): array
     {
-        return $this->userMediaPathService->avatarTemplateData($this->projectRoot, $avatarPath);
+        return $this->avatarConfig->templateData($avatarPath);
     }
 
     private function publicTemplateUsername(string $username): string

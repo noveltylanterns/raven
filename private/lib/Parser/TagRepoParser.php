@@ -13,7 +13,7 @@ namespace Raven\Lib\Parser;
 
 use PDO;
 use Raven\Lib\Database\TableNameResolver;
-use Raven\Lib\Media\TaxonomyImagePathResolver;
+use Raven\Lib\Media\PreviewConfig;
 
 /**
  * Repository-backed parser for tag lookup rows and routing option payloads.
@@ -117,12 +117,12 @@ final class TagRepoParser
     private function hydrateTagRow(array $row): array
     {
         $id = (int) ($row['id'] ?? 0);
-        $storage = TaxonomyImagePathResolver::storagePayloadFromRecord('tag', $row);
-        if (TaxonomyImagePathResolver::supportsFilenameStorage('tag')) {
+        $storage = PreviewConfig::storagePayloadFromRecord('tag', $row);
+        if (PreviewConfig::supportsFilenameStorage('tag')) {
             $row['cover_image'] = $storage['cover_image'] ?? null;
             $row['preview_image'] = $storage['preview_image'] ?? null;
         }
 
-        return array_merge($row, TaxonomyImagePathResolver::pathsFromStoragePayload('tag', $id, $storage));
+        return array_merge($row, PreviewConfig::pathsFromStoragePayload('tag', $id, $storage));
     }
 }

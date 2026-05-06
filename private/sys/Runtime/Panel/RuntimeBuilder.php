@@ -25,7 +25,7 @@ use Raven\Lib\Extension\Panel\Manager as ExtensionManager;
 use Raven\Lib\Extension\Panel\Permissions as ExtensionPermissions;
 use Raven\Lib\Extension\StateRead;
 use Raven\Lib\Parser\ConfigParser;
-use Raven\Lib\Media\Panel\MediaManager;
+use Raven\Lib\Media\MediaUpload;
 use Raven\Lib\View\Panel\EditorWrapper;
 use Raven\Lib\View\Panel\EditorBlocks;
 use Raven\Lib\View\Panel\EditorMCE;
@@ -180,8 +180,8 @@ final class RuntimeBuilder
          * The manager spans both gallery duplicate/order lookups and media-row mutations,
          * so it takes the split read/write seams directly.
          */
-        $mediaManagerFactory = $memoize(static function () use (&$mediaManager, $rvn, $mediaReadFactory, $mediaWriteFactory): MediaManager {
-            $mediaManager = new MediaManager(
+        $mediaManagerFactory = $memoize(static function () use (&$mediaManager, $rvn, $mediaReadFactory, $mediaWriteFactory): MediaUpload {
+            $mediaManager = new MediaUpload(
                 $rvn['config'],
                 $rvn['input'],
                 $mediaReadFactory(),

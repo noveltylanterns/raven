@@ -15,9 +15,9 @@ use lbuchs\WebAuthn\WebAuthn as VendorWebAuthn;
 use lbuchs\WebAuthn\WebAuthnException;
 use Raven\Core\Config;
 use Raven\Lib\Auth\LoginIdentifier;
-use Raven\Lib\Media\Panel\AvatarValidationPolicy;
-use Raven\Lib\Media\Panel\AvatarValidator;
-use Raven\Lib\Media\Panel\UserMediaPathService;
+use Raven\Lib\Media\AvatarConfig;
+use Raven\Lib\Media\AvatarValidator;
+use Raven\Lib\Media\CoverConfig;
 use Raven\Lib\Scribe\UserScribe;
 use Raven\Lib\Security\PasswordValidator;
 use Raven\Lib\View\Qr;
@@ -25,7 +25,7 @@ use Raven\Lib\View\Form2fa;
 use Raven\Lib\View\Panel\EditorWrapper;
 use Raven\Lib\View\Panel\EditorBlocks;
 use Raven\Lib\View\Panel\EditorTabs;
-use Raven\Lib\Media\Panel\MediaConfigService;
+use Raven\Lib\Media\MediaConfig;
 use Raven\Lib\Parser\UserProfileParser;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\Security\WebAuthn;
@@ -43,32 +43,32 @@ final class PreferencesController
     private SharedController $context;
     private Config $config;
     private InputSanitizer $input;
-    private string $root;
     private LoginIdentifier $loginIdentifierResolver;
     private EditorTabs $editorTabs;
     private EditorWrapper $editor;
     private EditorBlocks $editorBlocks;
-    private MediaConfigService $panelMediaConfigService;
+    private AvatarConfig $avatarConfig;
+    private MediaConfig $mediaConfig;
     private UserProfileParser $profileContactService;
     private Form2fa $form2fa;
     private UserScribe $userMediaScribe;
-    private UserMediaPathService $userMediaPathService;
+    private CoverConfig $coverConfig;
     private PasswordValidator $passwordValidator;
 
     /**
      * @param SharedController $context Shared panel request context.
      * @param Config $config Runtime configuration reader.
      * @param InputSanitizer $input Shared request input sanitizer.
-     * @param string $root Project root path for user-media storage helpers.
      * @param LoginIdentifier $loginIdentifierResolver Shared login-identifier normalization helper.
      * @param EditorTabs $editorTabs Shared editor-tab normalization helper.
      * @param EditorWrapper $editor Shared panel editor utility methods (theme normalization).
      * @param EditorBlocks $editorBlocks Shared repeater-block view helper for modular panel rows.
-     * @param MediaConfigService $panelMediaConfigService Shared media-limit helper.
+     * @param AvatarConfig $avatarConfig Shared avatar-limit and template-data helper.
+     * @param MediaConfig $mediaConfig Shared non-avatar media-limit helper.
      * @param UserProfileParser $profileContactService Shared profile-contact normalizer.
      * @param Form2fa $form2fa Shared 2FA helper set.
      * @param UserScribe $userMediaScribe Shared user-media write helper.
-     * @param UserMediaPathService $userMediaPathService Shared user-media path resolver.
+     * @param CoverConfig $coverConfig Shared user cover-image URL resolver.
      * @param PasswordValidator $passwordValidator Shared password validation policy.
      * @return void
      */
@@ -76,31 +76,31 @@ final class PreferencesController
         SharedController $context,
         Config $config,
         InputSanitizer $input,
-        string $root,
         LoginIdentifier $loginIdentifierResolver,
         EditorTabs $editorTabs,
         EditorWrapper $editor,
         EditorBlocks $editorBlocks,
-        MediaConfigService $panelMediaConfigService,
+        AvatarConfig $avatarConfig,
+        MediaConfig $mediaConfig,
         UserProfileParser $profileContactService,
         Form2fa $form2fa,
         UserScribe $userMediaScribe,
-        UserMediaPathService $userMediaPathService,
+        CoverConfig $coverConfig,
         PasswordValidator $passwordValidator
     ) {
         $this->context = $context;
         $this->config = $config;
         $this->input = $input;
-        $this->root = rtrim($root, '/\\');
         $this->loginIdentifierResolver = $loginIdentifierResolver;
         $this->editorTabs = $editorTabs;
         $this->editor = $editor;
         $this->editorBlocks = $editorBlocks;
-        $this->panelMediaConfigService = $panelMediaConfigService;
+        $this->avatarConfig = $avatarConfig;
+        $this->mediaConfig = $mediaConfig;
         $this->profileContactService = $profileContactService;
         $this->form2fa = $form2fa;
         $this->userMediaScribe = $userMediaScribe;
-        $this->userMediaPathService = $userMediaPathService;
+        $this->coverConfig = $coverConfig;
         $this->passwordValidator = $passwordValidator;
     }
 
@@ -272,10 +272,10 @@ final class PreferencesController
         $hasUpload = is_array($avatarUpload)
             && (($avatarUpload['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE);
         if ($hasUpload) {
-            $avatarMaxSizeBytes = $this->panelMediaConfigService->resolveMediaMaxFilesizeBytes('avatars', 1048576);
+            $avatarMaxSizeBytes = $this->avatarConfig->resolveMaxFilesizeBytes(1048576);
             $avatarMaxWidth = (int) $this->config->get('user.avatar.max_width', 500);
             $avatarMaxHeight = (int) $this->config->get('user.avatar.max_height', 500);
-            $avatarAllowedExtensions = $this->panelMediaConfigService->resolveAvatarAllowedExtensionsCsv();
+            $avatarAllowedExtensions = $this->avatarConfig->allowedExtensionsCsv();
 
             $validator = new AvatarValidator(
                 $avatarMaxSizeBytes,
@@ -711,7 +711,7 @@ final class PreferencesController
      */
     private function avatarUploadLimitsNote(): string
     {
-        return $this->panelMediaConfigService->avatarUploadLimitsNote();
+        return $this->avatarConfig->uploadLimitsNote();
     }
 
     /**
@@ -722,7 +722,7 @@ final class PreferencesController
      */
     private function coverPublicUrl(string $coverValue): string
     {
-        return $this->userMediaPathService->coverPublicUrl($this->root, $coverValue);
+        return $this->coverConfig->publicUrl($coverValue);
     }
 
     /**
@@ -733,7 +733,7 @@ final class PreferencesController
      */
     private function avatarTemplateData(string $avatarPath): array
     {
-        return $this->userMediaPathService->avatarTemplateData($this->root, $avatarPath);
+        return $this->avatarConfig->templateData($avatarPath);
     }
 
     /**
@@ -756,9 +756,9 @@ final class PreferencesController
      */
     private function validateUserCoverUpload(array $upload): array
     {
-        $maxBytes = $this->panelMediaConfigService->resolveMediaMaxFilesizeBytes('images', 10485760);
+        $maxBytes = $this->mediaConfig->resolveMaxFilesizeBytes('images', 10485760);
         $allowedExtensions = (string) $this->config->get('media.allowed_extensions', 'gif,jpg,jpeg,png');
-        $policy = new AvatarValidationPolicy($maxBytes, 10000, 10000, $allowedExtensions);
+        $policy = new AvatarValidator($maxBytes, 10000, 10000, $allowedExtensions);
         return $policy->validate($upload);
     }
 

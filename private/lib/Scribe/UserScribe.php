@@ -12,7 +12,7 @@ declare(strict_types=1);
 namespace Raven\Lib\Scribe;
 
 use PDO;
-use Raven\Lib\Media\Panel\AvatarUploadService;
+use Raven\Lib\Media\AvatarUpload;
 use Raven\Lib\Security\UserString;
 use RuntimeException;
 
@@ -34,19 +34,19 @@ final class UserScribe
 {
     private string $projectRoot;
     private UserString $userStringService;
-    private AvatarUploadService $avatarUploadService;
+    private ?AvatarUpload $avatarUpload = null;
 
     /**
      * Prepares the user scribe for write operations.
      *
      * @param string $projectRoot Project root path for user-media filesystem writes; may be empty for DB-only callers.
-     * @param AvatarUploadService|null $avatarUploadService Optional low-level upload sanitizer override.
+     * @param AvatarUpload|null $avatarUpload Optional upload sanitizer override for media-aware callers.
      */
-    public function __construct(string $projectRoot = '', ?AvatarUploadService $avatarUploadService = null)
+    public function __construct(string $projectRoot = '', ?AvatarUpload $avatarUpload = null)
     {
         $this->projectRoot = rtrim($projectRoot, '/\\');
         $this->userStringService = new UserString();
-        $this->avatarUploadService = $avatarUploadService ?? new AvatarUploadService();
+        $this->avatarUpload = $avatarUpload;
     }
 
     // -------------------------------------------------------------------------
@@ -450,7 +450,7 @@ final class UserScribe
      */
     public function normalizeExtension(string $extension): ?string
     {
-        return $this->avatarUploadService->normalizeExtension($extension);
+        return $this->avatarUpload()->normalizeExtension($extension);
     }
 
     /**
@@ -474,7 +474,7 @@ final class UserScribe
         $directory = $this->userDirectory($userId);
         $filename = 'avatar.' . $normalizedExtension;
         $destination = $directory . '/' . $filename;
-        $storeError = $this->avatarUploadService->storeSanitizedUpload($upload, $destination);
+        $storeError = $this->avatarUpload()->storeSanitizedUpload($upload, $destination);
         if ($storeError !== null) {
             return ['ok' => false, 'error' => $storeError];
         }
@@ -503,7 +503,7 @@ final class UserScribe
         $directory = $this->userDirectory($userId);
         $filename = 'cover.' . $normalizedExtension;
         $destination = $directory . '/' . $filename;
-        $storeError = $this->avatarUploadService->storeSanitizedImageUpload($upload, $destination);
+        $storeError = $this->avatarUpload()->storeSanitizedImageUpload($upload, $destination);
         if ($storeError !== null) {
             return ['ok' => false, 'error' => $storeError];
         }
@@ -536,7 +536,7 @@ final class UserScribe
             }
 
             // Delete the thumbnail that lives alongside the main file.
-            $thumbAbsolute = dirname($absolute) . '/' . $this->avatarUploadService->thumbnailFilename(basename($absolute));
+            $thumbAbsolute = dirname($absolute) . '/' . $this->avatarUpload()->thumbnailFilename(basename($absolute));
             if (is_file($thumbAbsolute)) {
                 @unlink($thumbAbsolute);
             }
@@ -556,7 +556,7 @@ final class UserScribe
             @unlink($path);
         }
 
-        $thumbPath = $legacyDirectory . '/' . $this->avatarUploadService->thumbnailFilename($safeName);
+        $thumbPath = $legacyDirectory . '/' . $this->avatarUpload()->thumbnailFilename($safeName);
         if (is_file($thumbPath)) {
             @unlink($thumbPath);
         }
@@ -692,5 +692,22 @@ final class UserScribe
         }
 
         return $directory;
+    }
+
+    /**
+     * Lazily resolves the avatar upload helper only when avatar I/O is requested.
+     *
+     * DB-only callers of UserScribe (for example repository write seams) do not
+     * need this dependency and avoid constructing it on every request.
+     *
+     * @return AvatarUpload Upload sanitizer and thumbnail helper.
+     */
+    private function avatarUpload(): AvatarUpload
+    {
+        if (!$this->avatarUpload instanceof AvatarUpload) {
+            $this->avatarUpload = new AvatarUpload();
+        }
+
+        return $this->avatarUpload;
     }
 }

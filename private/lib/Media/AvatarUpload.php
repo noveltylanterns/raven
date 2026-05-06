@@ -2,22 +2,25 @@
 
 /**
  * RAVEN CMS
- * ~/private/lib/Media/Panel/AvatarUploadService.php
+ * ~/private/lib/Media/AvatarUpload.php
  * Sanitizes avatar uploads and generates deterministic thumbnail derivatives.
  * Docs: https://raven.lanterns.io
  */
 
 declare(strict_types=1);
 
-namespace Raven\Lib\Media\Panel;
+namespace Raven\Lib\Media;
+
+use Raven\Lib\Transport\Upload;
 
 /**
  * Sanitizes avatar uploads and generates deterministic thumbnail derivatives.
  */
-final class AvatarUploadService
+final class AvatarUpload
 {
     /** Fixed side length for generated avatar thumbnail JPEG files. */
     private const AVATAR_THUMB_SIZE = 120;
+    private ?Upload $uploadTransport = null;
 
     /**
      * Stores one avatar upload after decode/re-encode metadata stripping.
@@ -55,10 +58,18 @@ final class AvatarUploadService
      */
     public function storeSanitizedImageUpload(array $upload, string $destination): ?string
     {
-        $tmpPath = (string) ($upload['tmp_name'] ?? '');
-        if ($tmpPath === '' || !is_uploaded_file($tmpPath) || !is_file($tmpPath)) {
-            return 'Failed to read uploaded avatar file.';
+        $validatedUpload = $this->uploadTransport()->validateSingleUpload($upload, 'avatar', [
+            'empty_error' => 'Avatar upload appears empty.',
+        ]);
+        if (!(bool) ($validatedUpload['ok'] ?? false)) {
+            return (string) ($validatedUpload['error'] ?? 'Avatar upload failed.');
         }
+        $validated = $validatedUpload['upload'] ?? null;
+        if (!is_array($validated)) {
+            return 'Avatar upload failed.';
+        }
+
+        $tmpPath = (string) ($validated['tmp_name'] ?? '');
 
         $extension = strtolower((string) pathinfo($destination, PATHINFO_EXTENSION));
         if (!in_array($extension, ['jpg', 'jpeg', 'png', 'gif'], true)) {
@@ -96,6 +107,12 @@ final class AvatarUploadService
         return null;
     }
 
+    /**
+     * Returns the avatar storage directory and creates it when missing.
+     *
+     * @param string $projectRoot Absolute Raven project root.
+     * @return string Absolute avatar storage directory.
+     */
     public function storageDirectory(string $projectRoot): string
     {
         $avatarsDir = rtrim($projectRoot, '/\\') . '/public/uploads/avatars';
@@ -106,6 +123,12 @@ final class AvatarUploadService
         return $avatarsDir;
     }
 
+    /**
+     * Normalizes one extension token to the supported avatar extension set.
+     *
+     * @param string $extension Submitted extension token.
+     * @return string|null Normalized extension, or null when unsupported.
+     */
     public function normalizeExtension(string $extension): ?string
     {
         $normalized = strtolower(trim($extension));
@@ -120,6 +143,13 @@ final class AvatarUploadService
         return $normalized;
     }
 
+    /**
+     * Builds one deterministic filename from a user-string and extension.
+     *
+     * @param string $userString User string used as filename stem.
+     * @param string $extension Submitted extension token.
+     * @return string Canonical avatar filename.
+     */
     public function filenameForUserString(string $userString, string $extension): string
     {
         $normalizedExtension = $this->normalizeExtension($extension) ?? 'jpg';
@@ -131,6 +161,12 @@ final class AvatarUploadService
         return $normalizedUserString . '.' . $normalizedExtension;
     }
 
+    /**
+     * Builds the deterministic avatar thumbnail filename.
+     *
+     * @param string $filename Source avatar filename.
+     * @return string Thumbnail filename.
+     */
     public function thumbnailFilename(string $filename): string
     {
         $base = (string) pathinfo($filename, PATHINFO_FILENAME);
@@ -141,6 +177,13 @@ final class AvatarUploadService
         return $base . '_thumb.jpg';
     }
 
+    /**
+     * Deletes one avatar file and its thumbnail from legacy flat storage.
+     *
+     * @param string $projectRoot Absolute Raven project root.
+     * @param string $filename Stored avatar filename.
+     * @return void
+     */
     public function deleteAvatarFile(string $projectRoot, string $filename): void
     {
         // Normalize to basename to prevent path traversal on deletion.
@@ -167,6 +210,14 @@ final class AvatarUploadService
         }
     }
 
+    /**
+     * Sanitizes and writes an upload using ImageMagick.
+     *
+     * @param string $tmpPath Uploaded temporary file path.
+     * @param string $destination Destination path for sanitized output.
+     * @param string $extension Target file extension.
+     * @return string|null Null on success, otherwise one user-facing error.
+     */
     private function storeSanitizedWithImagick(string $tmpPath, string $destination, string $extension): ?string
     {
         try {
@@ -211,6 +262,14 @@ final class AvatarUploadService
         }
     }
 
+    /**
+     * Sanitizes and writes an upload using GD fallback.
+     *
+     * @param string $tmpPath Uploaded temporary file path.
+     * @param string $destination Destination path for sanitized output.
+     * @param string $extension Target file extension.
+     * @return string|null Null on success, otherwise one user-facing error.
+     */
     private function storeSanitizedWithGd(string $tmpPath, string $destination, string $extension): ?string
     {
         $bytes = @file_get_contents($tmpPath);
@@ -246,6 +305,13 @@ final class AvatarUploadService
         return null;
     }
 
+    /**
+     * Generates the deterministic avatar thumbnail from one sanitized source.
+     *
+     * @param string $sourcePath Source avatar path.
+     * @param string $destination Thumbnail destination path.
+     * @return string|null Null on success, otherwise one user-facing error.
+     */
     private function storeThumbnail(string $sourcePath, string $destination): ?string
     {
         $sourceInfo = @getimagesize($sourcePath);
@@ -288,6 +354,13 @@ final class AvatarUploadService
         return 'Avatar thumbnail generation requires Imagick or GD extension.';
     }
 
+    /**
+     * Generates the avatar thumbnail with ImageMagick.
+     *
+     * @param string $sourcePath Source avatar path.
+     * @param string $destination Thumbnail destination path.
+     * @return string|null Null on success, otherwise one user-facing error.
+     */
     private function storeThumbnailWithImagick(string $sourcePath, string $destination): ?string
     {
         try {
@@ -353,6 +426,13 @@ final class AvatarUploadService
         }
     }
 
+    /**
+     * Generates the avatar thumbnail with GD fallback.
+     *
+     * @param string $sourcePath Source avatar path.
+     * @param string $destination Thumbnail destination path.
+     * @return string|null Null on success, otherwise one user-facing error.
+     */
     private function storeThumbnailWithGd(string $sourcePath, string $destination): ?string
     {
         $bytes = @file_get_contents($sourcePath);
@@ -417,5 +497,20 @@ final class AvatarUploadService
         }
 
         return null;
+    }
+
+    /**
+     * Returns the shared upload baseline validator.
+     *
+     * @return Upload
+     */
+    private function uploadTransport(): Upload
+    {
+        if ($this->uploadTransport instanceof Upload) {
+            return $this->uploadTransport;
+        }
+
+        $this->uploadTransport = new Upload();
+        return $this->uploadTransport;
     }
 }

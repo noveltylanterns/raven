@@ -12,7 +12,7 @@ declare(strict_types=1);
 namespace Raven\Lib\Parser;
 
 use Raven\Core\Repository\PageRead;
-use Raven\Lib\Media\Panel\PageEditorGalleryHydrator;
+use Raven\Lib\View\Panel\EditorMedia;
 use Raven\Lib\Security\InputSanitizer;
 use RuntimeException;
 
@@ -26,7 +26,7 @@ final class PageDataParser
 {
     private InputSanitizer $input;
     private ?PageRead $pageRepo;
-    private PageEditorGalleryHydrator $galleryHydrator;
+    private EditorMedia $galleryHydrator;
 
     /**
      * Initializes the page data reader.
@@ -38,7 +38,7 @@ final class PageDataParser
     {
         $this->input = $input;
         $this->pageRepo = $pageRepo;
-        $this->galleryHydrator = new PageEditorGalleryHydrator();
+        $this->galleryHydrator = new EditorMedia();
     }
 
     /**

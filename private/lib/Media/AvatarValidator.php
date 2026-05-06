@@ -1,13 +1,20 @@
 <?php
 
+/**
+ * RAVEN CMS
+ * ~/private/lib/Media/AvatarValidator.php
+ * Avatar upload validation policy for size, dimensions, and MIME checks.
+ * Docs: https://raven.lanterns.io
+ */
+
 declare(strict_types=1);
 
-namespace Raven\Lib\Media\Panel;
+namespace Raven\Lib\Media;
 
 /**
- * Validates avatar uploads using size, dimensions, and binary MIME checks.
+ * Validates avatar and cover uploads against image safety constraints.
  */
-final class AvatarValidationPolicy
+final class AvatarValidator
 {
     /** Default maximum avatar file size in bytes (1 MB). */
     private const DEFAULT_MAX_SIZE = 1048576;
@@ -18,24 +25,31 @@ final class AvatarValidationPolicy
     /** Default maximum height in pixels. */
     private const DEFAULT_MAX_HEIGHT = 500;
 
-    /** Default allowed extension list used when config keys are missing. */
+    /** Default extension allowlist when config keys are missing. */
     private const DEFAULT_ALLOWED_EXTENSIONS = 'gif,jpg,jpeg,png';
 
-    /** Maximum avatar file size in bytes from runtime config. */
+    /** Maximum file size in bytes from runtime config. */
     private int $maxSizeBytes;
 
-    /** Maximum avatar width in pixels from runtime config. */
+    /** Maximum width in pixels from runtime config. */
     private int $maxWidth;
 
-    /** Maximum avatar height in pixels from runtime config. */
+    /** Maximum height in pixels from runtime config. */
     private int $maxHeight;
 
-    /** @var array<string, string> Allowed MIME => output extension map. */
+    /** @var array<string, string> Allowed MIME => normalized extension map. */
     private array $allowedMime;
 
     /** Human-readable extension label for validation errors. */
     private string $allowedExtensionsLabel;
 
+    /**
+     * @param int|null $maxSizeBytes Maximum upload size in bytes.
+     * @param int|null $maxWidth Maximum image width in pixels.
+     * @param int|null $maxHeight Maximum image height in pixels.
+     * @param string|null $allowedExtensionsCsv Comma-separated extension allowlist.
+     * @return void
+     */
     public function __construct(
         ?int $maxSizeBytes = null,
         ?int $maxWidth = null,
@@ -53,7 +67,9 @@ final class AvatarValidationPolicy
     }
 
     /**
-     * @param array<string, mixed> $file
+     * Validates one uploaded file payload.
+     *
+     * @param array<string, mixed> $file One entry from `$_FILES`.
      * @return array{ok: bool, error: string|null, extension: string|null}
      */
     public function validate(array $file): array
@@ -106,6 +122,9 @@ final class AvatarValidationPolicy
     }
 
     /**
+     * Parses an extension allowlist into MIME rules and label text.
+     *
+     * @param string $csv Raw comma-separated extension list.
      * @return array{mime_map: array<string, string>, label: string}
      */
     private function parseAllowedExtensions(string $csv): array
@@ -146,6 +165,12 @@ final class AvatarValidationPolicy
         return ['mime_map' => $mimeMap, 'label' => implode('/', array_keys($labels))];
     }
 
+    /**
+     * Formats one byte value into a compact user-facing size label.
+     *
+     * @param int $bytes File-size ceiling in bytes.
+     * @return string Human-readable size label.
+     */
     private function sizeLabel(int $bytes): string
     {
         if ($bytes % 1048576 === 0) {
@@ -163,4 +188,3 @@ final class AvatarValidationPolicy
         return (string) $bytes . ' bytes';
     }
 }
-
