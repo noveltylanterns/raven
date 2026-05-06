@@ -27,6 +27,7 @@ final class UserDataParser
      * Prepares the user data parser for repository-backed user and profile reads.
      *
      * @param UserRead|null $userRepo Optional user repository used for read-only user/profile lookups.
+     * @return void
      */
     public function __construct(?UserRead $userRepo = null)
     {

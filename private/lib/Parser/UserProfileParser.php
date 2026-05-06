@@ -36,6 +36,7 @@ final class UserProfileParser
      * Prepares the profile-contact parser for option normalization and profile decoration.
      *
      * @param InputSanitizer $input Shared input sanitizer for contact value and slug normalization.
+     * @return void
      */
     public function __construct(InputSanitizer $input)
     {

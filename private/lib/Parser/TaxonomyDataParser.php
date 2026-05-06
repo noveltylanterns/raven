@@ -26,6 +26,7 @@ final class TaxonomyDataParser
 
     /**
      * @param PageRead $pageRepo Canonical page repository for all taxonomy page-list reads.
+     * @return void
      */
     public function __construct(PageRead $pageRepo)
     {

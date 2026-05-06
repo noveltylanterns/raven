@@ -30,6 +30,7 @@ final class GroupRouteParser
      *
      * @param Config         $config Runtime site configuration.
      * @param InputSanitizer $input  Input normalizer used when validating route prefixes.
+     * @return void
      */
     public function __construct(Config $config, InputSanitizer $input)
     {
@@ -44,7 +45,7 @@ final class GroupRouteParser
      */
     public function profileRoutePrefix(): string
     {
-        return $this->normalizeRoutePrefix((string) $this->config->get('user.prefix', 'user'), 'user', true);
+        return RoutePrefixParser::normalize($this->input, (string) $this->config->get('user.prefix', 'user'), 'user', true);
     }
 
     /**
@@ -101,7 +102,7 @@ final class GroupRouteParser
      */
     public function groupRoutePrefix(): string
     {
-        return $this->normalizeRoutePrefix((string) $this->config->get('group.prefix', 'group'), 'group', true);
+        return RoutePrefixParser::normalize($this->input, (string) $this->config->get('group.prefix', 'group'), 'group', true);
     }
 
     /**
@@ -141,19 +142,6 @@ final class GroupRouteParser
             ['open', 'invite', 'closed'],
             'closed'
         );
-    }
-
-    /**
-     * Normalizes a raw route-prefix string through the panel URL helper.
-     *
-     * @param string $configured Configured prefix value.
-     * @param string $fallback   Fallback prefix when the configured value is invalid.
-     * @param bool   $allowBlank When true, an empty result is accepted; otherwise the fallback is used.
-     * @return string            Normalized route prefix.
-     */
-    public function normalizeRoutePrefix(string $configured, string $fallback, bool $allowBlank = false): string
-    {
-        return PanelParser::normalizeRoutePrefix($this->input, $configured, $fallback, $allowBlank);
     }
 
     /**

@@ -33,6 +33,7 @@ final class PageDataParser
      *
      * @param InputSanitizer      $input    Input normalizer used when validating slugs and ids.
      * @param PageRead|null $pageRepo Optional page repository for read-only page lookups.
+     * @return void
      */
     public function __construct(InputSanitizer $input, ?PageRead $pageRepo = null)
     {

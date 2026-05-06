@@ -26,6 +26,7 @@ final class InviteParser
 
     /**
      * @param InviteRead $inviteRepo Canonical invite-token repository for all read operations.
+     * @return void
      */
     public function __construct(InviteRead $inviteRepo)
     {

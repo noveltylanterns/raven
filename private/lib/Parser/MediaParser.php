@@ -29,6 +29,7 @@ final class MediaParser
      * Prepares the media parser for read-only page-media lookups.
      *
      * @param MediaRead|null $mediaRepo Optional repository for read-only page-media queries.
+     * @return void
      */
     public function __construct(?MediaRead $mediaRepo = null)
     {

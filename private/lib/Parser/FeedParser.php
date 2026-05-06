@@ -31,6 +31,7 @@ final class FeedParser
      *
      * @param Config         $config Runtime site configuration.
      * @param InputSanitizer $input  Input normalizer used when validating route prefixes.
+     * @return void
      */
     public function __construct(Config $config, InputSanitizer $input)
     {
@@ -59,7 +60,7 @@ final class FeedParser
             return '';
         }
 
-        return $this->normalizeRoutePrefix((string) $this->config->get('feed.rss', 'rss'), 'rss', true);
+        return RoutePrefixParser::normalize($this->input, (string) $this->config->get('feed.rss', 'rss'), 'rss', true);
     }
 
     /**
@@ -73,7 +74,7 @@ final class FeedParser
             return '';
         }
 
-        return $this->normalizeRoutePrefix((string) $this->config->get('feed.atom', 'atom'), 'atom', true);
+        return RoutePrefixParser::normalize($this->input, (string) $this->config->get('feed.atom', 'atom'), 'atom', true);
     }
 
     /**
@@ -123,16 +124,4 @@ final class FeedParser
         return max(1, $items);
     }
 
-    /**
-     * Normalizes a raw route-prefix string through the panel URL helper.
-     *
-     * @param string $configured Configured prefix value.
-     * @param string $fallback   Fallback prefix when the configured value is invalid.
-     * @param bool   $allowBlank When true, an empty result is accepted; otherwise the fallback is used.
-     * @return string            Normalized route prefix.
-     */
-    private function normalizeRoutePrefix(string $configured, string $fallback, bool $allowBlank = false): string
-    {
-        return PanelParser::normalizeRoutePrefix($this->input, $configured, $fallback, $allowBlank);
-    }
 }

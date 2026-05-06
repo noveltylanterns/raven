@@ -31,6 +31,7 @@ final class TagDataParser
      *
      * @param InputSanitizer     $input   Input normalizer used when validating slugs and ids.
      * @param TagRead|null $tagRepo Optional tag repository for read-only tag lookups.
+     * @return void
      */
     public function __construct(InputSanitizer $input, ?TagRead $tagRepo = null)
     {

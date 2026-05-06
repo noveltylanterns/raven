@@ -31,6 +31,7 @@ final class GroupDataParser
      *
      * @param InputSanitizer       $input     Input normalizer used when validating slugs.
      * @param GroupRead|null $groupRepo Optional group repository for read-only group lookups.
+     * @return void
      */
     public function __construct(InputSanitizer $input, ?GroupRead $groupRepo = null)
     {

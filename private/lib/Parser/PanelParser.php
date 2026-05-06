@@ -12,10 +12,9 @@ declare(strict_types=1);
 namespace Raven\Lib\Parser;
 
 use Raven\Core\Config;
-use Raven\Lib\Security\InputSanitizer;
 
 /**
- * Shared panel-path and route-prefix normalization helper.
+ * Shared panel-path normalization helper.
  */
 final class PanelParser
 {
@@ -30,24 +29,5 @@ final class PanelParser
         $suffix = '/' . ltrim($suffix, '/');
 
         return rtrim($prefix, '/') . ($suffix === '/' ? '' : $suffix);
-    }
-
-    public static function normalizeRoutePrefix(
-        InputSanitizer $input,
-        string $configured,
-        string $fallback,
-        bool $allowBlank = false
-    ): string {
-        $configured = trim($configured);
-        if ($allowBlank && $configured === '') {
-            return '';
-        }
-
-        $slug = $input->slug($configured);
-        if ($slug === null || $slug === '') {
-            return $fallback;
-        }
-
-        return $slug;
     }
 }

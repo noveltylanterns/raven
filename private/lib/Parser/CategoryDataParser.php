@@ -31,6 +31,7 @@ final class CategoryDataParser
      *
      * @param InputSanitizer          $input        Input normalizer used when validating slugs and ids.
      * @param CategoryRead|null $categoryRepo Optional category repository for read-only category lookups.
+     * @return void
      */
     public function __construct(InputSanitizer $input, ?CategoryRead $categoryRepo = null)
     {

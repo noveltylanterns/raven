@@ -35,6 +35,7 @@ final class ChannelDataParser
      * @param Config                 $config      Runtime site configuration.
      * @param InputSanitizer         $input       Input normalizer used when validating slugs.
      * @param ChannelRead|null $channelRepo Optional channel repository for read-only channel lookups.
+     * @return void
      */
     public function __construct(Config $config, InputSanitizer $input, ?ChannelRead $channelRepo = null)
     {

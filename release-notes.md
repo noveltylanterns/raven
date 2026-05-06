@@ -2,6 +2,14 @@
 
 *The machine is supposed to be logging patches & mods to this file. Sometimes it does, sometimes it doesn't. It might be useful for historical architectural context to your Agent at one point.*
 
+### May 6, 2026 — lib/Parser refactor cleanup
+
+- **Repository-boundary verification** — re-audited repository imports to confirm repositories now only consume focused `*RepoParser` primitives (`ChannelRepoParser`, `PageRepoParser`, `SetRepoParser`) and do not depend on broader parser classes.
+- **Route-prefix ownership cleanup** — split generic route-prefix normalization out of `PanelParser` into new `RoutePrefixParser::normalize(...)`; updated `FeedParser`, `GroupRouteParser`, `CategoryRouteParser`, and `TagRouteParser` to use the neutral helper and narrowed `PanelParser` back to panel-path normalization only.
+- **Parser dependency-weight sweep** — reviewed parser ownership and retained parser classes as extension-facing data-access/policy surfaces while keeping repository-only behavior in repository classes and `*RepoParser` primitives.
+- **Parser PHPDoc sweep closeout** — added missing constructor `@return void` tags across parser classes (`DataParser`, `RouteParser`, repo-parser, and helper parser classes) so public/protected method docblocks remain complete.
+- **Checklist/docs sync** — completed and checked off section 4 (`lib/Parser Refactor & Cleanup`) in `build/todo.md`.
+
 ### May 6, 2026 — sys/Repository refactor cleanup
 
 - **Repository parser-boundary correction** — added `lib/Parser/SetRepoParser` and moved `SetRead`/`SetWrite` to it so repositories no longer depend on non-repository parser primitives; extended `PageRepoParser` with content-block encode/decode/normalize helpers and moved `PageRead`/`PageWrite` off direct `PageBlockParser` usage.

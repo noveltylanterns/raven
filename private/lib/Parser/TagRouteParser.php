@@ -46,6 +46,6 @@ final class TagRouteParser
             return '';
         }
 
-        return PanelParser::normalizeRoutePrefix($input, (string) $config->get('tag.prefix', 'tag'), 'tag', true);
+        return RoutePrefixParser::normalize($input, (string) $config->get('tag.prefix', 'tag'), 'tag', true);
     }
 }

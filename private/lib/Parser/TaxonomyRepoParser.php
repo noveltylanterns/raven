@@ -42,6 +42,7 @@ final class TaxonomyRepoParser
      * @param string      $driver      Active PDO driver name used for table-name resolution.
      * @param string      $prefix      Application table prefix before resolver sanitization.
      * @param ChannelRead $channelRepo Channel read side used to contribute channel routing options.
+     * @return void
      */
     public function __construct(PDO $db, string $driver, string $prefix, ChannelRead $channelRepo)
     {

@@ -28,6 +28,7 @@ final class RedirectParser
      *
      * @param InputSanitizer          $input        Shared input sanitizer for redirect selector normalization.
      * @param RedirectRead|null $redirectRepo Optional redirect repository used for read-only redirect lookups.
+     * @return void
      */
     public function __construct(InputSanitizer $input, ?RedirectRead $redirectRepo = null)
     {

@@ -46,6 +46,6 @@ final class CategoryRouteParser
             return '';
         }
 
-        return PanelParser::normalizeRoutePrefix($input, (string) $config->get('category.prefix', 'cat'), 'cat', true);
+        return RoutePrefixParser::normalize($input, (string) $config->get('category.prefix', 'cat'), 'cat', true);
     }
 }

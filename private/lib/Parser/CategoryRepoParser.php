@@ -30,6 +30,7 @@ final class CategoryRepoParser
      * @param PDO    $db     App database connection used for category lookup reads.
      * @param string $driver Active PDO driver name used for table-name resolution.
      * @param string $prefix Application table prefix before resolver sanitization.
+     * @return void
      */
     public function __construct(PDO $db, string $driver, string $prefix)
     {
