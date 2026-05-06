@@ -2,14 +2,14 @@
 
 /**
  * RAVEN CMS
- * ~/private/lib/Database/PdoQueryProfiler.php
- * PDO subclass that records every query through an optional QueryProfilerInterface.
+ * ~/private/sys/Debug/PdoQueryProfiler.php
+ * PDO subclass that records every query through an optional QueryProfiler.
  * Docs: https://raven.lanterns.io
  */
 
 declare(strict_types=1);
 
-namespace Raven\Lib\Database;
+namespace Raven\Core\Debug;
 
 use PDO;
 use PDOStatement;
@@ -21,7 +21,7 @@ use Throwable;
 final class PdoQueryProfiler extends PDO
 {
     private string $connectionLabel;
-    private ?QueryProfilerInterface $queryProfiler;
+    private ?QueryProfiler $queryProfiler;
 
     /**
      * Opens a PDO connection and wires all prepared statements through the profiler.
@@ -31,7 +31,7 @@ final class PdoQueryProfiler extends PDO
      * @param string|null                 $password        Database password (null for SQLite).
      * @param array<int|string, mixed>    $options         PDO driver options.
      * @param string                      $connectionLabel Profiler label identifying this connection (e.g., 'app', 'auth').
-     * @param QueryProfilerInterface|null $queryProfiler   Profiler instance; null disables query recording.
+     * @param QueryProfiler|null $queryProfiler   Profiler instance; null disables query recording.
      */
     public function __construct(
         string $dsn,
@@ -39,7 +39,7 @@ final class PdoQueryProfiler extends PDO
         ?string $password = null,
         array $options = [],
         string $connectionLabel = 'app',
-        ?QueryProfilerInterface $queryProfiler = null
+        ?QueryProfiler $queryProfiler = null
     ) {
         $this->connectionLabel = strtolower(trim($connectionLabel)) !== '' ? strtolower(trim($connectionLabel)) : 'app';
         $this->queryProfiler = $queryProfiler;

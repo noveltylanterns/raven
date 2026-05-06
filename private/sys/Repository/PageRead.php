@@ -14,7 +14,7 @@ use PDO;
 use Raven\Lib\Parser\ChannelRepoParser;
 use Raven\Lib\Parser\PageBlockParser;
 use Raven\Lib\Parser\PageRepoParser;
-use Raven\Lib\Database\TableNameResolver;
+use Raven\Lib\Database\SqlTable;
 
 /**
  * SELECT and lookup methods for pages, public listings, and taxonomy filters.
@@ -1326,7 +1326,7 @@ class PageRead
      */
     private function table(string $table): string
     {
-        return TableNameResolver::appTable($this->driver, $this->prefix, $table);
+        return SqlTable::appTable($this->driver, $this->prefix, $table);
     }
 
     /**

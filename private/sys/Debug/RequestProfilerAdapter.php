@@ -11,12 +11,10 @@ declare(strict_types=1);
 
 namespace Raven\Core\Debug;
 
-use Raven\Lib\Database\QueryProfilerInterface;
-
 /**
  * Bridges shared profiled PDO hooks into the request-profiler collector.
  */
-final class RequestProfilerAdapter implements QueryProfilerInterface
+final class RequestProfilerAdapter implements QueryProfiler
 {
     /**
      * Reports whether the request profiler is enabled for the current request.

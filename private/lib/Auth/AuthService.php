@@ -18,7 +18,7 @@ use Raven\Lib\Auth\Login2fa;
 use Raven\Lib\Auth\Membership;
 use Raven\Lib\Auth\Panel\Service as PanelAuthService;
 use Raven\Lib\Auth\Public\Service as PublicAuthService;
-use Raven\Lib\Database\TableNameResolver;
+use Raven\Lib\Database\SqlTable;
 use Raven\Lib\Scribe\AuthProfileScribe;
 use Raven\Lib\Auth\ThrottleReturn;
 use Raven\Lib\Auth\ThrottleUser;
@@ -812,7 +812,7 @@ final class AuthService
      */
     private function authTable(string $base): string
     {
-        return TableNameResolver::authTable($this->driver, $this->prefix, $base);
+        return SqlTable::appTable($this->driver, $this->prefix, $base);
     }
 
     /**

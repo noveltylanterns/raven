@@ -13,7 +13,7 @@ namespace Raven\Core\Repository;
 use PDO;
 use PDOException;
 use RuntimeException;
-use Raven\Lib\Database\TableNameResolver;
+use Raven\Lib\Database\SqlTable;
 
 /**
  * INSERT, UPDATE, and DELETE methods for invite-token records.
@@ -289,6 +289,6 @@ final class InviteWrite
      */
     private function authTable(string $table): string
     {
-        return TableNameResolver::authTable($this->driver, $this->prefix, $table);
+        return SqlTable::appTable($this->driver, $this->prefix, $table);
     }
 }

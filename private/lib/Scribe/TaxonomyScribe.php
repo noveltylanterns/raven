@@ -12,7 +12,7 @@ declare(strict_types=1);
 namespace Raven\Lib\Scribe;
 
 use PDO;
-use Raven\Lib\Database\TableNameResolver;
+use Raven\Lib\Database\SqlTable;
 
 /**
  * Shared write-side SQL base for category/tag taxonomy records.
@@ -209,7 +209,7 @@ abstract class TaxonomyScribe
      */
     private function table(string $table): string
     {
-        return TableNameResolver::appTable($this->driver, $this->prefix, $table);
+        return SqlTable::appTable($this->driver, $this->prefix, $table);
     }
 
     /**

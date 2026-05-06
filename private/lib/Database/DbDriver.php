@@ -2,10 +2,10 @@
 
 /**
  * RAVEN CMS
- * ~/private/lib/Database/DriverConfigNormalizer.php
- * Normalizes backend driver selection and per-driver config payloads.
+ * ~/private/lib/Database/DbDriver.php
+ * Normalizes shared database driver + prefix config values.
  * Docs: https://raven.lanterns.io
- */
+*/
 
 declare(strict_types=1);
 
@@ -14,9 +14,9 @@ namespace Raven\Lib\Database;
 use RuntimeException;
 
 /**
- * Normalizes backend driver selection and per-driver config payloads.
+ * Normalizes shared database driver and table-prefix config values.
  */
-final class DriverConfigNormalizer
+final class DbDriver
 {
     /**
      * Returns the canonical driver slug from the database config array.

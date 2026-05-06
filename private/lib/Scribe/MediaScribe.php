@@ -13,7 +13,7 @@ namespace Raven\Lib\Scribe;
 
 use PDO;
 use Raven\Core\Config;
-use Raven\Lib\Database\TableNameResolver;
+use Raven\Lib\Database\SqlTable;
 use Raven\Lib\Media\CoverUpload;
 use Raven\Lib\Media\CoverValidator;
 use Raven\Lib\Media\ImageVariantProcessor;
@@ -932,6 +932,6 @@ final class MediaScribe
      */
     private function table(string $table): string
     {
-        return TableNameResolver::appTable($this->driver, $this->prefix, $table);
+        return SqlTable::appTable($this->driver, $this->prefix, $table);
     }
 }

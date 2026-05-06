@@ -12,8 +12,8 @@ declare(strict_types=1);
 namespace Raven\Lib\Scribe;
 
 use PDO;
-use Raven\Lib\Database\SqlUpsertPolicy;
-use Raven\Lib\Database\TableNameResolver;
+use Raven\Lib\Database\SqlInsert;
+use Raven\Lib\Database\SqlTable;
 
 /**
  * Owns page mutation writes and transactional cleanup rules.
@@ -29,7 +29,7 @@ final class PageScribe
     private string $prefix;
     private bool $categoryEnabled;
     private bool $tagEnabled;
-    private SqlUpsertPolicy $upsertPolicy;
+    private SqlInsert $insertSql;
 
     /**
      * Prepares the page scribe for page write operations.
@@ -39,7 +39,7 @@ final class PageScribe
      * @param string                $prefix          Application table prefix before resolver sanitization.
      * @param bool                  $categoryEnabled Whether category relations are enabled in config.
      * @param bool                  $tagEnabled      Whether tag relations are enabled in config.
-     * @param SqlUpsertPolicy|null  $upsertPolicy    Optional SQL upsert policy override for tests or alternate drivers.
+     * @param SqlInsert|null        $insertSql       Optional SQL insert helper override for tests or alternate drivers.
      * @return void
      */
     public function __construct(
@@ -48,14 +48,14 @@ final class PageScribe
         string $prefix,
         bool $categoryEnabled,
         bool $tagEnabled,
-        ?SqlUpsertPolicy $upsertPolicy = null
+        ?SqlInsert $insertSql = null
     ) {
         $this->db = $db;
         $this->driver = $driver;
         $this->prefix = preg_replace('/[^a-zA-Z0-9_]/', '', $prefix) ?? '';
         $this->categoryEnabled = $categoryEnabled;
         $this->tagEnabled = $tagEnabled;
-        $this->upsertPolicy = $upsertPolicy ?? new SqlUpsertPolicy();
+        $this->insertSql = $insertSql ?? new SqlInsert();
     }
 
     /**
@@ -243,7 +243,7 @@ final class PageScribe
         }
 
         $insert = $this->db->prepare(
-            $this->upsertPolicy->insertIgnoreSql(
+            $this->insertSql->insertIgnore(
                 $this->driver,
                 $table,
                 ['page', $column],
@@ -267,6 +267,6 @@ final class PageScribe
      */
     private function table(string $table): string
     {
-        return TableNameResolver::appTable($this->driver, $this->prefix, $table);
+        return SqlTable::appTable($this->driver, $this->prefix, $table);
     }
 }

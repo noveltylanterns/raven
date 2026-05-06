@@ -17,7 +17,7 @@ use Raven\Lib\Parser\PageBlockParser;
 use Raven\Core\Debug\UniquenessProfiler;
 use Raven\Lib\Parser\PageRepoParser;
 use Raven\Lib\Scribe\PageScribe;
-use Raven\Lib\Database\TableNameResolver;
+use Raven\Lib\Database\SqlTable;
 
 /**
  * INSERT, UPDATE, and DELETE methods for page records.
@@ -253,6 +253,6 @@ final class PageWrite
      */
     private function table(string $table): string
     {
-        return TableNameResolver::appTable($this->driver, $this->prefix, $table);
+        return SqlTable::appTable($this->driver, $this->prefix, $table);
     }
 }

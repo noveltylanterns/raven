@@ -14,7 +14,7 @@ namespace Raven\Lib\Scribe;
 use PDO;
 use Raven\Lib\Auth\Panel\PermissionBase;
 use Raven\Lib\Auth\Panel\RolePolicy;
-use Raven\Lib\Database\TableNameResolver;
+use Raven\Lib\Database\SqlTable;
 use RuntimeException;
 
 /**
@@ -352,6 +352,6 @@ final class GroupScribe
      */
     private function table(string $table): string
     {
-        return TableNameResolver::appTable($this->driver, $this->prefix, $table);
+        return SqlTable::appTable($this->driver, $this->prefix, $table);
     }
 }

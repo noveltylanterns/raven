@@ -12,12 +12,12 @@ declare(strict_types=1);
 namespace Raven\Core\Runtime;
 
 use PDO;
+use Raven\Core\Debug\PdoQueryProfiler;
 use Raven\Core\Debug\RequestProfilerAdapter;
-use Raven\Lib\Database\DriverConfigNormalizer;
+use Raven\Lib\Database\DbDriver;
 use Raven\Lib\Database\MysqlConfig;
 use Raven\Lib\Database\PgsqlConfig;
-use Raven\Lib\Database\PdoQueryProfiler;
-use Raven\Lib\Database\QueryProfilerInterface;
+use Raven\Core\Debug\QueryProfiler;
 use Raven\Lib\Database\SqliteBootstrap;
 use Raven\Lib\Database\SqliteConfig;
 
@@ -32,20 +32,20 @@ final class DatabaseFactory
 {
     /** @var array<string, mixed> */
     private array $config;
-    private QueryProfilerInterface $queryProfiler;
-    private DriverConfigNormalizer $configNormalizer;
+    private QueryProfiler $queryProfiler;
+    private DbDriver $dbDriver;
     private SqliteBootstrap $sqliteBootstrap;
     private ?SqliteConfig $sqlitePaths = null;
 
     /**
      * @param array<string, mixed> $databaseConfig Raven database configuration array (from config.php).
-     * @param QueryProfilerInterface|null $queryProfiler Optional profiler; defaults to RequestProfilerAdapter.
+     * @param QueryProfiler|null $queryProfiler Optional profiler; defaults to RequestProfilerAdapter.
      */
-    public function __construct(array $databaseConfig, ?QueryProfilerInterface $queryProfiler = null)
+    public function __construct(array $databaseConfig, ?QueryProfiler $queryProfiler = null)
     {
         $this->config = $databaseConfig;
         $this->queryProfiler = $queryProfiler ?? new RequestProfilerAdapter();
-        $this->configNormalizer = new DriverConfigNormalizer();
+        $this->dbDriver = new DbDriver();
         $this->sqliteBootstrap = new SqliteBootstrap();
     }
 
@@ -56,7 +56,7 @@ final class DatabaseFactory
      */
     public function getDriver(): string
     {
-        return $this->configNormalizer->driver($this->config);
+        return $this->dbDriver->driver($this->config);
     }
 
     /**
@@ -66,7 +66,7 @@ final class DatabaseFactory
      */
     public function getPrefix(): string
     {
-        return $this->configNormalizer->prefix($this->config);
+        return $this->dbDriver->prefix($this->config);
     }
 
     /**

@@ -12,7 +12,7 @@ namespace Raven\Core\Repository;
 
 use PDO;
 use Raven\Lib\Auth\Panel\RolePolicy;
-use Raven\Lib\Database\TableNameResolver;
+use Raven\Lib\Database\SqlTable;
 
 /**
  * SELECT and lookup methods for user groups.
@@ -518,7 +518,7 @@ class GroupRead
      */
     private function table(string $table): string
     {
-        return TableNameResolver::appTable($this->driver, $this->prefix, $table);
+        return SqlTable::appTable($this->driver, $this->prefix, $table);
     }
 
     /**

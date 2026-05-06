@@ -12,7 +12,7 @@ declare(strict_types=1);
 namespace Raven\Core\Schema;
 
 use PDO;
-use Raven\Lib\Database\TableNameResolver;
+use Raven\Lib\Database\SqlTable;
 
 /**
  * Applies app-side schema migrations and index/column backfills.
@@ -20,18 +20,15 @@ use Raven\Lib\Database\TableNameResolver;
 final class SchemaBuilder
 {
     private SchemaIntrospector $introspector;
-    private TableNameResolver $tables;
 
     /**
-     * Wires the introspector and optional table-name resolver used by all ensure methods.
+     * Wires the introspector used by all ensure methods.
      *
-     * @param SchemaIntrospector    $introspector Cross-driver column/index/table inspection helper.
-     * @param TableNameResolver|null $tables       Optional resolver; defaults to a plain TableNameResolver.
+     * @param SchemaIntrospector $introspector Cross-driver column/index/table inspection helper.
      */
-    public function __construct(SchemaIntrospector $introspector, ?TableNameResolver $tables = null)
+    public function __construct(SchemaIntrospector $introspector)
     {
         $this->introspector = $introspector;
-        $this->tables = $tables ?? new TableNameResolver();
     }
 
     /**
@@ -195,7 +192,7 @@ final class SchemaBuilder
      */
     public function ensureGroupRoutingColumns(PDO $db, string $driver, string $prefix): void
     {
-        $groupsTable = $this->tables->resolve($driver, $prefix, 'groups');
+        $groupsTable = SqlTable::appTable($driver, $prefix, 'groups');
 
         $rows = $db->query(
             'SELECT id, name, slug, route
@@ -270,7 +267,7 @@ final class SchemaBuilder
 
         if ($driver === 'sqlite') {
             foreach ($taxonomyTables as $table) {
-                $qualifiedTable = $this->tables->resolve($driver, $prefix, $table);
+                $qualifiedTable = SqlTable::appTable($driver, $prefix, $table);
                 if (!$this->introspector->columnExists($db, 'sqlite', $qualifiedTable, 'cover_image')) {
                     $db->exec('ALTER TABLE ' . $qualifiedTable . ' ADD COLUMN cover_image TEXT NULL');
                 }
@@ -307,7 +304,7 @@ final class SchemaBuilder
 
         if ($driver === 'sqlite') {
             foreach ($tables as $table) {
-                $qualifiedTable = $this->tables->resolve($driver, $prefix, $table);
+                $qualifiedTable = SqlTable::appTable($driver, $prefix, $table);
                 if (!$this->introspector->columnExists($db, 'sqlite', $qualifiedTable, 'icon_image')) {
                     $db->exec('ALTER TABLE ' . $qualifiedTable . ' ADD COLUMN icon_image TEXT NULL');
                 }
@@ -338,7 +335,7 @@ final class SchemaBuilder
 
         if ($driver === 'sqlite') {
             foreach ($taxonomyTables as $table) {
-                $qualifiedTable = $this->tables->resolve($driver, $prefix, $table);
+                $qualifiedTable = SqlTable::appTable($driver, $prefix, $table);
                 if (!$this->introspector->columnExists($db, 'sqlite', $qualifiedTable, 'set')) {
                     $db->exec('ALTER TABLE ' . $qualifiedTable . ' ADD COLUMN ' . $setColumn . ' INTEGER NOT NULL DEFAULT 1');
                 }
@@ -391,10 +388,10 @@ final class SchemaBuilder
     public function ensurePanelPerformanceIndexes(PDO $db, string $driver, string $prefix): void
     {
         if ($driver === 'sqlite') {
-            $pageCategoriesTable = $this->tables->resolve($driver, $prefix, 'page_categories');
-            $pageTagsTable = $this->tables->resolve($driver, $prefix, 'page_tags');
-            $userGroupsTable = $this->tables->resolve($driver, $prefix, 'user_groups');
-            $redirectsTable = $this->tables->resolve($driver, $prefix, 'redirects');
+            $pageCategoriesTable = SqlTable::appTable($driver, $prefix, 'page_categories');
+            $pageTagsTable = SqlTable::appTable($driver, $prefix, 'page_tags');
+            $userGroupsTable = SqlTable::appTable($driver, $prefix, 'user_groups');
+            $redirectsTable = SqlTable::appTable($driver, $prefix, 'redirects');
             $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $pageCategoriesTable . '_category ON ' . $pageCategoriesTable . ' (category, page)');
             $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $pageTagsTable . '_tag ON ' . $pageTagsTable . ' (tag, page)');
             $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $userGroupsTable . '_group_id ON ' . $userGroupsTable . ' ("group", user)');
@@ -449,7 +446,7 @@ final class SchemaBuilder
     {
         // Normalise null channel values and ensure redirect lookup indexes.
         if ($driver === 'sqlite') {
-            $table = $this->tables->resolve($driver, $prefix, 'redirects');
+            $table = SqlTable::appTable($driver, $prefix, 'redirects');
             $db->exec('UPDATE ' . $table . ' SET channel = 0 WHERE channel IS NULL');
             $this->ensureRedirectIndexesSqlite($db, $table);
             return;

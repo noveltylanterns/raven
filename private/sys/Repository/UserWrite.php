@@ -12,7 +12,7 @@ namespace Raven\Core\Repository;
 
 use PDO;
 use Raven\Lib\Auth\UserAuthCodec;
-use Raven\Lib\Database\TableNameResolver;
+use Raven\Lib\Database\SqlTable;
 use Raven\Lib\Scribe\UserScribe;
 
 /**
@@ -243,7 +243,7 @@ final class UserWrite
      */
     private function authTable(string $table): string
     {
-        return TableNameResolver::authTable($this->driver, $this->prefix, $table);
+        return SqlTable::appTable($this->driver, $this->prefix, $table);
     }
 
     /**
@@ -254,7 +254,7 @@ final class UserWrite
      */
     private function appAuthTable(string $table): string
     {
-        return TableNameResolver::appTable($this->driver, $this->prefix, $table);
+        return SqlTable::appTable($this->driver, $this->prefix, $table);
     }
 
     /**
@@ -265,6 +265,6 @@ final class UserWrite
      */
     private function groupTable(string $table): string
     {
-        return TableNameResolver::appTable($this->driver, $this->prefix, $table);
+        return SqlTable::appTable($this->driver, $this->prefix, $table);
     }
 }

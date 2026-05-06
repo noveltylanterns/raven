@@ -12,7 +12,7 @@ declare(strict_types=1);
 namespace Raven\Lib\Auth;
 
 use PDO;
-use Raven\Lib\Database\TableNameResolver;
+use Raven\Lib\Database\SqlTable;
 
 /**
  * Shared user-group membership queries/mutations for auth permission flows.
@@ -165,6 +165,6 @@ final class Membership
 
     private function table(string $base): string
     {
-        return TableNameResolver::appTable($this->driver, $this->prefix, $base);
+        return SqlTable::appTable($this->driver, $this->prefix, $base);
     }
 }

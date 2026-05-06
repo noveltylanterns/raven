@@ -12,7 +12,7 @@ declare(strict_types=1);
 namespace Raven\Core\Schema;
 
 use PDO;
-use Raven\Lib\Database\TableNameResolver;
+use Raven\Lib\Database\SqlTable;
 use Raven\Lib\Extension\Bootstrap;
 use Raven\Lib\Extension\Registry;
 use Raven\Lib\Extension\Resolver;
@@ -22,15 +22,12 @@ use Raven\Lib\Extension\Resolver;
  */
 final class ExtensionSchemaRunner
 {
-    private TableNameResolver $tables;
     private Bootstrap $bootstrapResolver;
 
     public function __construct(
-        ?TableNameResolver $tables = null,
         ?Bootstrap $bootstrapResolver = null
     )
     {
-        $this->tables = $tables ?? new TableNameResolver();
         $this->bootstrapResolver = $bootstrapResolver ?? new Bootstrap();
     }
 
@@ -80,7 +77,7 @@ final class ExtensionSchemaRunner
             }
 
             try {
-                $tableStem = $this->tables->resolve($driver, $prefix, 'ext_' . $directory);
+                $tableStem = SqlTable::appTable($driver, $prefix, 'ext_' . $directory);
                 $storageLocalPath = $root . '/private/dat/ext/' . $directory;
                 $storagePanelPath = $root . '/panel/ext/' . $directory;
                 $storagePublicPath = $root . '/public/uploads/ext/' . $directory;
@@ -103,7 +100,7 @@ final class ExtensionSchemaRunner
                         throw new \RuntimeException('Extension table suffix was not provisioned: ' . $normalized);
                     }
 
-                    return $this->tables->resolve($driver, $prefix, 'ext_' . $directory . '_' . $normalized);
+                    return SqlTable::appTable($driver, $prefix, 'ext_' . $directory . '_' . $normalized);
                 };
                 $provider([
                     'db' => $db,

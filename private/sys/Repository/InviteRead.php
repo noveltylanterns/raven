@@ -11,7 +11,7 @@ declare(strict_types=1);
 namespace Raven\Core\Repository;
 
 use PDO;
-use Raven\Lib\Database\TableNameResolver;
+use Raven\Lib\Database\SqlTable;
 
 /**
  * SELECT, token normalization, and token generation methods for invite records.
@@ -301,6 +301,6 @@ class InviteRead
      */
     private function authTable(string $table): string
     {
-        return TableNameResolver::authTable($this->driver, $this->prefix, $table);
+        return SqlTable::appTable($this->driver, $this->prefix, $table);
     }
 }

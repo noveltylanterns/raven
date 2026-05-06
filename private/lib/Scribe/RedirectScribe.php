@@ -13,7 +13,7 @@ namespace Raven\Lib\Scribe;
 
 use PDO;
 use Raven\Core\Repository\ChannelRead;
-use Raven\Lib\Database\TableNameResolver;
+use Raven\Lib\Database\SqlTable;
 use Raven\Lib\Parser\ChannelRepoParser;
 use Raven\Core\Debug\UniquenessProfiler;
 use RuntimeException;
@@ -198,6 +198,6 @@ final class RedirectScribe
      */
     private function table(string $table): string
     {
-        return TableNameResolver::appTable($this->driver, $this->prefix, $table);
+        return SqlTable::appTable($this->driver, $this->prefix, $table);
     }
 }

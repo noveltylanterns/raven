@@ -11,15 +11,12 @@ declare(strict_types=1);
 
 namespace Raven\Core\Schema;
 
-use Raven\Lib\Database\TableNameResolver;
-
 /**
  * Lazily wires schema bootstrap components with shared dependencies.
  */
 final class SchemaComponentFactory
 {
     private ?SchemaIntrospector $schemaIntrospector;
-    private ?TableNameResolver $tableNameResolver;
     private ?SchemaBootstrap $schemaBootstrap;
     private ?AuthSchemaBuilder $authSchemaBuilder;
     private ?SchemaBuilder $schemaBuilder;
@@ -29,17 +26,15 @@ final class SchemaComponentFactory
     /**
      * Accepts optional pre-wired component instances, defaulting to lazy construction on first use.
      *
-     * @param SchemaIntrospector|null    $schemaIntrospector  Optional shared introspector; created on first use if null.
-     * @param TableNameResolver|null     $tableNameResolver   Optional shared table-name resolver; created on first use if null.
-     * @param SchemaBootstrap|null       $schemaBootstrap     Optional base app schema bootstrapper; created on first use if null.
-     * @param AuthSchemaBuilder|null     $authSchemaBuilder   Optional auth schema builder; created on first use if null.
-     * @param SchemaBuilder|null         $schemaBuilder       Optional app schema builder; created on first use if null.
-     * @param SeedInstaller|null         $seedInstaller       Optional seed installer; created on first use if null.
+     * @param SchemaIntrospector|null    $schemaIntrospector    Optional shared introspector; created on first use if null.
+     * @param SchemaBootstrap|null       $schemaBootstrap       Optional base app schema bootstrapper; created on first use if null.
+     * @param AuthSchemaBuilder|null     $authSchemaBuilder     Optional auth schema builder; created on first use if null.
+     * @param SchemaBuilder|null         $schemaBuilder         Optional app schema builder; created on first use if null.
+     * @param SeedInstaller|null         $seedInstaller         Optional seed installer; created on first use if null.
      * @param ExtensionSchemaRunner|null $extensionSchemaRunner Optional extension schema runner; created on first use if null.
      */
     public function __construct(
         ?SchemaIntrospector $schemaIntrospector = null,
-        ?TableNameResolver $tableNameResolver = null,
         ?SchemaBootstrap $schemaBootstrap = null,
         ?AuthSchemaBuilder $authSchemaBuilder = null,
         ?SchemaBuilder $schemaBuilder = null,
@@ -47,7 +42,6 @@ final class SchemaComponentFactory
         ?ExtensionSchemaRunner $extensionSchemaRunner = null
     ) {
         $this->schemaIntrospector = $schemaIntrospector;
-        $this->tableNameResolver = $tableNameResolver;
         $this->schemaBootstrap = $schemaBootstrap;
         $this->authSchemaBuilder = $authSchemaBuilder;
         $this->schemaBuilder = $schemaBuilder;
@@ -91,7 +85,7 @@ final class SchemaComponentFactory
     public function schemaBuilder(): SchemaBuilder
     {
         if ($this->schemaBuilder === null) {
-            $this->schemaBuilder = new SchemaBuilder($this->schemaIntrospector(), $this->tableNameResolver());
+            $this->schemaBuilder = new SchemaBuilder($this->schemaIntrospector());
         }
 
         return $this->schemaBuilder;
@@ -105,7 +99,7 @@ final class SchemaComponentFactory
     public function seedInstaller(): SeedInstaller
     {
         if ($this->seedInstaller === null) {
-            $this->seedInstaller = new SeedInstaller($this->tableNameResolver());
+            $this->seedInstaller = new SeedInstaller();
         }
 
         return $this->seedInstaller;
@@ -119,7 +113,7 @@ final class SchemaComponentFactory
     public function extensionSchemaRunner(): ExtensionSchemaRunner
     {
         if ($this->extensionSchemaRunner === null) {
-            $this->extensionSchemaRunner = new ExtensionSchemaRunner($this->tableNameResolver());
+            $this->extensionSchemaRunner = new ExtensionSchemaRunner();
         }
 
         return $this->extensionSchemaRunner;
@@ -132,14 +126,5 @@ final class SchemaComponentFactory
         }
 
         return $this->schemaIntrospector;
-    }
-
-    private function tableNameResolver(): TableNameResolver
-    {
-        if ($this->tableNameResolver === null) {
-            $this->tableNameResolver = new TableNameResolver();
-        }
-
-        return $this->tableNameResolver;
     }
 }

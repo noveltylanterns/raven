@@ -13,20 +13,13 @@ namespace Raven\Core\Schema;
 
 use PDO;
 use Raven\Lib\Auth\Panel\PermissionBase as PanelAccess;
-use Raven\Lib\Database\TableNameResolver;
+use Raven\Lib\Database\SqlTable;
 
 /**
  * Installs/normalizes seed rows for stock groups and starter pages.
  */
 final class SeedInstaller
 {
-    private TableNameResolver $tables;
-
-    public function __construct(?TableNameResolver $tables = null)
-    {
-        $this->tables = $tables ?? new TableNameResolver();
-    }
-
     /**
      * Inserts missing stock groups, normalizes their IDs to canonical positions, and syncs permission masks.
      *
@@ -36,7 +29,7 @@ final class SeedInstaller
      */
     public function ensureGroups(PDO $db, string $driver, string $prefix): void
     {
-        $groupsTable = $this->tables->resolve($driver, $prefix, 'groups');
+        $groupsTable = SqlTable::appTable($driver, $prefix, 'groups');
         $now = gmdate('Y-m-d H:i:s');
         $stockGroups = PanelAccess::stockGroups();
         $findBySlug = $db->prepare(
@@ -118,7 +111,7 @@ final class SeedInstaller
      */
     public function ensurePages(PDO $db, string $driver, string $prefix): void
     {
-        $pagesTable = $this->tables->resolve($driver, $prefix, 'pages');
+        $pagesTable = SqlTable::appTable($driver, $prefix, 'pages');
         $usersTable = $prefix . 'users';
 
         $userCountStmt = $db->query('SELECT COUNT(*) FROM ' . $usersTable);
@@ -169,8 +162,8 @@ final class SeedInstaller
             return;
         }
 
-        $groupsTable = $this->tables->resolve($driver, $prefix, 'groups');
-        $userGroupsTable = $this->tables->resolve($driver, $prefix, 'user_groups');
+        $groupsTable = SqlTable::appTable($driver, $prefix, 'groups');
+        $userGroupsTable = SqlTable::appTable($driver, $prefix, 'user_groups');
 
         $findStock = $db->prepare(
             'SELECT id

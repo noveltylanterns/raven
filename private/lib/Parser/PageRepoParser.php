@@ -11,7 +11,7 @@ declare(strict_types=1);
 namespace Raven\Lib\Parser;
 
 use PDO;
-use Raven\Lib\Database\TableNameResolver;
+use Raven\Lib\Database\SqlTable;
 
 /**
  * Shared page-repository primitives used by both PageRead and PageWrite.
@@ -68,7 +68,7 @@ final class PageRepoParser
     public static function applySchedule(PDO $db, string $driver, string $prefix): void
     {
         $safePrefix = preg_replace('/[^a-zA-Z0-9_]/', '', $prefix) ?? '';
-        $pages = TableNameResolver::appTable($driver, $safePrefix, 'pages');
+        $pages = SqlTable::appTable($driver, $safePrefix, 'pages');
         $now = gmdate('Y-m-d H:i:s');
 
         // Publish drafts whose scheduled publish time has arrived.

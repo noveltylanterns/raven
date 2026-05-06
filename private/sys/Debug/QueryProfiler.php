@@ -2,16 +2,16 @@
 
 /**
  * RAVEN CMS
- * ~/private/lib/Database/QueryProfilerInterface.php
+ * ~/private/sys/Debug/QueryProfiler.php
  * Contract for query profiler implementations used by PdoQueryProfiler and PdoStmtProfiler.
  * Docs: https://raven.lanterns.io
  */
 
 declare(strict_types=1);
 
-namespace Raven\Lib\Database;
+namespace Raven\Core\Debug;
 
-interface QueryProfilerInterface
+interface QueryProfiler
 {
     /**
      * Returns true when query recording is active for the current request.

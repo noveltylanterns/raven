@@ -16,7 +16,7 @@ namespace Raven\Lib\Parser;
 
 use PDO;
 use Raven\Core\Repository\ChannelRead;
-use Raven\Lib\Database\TableNameResolver;
+use Raven\Lib\Database\SqlTable;
 
 /**
  * Repository-backed parser for mixed channel/category/tag option sets.
@@ -258,7 +258,7 @@ final class TaxonomyRepoParser
      */
     private function table(string $table): string
     {
-        return TableNameResolver::appTable($this->driver, $this->prefix, $table);
+        return SqlTable::appTable($this->driver, $this->prefix, $table);
     }
 
     /**

@@ -11,7 +11,7 @@ declare(strict_types=1);
 namespace Raven\Core\Repository;
 
 use PDO;
-use Raven\Lib\Database\TableNameResolver;
+use Raven\Lib\Database\SqlTable;
 use Raven\Lib\Parser\ChannelRepoParser;
 use Raven\Lib\Scribe\ChannelScribe;
 use RuntimeException;
@@ -290,6 +290,6 @@ final class ChannelWrite
      */
     private function table(string $table): string
     {
-        return TableNameResolver::appTable($this->driver, $this->prefix, $table);
+        return SqlTable::appTable($this->driver, $this->prefix, $table);
     }
 }

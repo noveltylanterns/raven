@@ -19,33 +19,32 @@ This is the default Build Mode backlog file. If the user asks about goals, unpat
 
 # Data Access Layer Refactor Cleanup
 
-## 1) lib/Database/ Refactor & Cleanup (Pending Plan, DO NOT PROCEED)
+## 1) lib/Database/ Refactor & Cleanup (Active Cleanup Checklist)
 
-### Unsorted class inventory + purpose baseline
-- [ ] `DriverConfigNormalizer.php` — normalize/validate shared database config payloads (`driver`, `prefix`).
-	- Rename to DbDriver.php
-- [ ] `TableNameResolver.php` — resolve prefixed app/auth table names for SQL call sites.
-	- Rename to TableResolver.php
-- [ ] `SqlUpsertPolicy.php` — emit driver-appropriate duplicate-safe insert SQL.
-- [ ] `QueryProfilerInterface.php` — define query profiling contract only (no implementation logic).
-	- Relocate to sys/Debug/QueryProfiler.php
-- [ ] `PdoQueryProfiler.php` — PDO wrapper that records `exec`/`query`/`prepare` activity into query profiler.
-- [ ] `PdoStmtProfiler.php` — statement wrapper that records binds + execute timing into query profiler.
+### Class inventory + purpose baseline
+- [x] `DbDriver.php` — normalize/validate shared database config payloads (`driver`, `prefix`).
+- [x] `MysqlConfig.php` — extract MySQL config from runtime payload and expose DSN/credential primitives.
+- [x] `PgsqlConfig.php` — extract PostgreSQL config from runtime payload and expose DSN/credential primitives.
+- [x] `SqliteConfig.php` — extract SQLite base path from config and resolve canonical SQLite file path by DB key.
+- [x] `SqliteBootstrap.php` — ensure SQLite filesystem path exists and apply connection PRAGMAs.
+- [x] `SqlTable.php` — resolve prefixed SQL table names for call sites.
+- [x] `SqlInsert.php` — build plain and duplicate-safe INSERT SQL across supported drivers.
+- [x] `QueryProfiler.php` moved to `sys/Debug/` ownership as debug-facing query-profiler contract.
+- [x] `PdoQueryProfiler.php` + `PdoStmtProfiler.php` moved to `sys/Debug/` ownership and removed from `lib/Database/`.
 
 ### Dependency-boundary pass by lane
-- [ ] Config lane (`DriverConfigNormalizer`, `MysqlConfig`, `PgsqlConfig`, `SqliteConfig`) stays pure config/path logic and does not absorb runtime PDO/bootstrap orchestration.
-- [ ] Driver lane (`MysqlConfig`, `Mysql*`, `PgsqlConfig`, `Pgsql*`, `SqliteConfig`, `Sqlite*`, etc) stays focused on individual data drivers. Unused drivers should never have dependencies loading on any route.
-- [ ] Runtime lane (`SqliteBootstrap`, `TableNameResolver`, `SqlUpsertPolicy`) stays focused on SQL/runtime helpers and does not absorb config parsing.
-- [ ] Profiling lane (`QueryProfilerInterface`, `PdoQueryProfiler`, `PdoStmtProfiler`) stays profiling-only and does not absorb unrelated query helper behavior.
+- [x] Config lane (`DbDriver`, `MysqlConfig`, `PgsqlConfig`, `SqliteConfig`) kept focused on config/path only.
+- [x] Driver lane split completed so MySQL/PgSQL/SQLite concerns are isolated by class.
+- [x] Runtime lane (`SqliteBootstrap`, `SqlTable`, `SqlInsert`) kept focused on SQL/runtime helpers.
+- [x] Profiling lane split completed (`QueryProfiler` contract + PDO wrappers in `sys/Debug`).
 
 ### Cleanup
-- [ ] Make sure no Database/ class is pulling up dead function/class/dependency weight irrelevant to the data type that class handles.
-- [ ] Scan the whole Database/ directory for legacy aliases, compatability shims, and thin wrappers that don't add any extra logic. Purge all of them. Update all callers to use actual source functions.
-- [ ] Specifically review no-op overlaps inside `TableNameResolver` (`resolve`/`appTable`/`authTable`) and profiler wrappers for pass-through methods that add no policy.
-- [ ] A lot of the functions in our Database/ classes have really long & unclear names. Do a sweep of every class and make sure the function/variable names are concise+accurate.
-- [ ] Do a sweep of all classes in Database/ making sure PHPdoc blocks are present+accurate for ALL headings, classes & functions.
-- [ ] Run caller-surface sweep after any rename/removal so container wiring + repository/schema call sites stay aligned.
-- [ ] Update release-notes.md, clear completed section out of todo.md, and commit.
+- [x] Removed dead/overlapping Database primitives (`DsnBuilder`, `SqlUpsertPolicy`, prior SQLite class names).
+- [x] Updated all known callers to use current canonical classes/methods.
+- [x] Naming sweep completed for this pass (`DbDriver`, `SqlTable`, `SqlInsert`, `SqliteConfig`, `PdoQueryProfiler`, `PdoStmtProfiler`).
+- [x] PHPDoc/header sweep completed on current Database primitives.
+- [x] Release notes and docs updated for completed refactor items.
+- [x] Optional naming pass complete: `DriverConfigNormalizer` -> `DbDriver`, `TableNameResolver` -> `SqlTable`.
 
 
 ## 2) sys/Schema Refactor & Cleanup (Pending Plan, DO NOT PROCEED)
@@ -74,7 +73,7 @@ This is the default Build Mode backlog file. If the user asks about goals, unpat
 - [ ] A lot of the functions in our Schema/ classes have really long & unclear names. Do a sweep of every class and make sure the function/variable names are concise+accurate.
 - [ ] Do a sweep of all classes in Schema/ making sure PHPdoc blocks are present+accurate for ALL headings, classes & functions.
 - [ ] Run caller-surface sweep after refactors across runtime bootstrap, installer paths, and any extension schema invocations.
-- [ ] Update release-notes.md, clear completed section out of todo.md, and commit.
+- [ ] Update release-notes.md and check off list.
 
 
 ## 2) sys/Repository/ Refactor & Cleanup (Pending Plan, DO NOT PROCEED)
@@ -88,7 +87,7 @@ Lingering issues & reorganization tasks. Make a plan to deal with them all in on
 - [ ] Scan the whole Repository/ directory for legacy aliases, compatability shims, and thin wrappers that don't add any extra logic. Purge all of them. Update all callers to use actual source functions.
 - [ ] A lot of the functions in our Repository/ classes have really long & unclear names. Do a sweep of every class and make sure the function/variable names are concise+accurate.
 - [ ] Do a sweep of all classes in Repository/ making sure PHPdoc blocks are present+accurate for ALL headings, classes & functions.
-- [ ] Update release-notes.md, clear completed section out of todo.md, and commit.
+- [ ] Update release-notes.md and check off list.
 
 ## 3) lib/Parser/ Refactor & Cleanup (Pending Plan, DO NOT PROCEED)
 Lingering issues & reorganization tasks. Make a plan to deal with them all in one clean sweep. Append it as a detailed checklist to this section in case we lose session or we have to bounce between agents:
@@ -98,7 +97,7 @@ Lingering issues & reorganization tasks. Make a plan to deal with them all in on
 - [ ] Scan the whole Parser/ directory for legacy aliases, compatability shims, and thin wrappers that don't add any extra logic. Purge all of them. Update all callers to use actual source functions.
 - [ ] A lot of the functions in our Parser/ classes have really long & unclear names. Do a sweep of every class and make sure the function/variable names are concise+accurate.
 - [ ] Do a sweep of all classes in Parser/ making sure PHPdoc blocks are present+accurate for ALL headings, classes & functions.
-- [ ] Update release-notes.md, clear completed section out of todo.md, and commit.
+- [ ] Update release-notes.md and check off list.
 
 ## 4) lib/Scribe/ Refactor & Cleanup (Pending Plan, DO NOT PROCEED)
 Lingering issues & reorganization tasks. Make a plan to deal with them all in one clean sweep. Append it as a detailed checklist to this section in case we lose session or we have to bounce between agents:
@@ -108,7 +107,7 @@ Lingering issues & reorganization tasks. Make a plan to deal with them all in on
 - [ ] Scan the whole Scribe/ directory for legacy aliases, compatability shims, and thin wrappers that don't add any extra logic. Purge all of them. Update all callers to use actual source functions.
 - [ ] A lot of the functions in our Scribe/ classes have really long & unclear names. Do a sweep of every class and make sure the function/variable names are concise+accurate.
 - [ ] Do a sweep of all classes in Scribe/ making sure PHPdoc blocks are present+accurate for ALL headings, classes & functions.
-- [ ] Update release-notes.md, clear completed section out of todo.md, and commit.
+- [ ] Update release-notes.md and check off list.
 
 
 

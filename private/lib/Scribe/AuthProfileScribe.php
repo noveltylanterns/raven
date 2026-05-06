@@ -12,7 +12,7 @@ declare(strict_types=1);
 namespace Raven\Lib\Scribe;
 
 use PDO;
-use Raven\Lib\Database\TableNameResolver;
+use Raven\Lib\Database\SqlTable;
 
 /**
  * Owns auth-table profile and security-field writes for existing users.
@@ -135,6 +135,6 @@ final class AuthProfileScribe
      */
     private function usersTable(): string
     {
-        return TableNameResolver::authTable($this->driver, $this->prefix, 'users');
+        return SqlTable::appTable($this->driver, $this->prefix, 'users');
     }
 }

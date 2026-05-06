@@ -115,6 +115,7 @@ This file is the fast system map for Raven CMS. Use it to quickly understand the
 - `private/sys/Debug`
   - Debug and profiling infrastructure (`Raven\Core\Debug`).
   - `OutputProfilerConfig`, `OutputProfilerSanitizer`, and `OutputProfiler` own the fixed-bottom HTML output-profiler UI injected into eligible responses (`OutputProfiler` now also owns the response-hook arming seam).
+  - `PdoQueryProfiler` and `PdoStmtProfiler` wrap PDO/PDOStatement for query-level profiling instrumentation and emit events through `QueryProfiler`.
   - `RequestProfiler`, `RequestProfilerAdapter`, and `RequestProfilerOutput` own request-scoped query/render collection plus pluggable custom request-profiler outputs used by the output profiler and profiled PDO wrappers.
   - `ClientProfiler` owns visitor network-context normalization and reverse-DNS hostname resolution used by request diagnostics, captcha checks, and throttle keys.
   - `LocalProfiler` owns localhost/runtime environment snapshot collection for debug tooling.
@@ -226,10 +227,9 @@ This file is the fast system map for Raven CMS. Use it to quickly understand the
   - `Json.php` — shared JSON encode/decode helpers for strings and files, including atomic file writes for JSON payload persistence.
 - `private/lib/Database/`
   - Reusable database primitives for core and extensions.
-  - `PdoQueryProfiler` and `PdoStmtProfiler` wrap PDO for query-level profiling; `QueryProfilerInterface` is the shared contract.
-  - `TableNameResolver` — resolves logical table names to physical prefixed names for both app-db and auth-db contexts; available to extensions.
-  - `SqlUpsertPolicy.php` — driver-aware upsert helper available to extensions.
-  - Connection primitives — driver-specific connection config/bootstrap helpers (`DriverConfigNormalizer`, `MysqlConfig`, `PgsqlConfig`, `SqliteConfig`, `SqliteBootstrap`). Used by `DatabaseFactory` in `sys/Runtime/`; not for direct extension use.
+  - `SqlTable` — resolves logical table names to physical prefixed names for SQL call sites; available to extensions.
+  - `SqlInsert.php` — driver-aware insert SQL helper (plain insert + duplicate-safe insert variants) available to extensions.
+  - Driver/config primitives — shared driver/prefix normalization plus driver-specific config/bootstrap helpers (`DbDriver`, `MysqlConfig`, `PgsqlConfig`, `SqliteConfig`, `SqliteBootstrap`). Used by `DatabaseFactory` in `sys/Runtime/`; not for direct extension use.
   - `Schema/` — schema ensure pipeline, schema builders, introspector, state store, seed installer, and extension schema runner. All schema orchestration lives here; `sys/Runtime/DatabaseFactory` is the sole core caller.
 - `private/lib/Scheduler/`
   - Shared scheduler runtime for core and extensions.
