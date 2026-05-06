@@ -19,47 +19,60 @@ This is the default Build Mode backlog file. If the user asks about goals, unpat
 
 # Data Access Layer Refactor Cleanup
 
-## 1) lib/Database/ Refactor & Cleanup
+## 1) lib/Database/ Refactor & Cleanup (Pending Plan, DO NOT PROCEED)
 
-### Connection Primitives
+### Class inventory + purpose baseline
+- [ ] `DriverConfigNormalizer.php` — normalize/validate database driver config payloads (`driver`, `prefix`, driver-specific config arrays).
+- [ ] `DsnBuilder.php` — build backend DSN strings from normalized MySQL/PostgreSQL config.
+- [ ] `SqlitePathResolver.php` — resolve canonical SQLite file path from configured base path and canonical DB key.
+- [ ] `SqliteConnectionBootstrap.php` — ensure SQLite filesystem path exists and apply connection PRAGMAs.
+- [ ] `TableNameResolver.php` — resolve prefixed app/auth table names for SQL call sites.
+- [ ] `SqlUpsertPolicy.php` — emit driver-appropriate duplicate-safe insert SQL.
+- [ ] `QueryProfilerInterface.php` — define query profiling contract only (no implementation logic).
+- [ ] `ProfiledPDO.php` — PDO wrapper that records `exec`/`query`/`prepare` activity into query profiler.
+- [ ] `ProfiledPDOStatement.php` — statement wrapper that records binds + execute timing into query profiler.
 
-- [ ] **ProfiledPDO.php** — PDO subclass. Wraps `exec()`, `query()`, and `prepare()` to time each call and pipe results into the profiler. Injected wherever a connection is needed; the rest of the app never sees a plain PDO.
-- [ ] **ProfiledPDOStatement.php** — PDOStatement subclass. Captures `bindValue()`/`bindParam()` values so the full parameter map is available to the profiler on `execute()`. Injected automatically via `ATTR_STATEMENT_CLASS` when ProfiledPDO prepares a statement.
-- [ ] **QueryProfilerInterface.php** — Contract for profiler implementations. One method to ask if recording is active, one to receive a query event. `RequestProfilerAdapter` in `sys/` is the live implementation; tests can inject a stub.
-
-### Connection Config & Setup
-
-- [ ] **DriverConfigNormalizer.php** — Reads the flat database config array and pulls out the driver slug, sanitized table prefix, and per-driver sub-arrays (mysql/pgsql/sqlite sections). Single source of truth for config interpretation.
-- [ ] **DsnBuilder.php** — Assembles the MySQL and PostgreSQL DSN strings from the already-normalized config sub-arrays.
-- [ ] **SqliteConnectionBootstrap.php** — Two jobs: `ensureDir()` creates the parent directory for the `.sqlite` file if it doesn't exist; `bootstrap()` fires `PRAGMA foreign_keys = ON` on the opened connection.
-- [ ] **SqlitePathResolver.php** — Maps Raven canonical key strings (`'core'`, `'pages'`, `'auth'`, `'taxonomy'`) to the actual `.sqlite` file path on disk. All four currently resolve to the same consolidated file.
-
-### Schema Orchestration
-
-- [x] **SchemaManager.php** — Moved to `sys/Schema.php` (`Raven\Core\Schema`). Runtime entrypoint belongs in `sys/`, not `lib/`. Callers in `Raven.php` updated.
-- [ ] **SchemaEnsurePipeline.php** — Executes the full ordered sequence: base tables → migrations → extension schemas → seed rows (app side), then auth tables + invite tokens (auth side). No state-tracking logic here — that's the manager's job.
-- [ ] **SchemaEnsureStateStore.php** — Skips redundant ensure passes by comparing file mtimes (marker file vs state file vs schema source files). Uses an exclusive lock to prevent a burst of concurrent requests from all running the pipeline at once. One instance per side (app / auth).
-- [ ] **SchemaComponentFactory.php** — Lazy wiring. Holds nullable slots for all schema components and constructs them on first use with shared introspector/resolver instances. Keeps the pipeline from having a 7-argument constructor.
-
-### Schema Work
-
-- [ ] **SchemaBootstrap.php** — Creates the base set of app tables from scratch across all three drivers: pages, categories, tags, redirects, media, media_variants, groups, user_groups, auth_failures. Also handles the legacy `page_images` → `media` table rename for old installs. First step in the pipeline. **FLAG: has private copies of `tableExists()` and `quotePgIdentifier()` that duplicate public methods on SchemaIntrospector — SchemaBootstrap doesn't accept an injected introspector.**
-- [ ] **SchemaBuilder.php** — Incremental migration and backfill helpers. Does not recreate tables — only adds missing columns, creates missing indexes, normalizes existing data (NULL channel → 0, slug deduplication, etc.). Called after SchemaBootstrap in the pipeline.
-- [ ] **AuthSchemaBuilder.php** — Manages the Delight Auth side. Loads and executes the Delight SQL schema file if the users table doesn't exist, applies the table prefix, then ensures all Raven-specific user profile columns (theme, avatar, bio, timezone, etc.) on every bootstrap.
-- [ ] **SchemaIntrospector.php** — Cross-driver introspection tools: `columnExists()`, `indexExists()`, `tableExists()`, `sqliteTableExists()`, `indexExistsMySql/PgSql()`, `quotePgIdentifier()`, `isAlreadyExistsError()`. Used by SchemaBuilder, AuthSchemaBuilder, and SchemaBootstrap.
-- [ ] **ExtensionSchemaRunner.php** — Iterates enabled extensions, reads each one's `schema.php` provider, and calls it with a standardized context payload (db connection, driver, prefix, table resolver closures, storage path map). Extensions that declare no storage are skipped.
-
-### Seed & Data Helpers
-
-- [ ] **SeedInstaller.php** — Fresh-install seeding. `ensureGroups()` inserts the five stock groups (admin/guest/validating/user/banned), normalizes their IDs to canonical positions 1–5, and syncs permission masks. `ensurePages()` inserts the starter home page only when no users and no root pages exist yet.
-- [ ] **SqlUpsertPolicy.php** — One method, `insertIgnoreSql()`. Returns a driver-appropriate INSERT that silently skips duplicates: `INSERT IGNORE` for MySQL, `ON CONFLICT DO NOTHING` for SQLite/PgSQL. Used by `PageScribe` for taxonomy join rows.
-
-### Shared Utility
-
-- [ ] **TableNameResolver.php** — Applies the table prefix. Has instance `resolve()` (used by injected services) and static `appTable()` / `authTable()` (for callers without an instance). All three currently just return `$prefix . $table` — the driver parameter is reserved for future per-driver quoting. **FLAG: `authTable()` is byte-for-byte identical to `appTable()` — dead distinction that never materialized.**
+### Dependency-boundary pass by lane
+- [ ] Config lane (`DriverConfigNormalizer`, `DsnBuilder`, `SqlitePathResolver`) stays pure config/path logic and does not absorb runtime PDO/bootstrap orchestration.
+- [ ] Runtime lane (`SqliteConnectionBootstrap`, `TableNameResolver`, `SqlUpsertPolicy`) stays focused on SQL/runtime helpers and does not absorb config parsing.
+- [ ] Profiling lane (`QueryProfilerInterface`, `ProfiledPDO`, `ProfiledPDOStatement`) stays profiling-only and does not absorb unrelated query helper behavior.
 
 ### Cleanup
+- [ ] Make sure no Database/ class is pulling up dead function/class/dependency weight irrelevant to the data type that class handles.
+- [ ] Scan the whole Database/ directory for legacy aliases, compatability shims, and thin wrappers that don't add any extra logic. Purge all of them. Update all callers to use actual source functions.
+- [ ] Specifically review no-op overlaps inside `TableNameResolver` (`resolve`/`appTable`/`authTable`) and profiler wrappers for pass-through methods that add no policy.
+- [ ] A lot of the functions in our Database/ classes have really long & unclear names. Do a sweep of every class and make sure the function/variable names are concise+accurate.
+- [ ] Do a sweep of all classes in Database/ making sure PHPdoc blocks are present+accurate for ALL headings, classes & functions.
+- [ ] Run caller-surface sweep after any rename/removal so container wiring + repository/schema call sites stay aligned.
+- [ ] Update release-notes.md, clear completed section out of todo.md, and commit.
 
+
+## 2) sys/Schema Refactor & Cleanup (Pending Plan, DO NOT PROCEED)
+
+### Class inventory + purpose baseline
+- [ ] `SchemaManager.php` — public runtime entrypoint that gates ensures through state stores + pipeline.
+- [ ] `SchemaEnsureStateStore.php` — marker/state/lock based dirty-check store that decides when ensure work must run.
+- [ ] `SchemaEnsurePipeline.php` — ordered execution pipeline for app-side and auth-side ensure flows.
+- [ ] `SchemaComponentFactory.php` — lazy wiring of schema components used by pipeline execution.
+- [ ] `SchemaBootstrap.php` — base app table/index bootstrap and legacy table-rename shims.
+- [ ] `SchemaBuilder.php` — app-side schema migrations/backfills/index additions after base bootstrap.
+- [ ] `SeedInstaller.php` — seed data install/normalization for stock groups and starter page records.
+- [ ] `AuthSchemaBuilder.php` — auth schema/bootstrap plus Raven auth-profile column ensures.
+- [ ] `ExtensionSchemaRunner.php` — runs enabled extension `schema.php` providers and guards their storage/table contracts.
+- [ ] `SchemaIntrospector.php` — cross-driver table/column/index existence checks and DDL safety helpers.
+
+### Pipeline-boundary pass
+- [ ] Runtime entry flow remains `SchemaManager -> SchemaEnsureStateStore -> SchemaEnsurePipeline`; no lower class should call back up into manager/state layers.
+- [ ] Pipeline orchestration remains in `SchemaEnsurePipeline`; component classes (`SchemaBootstrap`, `SchemaBuilder`, `AuthSchemaBuilder`, `SeedInstaller`, `ExtensionSchemaRunner`) stay focused on their specific ensure responsibilities.
+- [ ] `SchemaIntrospector` stays read/introspection focused and does not absorb orchestration, seed, or provider-execution behavior.
+
+### Cleanup
+- [ ] Make sure no Schema/ class is pulling up dead function/class/dependency weight irrelevant to the data type that class handles.
+- [ ] Scan the whole Schema/ directory for legacy aliases, compatability shims, and thin wrappers that don't add any extra logic. Purge all of them. Update all callers to use actual source functions.
+- [ ] Explicitly audit legacy migration shims in schema bootstrap/builders and log any intentionally retained fallback in Legacy Fallback Log.
+- [ ] A lot of the functions in our Schema/ classes have really long & unclear names. Do a sweep of every class and make sure the function/variable names are concise+accurate.
+- [ ] Do a sweep of all classes in Schema/ making sure PHPdoc blocks are present+accurate for ALL headings, classes & functions.
+- [ ] Run caller-surface sweep after refactors across runtime bootstrap, installer paths, and any extension schema invocations.
 - [ ] Update release-notes.md, clear completed section out of todo.md, and commit.
 
 

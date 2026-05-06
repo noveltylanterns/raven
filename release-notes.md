@@ -2,9 +2,9 @@
 
 *The machine is supposed to be logging patches & mods to this file. Sometimes it does, sometimes it doesn't. It might be useful for historical architectural context to your Agent at one point.*
 
-### May 6, 2026 — sys/Schema.php
+### May 6, 2026 — sys/Schema/ isolation
 
-- **SchemaManager → sys/Schema** — moved `lib/Database/SchemaManager` to `sys/Schema` (`Raven\Core\Schema`); the runtime schema entrypoint belongs in `sys/`, not `lib/`; updated `Raven.php` import and instantiation; corrected `dirname` depth from 3 to 2 for the new path.
+- **Schema stack → sys/Schema/** — moved all 9 schema pipeline classes out of `lib/Database/` into `sys/Schema/` (`Raven\Core\Schema` namespace): `SchemaManager` (renamed from `Schema`), `SchemaEnsurePipeline`, `SchemaEnsureStateStore`, `SchemaComponentFactory`, `SchemaBootstrap`, `SchemaBuilder`, `AuthSchemaBuilder`, `SchemaIntrospector`, `ExtensionSchemaRunner`, `SeedInstaller`. Updated `Raven.php`, `lib/Extension/StateWrite`, and `lib/Archive/Update` imports; corrected `dirname` depth in `SchemaManager`; updated hardcoded source-file paths in `SchemaEnsureStateStore`. `lib/Database/` now contains only connection infrastructure and shared SQL helpers.
 
 ### May 6, 2026 — lib/Database/ refactor cleanup
 
