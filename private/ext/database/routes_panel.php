@@ -326,7 +326,7 @@ return static function (RouteHandler $router, array $context): void {
     $requireDatabaseManagerAccess = static function () use ($rvn, $requirePanelLogin, $renderPublicNotFound): bool {
         $requirePanelLogin();
 
-        if (!$rvn['auth']->canManageConfiguration()) {
+        if (!$rvn['auth']->panelService()->canManageConfiguration()) {
             $renderPublicNotFound();
             return false;
         }
@@ -491,7 +491,7 @@ return static function (RouteHandler $router, array $context): void {
     ): void {
         $requirePanelLogin();
 
-        $canManageConfiguration = $rvn['auth']->canManageConfiguration();
+        $canManageConfiguration = $rvn['auth']->panelService()->canManageConfiguration();
         if (!$canManageConfiguration) {
             $renderPublicNotFound();
             return;

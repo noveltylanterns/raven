@@ -239,7 +239,7 @@ final class UpdateController
         bool $allowOverwrite
     ): void {
         $this->context->renderPanel('panel/update', [
-            'canManageConfiguration' => $this->context->auth()->canManageConfiguration(),
+            'canManageConfiguration' => $this->context->auth()->panelService()->canManageConfiguration(),
             'csrfField' => $this->context->csrfField(),
             'flashSuccess' => $flashSuccess,
             'flashError' => $flashError,

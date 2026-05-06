@@ -40,7 +40,7 @@ final class SessionGuard
         $isLoggedIn = $auth->isLoggedIn();
 
         if ($mode === 'disabled') {
-            if ($isLoggedIn && $auth->canViewDisabledSite()) {
+            if ($isLoggedIn && $auth->publicService()->canViewDisabledSite()) {
                 return true;
             }
 
@@ -49,7 +49,7 @@ final class SessionGuard
         }
 
         if ($mode === 'private') {
-            if ($isLoggedIn && $auth->canViewPrivateSite()) {
+            if ($isLoggedIn && $auth->publicService()->canViewPrivateSite()) {
                 return true;
             }
 
@@ -57,7 +57,7 @@ final class SessionGuard
             return false;
         }
 
-        if (!$auth->canViewPublicSite()) {
+        if (!$auth->publicService()->canViewPublicSite()) {
             $renderDenied();
             return false;
         }

@@ -75,7 +75,7 @@ final class AuthController
      */
     public function showLogin(): void
     {
-        if ($this->auth->isLoggedIn() && $this->auth->canAccessPanel()) {
+        if ($this->auth->isLoggedIn() && $this->auth->panelService()->canAccessPanel()) {
             $userId = $this->auth->userId();
             if ($userId !== null && !$this->auth->isTwoFactorVerifiedForUser($userId)) {
                 if ($this->auth->pendingTwoFactorUserId() === $userId) {
@@ -122,7 +122,7 @@ final class AuthController
             $this->loginUiState(),
             static function (AuthService $auth, int $userId): array {
                 return [
-                    'ok' => $auth->canAccessPanel($userId),
+                    'ok' => $auth->panelService()->canAccessPanel($userId),
                     'message' => 'Panel access requires Access Dashboard permission.',
                 ];
             }
@@ -146,7 +146,7 @@ final class AuthController
     public function showLoginTwoFactor(): void
     {
         $userId = $this->auth->userId();
-        if ($userId === null || !$this->auth->canAccessPanel($userId)) {
+        if ($userId === null || !$this->auth->panelService()->canAccessPanel($userId)) {
             $this->logoutPanelSession();
             Redirect::redirect($this->panelUrl('/login'));
         }

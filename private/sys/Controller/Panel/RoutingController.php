@@ -374,25 +374,25 @@ final class RoutingController
 
         return match ($normalizedType) {
             'feed' => $this->routingFeedEditUrl($meta),
-            'channel' => $sourceId > 0 && $this->context->auth()->hasPanelPermissionBit(PanelAccess::CHANNELS_EDIT)
+            'channel' => $sourceId > 0 && $this->context->auth()->panelService()->hasPanelPermissionBit(PanelAccess::CHANNELS_EDIT)
                 ? $this->context->panelUrl('/channel/edit/' . $sourceId)
                 : '',
-            'page' => $sourceId > 0 && $this->context->auth()->hasPanelPermissionBit(PanelAccess::PAGES_EDIT)
+            'page' => $sourceId > 0 && $this->context->auth()->panelService()->hasPanelPermissionBit(PanelAccess::PAGES_EDIT)
                 ? $this->context->panelUrl('/page/edit/' . $sourceId)
                 : '',
-            'category' => $sourceId > 0 && $this->context->auth()->hasPanelPermissionBit(PanelAccess::CATEGORIES_EDIT)
+            'category' => $sourceId > 0 && $this->context->auth()->panelService()->hasPanelPermissionBit(PanelAccess::CATEGORIES_EDIT)
                 ? $this->context->panelUrl('/category/edit/' . $sourceId)
                 : '',
-            'tag' => $sourceId > 0 && $this->context->auth()->hasPanelPermissionBit(PanelAccess::TAGS_EDIT)
+            'tag' => $sourceId > 0 && $this->context->auth()->panelService()->hasPanelPermissionBit(PanelAccess::TAGS_EDIT)
                 ? $this->context->panelUrl('/tag/edit/' . $sourceId)
                 : '',
-            'group' => $sourceId > 0 && $this->context->auth()->hasPanelPermissionBit(PanelAccess::GROUPS_EDIT)
+            'group' => $sourceId > 0 && $this->context->auth()->panelService()->hasPanelPermissionBit(PanelAccess::GROUPS_EDIT)
                 ? $this->context->panelUrl('/group/edit/' . $sourceId)
                 : '',
-            'user' => $sourceId > 0 && $this->context->auth()->hasPanelPermissionBit(PanelAccess::USERS_EDIT)
+            'user' => $sourceId > 0 && $this->context->auth()->panelService()->hasPanelPermissionBit(PanelAccess::USERS_EDIT)
                 ? $this->context->panelUrl('/user/edit/' . $sourceId)
                 : '',
-            'redirect' => $sourceId > 0 && $this->context->auth()->hasPanelPermissionBit(PanelAccess::REDIRECTS_EDIT)
+            'redirect' => $sourceId > 0 && $this->context->auth()->panelService()->hasPanelPermissionBit(PanelAccess::REDIRECTS_EDIT)
                 ? $this->context->panelUrl('/redirect/edit/' . $sourceId)
                 : '',
             default => '',
@@ -409,13 +409,13 @@ final class RoutingController
     {
         $kind = strtolower(trim((string) ($meta['kind'] ?? '')));
         if ($kind === 'global') {
-            return $this->context->auth()->canManageConfiguration()
+            return $this->context->auth()->panelService()->canManageConfiguration()
                 ? $this->context->panelUrl('/configuration?tab=content')
                 : '';
         }
 
         $channelId = max(0, (int) ($meta['channel_id'] ?? 0));
-        if ($kind === 'channel' && $channelId > 0 && $this->context->auth()->hasPanelPermissionBit(PanelAccess::CHANNELS_EDIT)) {
+        if ($kind === 'channel' && $channelId > 0 && $this->context->auth()->panelService()->hasPanelPermissionBit(PanelAccess::CHANNELS_EDIT)) {
             return $this->context->panelUrl('/channel/edit/' . $channelId);
         }
 

@@ -151,7 +151,7 @@ final class UserEditController
         }
 
         $groupOptions = $this->groupRead->listOptions();
-        $actorIsAdmin = $this->context->auth()->isAdmin();
+        $actorIsAdmin = $this->context->auth()->panelService()->isAdmin();
         $primaryGroupId = (int) ($user['primary_group_id'] ?? 0);
         $secondaryGroupIds = array_map('intval', (array) ($user['secondary_group_ids'] ?? []));
         $bioMaxLength = max(1, (int) $this->config->get('user.bio', 500));
@@ -292,7 +292,7 @@ final class UserEditController
             $groupPermissionMasks[(int) ($groupOption['id'] ?? 0)] = (int) ($groupOption['permissions'] ?? 0);
         }
 
-        $actorIsAdmin = $this->context->auth()->isAdmin();
+        $actorIsAdmin = $this->context->auth()->panelService()->isAdmin();
         if (!$actorIsAdmin) {
             $targetAlreadyHasAdmin = false;
             if (is_array($existingUser)) {

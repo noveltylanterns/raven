@@ -119,7 +119,7 @@ final class GroupEditController
             'groupRoutePrefix' => $this->groupRouteParser->groupRoutePrefix(),
             'groupRoutingEnabledSystemWide' => $this->groupRouteParser->groupRoutesEnabledForRoutingTable(),
             'permissionDefinitions' => $this->permissionDefinitions(),
-            'canEditConfigurationBit' => $this->context->auth()->isAdmin(),
+            'canEditConfigurationBit' => $this->context->auth()->panelService()->isAdmin(),
             'imageAllowedExtensions' => $this->taxonomyImageService->allowedImageExtensionsLabel(),
             'imageMaxFilesizeKb' => $this->taxonomyImageService->maxImageFilesizeKb(),
             'imageVariantSpecs' => $this->taxonomyImageService->imageVariantSpecs(),
@@ -161,7 +161,7 @@ final class GroupEditController
             $activeTab,
             'basic'
         );
-        $actorIsAdmin = $this->context->auth()->isAdmin();
+        $actorIsAdmin = $this->context->auth()->panelService()->isAdmin();
         $existingGroup = $id !== null ? $this->groupRead->findById($id) : null;
         $isExistingStockGroup = is_array($existingGroup) && (int) ($existingGroup['is_stock'] ?? 0) === 1;
         $slugRaw = trim($this->input->text($post['slug'] ?? null, 160));

@@ -745,135 +745,29 @@ final class AuthService
     }
 
     /**
-     * Returns true when user belongs to a panel-capable group.
-     */
-    public function canAccessPanel(?int $userId = null): bool
-    {
-        return $this->panelAuthService->canAccessPanel($userId);
-    }
-
-    /**
-     * Returns true when current user has one exact panel permission bit.
-     */
-    public function hasPanelPermissionBit(int $bit, ?int $userId = null): bool
-    {
-        return $this->panelAuthService->hasPanelPermissionBit($bit, $userId);
-    }
-
-    /**
-     * Returns the combined panel permission bitmask for the current or specified user.
+     * Returns the panel authorization service for direct permission checks.
      *
-     * Intended for cache-key derivation where one integer captures the full permission
-     * state without requiring individual bit checks. Returns 0 when no user is resolved.
+     * Callers on panel routes should call permission methods here rather than through
+     * AuthService delegates, which were removed to keep AuthService focused on login flows.
      *
-     * @param int|null $userId User ID to resolve; defaults to current session user.
-     * @return int Combined permission mask, or 0 when no user is active.
+     * @return PanelAuthService Panel authorization service instance.
      */
-    public function panelPermissionMask(?int $userId = null): int
+    public function panelService(): PanelAuthService
     {
-        return $this->panelAuthService->panelPermissionMask($userId);
+        return $this->panelAuthService;
     }
 
     /**
-     * Returns true when current user has at least one panel permission bit in list.
+     * Returns the public authorization service for direct visibility checks.
      *
-     * @param array<int, int> $bits
-     */
-    public function hasAnyPanelPermissionBit(array $bits, ?int $userId = null): bool
-    {
-        return $this->panelAuthService->hasAnyPanelPermissionBit($bits, $userId);
-    }
-
-    /**
-     * Returns true when user can edit users.
-     */
-    public function canManageUsers(?int $userId = null): bool
-    {
-        return $this->panelAuthService->canManageUsers($userId);
-    }
-
-    /**
-     * Returns true when user can edit groups.
-     */
-    public function canManageGroups(?int $userId = null): bool
-    {
-        return $this->panelAuthService->canManageGroups($userId);
-    }
-
-    /**
-     * Returns true when user can manage content pages/media.
-     */
-    public function canManageContent(?int $userId = null): bool
-    {
-        return $this->panelAuthService->canManageContent($userId);
-    }
-
-    /**
-     * Returns true when user has system-configuration permission.
+     * Callers on public routes should call site-visibility methods here rather than
+     * through AuthService delegates.
      *
-     * This gate controls access to Configuration, Extensions, and Updates pages.
+     * @return PublicAuthService Public authorization service instance.
      */
-    public function canManageConfiguration(?int $userId = null): bool
+    public function publicService(): PublicAuthService
     {
-        return $this->panelAuthService->canManageConfiguration($userId);
-    }
-
-    /**
-     * Returns true when user has taxonomy-management permission.
-     */
-    public function canManageTaxonomy(?int $userId = null): bool
-    {
-        return $this->panelAuthService->canManageTaxonomy($userId);
-    }
-
-    /**
-     * Returns true when current visitor can access public-site mode routes.
-     */
-    public function canViewPublicSite(?int $userId = null): bool
-    {
-        return $this->publicAuthService->canViewPublicSite($userId);
-    }
-
-    /**
-     * Returns true when authenticated user can access private-site mode routes.
-     */
-    public function canViewPrivateSite(?int $userId = null): bool
-    {
-        return $this->publicAuthService->canViewPrivateSite($userId);
-    }
-
-    /**
-     * Returns true when authenticated user can access frontend while site mode is disabled.
-     */
-    public function canViewDisabledSite(?int $userId = null): bool
-    {
-        return $this->publicAuthService->canViewDisabledSite($userId);
-    }
-
-    /**
-     * Returns true when user currently belongs to the Super Admin group.
-     */
-    public function isAdmin(?int $userId = null): bool
-    {
-        return $this->panelAuthService->isAdmin($userId);
-    }
-
-    /**
-     * Returns user's group memberships.
-     *
-     * @return array<int, array{id: int, name: string, slug: string, permissions: int, is_stock: int}>
-     */
-    public function groupsForUser(int $userId): array
-    {
-        return $this->panelAuthService->groupsForUser($userId);
-    }
-
-    /**
-     * Assigns a user to a named group idempotently.
-     */
-    public function assignUserToGroupByName(int $userId, string $groupName): void
-    {
-        $this->panelAuthService->assignUserToGroupByName($userId, $groupName);
+        return $this->publicAuthService;
     }
 
     /**

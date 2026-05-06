@@ -185,7 +185,7 @@ final class Routes
          * @return bool True when the current user has the requested bit.
          */
         $hasPanelPermissionBit = static function (int $bit) use ($rvn): bool {
-            return $rvn['auth']->hasPanelPermissionBit($bit);
+            return $rvn['auth']->panelService()->hasPanelPermissionBit($bit);
         };
 
         foreach (array_keys($enabledExtensions) as $extensionName) {
@@ -254,7 +254,7 @@ final class Routes
             if ($isSystemType) {
                 $extensionRequirePanelAccess = static function () use ($requirePanelLoginForExtension, $rvn, $renderPublicNotFound): void {
                     $requirePanelLoginForExtension();
-                    if (!$rvn['auth']->hasPanelPermissionBit(PanelAccess::CONFIGURATION_VIEW)) {
+                    if (!$rvn['auth']->panelService()->hasPanelPermissionBit(PanelAccess::CONFIGURATION_VIEW)) {
                         $renderPublicNotFound();
                         exit;
                     }

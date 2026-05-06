@@ -213,7 +213,7 @@ final class ConfigController
         $activeTab = $this->normalizeConfigTab($_GET['tab'] ?? 'basic');
 
         $this->context->renderPanel('panel/configuration', [
-            'canManageConfiguration' => $this->context->auth()->canManageConfiguration(),
+            'canManageConfiguration' => $this->context->auth()->panelService()->canManageConfiguration(),
             'csrfField' => $this->context->csrfField(),
             'flashSuccess' => $this->context->pullFlash('success'),
             'flashError' => $this->context->pullFlash('error'),

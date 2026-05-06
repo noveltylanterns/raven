@@ -112,7 +112,7 @@ $canRenderPublicProfiler = static function () use ($rvn, $isPublicAuthHelperPath
     }
 
     $userId = $auth->userId();
-    if ($userId === null || !$auth->canManageConfiguration($userId)) {
+    if ($userId === null || !$auth->panelService()->canManageConfiguration($userId)) {
         return false;
     }
 

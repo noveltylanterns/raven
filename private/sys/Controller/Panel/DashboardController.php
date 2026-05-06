@@ -41,9 +41,9 @@ final class DashboardController
             'user' => [
                 'email' => (string) ($panelIdentity['email'] ?? ''),
             ],
-            'canManageUsers' => $this->context->auth()->canManageUsers(),
-            'canManageGroups' => $this->context->auth()->canManageGroups(),
-            'canManageConfiguration' => $this->context->auth()->canManageConfiguration(),
+            'canManageUsers' => $this->context->auth()->panelService()->canManageUsers(),
+            'canManageGroups' => $this->context->auth()->panelService()->canManageGroups(),
+            'canManageConfiguration' => $this->context->auth()->panelService()->canManageConfiguration(),
             'csrfField' => $this->context->csrfField(),
             'flashSuccess' => $this->context->pullFlash('success'),
             'flashError' => $this->context->pullFlash('error'),

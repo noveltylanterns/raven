@@ -101,7 +101,7 @@ final class LogsController
             'flashError' => $this->context->pullFlash('error'),
             'section' => 'logs',
             'pageTitle' => 'Event Log',
-            'canClear' => $this->context->auth()->hasPanelPermissionBit(PanelAccess::CONFIGURATION_DELETE),
+            'canClear' => $this->context->auth()->panelService()->hasPanelPermissionBit(PanelAccess::CONFIGURATION_DELETE),
         ]);
     }
 

@@ -47,7 +47,7 @@ final class SessionGuard
             exit;
         }
 
-        if (!$auth->canAccessPanel()) {
+        if (!$auth->panelService()->canAccessPanel()) {
             $auth->logout();
             if ($isGuestLoginEntryRequest) {
                 Redirect::redirect($loginUrl);
@@ -148,11 +148,11 @@ final class SessionGuard
             'username' => trim((string) ($preferences['username'] ?? '')),
             'email' => trim((string) ($preferences['email'] ?? '')),
         ];
-        $_SESSION['_raven_can_manage_content'] = $auth->canManageContent();
-        $_SESSION['_raven_can_manage_taxonomy'] = $auth->canManageTaxonomy();
-        $_SESSION['_raven_can_manage_users'] = $auth->canManageUsers();
-        $_SESSION['_raven_can_manage_groups'] = $auth->canManageGroups();
-        $_SESSION['_raven_can_manage_configuration'] = $auth->canManageConfiguration();
+        $_SESSION['_raven_can_manage_content'] = $auth->panelService()->canManageContent();
+        $_SESSION['_raven_can_manage_taxonomy'] = $auth->panelService()->canManageTaxonomy();
+        $_SESSION['_raven_can_manage_users'] = $auth->panelService()->canManageUsers();
+        $_SESSION['_raven_can_manage_groups'] = $auth->panelService()->canManageGroups();
+        $_SESSION['_raven_can_manage_configuration'] = $auth->panelService()->canManageConfiguration();
     }
 
     /**

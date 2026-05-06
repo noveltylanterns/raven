@@ -183,7 +183,7 @@ final class SharedController
         }
 
         $requiredBit = (int) ($routePermission[$normalizedAction] ?? 0);
-        if ($requiredBit > 0 && $this->auth->hasPanelPermissionBit($requiredBit)) {
+        if ($requiredBit > 0 && $this->auth->panelService()->hasPanelPermissionBit($requiredBit)) {
             $this->routePermissionDecisionCache[$cacheKey] = true;
             return true;
         }
@@ -461,7 +461,7 @@ final class SharedController
         callable $panelUrl
     ): void {
         $hasBit = static function (int $bit) use ($rvn): bool {
-            return $rvn['auth']->hasPanelPermissionBit($bit);
+            return $rvn['auth']->panelService()->hasPanelPermissionBit($bit);
         };
 
         // Auth-helper paths (login, 2FA) are pre-authentication — clear extension nav
@@ -483,7 +483,7 @@ final class SharedController
         // shortcuts self-heal on the next permission or extension change.
         $navCacheKey = md5(implode('|', [
             implode(',', array_keys($enabledExtensionManifests)),
-            (string) $rvn['auth']->panelPermissionMask(),
+            (string) $rvn['auth']->panelService()->panelPermissionMask(),
             $categoryEnabled ? '1' : '0',
             $tagEnabled ? '1' : '0',
         ]));
