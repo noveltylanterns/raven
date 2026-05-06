@@ -11,7 +11,7 @@ declare(strict_types=1);
 
 namespace Raven\Lib\Extension;
 
-use Raven\Core\Schema\SchemaEnsureStateStore;
+use Raven\Core\Schema\SchemaState;
 
 /**
  * Owns filesystem writes for `private/dat/ext/.state.php`.
@@ -120,11 +120,11 @@ final class StateWrite
     /**
      * Returns the schema ensure marker helper for the current project root.
      *
-     * @return SchemaEnsureStateStore Shared schema ensure marker helper.
+     * @return SchemaState Shared schema ensure marker helper.
      */
-    private function schemaEnsureStateStore(): SchemaEnsureStateStore
+    private function schemaEnsureStateStore(): SchemaState
     {
-        return new SchemaEnsureStateStore(dirname($this->extensionsBasePath, 2));
+        return new SchemaState(dirname($this->extensionsBasePath, 2));
     }
 
     /**

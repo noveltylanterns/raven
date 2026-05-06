@@ -2,7 +2,7 @@
 
 /**
  * RAVEN CMS
- * ~/private/sys/Schema/SchemaEnsureStateStore.php
+ * ~/private/sys/Schema/SchemaState.php
  * Persists and compares a schema-ensure signature so hot paths can skip no-op ensure runs.
  * Docs: https://raven.lanterns.io
  */
@@ -18,7 +18,7 @@ namespace Raven\Core\Schema;
  * system. Raven's long-term release/update versioning plan lives in build/todo.md and
  * should stay the canonical home for version-bound upgrade shim design.
  */
-final class SchemaEnsureStateStore
+final class SchemaState
 {
     private string $root;
     private string $stateFile;
@@ -163,10 +163,10 @@ final class SchemaEnsureStateStore
         $files = [
             $this->root . '/private/sys/Schema/SchemaBootstrap.php',
             $this->root . '/private/sys/Schema/SchemaBuilder.php',
-            $this->root . '/private/sys/Schema/AuthSchemaBuilder.php',
-            $this->root . '/private/sys/Schema/SchemaEnsurePipeline.php',
-            $this->root . '/private/sys/Schema/ExtensionSchemaRunner.php',
-            $this->root . '/private/sys/Schema/SeedInstaller.php',
+            $this->root . '/private/sys/Schema/SchemaAuth.php',
+            $this->root . '/private/sys/Schema/SchemaPipeline.php',
+            $this->root . '/private/sys/Schema/SchemaExtension.php',
+            $this->root . '/private/sys/Schema/SchemaInstaller.php',
         ];
 
         $latest = 0;

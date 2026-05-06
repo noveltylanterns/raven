@@ -2,7 +2,7 @@
 
 /**
  * RAVEN CMS
- * ~/private/sys/Schema/ExtensionSchemaRunner.php
+ * ~/private/sys/Schema/SchemaExtension.php
  * Executes extension-owned schema providers during bootstrap.
  * Docs: https://raven.lanterns.io
  */
@@ -20,7 +20,7 @@ use Raven\Lib\Extension\Resolver;
 /**
  * Executes extension-owned schema providers during bootstrap.
  */
-final class ExtensionSchemaRunner
+final class SchemaExtension
 {
     private Bootstrap $bootstrapResolver;
 

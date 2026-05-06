@@ -22,26 +22,26 @@ use PDO;
  */
 final class SchemaManager
 {
-    private SchemaEnsurePipeline $pipeline;
-    private SchemaEnsureStateStore $appStateStore;
-    private SchemaEnsureStateStore $authStateStore;
+    private SchemaPipeline $pipeline;
+    private SchemaState $appStateStore;
+    private SchemaState $authStateStore;
 
     /**
      * Wires the pipeline and per-side state stores used by the public ensure methods.
      *
-     * @param SchemaEnsurePipeline|null   $pipeline       Schema ensure pipeline; defaults to a fresh instance.
-     * @param SchemaEnsureStateStore|null $appStateStore  App-side state store; defaults to standard paths.
-     * @param SchemaEnsureStateStore|null $authStateStore Auth-side state store; defaults to auth-specific paths.
+     * @param SchemaPipeline|null   $pipeline       Schema ensure pipeline; defaults to a fresh instance.
+     * @param SchemaState|null $appStateStore  App-side state store; defaults to standard paths.
+     * @param SchemaState|null $authStateStore Auth-side state store; defaults to auth-specific paths.
      */
     public function __construct(
-        ?SchemaEnsurePipeline $pipeline = null,
-        ?SchemaEnsureStateStore $appStateStore = null,
-        ?SchemaEnsureStateStore $authStateStore = null
+        ?SchemaPipeline $pipeline = null,
+        ?SchemaState $appStateStore = null,
+        ?SchemaState $authStateStore = null
     ) {
-        $this->pipeline = $pipeline ?? new SchemaEnsurePipeline();
+        $this->pipeline = $pipeline ?? new SchemaPipeline();
         $root = dirname(__DIR__, 3);
-        $this->appStateStore = $appStateStore ?? new SchemaEnsureStateStore($root);
-        $this->authStateStore = $authStateStore ?? new SchemaEnsureStateStore(
+        $this->appStateStore = $appStateStore ?? new SchemaState($root);
+        $this->authStateStore = $authStateStore ?? new SchemaState(
             $root,
             $root . '/private/dat/.schema_ensure_auth_state.php',
             $root . '/private/dat/.schema_ensure_auth.lock',

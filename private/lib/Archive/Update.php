@@ -12,7 +12,7 @@ declare(strict_types=1);
 namespace Raven\Lib\Archive;
 
 use FilesystemIterator;
-use Raven\Core\Schema\SchemaEnsureStateStore;
+use Raven\Core\Schema\SchemaState;
 use Raven\Lib\Format\Git;
 use RecursiveCallbackFilterIterator;
 use RecursiveDirectoryIterator;
@@ -1101,11 +1101,11 @@ final class Update
      * Updates can add, remove, or replace schema-related files, so the next
      * bootstrap needs a fresh ensure pass after any applied update action.
      *
-     * @return SchemaEnsureStateStore Shared schema ensure marker helper.
+     * @return SchemaState Shared schema ensure marker helper.
      */
-    private function schemaEnsureStateStore(): SchemaEnsureStateStore
+    private function schemaEnsureStateStore(): SchemaState
     {
-        return new SchemaEnsureStateStore($this->root);
+        return new SchemaState($this->root);
     }
 
     /**

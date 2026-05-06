@@ -2,6 +2,13 @@
 
 *The machine is supposed to be logging patches & mods to this file. Sometimes it does, sometimes it doesn't. It might be useful for historical architectural context to your Agent at one point.*
 
+### May 6, 2026 — sys/Schema refactor cleanup (first 2/3 sections)
+
+- **Schema class rename sweep completed** — renamed six `Raven\Core\Schema` classes/files and updated all callers/imports: `SchemaEnsureStateStore` → `SchemaState`, `SchemaEnsurePipeline` → `SchemaPipeline`, `SchemaComponentFactory` → `SchemaComponents`, `SeedInstaller` → `SchemaInstaller`, `AuthSchemaBuilder` → `SchemaAuth`, `ExtensionSchemaRunner` → `SchemaExtension`. Updated schema source-mtime tracking in `SchemaState`, plus schema invalidation callers in `lib/Extension/StateWrite` and `lib/Archive/Update`.
+- **Pipeline boundary pass completed** — runtime flow stays `SchemaManager -> SchemaState -> SchemaPipeline`; pipeline orchestration remains in `SchemaPipeline`; lower schema components (`SchemaBootstrap`, `SchemaBuilder`, `SchemaAuth`, `SchemaInstaller`, `SchemaExtension`) remain focused on their own ensure duties, and `SchemaIntrospector` remains read/introspection-only.
+- **Component naming alignment** — updated `SchemaComponents` accessors to the new canonical names (`schemaAuth()`, `schemaInstaller()`, `schemaExtension()`) and rewired `SchemaPipeline` to those accessors.
+- **Docs/todo sync** — updated `build/todo.md` schema checklist entries for completed sections and refreshed the `docs/filetree.md` schema ownership map to `private/sys/Schema/`.
+
 ### May 6, 2026 — sys/Schema/ isolation
 
 - **Schema stack → sys/Schema/** — moved all 9 schema pipeline classes out of `lib/Database/` into `sys/Schema/` (`Raven\Core\Schema` namespace): `SchemaManager` (renamed from `Schema`), `SchemaEnsurePipeline`, `SchemaEnsureStateStore`, `SchemaComponentFactory`, `SchemaBootstrap`, `SchemaBuilder`, `AuthSchemaBuilder`, `SchemaIntrospector`, `ExtensionSchemaRunner`, `SeedInstaller`. Updated `Raven.php`, `lib/Extension/StateWrite`, and `lib/Archive/Update` imports; corrected `dirname` depth in `SchemaManager`; updated hardcoded source-file paths in `SchemaEnsureStateStore`. `lib/Database/` now contains only connection infrastructure and shared SQL helpers.

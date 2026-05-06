@@ -50,21 +50,18 @@ This is the default Build Mode backlog file. If the user asks about goals, unpat
 ## 2) sys/Schema Refactor & Cleanup (Pending Plan, DO NOT PROCEED)
 
 ### Unsorted class inventory + purpose baseline
-- [ ] `SchemaManager.php` — public runtime entrypoint that gates ensures through state stores + pipeline.
-- [ ] `SchemaEnsureStateStore.php` — marker/state/lock based dirty-check store that decides when ensure work must run.
-- [ ] `SchemaEnsurePipeline.php` — ordered execution pipeline for app-side and auth-side ensure flows.
-- [ ] `SchemaComponentFactory.php` — lazy wiring of schema components used by pipeline execution.
-- [ ] `SchemaBootstrap.php` — base app table/index bootstrap and legacy table-rename shims.
-- [ ] `SchemaBuilder.php` — app-side schema migrations/backfills/index additions after base bootstrap.
-- [ ] `SeedInstaller.php` — seed data install/normalization for stock groups and starter page records.
-- [ ] `AuthSchemaBuilder.php` — auth schema/bootstrap plus Raven auth-profile column ensures.
-- [ ] `ExtensionSchemaRunner.php` — runs enabled extension `schema.php` providers and guards their storage/table contracts.
-- [ ] `SchemaIntrospector.php` — cross-driver table/column/index existence checks and DDL safety helpers.
+- [x] `SchemaState.php` — marker/state/lock based dirty-check store that decides when ensure work must run.
+- [x] `SchemaPipeline.php` — ordered execution pipeline for app-side and auth-side ensure flows.
+- [x] `SchemaComponents.php` — lazy wiring of schema components used by pipeline execution.
+- [x] `SchemaInstaller.php` — seed data install/normalization for stock groups and starter page records.
+- [x] `SchemaAuth.php` — auth schema/bootstrap plus Raven auth-profile column ensures.
+- [x] `SchemaExtension.php` — runs enabled extension `schema.php` providers and guards their storage/table contracts.
+- [x] `SchemaIntrospector.php` — cross-driver table/column/index existence checks and DDL safety helpers.
 
 ### Pipeline-boundary pass
-- [ ] Runtime entry flow remains `SchemaManager -> SchemaEnsureStateStore -> SchemaEnsurePipeline`; no lower class should call back up into manager/state layers.
-- [ ] Pipeline orchestration remains in `SchemaEnsurePipeline`; component classes (`SchemaBootstrap`, `SchemaBuilder`, `AuthSchemaBuilder`, `SeedInstaller`, `ExtensionSchemaRunner`) stay focused on their specific ensure responsibilities.
-- [ ] `SchemaIntrospector` stays read/introspection focused and does not absorb orchestration, seed, or provider-execution behavior.
+- [x] Runtime entry flow remains `SchemaManager -> SchemaState -> SchemaPipeline`; no lower class calls back up into manager/state layers.
+- [x] Pipeline orchestration remains in `SchemaPipeline`; component classes (`SchemaBootstrap`, `SchemaBuilder`, `SchemaAuth`, `SchemaInstaller`, `SchemaExtension`) stay focused on their specific ensure responsibilities.
+- [x] `SchemaIntrospector` stays read/introspection focused and does not absorb orchestration, seed, or provider-execution behavior.
 
 ### Cleanup
 - [ ] Make sure no Schema/ class is pulling up dead function/class/dependency weight irrelevant to the data type that class handles.

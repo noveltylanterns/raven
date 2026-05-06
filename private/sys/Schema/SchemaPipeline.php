@@ -2,7 +2,7 @@
 
 /**
  * RAVEN CMS
- * ~/private/sys/Schema/SchemaEnsurePipeline.php
+ * ~/private/sys/Schema/SchemaPipeline.php
  * Ordered schema ensure pipeline for app and auth databases.
  * Docs: https://raven.lanterns.io
  */
@@ -16,13 +16,13 @@ use PDO;
 /**
  * Runs schema ensure steps in the required app/auth/seed order.
  */
-final class SchemaEnsurePipeline
+final class SchemaPipeline
 {
-    private SchemaComponentFactory $components;
+    private SchemaComponents $components;
 
-    public function __construct(?SchemaComponentFactory $components = null)
+    public function __construct(?SchemaComponents $components = null)
     {
-        $this->components = $components ?? new SchemaComponentFactory();
+        $this->components = $components ?? new SchemaComponents();
     }
 
     /**
@@ -55,7 +55,7 @@ final class SchemaEnsurePipeline
     {
         $components = $this->components;
         $schemaBuilder = $components->schemaBuilder();
-        $seedInstaller = $components->seedInstaller();
+        $schemaInstaller = $components->schemaInstaller();
 
         // App schema is always safe to ensure independently from auth setup.
         $components->schemaBootstrap()->ensureSchema($rvnDb, $driver, $prefix);
@@ -72,10 +72,10 @@ final class SchemaEnsurePipeline
         $schemaBuilder->ensureTaxonomyIconColumn($rvnDb, $driver, $prefix);
         $schemaBuilder->ensurePanelPerformanceIndexes($rvnDb, $driver, $prefix);
         $schemaBuilder->ensureEventLogTable($rvnDb, $driver, $prefix);
-        $components->extensionSchemaRunner()->ensureExtensionSchemas($rvnDb, $driver, $prefix);
+        $components->schemaExtension()->ensureExtensionSchemas($rvnDb, $driver, $prefix);
 
-        $seedInstaller->ensureGroups($rvnDb, $driver, $prefix);
-        $seedInstaller->ensurePages($rvnDb, $driver, $prefix);
+        $schemaInstaller->ensureGroups($rvnDb, $driver, $prefix);
+        $schemaInstaller->ensurePages($rvnDb, $driver, $prefix);
     }
 
     /**
@@ -88,8 +88,8 @@ final class SchemaEnsurePipeline
      */
     public function ensureAuth(PDO $authDb, string $driver, string $prefix): void
     {
-        $authSchemaBuilder = $this->components->authSchemaBuilder();
-        $authSchemaBuilder->ensureAuthSchema($authDb, $driver, $prefix);
-        $authSchemaBuilder->ensureInviteTokenSchema($authDb, $driver, $prefix);
+        $schemaAuth = $this->components->schemaAuth();
+        $schemaAuth->ensureAuthSchema($authDb, $driver, $prefix);
+        $schemaAuth->ensureInviteTokenSchema($authDb, $driver, $prefix);
     }
 }

@@ -2,7 +2,7 @@
 
 /**
  * RAVEN CMS
- * ~/private/sys/Schema/SchemaComponentFactory.php
+ * ~/private/sys/Schema/SchemaComponents.php
  * Lazy schema component wiring for bootstrap pipelines.
  * Docs: https://raven.lanterns.io
  */
@@ -14,39 +14,39 @@ namespace Raven\Core\Schema;
 /**
  * Lazily wires schema bootstrap components with shared dependencies.
  */
-final class SchemaComponentFactory
+final class SchemaComponents
 {
     private ?SchemaIntrospector $schemaIntrospector;
     private ?SchemaBootstrap $schemaBootstrap;
-    private ?AuthSchemaBuilder $authSchemaBuilder;
+    private ?SchemaAuth $schemaAuth;
     private ?SchemaBuilder $schemaBuilder;
-    private ?SeedInstaller $seedInstaller;
-    private ?ExtensionSchemaRunner $extensionSchemaRunner;
+    private ?SchemaInstaller $schemaInstaller;
+    private ?SchemaExtension $schemaExtension;
 
     /**
      * Accepts optional pre-wired component instances, defaulting to lazy construction on first use.
      *
      * @param SchemaIntrospector|null    $schemaIntrospector    Optional shared introspector; created on first use if null.
      * @param SchemaBootstrap|null       $schemaBootstrap       Optional base app schema bootstrapper; created on first use if null.
-     * @param AuthSchemaBuilder|null     $authSchemaBuilder     Optional auth schema builder; created on first use if null.
-     * @param SchemaBuilder|null         $schemaBuilder         Optional app schema builder; created on first use if null.
-     * @param SeedInstaller|null         $seedInstaller         Optional seed installer; created on first use if null.
-     * @param ExtensionSchemaRunner|null $extensionSchemaRunner Optional extension schema runner; created on first use if null.
+     * @param SchemaAuth|null          $schemaAuth      Optional auth schema builder; created on first use if null.
+     * @param SchemaBuilder|null       $schemaBuilder   Optional app schema builder; created on first use if null.
+     * @param SchemaInstaller|null     $schemaInstaller Optional seed installer; created on first use if null.
+     * @param SchemaExtension|null     $schemaExtension Optional extension schema runner; created on first use if null.
      */
     public function __construct(
         ?SchemaIntrospector $schemaIntrospector = null,
         ?SchemaBootstrap $schemaBootstrap = null,
-        ?AuthSchemaBuilder $authSchemaBuilder = null,
+        ?SchemaAuth $schemaAuth = null,
         ?SchemaBuilder $schemaBuilder = null,
-        ?SeedInstaller $seedInstaller = null,
-        ?ExtensionSchemaRunner $extensionSchemaRunner = null
+        ?SchemaInstaller $schemaInstaller = null,
+        ?SchemaExtension $schemaExtension = null
     ) {
         $this->schemaIntrospector = $schemaIntrospector;
         $this->schemaBootstrap = $schemaBootstrap;
-        $this->authSchemaBuilder = $authSchemaBuilder;
+        $this->schemaAuth = $schemaAuth;
         $this->schemaBuilder = $schemaBuilder;
-        $this->seedInstaller = $seedInstaller;
-        $this->extensionSchemaRunner = $extensionSchemaRunner;
+        $this->schemaInstaller = $schemaInstaller;
+        $this->schemaExtension = $schemaExtension;
     }
 
     /**
@@ -66,15 +66,15 @@ final class SchemaComponentFactory
     /**
      * Returns the auth-schema builder on first use.
      *
-     * @return AuthSchemaBuilder Builder for auth-side schema objects.
+     * @return SchemaAuth Builder for auth-side schema objects.
      */
-    public function authSchemaBuilder(): AuthSchemaBuilder
+    public function schemaAuth(): SchemaAuth
     {
-        if ($this->authSchemaBuilder === null) {
-            $this->authSchemaBuilder = new AuthSchemaBuilder($this->schemaIntrospector());
+        if ($this->schemaAuth === null) {
+            $this->schemaAuth = new SchemaAuth($this->schemaIntrospector());
         }
 
-        return $this->authSchemaBuilder;
+        return $this->schemaAuth;
     }
 
     /**
@@ -94,29 +94,29 @@ final class SchemaComponentFactory
     /**
      * Returns the seed installer on first use.
      *
-     * @return SeedInstaller Installer for stock groups and starter pages.
+     * @return SchemaInstaller Installer for stock groups and starter pages.
      */
-    public function seedInstaller(): SeedInstaller
+    public function schemaInstaller(): SchemaInstaller
     {
-        if ($this->seedInstaller === null) {
-            $this->seedInstaller = new SeedInstaller();
+        if ($this->schemaInstaller === null) {
+            $this->schemaInstaller = new SchemaInstaller();
         }
 
-        return $this->seedInstaller;
+        return $this->schemaInstaller;
     }
 
     /**
      * Returns the extension schema runner on first use.
      *
-     * @return ExtensionSchemaRunner Runner for extension-owned schema providers.
+     * @return SchemaExtension Runner for extension-owned schema providers.
      */
-    public function extensionSchemaRunner(): ExtensionSchemaRunner
+    public function schemaExtension(): SchemaExtension
     {
-        if ($this->extensionSchemaRunner === null) {
-            $this->extensionSchemaRunner = new ExtensionSchemaRunner();
+        if ($this->schemaExtension === null) {
+            $this->schemaExtension = new SchemaExtension();
         }
 
-        return $this->extensionSchemaRunner;
+        return $this->schemaExtension;
     }
 
     private function schemaIntrospector(): SchemaIntrospector

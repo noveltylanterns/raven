@@ -131,6 +131,9 @@ This file is the fast system map for Raven CMS. Use it to quickly understand the
   - Write classes: `PageWrite`, `ChannelWrite`, `UserWrite`, `GroupWrite`, `CategoryWrite`, `TagWrite`, `SetWrite`, `RedirectWrite`, `MediaWrite`, `InviteWrite`. Each `*Write` takes the corresponding `*Read` as a constructor arg for validation lookups.
   - Repositories are the shared storage layer only: panel/public helper services should not be loaded into repo constructors. `UserRead` and `GroupRead` now keep their same-domain row shaping inline instead of instantiating the old route-scope auth helpers `UserPanelHydrator` and `GroupPublicRouteService`, and repository method names are being moved away from panel/public wording where the underlying data access is generic. `ChannelRead` now owns `explicitTaxonomySetCounts()` (bulk channel-to-set membership tallies by kind) and `countExplicitTaxonomySetAssignments()` (single-set count) that were previously duplicated in `ChannelDataParser`.
   - Bridge shims (`*Repository` files, e.g. `PageRepository extends PageRead`) remain for extension backward-compatibility. Do not add new core dependencies on bridge classes; use `*Read`/`*Write` directly.
+- `private/sys/Schema/`
+  - Core schema orchestration and ensure pipeline (`SchemaManager`, `SchemaState`, `SchemaPipeline`, `SchemaComponents`, `SchemaBootstrap`, `SchemaBuilder`, `SchemaAuth`, `SchemaInstaller`, `SchemaExtension`, `SchemaIntrospector`).
+  - Runtime entry flow is `SchemaManager -> SchemaState -> SchemaPipeline`, while `SchemaIntrospector` stays read-only for driver/table/column/index checks.
 - `private/sys/Runtime/`
   - Runtime payload contracts, assertion helpers, and scope-level runtime builders.
   - `Runtime/RuntimeAssert.php` provides shared callable-key assertions for runtime payload arrays.
@@ -230,7 +233,6 @@ This file is the fast system map for Raven CMS. Use it to quickly understand the
   - `SqlTable` — resolves logical table names to physical prefixed names for SQL call sites; available to extensions.
   - `SqlInsert.php` — driver-aware insert SQL helper (plain insert + duplicate-safe insert variants) available to extensions.
   - Driver/config primitives — shared driver/prefix normalization plus driver-specific config/bootstrap helpers (`DbDriver`, `MysqlConfig`, `PgsqlConfig`, `SqliteConfig`, `SqliteBootstrap`). Used by `DatabaseFactory` in `sys/Runtime/`; not for direct extension use.
-  - `Schema/` — schema ensure pipeline, schema builders, introspector, state store, seed installer, and extension schema runner. All schema orchestration lives here; `sys/Runtime/DatabaseFactory` is the sole core caller.
 - `private/lib/Scheduler/`
   - Shared scheduler runtime for core and extensions.
   - `Registry` — system-wide scheduler registry. Registers named jobs, lazy-loads extension `cron.php` sources, tracks last-run state under `.tmp/cron/`, exposes `getStatus()`, and executes due jobs via `runDue()`.

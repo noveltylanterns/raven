@@ -2,7 +2,7 @@
 
 /**
  * RAVEN CMS
- * ~/private/sys/Schema/AuthSchemaBuilder.php
+ * ~/private/sys/Schema/SchemaAuth.php
  * Ensures auth-side schema objects and Raven-specific user profile columns.
  * Docs: https://raven.lanterns.io
  */
@@ -17,7 +17,7 @@ use RuntimeException;
 /**
  * Ensures auth-side schema objects and user preference columns.
  */
-final class AuthSchemaBuilder
+final class SchemaAuth
 {
     private SchemaIntrospector $introspector;
 

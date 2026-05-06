@@ -2,7 +2,7 @@
 
 /**
  * RAVEN CMS
- * ~/private/sys/Schema/SeedInstaller.php
+ * ~/private/sys/Schema/SchemaInstaller.php
  * Seed row installer for stock groups and starter pages.
  * Docs: https://raven.lanterns.io
  */
@@ -18,7 +18,7 @@ use Raven\Lib\Database\SqlTable;
 /**
  * Installs/normalizes seed rows for stock groups and starter pages.
  */
-final class SeedInstaller
+final class SchemaInstaller
 {
     /**
      * Inserts missing stock groups, normalizes their IDs to canonical positions, and syncs permission masks.
