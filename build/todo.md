@@ -36,7 +36,7 @@ This is the default Build Mode backlog file. If the user asks about goals, unpat
 
 ### Schema Orchestration
 
-- [ ] **SchemaManager.php** — The public entry point for the rest of the runtime. Has `ensure()`, `ensureApp()`, `ensureAuth()`. Gates all calls through the state stores so the pipeline only fires when something has actually changed.
+- [x] **SchemaManager.php** — Moved to `sys/Schema.php` (`Raven\Core\Schema`). Runtime entrypoint belongs in `sys/`, not `lib/`. Callers in `Raven.php` updated.
 - [ ] **SchemaEnsurePipeline.php** — Executes the full ordered sequence: base tables → migrations → extension schemas → seed rows (app side), then auth tables + invite tokens (auth side). No state-tracking logic here — that's the manager's job.
 - [ ] **SchemaEnsureStateStore.php** — Skips redundant ensure passes by comparing file mtimes (marker file vs state file vs schema source files). Uses an exclusive lock to prevent a burst of concurrent requests from all running the pipeline at once. One instance per side (app / auth).
 - [ ] **SchemaComponentFactory.php** — Lazy wiring. Holds nullable slots for all schema components and constructs them on first use with shared introspector/resolver instances. Keeps the pipeline from having a 7-argument constructor.

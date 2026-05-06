@@ -2,21 +2,27 @@
 
 /**
  * RAVEN CMS
- * ~/private/lib/Database/SchemaManager.php
- * Public schema ensure entrypoint backed by the schema ensure pipeline.
+ * ~/private/sys/Schema.php
+ * Runtime schema ensure entrypoint; gates the bootstrap pipeline behind mtime-based state tracking.
  * Docs: https://raven.lanterns.io
  */
 
 declare(strict_types=1);
 
-namespace Raven\Lib\Database;
+namespace Raven\Core;
 
 use PDO;
+use Raven\Lib\Database\SchemaEnsurePipeline;
+use Raven\Lib\Database\SchemaEnsureStateStore;
 
 /**
- * Public schema ensure entrypoint backed by the schema ensure pipeline.
+ * Runtime schema ensure entrypoint backed by the schema ensure pipeline.
+ *
+ * Coordinates per-side state stores so the pipeline only fires when schema
+ * source files or an explicit invalidation marker are newer than the last
+ * successful ensure stamp.
  */
-final class SchemaManager
+final class Schema
 {
     private SchemaEnsurePipeline $pipeline;
     private SchemaEnsureStateStore $appStateStore;
@@ -25,18 +31,17 @@ final class SchemaManager
     /**
      * Wires the pipeline and per-side state stores used by the public ensure methods.
      *
-     * @param SchemaEnsurePipeline|null      $pipeline       Shared schema ensure pipeline; defaults to a fresh instance.
-     * @param SchemaEnsureStateStore|null    $appStateStore  App-side schema ensure state store; defaults to standard paths.
-     * @param SchemaEnsureStateStore|null    $authStateStore Auth-side schema ensure state store; defaults to auth-specific paths.
+     * @param SchemaEnsurePipeline|null   $pipeline       Schema ensure pipeline; defaults to a fresh instance.
+     * @param SchemaEnsureStateStore|null $appStateStore  App-side state store; defaults to standard paths.
+     * @param SchemaEnsureStateStore|null $authStateStore Auth-side state store; defaults to auth-specific paths.
      */
     public function __construct(
         ?SchemaEnsurePipeline $pipeline = null,
         ?SchemaEnsureStateStore $appStateStore = null,
         ?SchemaEnsureStateStore $authStateStore = null
-    )
-    {
+    ) {
         $this->pipeline = $pipeline ?? new SchemaEnsurePipeline();
-        $root = dirname(__DIR__, 3);
+        $root = dirname(__DIR__, 2);
         $this->appStateStore = $appStateStore ?? new SchemaEnsureStateStore($root);
         $this->authStateStore = $authStateStore ?? new SchemaEnsureStateStore(
             $root,
@@ -47,13 +52,12 @@ final class SchemaManager
     }
 
     /**
-     * Ensures both app and auth schema state.
+     * Ensures both app and auth schema state in one pass.
      *
-     * @param PDO $rvnDb App database connection.
-     * @param PDO $authDb Auth database connection.
+     * @param PDO    $rvnDb  App database connection.
+     * @param PDO    $authDb Auth database connection.
      * @param string $driver Active PDO driver name.
      * @param string $prefix Active Raven table prefix.
-     * @return void
      */
     public function ensure(PDO $rvnDb, PDO $authDb, string $driver, string $prefix): void
     {
@@ -64,10 +68,12 @@ final class SchemaManager
     /**
      * Ensures app-side schema state only.
      *
-     * @param PDO $rvnDb App database connection.
+     * Intentionally independent from auth DB setup so non-auth entrypoints
+     * can finish bootstrap without opening the auth connection.
+     *
+     * @param PDO    $rvnDb  App database connection.
      * @param string $driver Active PDO driver name.
      * @param string $prefix Active Raven table prefix.
-     * @return void
      */
     public function ensureApp(PDO $rvnDb, string $driver, string $prefix): void
     {
@@ -79,10 +85,9 @@ final class SchemaManager
     /**
      * Ensures auth-side schema state only.
      *
-     * @param PDO $authDb Auth database connection.
+     * @param PDO    $authDb Auth database connection.
      * @param string $driver Active PDO driver name.
      * @param string $prefix Active Raven table prefix.
-     * @return void
      */
     public function ensureAuth(PDO $authDb, string $driver, string $prefix): void
     {

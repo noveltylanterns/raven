@@ -2,6 +2,10 @@
 
 *The machine is supposed to be logging patches & mods to this file. Sometimes it does, sometimes it doesn't. It might be useful for historical architectural context to your Agent at one point.*
 
+### May 6, 2026 — sys/Schema.php
+
+- **SchemaManager → sys/Schema** — moved `lib/Database/SchemaManager` to `sys/Schema` (`Raven\Core\Schema`); the runtime schema entrypoint belongs in `sys/`, not `lib/`; updated `Raven.php` import and instantiation; corrected `dirname` depth from 3 to 2 for the new path.
+
 ### May 6, 2026 — lib/Database/ refactor cleanup
 
 - **SchemaIntrospector thin-wrapper purge** — deleted `authUsersTableExists()`, `authColumnExistsSqlite()`, `authColumnExistsMySql()`, `authColumnExistsPgSql()` (byte-for-byte duplicates of the `app*` / `tableExists()` equivalents); made `appColumnExistsSqlite()`, `appColumnExistsMySql()`, `appColumnExistsPgSql()` private; all `AuthSchemaBuilder` callers updated to `columnExists()` and `tableExists()` dispatch.
