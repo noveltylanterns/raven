@@ -2,7 +2,7 @@
 
 /**
  * RAVEN CMS
- * ~/private/lib/Database/ProfiledPDO.php
+ * ~/private/lib/Database/PdoQueryProfiler.php
  * PDO subclass that records every query through an optional QueryProfilerInterface.
  * Docs: https://raven.lanterns.io
  */
@@ -18,7 +18,7 @@ use Throwable;
 /**
  * PDO subclass that feeds every query into the active query profiler when enabled.
  */
-final class ProfiledPDO extends PDO
+final class PdoQueryProfiler extends PDO
 {
     private string $connectionLabel;
     private ?QueryProfilerInterface $queryProfiler;
@@ -46,7 +46,7 @@ final class ProfiledPDO extends PDO
         parent::__construct($dsn, $username, $password, $options);
 
         $this->setAttribute(PDO::ATTR_STATEMENT_CLASS, [
-            ProfiledPDOStatement::class,
+            PdoStmtProfiler::class,
             [$this->connectionLabel, $this->queryProfiler],
         ]);
     }
@@ -62,7 +62,7 @@ final class ProfiledPDO extends PDO
     {
         if (!isset($options[PDO::ATTR_STATEMENT_CLASS])) {
             $options[PDO::ATTR_STATEMENT_CLASS] = [
-                ProfiledPDOStatement::class,
+                PdoStmtProfiler::class,
                 [$this->connectionLabel, $this->queryProfiler],
             ];
         }

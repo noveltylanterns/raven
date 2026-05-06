@@ -226,7 +226,7 @@ This file is the fast system map for Raven CMS. Use it to quickly understand the
   - `Json.php` — shared JSON encode/decode helpers for strings and files, including atomic file writes for JSON payload persistence.
 - `private/lib/Database/`
   - Reusable database primitives for core and extensions.
-  - `ProfiledPDO` and `ProfiledPDOStatement` wrap PDO for query-level profiling; `QueryProfilerInterface` is the shared contract.
+  - `PdoQueryProfiler` and `PdoStmtProfiler` wrap PDO for query-level profiling; `QueryProfilerInterface` is the shared contract.
   - `TableNameResolver` — resolves logical table names to physical prefixed names for both app-db and auth-db contexts; available to extensions.
   - `SqlUpsertPolicy.php` — driver-aware upsert helper available to extensions.
   - Connection primitives — driver-specific connection config/bootstrap helpers (`DriverConfigNormalizer`, `MysqlConfig`, `PgsqlConfig`, `SqliteConfig`, `SqliteBootstrap`). Used by `DatabaseFactory` in `sys/Runtime/`; not for direct extension use.

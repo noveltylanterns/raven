@@ -21,22 +21,22 @@ This is the default Build Mode backlog file. If the user asks about goals, unpat
 
 ## 1) lib/Database/ Refactor & Cleanup (Pending Plan, DO NOT PROCEED)
 
-### Class inventory + purpose baseline
+### Unsorted class inventory + purpose baseline
 - [ ] `DriverConfigNormalizer.php` — normalize/validate shared database config payloads (`driver`, `prefix`).
-- [ ] `MysqlConfig.php` — extract MySQL config from the runtime payload and expose DSN/credential primitives.
-- [ ] `PgsqlConfig.php` — extract PostgreSQL config from the runtime payload and expose DSN/credential primitives.
-- [ ] `SqliteConfig.php` — extract SQLite base path from config and resolve canonical SQLite file path by DB key.
-- [ ] `SqliteBootstrap.php` — ensure SQLite filesystem path exists and apply connection PRAGMAs.
+	- Rename to DbDriver.php
 - [ ] `TableNameResolver.php` — resolve prefixed app/auth table names for SQL call sites.
+	- Rename to TableResolver.php
 - [ ] `SqlUpsertPolicy.php` — emit driver-appropriate duplicate-safe insert SQL.
 - [ ] `QueryProfilerInterface.php` — define query profiling contract only (no implementation logic).
-- [ ] `ProfiledPDO.php` — PDO wrapper that records `exec`/`query`/`prepare` activity into query profiler.
-- [ ] `ProfiledPDOStatement.php` — statement wrapper that records binds + execute timing into query profiler.
+	- Relocate to sys/Debug/QueryProfiler.php
+- [ ] `PdoQueryProfiler.php` — PDO wrapper that records `exec`/`query`/`prepare` activity into query profiler.
+- [ ] `PdoStmtProfiler.php` — statement wrapper that records binds + execute timing into query profiler.
 
 ### Dependency-boundary pass by lane
 - [ ] Config lane (`DriverConfigNormalizer`, `MysqlConfig`, `PgsqlConfig`, `SqliteConfig`) stays pure config/path logic and does not absorb runtime PDO/bootstrap orchestration.
+- [ ] Driver lane (`MysqlConfig`, `Mysql*`, `PgsqlConfig`, `Pgsql*`, `SqliteConfig`, `Sqlite*`, etc) stays focused on individual data drivers. Unused drivers should never have dependencies loading on any route.
 - [ ] Runtime lane (`SqliteBootstrap`, `TableNameResolver`, `SqlUpsertPolicy`) stays focused on SQL/runtime helpers and does not absorb config parsing.
-- [ ] Profiling lane (`QueryProfilerInterface`, `ProfiledPDO`, `ProfiledPDOStatement`) stays profiling-only and does not absorb unrelated query helper behavior.
+- [ ] Profiling lane (`QueryProfilerInterface`, `PdoQueryProfiler`, `PdoStmtProfiler`) stays profiling-only and does not absorb unrelated query helper behavior.
 
 ### Cleanup
 - [ ] Make sure no Database/ class is pulling up dead function/class/dependency weight irrelevant to the data type that class handles.
@@ -50,7 +50,7 @@ This is the default Build Mode backlog file. If the user asks about goals, unpat
 
 ## 2) sys/Schema Refactor & Cleanup (Pending Plan, DO NOT PROCEED)
 
-### Class inventory + purpose baseline
+### Unsorted class inventory + purpose baseline
 - [ ] `SchemaManager.php` — public runtime entrypoint that gates ensures through state stores + pipeline.
 - [ ] `SchemaEnsureStateStore.php` — marker/state/lock based dirty-check store that decides when ensure work must run.
 - [ ] `SchemaEnsurePipeline.php` — ordered execution pipeline for app-side and auth-side ensure flows.

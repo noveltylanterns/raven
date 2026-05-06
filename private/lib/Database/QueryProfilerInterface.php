@@ -3,7 +3,7 @@
 /**
  * RAVEN CMS
  * ~/private/lib/Database/QueryProfilerInterface.php
- * Contract for query profiler implementations used by ProfiledPDO and ProfiledPDOStatement.
+ * Contract for query profiler implementations used by PdoQueryProfiler and PdoStmtProfiler.
  * Docs: https://raven.lanterns.io
  */
 

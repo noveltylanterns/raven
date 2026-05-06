@@ -2,7 +2,7 @@
 
 /**
  * RAVEN CMS
- * ~/private/lib/Database/ProfiledPDOStatement.php
+ * ~/private/lib/Database/PdoStmtProfiler.php
  * PDOStatement subclass that records bind values and execution timing through QueryProfilerInterface.
  * Docs: https://raven.lanterns.io
  */
@@ -17,7 +17,7 @@ use Throwable;
 /**
  * PDOStatement subclass that captures bind values and feeds execution timing into the query profiler.
  */
-final class ProfiledPDOStatement extends \PDOStatement
+final class PdoStmtProfiler extends \PDOStatement
 {
     private string $connectionLabel = 'app';
     /** @var array<int|string, mixed> */
@@ -25,7 +25,7 @@ final class ProfiledPDOStatement extends \PDOStatement
     private ?QueryProfilerInterface $queryProfiler = null;
 
     /**
-     * Receives the connection label and optional profiler injected by ProfiledPDO via ATTR_STATEMENT_CLASS.
+     * Receives the connection label and optional profiler injected by PdoQueryProfiler via ATTR_STATEMENT_CLASS.
      *
      * @param string                      $connectionLabel Profiler label identifying the parent connection.
      * @param QueryProfilerInterface|null $queryProfiler   Profiler instance; null disables recording for this statement.

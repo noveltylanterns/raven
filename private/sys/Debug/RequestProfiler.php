@@ -80,7 +80,7 @@ final class RequestProfiler
      * Stores one normalized SQL query record on the current request snapshot.
      *
      * @param string $connection Logical connection label such as `app` or `auth`.
-     * @param string $mode Query execution mode reported by `ProfiledPDO`.
+     * @param string $mode Query execution mode reported by `PdoQueryProfiler`.
      * @param string $sql Raw SQL text for the executed statement.
      * @param array<int|string, mixed>|null $params Bound parameters captured for the statement.
      * @param float $durationMs Query duration in milliseconds.
