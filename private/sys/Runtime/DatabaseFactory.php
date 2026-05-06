@@ -15,10 +15,10 @@ use PDO;
 use Raven\Core\Debug\RequestProfilerAdapter;
 use Raven\Lib\Database\DriverConfigNormalizer;
 use Raven\Lib\Database\DsnBuilder;
-use Raven\Lib\Database\SqliteConnectionBootstrap;
-use Raven\Lib\Database\SqlitePathResolver;
 use Raven\Lib\Database\ProfiledPDO;
 use Raven\Lib\Database\QueryProfilerInterface;
+use Raven\Lib\Database\SqliteBootstrap;
+use Raven\Lib\Database\SqlitePath;
 
 /**
  * Builds profiled PDO connections for Raven database backends.
@@ -34,8 +34,8 @@ final class DatabaseFactory
     private QueryProfilerInterface $queryProfiler;
     private DriverConfigNormalizer $configNormalizer;
     private DsnBuilder $dsnBuilder;
-    private SqliteConnectionBootstrap $sqliteBootstrap;
-    private ?SqlitePathResolver $sqlitePaths = null;
+    private SqliteBootstrap $sqliteBootstrap;
+    private ?SqlitePath $sqlitePaths = null;
 
     /**
      * @param array<string, mixed> $databaseConfig Raven database configuration array (from config.php).
@@ -47,7 +47,7 @@ final class DatabaseFactory
         $this->queryProfiler = $queryProfiler ?? new RequestProfilerAdapter();
         $this->configNormalizer = new DriverConfigNormalizer();
         $this->dsnBuilder = new DsnBuilder();
-        $this->sqliteBootstrap = new SqliteConnectionBootstrap();
+        $this->sqliteBootstrap = new SqliteBootstrap();
     }
 
     /**
@@ -186,13 +186,12 @@ final class DatabaseFactory
     /**
      * Returns the lazy-initialized SQLite path resolver.
      *
-     * @return SqlitePathResolver Resolver initialized from the database config base path.
+     * @return SqlitePath Resolver initialized from the database config base path.
      */
-    private function sqlitePaths(): SqlitePathResolver
+    private function sqlitePaths(): SqlitePath
     {
         if ($this->sqlitePaths === null) {
-            $basePath = $this->configNormalizer->sqlitePath($this->config);
-            $this->sqlitePaths = new SqlitePathResolver($basePath);
+            $this->sqlitePaths = SqlitePath::fromConfig($this->config);
         }
 
         return $this->sqlitePaths;

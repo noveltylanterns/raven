@@ -2,8 +2,8 @@
 
 /**
  * RAVEN CMS
- * ~/private/lib/Database/SqlitePathResolver.php
- * Resolves canonical SQLite DB file paths from runtime configuration.
+ * ~/private/lib/Database/SqlitePath.php
+ * Extracts configured SQLite base paths and resolves canonical DB file paths.
  * Docs: https://raven.lanterns.io
  */
 
@@ -14,11 +14,29 @@ namespace Raven\Lib\Database;
 use RuntimeException;
 
 /**
- * Resolves canonical SQLite DB file paths from runtime configuration.
+ * Extracts configured SQLite base paths and resolves canonical DB file paths.
  */
-final class SqlitePathResolver
+final class SqlitePath
 {
     private string $configuredPath;
+
+    /**
+     * Builds a SQLite path helper directly from the Raven database config payload.
+     *
+     * @param array<string, mixed> $config Raven database configuration array.
+     * @return self SQLite path helper initialized from `sqlite.path`.
+     * @throws RuntimeException When no SQLite base path is configured.
+     */
+    public static function fromConfig(array $config): self
+    {
+        $sqlite = (array) ($config['sqlite'] ?? []);
+        $basePath = rtrim((string) ($sqlite['path'] ?? ''), '/');
+        if ($basePath === '') {
+            throw new RuntimeException('Missing SQLite base path configuration.');
+        }
+
+        return new self($basePath);
+    }
 
     /**
      * Stores the configured SQLite base path, trimming any trailing slash.

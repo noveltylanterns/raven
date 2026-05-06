@@ -2,7 +2,7 @@
 
 /**
  * RAVEN CMS
- * ~/private/lib/Database/SqliteConnectionBootstrap.php
+ * ~/private/lib/Database/SqliteBootstrap.php
  * SQLite filesystem and pragma initialization helpers.
  * Docs: https://raven.lanterns.io
  */
@@ -17,7 +17,7 @@ use RuntimeException;
 /**
  * Applies SQLite filesystem and pragma initialization steps.
  */
-final class SqliteConnectionBootstrap
+final class SqliteBootstrap
 {
     /**
      * Creates the parent directory of an SQLite database file when it does not exist.

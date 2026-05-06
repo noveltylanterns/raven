@@ -70,28 +70,10 @@ final class DriverConfigNormalizer
     }
 
     /**
-     * Returns the configured SQLite base path, trimmed of trailing slashes.
-     *
-     * @param array<string, mixed> $config Raven database configuration array.
-     * @return string Absolute base path to the SQLite data directory or file.
-     * @throws RuntimeException When no SQLite path is configured.
-     */
-    public function sqlitePath(array $config): string
-    {
-        $sqlite = $this->section($config, 'sqlite');
-        $basePath = rtrim((string) ($sqlite['path'] ?? ''), '/');
-        if ($basePath === '') {
-            throw new RuntimeException('Missing SQLite base path configuration.');
-        }
-
-        return $basePath;
-    }
-
-    /**
      * Extracts a named subsection from the config array, defaulting to an empty array.
      *
      * @param array<string, mixed> $config Raven database configuration array.
-     * @param string               $key    Section key to extract (e.g., 'mysql', 'sqlite').
+     * @param string               $key    Section key to extract (e.g., 'mysql', 'pgsql').
      * @return array<string, mixed> Config sub-array for the named driver or section.
      */
     private function section(array $config, string $key): array

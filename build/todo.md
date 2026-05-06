@@ -24,8 +24,8 @@ This is the default Build Mode backlog file. If the user asks about goals, unpat
 ### Class inventory + purpose baseline
 - [ ] `DriverConfigNormalizer.php` — normalize/validate database driver config payloads (`driver`, `prefix`, driver-specific config arrays).
 - [ ] `DsnBuilder.php` — build backend DSN strings from normalized MySQL/PostgreSQL config.
-- [ ] `SqlitePathResolver.php` — resolve canonical SQLite file path from configured base path and canonical DB key.
-- [ ] `SqliteConnectionBootstrap.php` — ensure SQLite filesystem path exists and apply connection PRAGMAs.
+- [ ] `SqlitePath.php` — extract SQLite base path from config and resolve canonical SQLite file path by DB key.
+- [ ] `SqliteBootstrap.php` — ensure SQLite filesystem path exists and apply connection PRAGMAs.
 - [ ] `TableNameResolver.php` — resolve prefixed app/auth table names for SQL call sites.
 - [ ] `SqlUpsertPolicy.php` — emit driver-appropriate duplicate-safe insert SQL.
 - [ ] `QueryProfilerInterface.php` — define query profiling contract only (no implementation logic).
@@ -33,8 +33,8 @@ This is the default Build Mode backlog file. If the user asks about goals, unpat
 - [ ] `ProfiledPDOStatement.php` — statement wrapper that records binds + execute timing into query profiler.
 
 ### Dependency-boundary pass by lane
-- [ ] Config lane (`DriverConfigNormalizer`, `DsnBuilder`, `SqlitePathResolver`) stays pure config/path logic and does not absorb runtime PDO/bootstrap orchestration.
-- [ ] Runtime lane (`SqliteConnectionBootstrap`, `TableNameResolver`, `SqlUpsertPolicy`) stays focused on SQL/runtime helpers and does not absorb config parsing.
+- [ ] Config lane (`DriverConfigNormalizer`, `DsnBuilder`, `SqlitePath`) stays pure config/path logic and does not absorb runtime PDO/bootstrap orchestration.
+- [ ] Runtime lane (`SqliteBootstrap`, `TableNameResolver`, `SqlUpsertPolicy`) stays focused on SQL/runtime helpers and does not absorb config parsing.
 - [ ] Profiling lane (`QueryProfilerInterface`, `ProfiledPDO`, `ProfiledPDOStatement`) stays profiling-only and does not absorb unrelated query helper behavior.
 
 ### Cleanup
