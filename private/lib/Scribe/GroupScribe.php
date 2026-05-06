@@ -12,6 +12,7 @@ declare(strict_types=1);
 namespace Raven\Lib\Scribe;
 
 use PDO;
+use Raven\Lib\Auth\Panel\PermissionBase;
 use Raven\Lib\Auth\Panel\RolePolicy;
 use Raven\Lib\Database\TableNameResolver;
 use RuntimeException;
@@ -141,7 +142,7 @@ final class GroupScribe
             throw new RuntimeException('Group slug already exists.');
         }
 
-        $mask = $this->rolePolicy->normalizeMaskForPanelAccess($mask);
+        $mask = PermissionBase::normalizeMaskForPanelAccess($mask);
         $customGroupId = $this->nextCustomGroupId();
 
         // Create path is always non-stock; schema/bootstrap own the stock groups.

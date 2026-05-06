@@ -71,52 +71,11 @@ final class RolePolicy
     }
 
     /**
-     * Returns true when the slug is a guest-like role (guest or validating).
-     *
-     * @param string $slug Normalized group slug to check.
-     * @return bool True for 'guest' or 'validating'.
-     */
-    public function isGuestLikeRoleSlug(string $slug): bool
-    {
-        $normalized = strtolower(trim($slug));
-        return $normalized === 'guest' || $normalized === 'validating';
-    }
-
-    /**
-     * Returns true when the slug is the banned role.
-     *
-     * @param string $slug Normalized group slug to check.
-     * @return bool True for 'banned'.
-     */
-    public function isBannedRoleSlug(string $slug): bool
-    {
-        return strtolower(trim($slug)) === 'banned';
-    }
-
-    /**
-     * Returns true when the slug is the standard user role.
-     *
-     * @param string $slug Normalized group slug to check.
-     * @return bool True for 'user'.
-     */
-    public function isUserRoleSlug(string $slug): bool
-    {
-        return strtolower(trim($slug)) === 'user';
-    }
-
-    /**
-     * Returns true when the slug is the admin role.
-     *
-     * @param string $slug Normalized group slug to check.
-     * @return bool True for 'admin'.
-     */
-    public function isAdminRoleSlug(string $slug): bool
-    {
-        return strtolower(trim($slug)) === 'admin';
-    }
-
-    /**
      * Returns enforced route and permissions values for a stock role slug.
+     *
+     * Banned is forced to zero, guest-like roles get VIEW_PUBLIC_SITE only,
+     * the standard user role gets public+private view bits, and admin always
+     * receives the full permission mask.
      *
      * @param string $roleSlug The group slug to evaluate.
      * @param int $routeEnabled Caller-supplied route value (0 or 1).
@@ -129,15 +88,15 @@ final class RolePolicy
         $resolvedRoute = $routeEnabled > 0 ? 1 : 0;
         $resolvedMask = $mask;
 
-        if ($this->isBannedRoleSlug($normalizedSlug)) {
+        if ($normalizedSlug === 'banned') {
             $resolvedRoute = 0;
             $resolvedMask = 0;
         } elseif ($this->isGuestLikeRoleSlug($normalizedSlug)) {
             $resolvedRoute = 0;
             $resolvedMask &= PublicMask::VIEW_PUBLIC_SITE;
-        } elseif ($this->isUserRoleSlug($normalizedSlug)) {
+        } elseif ($normalizedSlug === 'user') {
             $resolvedMask &= (PublicMask::VIEW_PUBLIC_SITE | PublicMask::VIEW_PRIVATE_SITE);
-        } elseif ($this->isAdminRoleSlug($normalizedSlug)) {
+        } elseif ($normalizedSlug === 'admin') {
             // Admin group always gets the full permission mask.
             $resolvedMask = (
                 PublicMask::VIEW_PUBLIC_SITE
@@ -155,24 +114,18 @@ final class RolePolicy
 
         return [
             'route'       => $resolvedRoute,
-            'permissions' => $this->normalizeMaskForPanelAccess($resolvedMask),
+            'permissions' => PermissionBase::normalizeMaskForPanelAccess($resolvedMask),
         ];
     }
 
     /**
-     * Strips route-level panel bits from a mask when PANEL_LOGIN is not present.
+     * Returns true when the slug is a guest-like role (guest or validating).
      *
-     * @param int $mask Raw permission mask to normalize.
-     * @return int Corrected mask with invalid bit combinations removed.
+     * @param string $slug Normalized group slug to check.
+     * @return bool True for 'guest' or 'validating'.
      */
-    public function normalizeMaskForPanelAccess(int $mask): int
+    private function isGuestLikeRoleSlug(string $slug): bool
     {
-        $resolvedMask = $mask;
-        if (($resolvedMask & PermissionBase::PANEL_LOGIN) !== PermissionBase::PANEL_LOGIN) {
-            $resolvedMask &= ~PermissionBase::allStockPanelBitsMask();
-            $resolvedMask &= ~PublicMask::VIEW_DISABLED_SITE;
-        }
-
-        return $resolvedMask;
+        return $slug === 'guest' || $slug === 'validating';
     }
 }

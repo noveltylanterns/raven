@@ -534,6 +534,25 @@ final class PermissionBase
     }
 
     /**
+     * Strips route-level panel bits from a mask when PANEL_LOGIN is not present.
+     *
+     * Prevents masks that grant route access (e.g. PAGES_EDIT) without granting panel
+     * login itself, which would produce an incoherent permission set.
+     *
+     * @param int $mask Raw permission mask to normalize.
+     * @return int Corrected mask with invalid bit combinations removed.
+     */
+    public static function normalizeMaskForPanelAccess(int $mask): int
+    {
+        if (($mask & self::PANEL_LOGIN) !== self::PANEL_LOGIN) {
+            $mask &= ~self::allStockPanelBitsMask();
+            $mask &= ~self::VIEW_DISABLED_SITE;
+        }
+
+        return $mask;
+    }
+
+    /**
      * Returns the permission bits for a single route key.
      *
      * @param string $route Lowercase panel route key.
