@@ -14,7 +14,7 @@ namespace Raven;
 use PDO;
 use Raven\Core\Config;
 use Raven\Core\Runtime\DatabaseFactory;
-use Raven\Core\Schema;
+use Raven\Core\Schema\SchemaManager;
 use Raven\Core\Logger;
 use Raven\Core\Postmaster;
 use Raven\Lib\Parser\PageRepoParser;
@@ -147,7 +147,7 @@ final class Raven
 
     // Keep app-side schema current during every bootstrap, but defer auth-side
     // schema and auth connection setup until something actually needs auth.
-    $schema = new Schema();
+    $schema = new SchemaManager();
     $schema->ensureApp($rvnDb, $driver, $prefix);
 
     // Auth DB and AuthService are lazy: many public routes (anonymous pages, feed,

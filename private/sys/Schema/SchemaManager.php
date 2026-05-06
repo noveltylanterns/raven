@@ -2,18 +2,16 @@
 
 /**
  * RAVEN CMS
- * ~/private/sys/Schema.php
+ * ~/private/sys/Schema/SchemaManager.php
  * Runtime schema ensure entrypoint; gates the bootstrap pipeline behind mtime-based state tracking.
  * Docs: https://raven.lanterns.io
  */
 
 declare(strict_types=1);
 
-namespace Raven\Core;
+namespace Raven\Core\Schema;
 
 use PDO;
-use Raven\Lib\Database\SchemaEnsurePipeline;
-use Raven\Lib\Database\SchemaEnsureStateStore;
 
 /**
  * Runtime schema ensure entrypoint backed by the schema ensure pipeline.
@@ -22,7 +20,7 @@ use Raven\Lib\Database\SchemaEnsureStateStore;
  * source files or an explicit invalidation marker are newer than the last
  * successful ensure stamp.
  */
-final class Schema
+final class SchemaManager
 {
     private SchemaEnsurePipeline $pipeline;
     private SchemaEnsureStateStore $appStateStore;
@@ -41,7 +39,7 @@ final class Schema
         ?SchemaEnsureStateStore $authStateStore = null
     ) {
         $this->pipeline = $pipeline ?? new SchemaEnsurePipeline();
-        $root = dirname(__DIR__, 2);
+        $root = dirname(__DIR__, 3);
         $this->appStateStore = $appStateStore ?? new SchemaEnsureStateStore($root);
         $this->authStateStore = $authStateStore ?? new SchemaEnsureStateStore(
             $root,

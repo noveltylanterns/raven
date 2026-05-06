@@ -2,14 +2,14 @@
 
 /**
  * RAVEN CMS
- * ~/private/lib/Database/SchemaComponentFactory.php
+ * ~/private/sys/Schema/SchemaComponentFactory.php
  * Lazy schema component wiring for bootstrap pipelines.
  * Docs: https://raven.lanterns.io
  */
 
 declare(strict_types=1);
 
-namespace Raven\Lib\Database;
+namespace Raven\Core\Schema;
 
 use Raven\Lib\Database\TableNameResolver;
 

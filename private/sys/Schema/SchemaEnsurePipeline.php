@@ -2,14 +2,14 @@
 
 /**
  * RAVEN CMS
- * ~/private/lib/Database/SchemaEnsurePipeline.php
+ * ~/private/sys/Schema/SchemaEnsurePipeline.php
  * Ordered schema ensure pipeline for app and auth databases.
  * Docs: https://raven.lanterns.io
  */
 
 declare(strict_types=1);
 
-namespace Raven\Lib\Database;
+namespace Raven\Core\Schema;
 
 use PDO;
 

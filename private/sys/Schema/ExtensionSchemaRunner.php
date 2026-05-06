@@ -2,14 +2,14 @@
 
 /**
  * RAVEN CMS
- * ~/private/lib/Database/ExtensionSchemaRunner.php
+ * ~/private/sys/Schema/ExtensionSchemaRunner.php
  * Executes extension-owned schema providers during bootstrap.
  * Docs: https://raven.lanterns.io
  */
 
 declare(strict_types=1);
 
-namespace Raven\Lib\Database;
+namespace Raven\Core\Schema;
 
 use PDO;
 use Raven\Lib\Database\TableNameResolver;

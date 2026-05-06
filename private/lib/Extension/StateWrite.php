@@ -11,7 +11,7 @@ declare(strict_types=1);
 
 namespace Raven\Lib\Extension;
 
-use Raven\Lib\Database\SchemaEnsureStateStore;
+use Raven\Core\Schema\SchemaEnsureStateStore;
 
 /**
  * Owns filesystem writes for `private/dat/ext/.state.php`.

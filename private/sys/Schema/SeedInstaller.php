@@ -2,14 +2,14 @@
 
 /**
  * RAVEN CMS
- * ~/private/lib/Database/SeedInstaller.php
+ * ~/private/sys/Schema/SeedInstaller.php
  * Seed row installer for stock groups and starter pages.
  * Docs: https://raven.lanterns.io
  */
 
 declare(strict_types=1);
 
-namespace Raven\Lib\Database;
+namespace Raven\Core\Schema;
 
 use PDO;
 use Raven\Lib\Auth\Panel\PermissionBase as PanelAccess;

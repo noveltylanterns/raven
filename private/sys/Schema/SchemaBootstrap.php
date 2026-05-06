@@ -2,14 +2,14 @@
 
 /**
  * RAVEN CMS
- * ~/private/lib/Database/SchemaBootstrap.php
+ * ~/private/sys/Schema/SchemaBootstrap.php
  * Base app schema bootstrap across supported drivers.
  * Docs: https://raven.lanterns.io
  */
 
 declare(strict_types=1);
 
-namespace Raven\Lib\Database;
+namespace Raven\Core\Schema;
 
 use PDO;
 

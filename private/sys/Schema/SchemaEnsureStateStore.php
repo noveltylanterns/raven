@@ -2,14 +2,14 @@
 
 /**
  * RAVEN CMS
- * ~/private/lib/Database/SchemaEnsureStateStore.php
+ * ~/private/sys/Schema/SchemaEnsureStateStore.php
  * Persists and compares a schema-ensure signature so hot paths can skip no-op ensure runs.
  * Docs: https://raven.lanterns.io
  */
 
 declare(strict_types=1);
 
-namespace Raven\Lib\Database;
+namespace Raven\Core\Schema;
 
 /**
  * Persists and compares a schema-ensure signature so hot paths can skip no-op ensure runs.
@@ -161,12 +161,12 @@ final class SchemaEnsureStateStore
     private function latestSchemaSourceMtime(): int
     {
         $files = [
-            $this->root . '/private/lib/Database/SchemaBootstrap.php',
-            $this->root . '/private/lib/Database/SchemaBuilder.php',
-            $this->root . '/private/lib/Database/AuthSchemaBuilder.php',
-            $this->root . '/private/lib/Database/SchemaEnsurePipeline.php',
-            $this->root . '/private/lib/Database/ExtensionSchemaRunner.php',
-            $this->root . '/private/lib/Database/SeedInstaller.php',
+            $this->root . '/private/sys/Schema/SchemaBootstrap.php',
+            $this->root . '/private/sys/Schema/SchemaBuilder.php',
+            $this->root . '/private/sys/Schema/AuthSchemaBuilder.php',
+            $this->root . '/private/sys/Schema/SchemaEnsurePipeline.php',
+            $this->root . '/private/sys/Schema/ExtensionSchemaRunner.php',
+            $this->root . '/private/sys/Schema/SeedInstaller.php',
         ];
 
         $latest = 0;

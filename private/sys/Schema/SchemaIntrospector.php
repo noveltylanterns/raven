@@ -2,14 +2,14 @@
 
 /**
  * RAVEN CMS
- * ~/private/lib/Database/SchemaIntrospector.php
+ * ~/private/sys/Schema/SchemaIntrospector.php
  * Cross-driver schema introspection and DDL safety helpers.
  * Docs: https://raven.lanterns.io
  */
 
 declare(strict_types=1);
 
-namespace Raven\Lib\Database;
+namespace Raven\Core\Schema;
 
 use PDO;
 
