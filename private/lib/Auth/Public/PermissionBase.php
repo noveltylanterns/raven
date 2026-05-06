@@ -11,21 +11,19 @@ declare(strict_types=1);
 
 namespace Raven\Lib\Auth\Public;
 
-use Raven\Lib\Auth\Panel\PermissionBase as PanelMask;
-
 /**
  * Canonical public-route permission helpers.
  */
 final class PermissionBase
 {
     /** Allows access to public-site mode frontend routes/content. */
-    public const VIEW_PUBLIC_SITE = PanelMask::VIEW_PUBLIC_SITE;
+    public const VIEW_PUBLIC_SITE = 128;
 
     /** Allows access to private-site mode frontend routes/content. */
-    public const VIEW_PRIVATE_SITE = PanelMask::VIEW_PRIVATE_SITE;
+    public const VIEW_PRIVATE_SITE = 256;
 
     /** Allows authenticated dashboard users to view frontend while site mode is disabled. */
-    public const VIEW_DISABLED_SITE = PanelMask::VIEW_DISABLED_SITE;
+    public const VIEW_DISABLED_SITE = 512;
 
     /**
      * Checks public-site-view capability from combined mask.
@@ -35,7 +33,7 @@ final class PermissionBase
      */
     public static function canViewPublicSite(int $mask): bool
     {
-        return PanelMask::canViewPublicSite($mask);
+        return (bool) ($mask & self::VIEW_PUBLIC_SITE);
     }
 
     /**
@@ -46,7 +44,7 @@ final class PermissionBase
      */
     public static function canViewPrivateSite(int $mask): bool
     {
-        return PanelMask::canViewPrivateSite($mask);
+        return (bool) ($mask & self::VIEW_PRIVATE_SITE);
     }
 
     /**
@@ -57,7 +55,7 @@ final class PermissionBase
      */
     public static function canViewDisabledSite(int $mask): bool
     {
-        return PanelMask::canViewDisabledSite($mask);
+        return (bool) ($mask & self::VIEW_DISABLED_SITE);
     }
 
     /**

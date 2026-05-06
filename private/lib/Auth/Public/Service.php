@@ -34,6 +34,7 @@ final class Service
      * @param PanelService $panelService Panel authorization service for authenticated user masks.
      * @param callable(): int|null $userIdResolver Callback returning current authenticated user id.
      * @param callable(): bool $isLoggedInResolver Callback returning current authentication state.
+     * @return void
      */
     public function __construct(
         PermissionMask $permissionMaskService,

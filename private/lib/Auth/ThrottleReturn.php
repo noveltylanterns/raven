@@ -25,6 +25,7 @@ final class ThrottleReturn
      * Prepares the orchestrator with its DB-layer dependency.
      *
      * @param ThrottleUser $throttle DB-layer throttle bucket accessor.
+     * @return void
      */
     public function __construct(ThrottleUser $throttle)
     {
@@ -120,6 +121,18 @@ final class ThrottleReturn
             $failureCount,
             $lockedUntil
         );
+    }
+
+    /**
+     * Clears one identifier+IP throttle bucket after a successful login.
+     *
+     * @param string $username Login identifier submitted by the user.
+     * @param string $ipAddress Client IP address for the bucket key.
+     * @return void
+     */
+    public function clear(string $username, string $ipAddress): void
+    {
+        $this->throttle->deleteRow(self::bucketHash($username, $ipAddress));
     }
 
     /**

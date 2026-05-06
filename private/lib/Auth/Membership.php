@@ -32,6 +32,7 @@ final class Membership
      * @param PDO $rvnDb Application database connection.
      * @param string $driver PDO driver name ('sqlite', 'mysql', or 'pgsql').
      * @param string $prefix Table-name prefix for the application schema.
+     * @return void
      */
     public function __construct(PDO $rvnDb, string $driver, string $prefix)
     {

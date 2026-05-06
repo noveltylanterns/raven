@@ -31,6 +31,9 @@
 - **Upload baseline consistency** — `AvatarUpload` and `MediaUpload` now route baseline `$_FILES` validation through `lib/Transport/Upload::validateSingleUpload()` before media-domain image processing, so upload error/HTTP-upload checks stay centralized.
 - **Taxonomy media split finalized** — taxonomy image config/path responsibilities are now consolidated on `PreviewConfig` with slot-specific `CoverUpload`/`PreviewUpload` and `CoverValidator`/`PreviewValidator`; legacy `Media/TaxonomyImageService.php` and `Media/TaxonomyImagePathResolver.php` were removed.
 - **Media docs/name cleanup pass** — completed media checklist cleanup by tightening method docs across new media classes and aligning `docs/filetree.md` media ownership notes with the new `Cover*`/`Preview*` layout.
+- **Auth thin-wrapper cleanup** — removed `lib/Auth/ThrottleClear.php` by folding its clear-path behavior into `ThrottleReturn::clear()` and updating `AuthService::clearFailedLoginAttempts()` to use the consolidated throttle orchestrator.
+- **Auth PHPDoc sweep finalization** — completed the remaining `lib/Auth` public-method PHPDoc gaps (constructor `@return void` tags and missing method summaries/param docs in `AuthService`) so public/protected method blocks are complete across the directory.
+- **Auth naming sweep finalization** — completed a final naming pass across `lib/Auth`; no further identifier renames were required after wrapper cleanup, and method/variable names remain concise and domain-accurate.
 
 ### May 5, 2026 — Public runtime performance fixes: deferred auth DB, corrected schema state paths
 

@@ -20,7 +20,6 @@ use Raven\Lib\Auth\Panel\Service as PanelAuthService;
 use Raven\Lib\Auth\Public\Service as PublicAuthService;
 use Raven\Lib\Database\TableNameResolver;
 use Raven\Lib\Scribe\AuthProfileScribe;
-use Raven\Lib\Auth\ThrottleClear;
 use Raven\Lib\Auth\ThrottleReturn;
 use Raven\Lib\Auth\ThrottleUser;
 use Raven\Lib\Security\PhraseValidate;
@@ -49,7 +48,6 @@ final class AuthService
     /** Delight Auth instance. */
     private mixed $auth;
     private ThrottleReturn $throttleReturn;
-    private ThrottleClear $throttleClear;
     private UserAuthCodec $authPayloadCodec;
     private PanelAuthService $panelAuthService;
     private PublicAuthService $publicAuthService;
@@ -82,6 +80,15 @@ final class AuthService
      */
     private array $userPreferencesCache = [];
 
+    /**
+     * Prepares the auth facade and all dependent auth/policy services.
+     *
+     * @param PDO $authDb Auth-database connection for delight-auth user/session state.
+     * @param PDO $rvnDb App-database connection for groups, memberships, and throttle buckets.
+     * @param string $driver Active PDO driver name.
+     * @param string $prefix Configured table prefix before sanitization.
+     * @return void
+     */
     public function __construct(PDO $authDb, PDO $rvnDb, string $driver, string $prefix)
     {
         $this->authDb = $authDb;
@@ -90,7 +97,6 @@ final class AuthService
         $this->prefix = preg_replace('/[^a-zA-Z0-9_]/', '', $prefix) ?? '';
         $throttleUser = new ThrottleUser($rvnDb, $driver, $this->prefix);
         $this->throttleReturn = new ThrottleReturn($throttleUser);
-        $this->throttleClear = new ThrottleClear($throttleUser);
         $this->authPayloadCodec = new UserAuthCodec();
         $panelPermissionMaskService = new Panel\PermissionMask();
         $publicPermissionMaskService = new Public\PermissionMask($rvnDb, $this->prefix);
@@ -214,7 +220,7 @@ final class AuthService
      */
     public function clearFailedLoginAttempts(string $username, string $ipAddress): void
     {
-        $this->throttleClear->clear($username, $ipAddress);
+        $this->throttleReturn->clear($username, $ipAddress);
     }
 
     /**
@@ -389,6 +395,8 @@ final class AuthService
     }
 
     /**
+     * Issues one pending email-code challenge for the active 2FA session.
+     *
      * @return array{
      *   ok: bool,
      *   message?: string,
@@ -410,6 +418,12 @@ final class AuthService
         );
     }
 
+    /**
+     * Clears one pending email-code challenge for the active 2FA session.
+     *
+     * @param string $selectedMethodKey Selected email method key or pool key.
+     * @return void
+     */
     public function clearPendingEmailCodeChallenge(string $selectedMethodKey = ''): void
     {
         $this->loginEmail->clearEmailCodeChallenge($selectedMethodKey);
@@ -497,6 +511,10 @@ final class AuthService
     }
 
     /**
+     * Normalizes and persists user 2FA methods for one account.
+     *
+     * @param int $userId Target user id.
+     * @param array<int, array<string, mixed>> $methods Submitted method rows.
      * @return array{ok: bool, errors: array<int, string>}
      */
     public function updateUserTwoFactorMethods(int $userId, array $methods): array
@@ -513,6 +531,14 @@ final class AuthService
         return ['ok' => true, 'errors' => []];
     }
 
+    /**
+     * Updates the stored WebAuthn signature counter for one credential.
+     *
+     * @param int $userId Target user id.
+     * @param string $credentialId WebAuthn credential id.
+     * @param int $signatureCounter Latest signature counter from successful assertion.
+     * @return void
+     */
     public function updateWebauthnSignatureCounter(int $userId, string $credentialId, int $signatureCounter): void
     {
         if ($userId <= 0 || $credentialId === '' || $signatureCounter < 0) {

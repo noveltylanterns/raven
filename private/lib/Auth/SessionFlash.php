@@ -20,6 +20,7 @@ final class SessionFlash
 
     /**
      * @param string $sessionKey Top-level key under which flash data is stored in $_SESSION.
+     * @return void
      */
     public function __construct(string $sessionKey = '_raven_flash')
     {

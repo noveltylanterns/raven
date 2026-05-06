@@ -37,6 +37,7 @@ final class LoginAttempt
      * @param InputSanitizer  $input                  Shared payload sanitizer for login form fields.
      * @param LoginIdentifier $identifierResolver     Shared helper that resolves login identifier mode and normalization.
      * @param Request         $requestContextResolver Shared request-context helper for normalized client IP extraction.
+     * @return void
      */
     public function __construct(
         Config $config,

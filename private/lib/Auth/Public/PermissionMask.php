@@ -27,6 +27,7 @@ final class PermissionMask
     /**
      * @param PDO $rvnDb Application database connection.
      * @param string $prefix Table-name prefix for the application schema.
+     * @return void
      */
     public function __construct(PDO $rvnDb, string $prefix)
     {

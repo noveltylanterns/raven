@@ -32,6 +32,7 @@ final class UserAuthCodec
      * Prepares the codec with an optional TOTP cipher for secret encryption at rest.
      *
      * @param TotpCipher|null $totpSecretCipher Cipher for encrypting TOTP secrets; defaults to a new instance.
+     * @return void
      */
     public function __construct(?TotpCipher $totpSecretCipher = null)
     {

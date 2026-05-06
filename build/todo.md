@@ -15,9 +15,9 @@ This is the default Build Mode backlog file. If the user asks about goals, unpat
 
 # lib/Auth/ Cleanup
 Phases 1–6 of the lib/Auth/ Refactor are complete (logged in release-notes.md). Remaining cleanup pass:
-- [ ] Scan all Auth/ classes for any remaining legacy aliases, compat shims, or thin wrappers without real logic. Purge them and update callers.
-- [ ] PHPDoc sweep: all classes in lib/Auth/ — every public/protected method must have a complete PHPDoc block.
-- [ ] Naming sweep: check all method/variable names across lib/Auth/ for clarity and conciseness.
+- [x] Scan all Auth/ classes for any remaining legacy aliases, compat shims, or thin wrappers without real logic. Purge them and update callers.
+- [x] PHPDoc sweep: all classes in lib/Auth/ — every public/protected method must have a complete PHPDoc block.
+- [x] Naming sweep: check all method/variable names across lib/Auth/ for clarity and conciseness.
 
 
 # lib/Database/ Refactor

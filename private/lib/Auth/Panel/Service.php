@@ -28,6 +28,7 @@ final class Service
      * @param PermissionMask $permissionMaskService Panel permission-mask cache/computation service.
      * @param Membership $groupMembership Shared group-membership read/write service.
      * @param callable(): int|null $userIdResolver Callback returning current authenticated user id.
+     * @return void
      */
     public function __construct(
         PermissionMask $permissionMaskService,

@@ -44,6 +44,7 @@ final class LoginChallenge
      * @param InputSanitizer $input      Shared payload sanitizer for challenge form fields.
      * @param LoginEmail     $loginEmail Shared email challenge session manager and delivery helper.
      * @param Postmaster     $postmaster Shared mail delivery service for email-code dispatch.
+     * @return void
      */
     public function __construct(Config $config, InputSanitizer $input, LoginEmail $loginEmail, Postmaster $postmaster)
     {
