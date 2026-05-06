@@ -19,7 +19,7 @@ This is the default Build Mode backlog file. If the user asks about goals, unpat
 
 # Data Access Layer Refactor Cleanup
 
-## 1) lib/Database/ Refactor & Cleanup (Active Cleanup Checklist)
+## 1) lib/Database/ Refactor & Cleanup
 
 ### Class inventory + purpose baseline
 - [x] `DbDriver.php` — normalize/validate shared database config payloads (`driver`, `prefix`).
@@ -47,7 +47,7 @@ This is the default Build Mode backlog file. If the user asks about goals, unpat
 - [x] Optional naming pass complete: `DriverConfigNormalizer` -> `DbDriver`, `TableNameResolver` -> `SqlTable`.
 
 
-## 2) sys/Schema Refactor & Cleanup (Pending Plan, DO NOT PROCEED)
+## 2) sys/Schema Refactor & Cleanup
 
 ### Unsorted class inventory + purpose baseline
 - [x] `SchemaState.php` — marker/state/lock based dirty-check store that decides when ensure work must run.
@@ -73,7 +73,7 @@ This is the default Build Mode backlog file. If the user asks about goals, unpat
 - [x] Updated release-notes.md and checked off list.
 
 
-## 2) sys/Repository/ Refactor & Cleanup (Pending Plan, DO NOT PROCEED)
+## 3) sys/Repository/ Refactor & Cleanup (Pending Plan, DO NOT PROCEED)
 Lingering issues & reorganization tasks. Make a plan to deal with them all in one clean sweep. Append it as a detailed checklist to this section in case we lose session or we have to bounce between agents:
 - [ ] All Repository/ classes should be public/panel/extension/library/scribe/cli-agnostic primitives. Doublecheck them all to make sure that is functionally the case:
 	- Repositories are the canonical base data access+manipulation layer.
@@ -86,7 +86,7 @@ Lingering issues & reorganization tasks. Make a plan to deal with them all in on
 - [ ] Do a sweep of all classes in Repository/ making sure PHPdoc blocks are present+accurate for ALL headings, classes & functions.
 - [ ] Update release-notes.md and check off list.
 
-## 3) lib/Parser/ Refactor & Cleanup (Pending Plan, DO NOT PROCEED)
+## 4) lib/Parser/ Refactor & Cleanup (Pending Plan, DO NOT PROCEED)
 Lingering issues & reorganization tasks. Make a plan to deal with them all in one clean sweep. Append it as a detailed checklist to this section in case we lose session or we have to bounce between agents:
 - [ ] Parser/ classes are designated data access points for novice Extension authors who have no reason to use Repositories directly.
 - [ ] Parser/ classes SHOULD NOT be the primitives for Repositories. Repositories are the primitives for Parser/ classes. (Exception for *RepoParser.php classes, so Repositories have a designated safe zone for bare essential read primitives that would also be useful to give to Extension authors.)
@@ -96,7 +96,7 @@ Lingering issues & reorganization tasks. Make a plan to deal with them all in on
 - [ ] Do a sweep of all classes in Parser/ making sure PHPdoc blocks are present+accurate for ALL headings, classes & functions.
 - [ ] Update release-notes.md and check off list.
 
-## 4) lib/Scribe/ Refactor & Cleanup (Pending Plan, DO NOT PROCEED)
+## 5) lib/Scribe/ Refactor & Cleanup (Pending Plan, DO NOT PROCEED)
 Lingering issues & reorganization tasks. Make a plan to deal with them all in one clean sweep. Append it as a detailed checklist to this section in case we lose session or we have to bounce between agents:
 - [ ] Scribe/ classes are designated easy entry points for novice Extension authors who have no reason to use Repositories directly.
 - [ ] Scribe/ classes SHOULD NOT be the primitives for Repositories. Repositories are the primitives for Scribe/ classes. (The last agent had trouble finishing this as you can see, so clarify anything uncertain.)
