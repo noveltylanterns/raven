@@ -107,19 +107,6 @@ Lingering issues & reorganization tasks. Make a plan to deal with them all in on
 
 
 
-# lib/Security/ Refactor
-Lingering issues & reorganization tasks. Make a plan to deal with them all in one clean sweep. Append it as a detailed checklist to this section in case we lose session or we have to bounce between agents:
-- [ ] Captcha.php says its a public route class. It should be a public/panel/extension agnostic class.
-- [ ] Totp.php & TotpCipher.php look partially agnostic, but it is hard to tell with inaccurate/missing PHPdoc blocks. Doublecheck to be safe.
-- [ ] The other lib/Security/ classes already look public/panel/extension agnostic, but doublecheck to be safe as some PHPdoc blocks are dated fragments. Others are missing entirely.
-- [ ] In PasswordValidator.php, function validateNewPasswordChange should be validateNewPass, $newPassword should be $newPass and $confirmNewPassword should be $confirmNewPass
-- [ ] Security/RecoveryPhrase.php should be split into PhraseGenerate & PhraseValidate classes (use best judgement to sort functions into new classes. update callers and delete initial RecoveryPhrase class.)
-### lib/Security/ Cleanup
-- [ ] Make sure no Security class is pulling up dead function/class/dependency weight irrelevant to the method that class handles.
-- [ ] Scan the whole Security/ directory for legacy aliases, compatability shims, and thin wrappers that don't add any extra logic. Purge all of them. Update all callers to use actual source functions.
-- [ ] A lot of the functions in our Security/ classes have really long & unclear names. Do a sweep of every class and make sure the function/variable names are concise+accurate.
-- [ ] Do a sweep of all classes in lib/Security/ making sure PHPdoc blocks are present+accurate for ALL headings, classes & functions.
-- [ ] Update release-notes.md, clear completed section out of todo.md, and commit.
 
 
 

@@ -12,7 +12,7 @@ declare(strict_types=1);
 namespace Raven\Lib\View;
 
 use Raven\Lib\Auth\Login2fa;
-use Raven\Lib\Security\RecoveryPhrase;
+use Raven\Lib\Security\PhraseValidate;
 use Raven\Lib\Security\Totp;
 
 /**
@@ -73,7 +73,7 @@ final class Preferences
                 }
 
                 $recoveryHash = trim((string) ($method['recovery_hash'] ?? ''));
-                if (!RecoveryPhrase::isValidHash($recoveryHash)) {
+                if (!PhraseValidate::isValidHash($recoveryHash)) {
                     continue;
                 }
 

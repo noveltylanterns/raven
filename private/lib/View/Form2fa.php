@@ -13,7 +13,8 @@ namespace Raven\Lib\View;
 
 use Raven\Lib\Auth\Login2fa;
 use Raven\Lib\Security\InputSanitizer;
-use Raven\Lib\Security\RecoveryPhrase;
+use Raven\Lib\Security\PhraseGenerate;
+use Raven\Lib\Security\PhraseValidate;
 use Raven\Lib\Security\Totp;
 use Raven\Lib\View\Qr;
 
@@ -140,14 +141,14 @@ final class Form2fa
                     $row['status'] = 'confirmed';
                 }
             } elseif ($type === 'recovery') {
-                $recoveryCode = RecoveryPhrase::normalize((string) ($method['recovery_code'] ?? ''));
+                $recoveryCode = PhraseValidate::normalize((string) ($method['recovery_code'] ?? ''));
                 $recoveryHash = trim((string) ($method['recovery_hash'] ?? ''));
-                if (RecoveryPhrase::isValid($recoveryCode, 12)) {
-                    $generatedHash = RecoveryPhrase::hash($recoveryCode, 12);
+                if (PhraseValidate::isValid($recoveryCode, 12)) {
+                    $generatedHash = PhraseGenerate::hash($recoveryCode, 12);
                     $recoveryHash = is_string($generatedHash) ? $generatedHash : '';
                 }
 
-                if (!RecoveryPhrase::isValidHash($recoveryHash)) {
+                if (!PhraseValidate::isValidHash($recoveryHash)) {
                     continue;
                 }
 
@@ -249,7 +250,7 @@ final class Form2fa
                 }
             } elseif ($type === 'recovery') {
                 $recoveryHash = trim((string) ($method['recovery_hash'] ?? ''));
-                if (!RecoveryPhrase::isValidHash($recoveryHash)) {
+                if (!PhraseValidate::isValidHash($recoveryHash)) {
                     continue;
                 }
 
@@ -380,8 +381,8 @@ final class Form2fa
      */
     public function generateRecoveryPhrase(int $wordCount = 12): ?string
     {
-        $phrase = RecoveryPhrase::generate($wordCount);
-        if (!is_string($phrase) || !RecoveryPhrase::isValid($phrase, $wordCount)) {
+        $phrase = PhraseGenerate::generate($wordCount);
+        if (!is_string($phrase) || !PhraseValidate::isValid($phrase, $wordCount)) {
             return null;
         }
 

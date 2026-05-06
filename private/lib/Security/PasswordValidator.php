@@ -17,36 +17,36 @@ namespace Raven\Lib\Security;
 final class PasswordValidator
 {
     /**
-     * Validates a new-password-change submission and returns a list of user-facing error strings.
+     * Validates a new-password submission and returns a list of user-facing error strings.
      *
      * Returns an empty array when both fields are empty (no change requested) or when all rules pass.
      *
-     * @param string $newPassword Submitted new password value.
-     * @param string $confirmNewPassword Submitted confirmation value.
+     * @param string $newPass Submitted new password value.
+     * @param string $confirmNewPass Submitted confirmation value.
      * @param int $minimumLength Minimum required password character length.
      * @return array<int, string> Validation errors; empty array on success.
      */
-    public function validateNewPasswordChange(
-        string $newPassword,
-        string $confirmNewPassword,
+    public function validateNewPass(
+        string $newPass,
+        string $confirmNewPass,
         int $minimumLength = 8
     ): array {
         $errors = [];
 
-        if ($newPassword === '' && $confirmNewPassword === '') {
+        if ($newPass === '' && $confirmNewPass === '') {
             return $errors;
         }
 
-        if ($newPassword === '' || $confirmNewPassword === '') {
+        if ($newPass === '' || $confirmNewPass === '') {
             $errors[] = 'Both new password fields are required to change password.';
             return $errors;
         }
 
-        if (!hash_equals($newPassword, $confirmNewPassword)) {
+        if (!hash_equals($newPass, $confirmNewPass)) {
             $errors[] = 'New password and confirm new password must match.';
         }
 
-        if (strlen($newPassword) < $minimumLength) {
+        if (strlen($newPass) < $minimumLength) {
             $errors[] = 'New password must be at least ' . $minimumLength . ' characters.';
         }
 

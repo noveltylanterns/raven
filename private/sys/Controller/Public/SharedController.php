@@ -362,7 +362,7 @@ final class SharedController
      */
     public function publicCaptchaMarkup(): string
     {
-        $markup = $this->captchaService()->publicMarkup($this->captchaScriptIncluded);
+        $markup = $this->captchaService()->markup($this->captchaScriptIncluded);
         $this->captchaScriptIncluded = (bool) ($markup['script_included'] ?? $this->captchaScriptIncluded);
         return (string) ($markup['markup'] ?? '');
     }

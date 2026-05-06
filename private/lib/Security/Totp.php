@@ -1,5 +1,12 @@
 <?php
 
+/**
+ * RAVEN CMS
+ * ~/private/lib/Security/Totp.php
+ * Shared TOTP secret, code, and provisioning-URI helpers for 2FA flows.
+ * Docs: https://raven.lanterns.io
+ */
+
 declare(strict_types=1);
 
 namespace Raven\Lib\Security;
@@ -26,12 +33,24 @@ final class Totp
     private const MODERN_DIGITS = 8;
     private const PERIOD_SECONDS = 30;
 
+    /**
+     * Strips non-base32 characters and uppercases a TOTP secret string.
+     *
+     * @param string $secret Raw secret value from user input or storage.
+     * @return string Cleaned uppercase base32 secret.
+     */
     public static function normalizeSecret(string $secret): string
     {
         $normalized = strtoupper(trim($secret));
         return preg_replace('/[^A-Z2-7]/', '', $normalized) ?? '';
     }
 
+    /**
+     * Returns true when the normalized secret meets the required base32 length constraints.
+     *
+     * @param string $secret Secret string; normalization is applied before the check.
+     * @return bool True when the secret is a valid base32 string of acceptable length.
+     */
     public static function isValidSecret(string $secret): bool
     {
         return preg_match(
@@ -40,16 +59,36 @@ final class Totp
         ) === 1;
     }
 
+    /**
+     * Strips all non-digit characters from a submitted TOTP code.
+     *
+     * @param string $code Raw code from user input, potentially with spaces or dashes.
+     * @return string Digit-only code string.
+     */
     public static function normalizeCode(string $code): string
     {
         return preg_replace('/\D+/', '', trim($code)) ?? '';
     }
 
+    /**
+     * Returns true when the normalized code is exactly the expected digit count.
+     *
+     * @param string $code Code string; normalization is applied before the check.
+     * @return bool True when the code contains exactly MODERN_DIGITS digits.
+     */
     public static function isValidCode(string $code): bool
     {
         return preg_match('/^\d{' . self::MODERN_DIGITS . '}$/', self::normalizeCode($code)) === 1;
     }
 
+    /**
+     * Generates a new cryptographically random TOTP secret using the vendor library.
+     *
+     * Returns null when the vendor library is unavailable or generation fails.
+     *
+     * @param string $issuer Display name embedded in the provisioning URI.
+     * @return string|null Normalized base32 secret, or null on failure.
+     */
     public static function generateSecret(string $issuer = 'Raven CMS'): ?string
     {
         if (!class_exists(TwoFactorAuth::class)) {
@@ -65,6 +104,18 @@ final class Totp
         }
     }
 
+    /**
+     * Verifies a submitted TOTP code against a secret using the vendor library.
+     *
+     * A clock tolerance window of 1 allows one step (±30 s) to account for submission lag.
+     * Returns false when the secret or code is invalid or the vendor library is unavailable.
+     *
+     * @param string $secret Base32 TOTP secret.
+     * @param string $code Submitted code from the user.
+     * @param int $window Clock drift tolerance in steps; clamped to ≥ 0.
+     * @param string $issuer TOTP issuer label used during verification.
+     * @return bool True when the code is valid for the given secret within the clock window.
+     */
     public static function verifyCode(
         string $secret,
         string $code,
@@ -93,6 +144,16 @@ final class Totp
         }
     }
 
+    /**
+     * Builds the otpauth:// provisioning URI for QR code display during TOTP setup.
+     *
+     * Returns an empty string when the secret is invalid or the vendor library is unavailable.
+     *
+     * @param string $issuer Site or app name shown in the authenticator app.
+     * @param string $accountEmail User email address shown in the authenticator app.
+     * @param string $secret Base32 TOTP secret to encode in the URI.
+     * @return string otpauth:// URI, or empty string on failure.
+     */
     public static function provisioningUri(string $issuer, string $accountEmail, string $secret): string
     {
         $normalizedSecret = self::normalizeSecret($secret);

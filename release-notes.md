@@ -2,6 +2,14 @@
 
 *The machine is supposed to be logging patches & mods to this file. Sometimes it does, sometimes it doesn't. It might be useful for historical architectural context to your Agent at one point.*
 
+### May 5, 2026 — lib/Security/ refactor cleanup
+
+- **Captcha.php** — removed "public route" qualifier from class docblock and file header; renamed `publicMarkup()` → `markup()` so the method is not implying public-route-only scope; updated `SharedController` caller.
+- **Totp.php** — added missing Raven file header; added complete PHPDoc blocks to all public methods (`normalizeSecret`, `isValidSecret`, `normalizeCode`, `isValidCode`, `generateSecret`, `verifyCode`, `provisioningUri`).
+- **RecoveryPhrase.php → PhraseGenerate + PhraseValidate** — split `RecoveryPhrase` into two focused classes: `PhraseGenerate` (`generate()`, `hash()`, private word-pool helpers) and `PhraseValidate` (absorbs `normalize()`, `isValid()`, `isValidHash()`, `verify()` alongside the existing `matchRecoveryMethod()`). Deleted `RecoveryPhrase.php`. Updated all callers: `lib/Auth/Login2fa`, `lib/View/Form2fa`, `lib/View/Preferences`.
+- **PasswordValidator.php** — renamed `validateNewPasswordChange()` → `validateNewPass()`; shortened params `$newPassword` → `$newPass`, `$confirmNewPassword` → `$confirmNewPass`; updated docblock. Updated `PreferencesController` caller.
+- **EmailObfuscate.php** — removed thin `Address::mask()` wrapper class; `lib/Auth/LoginChallenge` now calls `Address::mask()` directly with a proper `use` import. File deleted.
+
 ### May 5, 2026 — lib/Auth/ refactor: permission renames, delegate removal, security extraction, throttle extraction
 
 - **lib/Auth/Panel/Mask → PermissionBase** — renamed class and file; all callers updated.

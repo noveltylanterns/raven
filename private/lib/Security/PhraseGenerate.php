@@ -1,13 +1,20 @@
 <?php
 
+/**
+ * RAVEN CMS
+ * ~/private/lib/Security/PhraseGenerate.php
+ * Recovery-phrase generation and password-hashing helpers.
+ * Docs: https://raven.lanterns.io
+ */
+
 declare(strict_types=1);
 
 namespace Raven\Lib\Security;
 
 /**
- * Shared recovery phrase generation and validation utilities.
+ * Generates random BIP39-based recovery phrases and hashes them for at-rest storage.
  */
-final class RecoveryPhrase
+final class PhraseGenerate
 {
     private const WORD_LIST_PATH = __DIR__ . '/data/bip39-english.txt';
 
@@ -21,41 +28,16 @@ final class RecoveryPhrase
         'cost' => 12,
     ];
 
-    public static function normalize(string $raw): string
-    {
-        $normalized = strtolower(trim($raw));
-        $normalized = preg_replace('/[^a-z]+/', ' ', $normalized) ?? '';
-        $normalized = preg_replace('/\s+/', ' ', $normalized) ?? '';
-        return trim($normalized);
-    }
-
-    public static function isValid(string $phrase, int $wordCount = 12): bool
-    {
-        $wordCount = max(1, $wordCount);
-        $phrase = self::normalize($phrase);
-        if ($phrase === '') {
-            return false;
-        }
-
-        $words = explode(' ', $phrase);
-        if (count($words) !== $wordCount) {
-            return false;
-        }
-
-        $wordLookup = self::wordPoolLookup();
-        if ($wordLookup === []) {
-            return false;
-        }
-
-        foreach ($words as $word) {
-            if (!isset($wordLookup[$word])) {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
+    /**
+     * Generates a new random recovery phrase from the BIP39 word list.
+     *
+     * Validates the generated phrase before returning to guard against
+     * corrupted word-list reads. Returns null when the word pool is too
+     * small, CSPRNG entropy fails, or the result fails validation.
+     *
+     * @param int $wordCount Number of words in the phrase; clamped to at least 1.
+     * @return string|null Space-separated phrase, or null on failure.
+     */
     public static function generate(int $wordCount = 12): ?string
     {
         $wordCount = max(1, $wordCount);
@@ -80,17 +62,27 @@ final class RecoveryPhrase
         }
 
         $phrase = implode(' ', $words);
-        if (!self::isValid($phrase, $wordCount)) {
+        if (!PhraseValidate::isValid($phrase, $wordCount)) {
             return null;
         }
 
         return $phrase;
     }
 
+    /**
+     * Normalizes and hashes a recovery phrase for at-rest storage.
+     *
+     * Uses Argon2id when available, falling back to bcrypt. Returns null when
+     * the phrase fails validation or password_hash produces an empty result.
+     *
+     * @param string $phrase Recovery phrase to hash; normalization is applied before hashing.
+     * @param int $wordCount Expected word count used for pre-hash validation.
+     * @return string|null Hashed phrase string, or null on failure.
+     */
     public static function hash(string $phrase, int $wordCount = 12): ?string
     {
-        $normalized = self::normalize($phrase);
-        if (!self::isValid($normalized, $wordCount)) {
+        $normalized = PhraseValidate::normalize($phrase);
+        if (!PhraseValidate::isValid($normalized, $wordCount)) {
             return null;
         }
 
@@ -105,27 +97,6 @@ final class RecoveryPhrase
         }
 
         return $hashed;
-    }
-
-    public static function isValidHash(string $hash): bool
-    {
-        $hash = trim($hash);
-        if ($hash === '') {
-            return false;
-        }
-
-        $info = password_get_info($hash);
-        return (is_array($info) && (string) ($info['algoName'] ?? 'unknown') !== 'unknown');
-    }
-
-    public static function verify(string $submittedPhrase, string $hash, int $wordCount = 12): bool
-    {
-        $normalizedPhrase = self::normalize($submittedPhrase);
-        if (!self::isValid($normalizedPhrase, $wordCount) || !self::isValidHash($hash)) {
-            return false;
-        }
-
-        return password_verify($normalizedPhrase, $hash);
     }
 
     /**
@@ -155,23 +126,5 @@ final class RecoveryPhrase
 
         $pool = array_values($loaded);
         return $pool;
-    }
-
-    /**
-     * @return array<string, bool>
-     */
-    private static function wordPoolLookup(): array
-    {
-        static $lookup = null;
-        if (is_array($lookup)) {
-            return $lookup;
-        }
-
-        $lookup = [];
-        foreach (self::wordPool() as $word) {
-            $lookup[$word] = true;
-        }
-
-        return $lookup;
     }
 }

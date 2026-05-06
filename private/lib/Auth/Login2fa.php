@@ -11,7 +11,8 @@ declare(strict_types=1);
 
 namespace Raven\Lib\Auth;
 
-use Raven\Lib\Security\RecoveryPhrase;
+use Raven\Lib\Security\PhraseGenerate;
+use Raven\Lib\Security\PhraseValidate;
 use Raven\Lib\Security\Totp;
 
 /**
@@ -46,7 +47,7 @@ final class Login2fa
      */
     public static function forRecoveryPhrase(string $phrase): string
     {
-        return 'recovery:' . sha1(RecoveryPhrase::normalize($phrase));
+        return 'recovery:' . sha1(PhraseValidate::normalize($phrase));
     }
 
     /**
@@ -289,15 +290,15 @@ final class Login2fa
                 $row['secret'] = $secret;
             } elseif ($type === 'recovery') {
                 $recoveryHash = trim((string) ($method['recovery_hash'] ?? ''));
-                if (!RecoveryPhrase::isValidHash($recoveryHash)) {
-                    $recoveryCode = RecoveryPhrase::normalize((string) ($method['recovery_code'] ?? ''));
-                    if (RecoveryPhrase::isValid($recoveryCode, 12)) {
-                        $hashedRecoveryCode = RecoveryPhrase::hash($recoveryCode, 12);
+                if (!PhraseValidate::isValidHash($recoveryHash)) {
+                    $recoveryCode = PhraseValidate::normalize((string) ($method['recovery_code'] ?? ''));
+                    if (PhraseValidate::isValid($recoveryCode, 12)) {
+                        $hashedRecoveryCode = PhraseGenerate::hash($recoveryCode, 12);
                         $recoveryHash = is_string($hashedRecoveryCode) ? $hashedRecoveryCode : '';
                     }
                 }
 
-                if (!RecoveryPhrase::isValidHash($recoveryHash)) {
+                if (!PhraseValidate::isValidHash($recoveryHash)) {
                     continue;
                 }
 

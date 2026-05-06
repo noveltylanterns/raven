@@ -3,7 +3,7 @@
 /**
  * RAVEN CMS
  * ~/private/lib/Security/Captcha.php
- * Shared captcha provider config, server-side verification, and public widget markup helpers.
+ * Captcha provider config, server-side verification, and widget markup helpers.
  * Docs: https://raven.lanterns.io
  */
 
@@ -14,7 +14,7 @@ namespace Raven\Lib\Security;
 use Raven\Core\Config;
 
 /**
- * Shared public captcha provider config, verification, and markup helpers.
+ * Captcha provider config, server-side verification, and widget markup helpers.
  */
 final class Captcha
 {
@@ -125,7 +125,7 @@ final class Captcha
     }
 
     /**
-     * Builds the HTML widget markup and optional JS script tag for embedding a captcha on a public form.
+     * Builds the HTML widget markup and optional JS script tag for embedding a captcha on a form.
      *
      * The `script_included` flag tracks whether the provider script has already been emitted on
      * the page so callers can avoid duplicate script tags across multiple widget instances.
@@ -133,7 +133,7 @@ final class Captcha
      * @param bool $scriptIncluded Whether the provider JS script has already been emitted on this page.
      * @return array{markup: string, script_included: bool} Widget HTML and updated script-included flag.
      */
-    public function publicMarkup(bool $scriptIncluded): array
+    public function markup(bool $scriptIncluded): array
     {
         $provider = $this->provider();
         if ($provider === 'none') {

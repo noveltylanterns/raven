@@ -251,7 +251,7 @@ final class PreferencesController
 
         $errors = array_merge(
             $errors,
-            $this->passwordValidator->validateNewPasswordChange($newPassword, $confirmNewPassword, 8)
+            $this->passwordValidator->validateNewPass($newPassword, $confirmNewPassword, 8)
         );
 
         $avatarSet = false;

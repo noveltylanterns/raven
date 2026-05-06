@@ -17,7 +17,7 @@ use Raven\Lib\Auth\AuthService;
 use Raven\Lib\Auth\Login2fa;
 use Raven\Lib\Auth\LoginEmail;
 use Raven\Lib\Auth\LoginUiState;
-use Raven\Lib\Security\EmailObfuscate;
+use Raven\Lib\Mail\Address;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\Security\WebAuthn;
 
@@ -92,7 +92,7 @@ final class LoginChallenge
         $selectedEmailInput = $uiState->emailInput();
         $emailCodeTargetMasked = '';
         if ($selectedMethodType === 'email' && $selectedEmailInput !== '') {
-            $emailCodeTargetMasked = EmailObfuscate::mask($selectedEmailInput);
+            $emailCodeTargetMasked = Address::mask($selectedEmailInput);
         }
 
         if (!(bool) ($flowState['show_method_picker'] ?? false)) {
