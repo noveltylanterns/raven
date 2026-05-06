@@ -243,7 +243,7 @@ final class PageScribe
         }
 
         $insert = $this->db->prepare(
-            $this->upsertPolicy->idempotentInsertSql(
+            $this->upsertPolicy->insertIgnoreSql(
                 $this->driver,
                 $table,
                 ['page', $column],

@@ -1,5 +1,12 @@
 <?php
 
+/**
+ * RAVEN CMS
+ * ~/private/lib/Database/SchemaEnsureStateStore.php
+ * Persists and compares a schema-ensure signature so hot paths can skip no-op ensure runs.
+ * Docs: https://raven.lanterns.io
+ */
+
 declare(strict_types=1);
 
 namespace Raven\Lib\Database;
@@ -20,10 +27,12 @@ final class SchemaEnsureStateStore
     private ?bool $dirtyCache = null;
 
     /**
-     * @param string $root Project root used to resolve schema and state paths.
-     * @param string|null $stateFile Optional absolute path to the persisted state file.
-     * @param string|null $lockFile Optional absolute path to the lock file guarding concurrent ensures.
-     * @param string|null $markerFile Optional absolute path to the invalidation marker file.
+     * Configures the state, lock, and marker file paths used by this store instance.
+     *
+     * @param string      $root       Project root used to resolve default state and marker paths.
+     * @param string|null $stateFile  Absolute path to the persisted ensure-state file; defaults to the app-side path.
+     * @param string|null $lockFile   Absolute path to the concurrency lock file; defaults to the app-side lock.
+     * @param string|null $markerFile Absolute path to the invalidation marker file; defaults to the app-side marker.
      */
     public function __construct(string $root, ?string $stateFile = null, ?string $lockFile = null, ?string $markerFile = null)
     {

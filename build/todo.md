@@ -20,50 +20,7 @@ This is the default Build Mode backlog file. If the user asks about goals, unpat
 
 # lib/Database/ Refactor
 
-**Boundary verdict:** Everything in `lib/Database/` is correctly placed as a shared primitive library. `sys/Runtime/DatabaseFactory.php` is the right entrypoint — it assembles the PDO connection and hands off. Nothing needs to move to `sys/Runtime/`. All 19 classes are public/panel/extension-agnostic.
-
-### Thin Wrapper Purge
-
-- [ ] **SchemaIntrospector: consolidate column-check methods.** Three parallel sets exist (`auth*`, `app*`, and the dispatch `columnExists()`). The `authColumnExistsMySql` and `authColumnExistsPgSql` methods are byte-for-byte identical to their `app*` counterparts. `authColumnExistsSqlite` is slightly simpler (no schema-prefix guard) but auth tables in SQLite mode carry no schema prefix, so `columnExists()` dispatch is safe for them too. Plan:
-	- Make `appColumnExistsSqlite`, `appColumnExistsMySql`, `appColumnExistsPgSql` private.
-	- Delete `authColumnExistsSqlite`, `authColumnExistsMySql`, `authColumnExistsPgSql`.
-	- Update `AuthSchemaBuilder` to call `$this->introspector->columnExists($db, $driver, $table, $col)` everywhere it currently calls the `auth*` variants.
-	- Update `SchemaBuilder::ensureTaxonomyImageColumns()` and `ensureTaxonomySetColumns()` to call `$this->introspector->columnExists($db, 'sqlite', $table, $col)` instead of `appColumnExistsSqlite()` directly.
-- [ ] **SchemaIntrospector: remove `authUsersTableExists()`.** It is a thin wrapper around the same SQL as `tableExists()`, hardcoding `$prefix . 'users'`. Update `AuthSchemaBuilder::ensureAuthSchema()` to call `$this->introspector->tableExists($db, $driver, $prefix . 'users')` directly. Delete `authUsersTableExists()`.
-- [ ] **SchemaBuilder: remove private `taxonomyColumnExists()`.** It delegates to `$this->introspector->columnExists()` with no added logic. Update its two callers within SchemaBuilder to call `$this->introspector->columnExists()` directly.
-
-### Naming Sweep
-
-- [ ] `SqliteConnectionBootstrap::ensureDirectory()` → `ensureDir()` (matches Archive/Folder convention)
-- [ ] `DriverConfigNormalizer::sqliteBasePath()` → `sqlitePath()` (Base is redundant)
-- [ ] `ExtensionSchemaRunner::ensureEnabledExtensionSchemas()` → `ensureExtensionSchemas()` (Enabled implied by ensure)
-- [ ] `SeedInstaller::ensureStockGroups()` → `ensureGroups()`; `ensureSeedPages()` → `ensurePages()`
-- [ ] `SqlUpsertPolicy::idempotentInsertSql()` → `insertIgnoreSql()` (accurate and concise)
-- [ ] `SchemaIntrospector::isAlreadyExistsSchemaError()` → `isAlreadyExistsError()` (class name already implies schema)
-- [ ] `SchemaIntrospector::mySqlIndexExists()` / `pgSqlIndexExists()` → `indexExistsMySql()` / `indexExistsPgSql()` (consistent driver-suffix ordering with the column methods)
-- [ ] After all renames: grep callers of every renamed method and update all call sites.
-
-### File Header + PHPDoc Sweep
-
-Review each file below and add/complete as noted. All public and protected methods need a one-line summary + `@param`/`@return`/`@throws` where applicable. Files missing the standard Raven header need it added.
-
-- [ ] **ProfiledPDO.php** — missing file header; `__construct`, `prepare`, `exec`, `query` all undocumented
-- [ ] **ProfiledPDOStatement.php** — missing file header; `__construct` (protected), `bindValue`, `bindParam`, `execute` all undocumented
-- [ ] **QueryProfilerInterface.php** — missing file header; `isEnabled()` and `recordQuery()` undocumented
-- [ ] **DriverConfigNormalizer.php** — missing file header; `driver()`, `prefix()`, `mysql()`, `pgsql()`, `sqlitePath()` have `@param` tags but no one-line summary
-- [ ] **DsnBuilder.php** — missing file header; `mysql()`, `pgsql()` have `@param` but no one-line summary
-- [ ] **SqliteConnectionBootstrap.php** — missing file header; `ensureDir()` and `bootstrap()` undocumented
-- [ ] **SqlitePathResolver.php** — missing file header; `__construct` and `path()` undocumented; also has a formatting bug: `private function looksLikeFilePath` is butted up against the closing `}` of `corePath()` with no blank line
-- [ ] **SchemaManager.php** — missing file header; constructor missing one-line summary
-- [ ] **SchemaEnsureStateStore.php** — missing file header; constructor missing one-line summary
-- [ ] **SchemaComponentFactory.php** — has file header; constructor missing PHPDoc
-- [ ] **SchemaBuilder.php** — has file header; ALL 12+ public methods undocumented (`ensurePageScheduleColumns`, `ensurePageDescriptionColumn`, `ensurePageDisplayTitleColumn`, `ensurePageGalleryEnabledColumn`, `ensurePageSlugScopeUniqueness`, `ensureRootChannelScope`, `ensureGroupRoutingColumns`, `ensureTaxonomyImageColumns`, `ensureTaxonomyIconColumn`, `ensureTaxonomySetColumns`, `ensurePanelPerformanceIndexes`, `ensureRedirectDescriptionColumn`, `ensureEventLogTable`)
-- [ ] **SchemaIntrospector.php** — missing file header; `authUsersTableExists`, `columnExists`, `indexExists`, `tableExists`, `sqliteTableExists`, `mySqlIndexExists`, `pgSqlIndexExists`, `quotePgIdentifier`, `isAlreadyExistsError` all undocumented or only partially documented
-- [ ] **ExtensionSchemaRunner.php** — has file header; `ensureExtensionSchemas()` undocumented
-- [ ] **SeedInstaller.php** — has file header; `ensureGroups()` and `ensurePages()` undocumented
-- [ ] **SqlUpsertPolicy.php** — missing file header; `insertIgnoreSql()` missing one-line summary
-
-- [ ] Update release-notes.md, clear completed section out of todo.md, and commit.
+**Completed — May 6, 2026.** All thin-wrapper purges, naming renames, and PHPDoc/header sweeps are done. See release-notes.md for details.
 
 
 

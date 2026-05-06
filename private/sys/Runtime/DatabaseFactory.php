@@ -117,7 +117,7 @@ final class DatabaseFactory
      */
     private function newSqliteConnection(string $path, string $connectionLabel = 'app'): PDO
     {
-        $this->sqliteBootstrap->ensureDirectory($path);
+        $this->sqliteBootstrap->ensureDir($path);
 
         $pdo = new ProfiledPDO('sqlite:' . $path, null, null, $this->defaultPdoOptions(), $connectionLabel, $this->queryProfiler);
         $this->sqliteBootstrap->bootstrap($pdo);
@@ -191,7 +191,7 @@ final class DatabaseFactory
     private function sqlitePaths(): SqlitePathResolver
     {
         if ($this->sqlitePaths === null) {
-            $basePath = $this->configNormalizer->sqliteBasePath($this->config);
+            $basePath = $this->configNormalizer->sqlitePath($this->config);
             $this->sqlitePaths = new SqlitePathResolver($basePath);
         }
 

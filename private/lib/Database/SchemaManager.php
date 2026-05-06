@@ -1,5 +1,12 @@
 <?php
 
+/**
+ * RAVEN CMS
+ * ~/private/lib/Database/SchemaManager.php
+ * Public schema ensure entrypoint backed by the schema ensure pipeline.
+ * Docs: https://raven.lanterns.io
+ */
+
 declare(strict_types=1);
 
 namespace Raven\Lib\Database;
@@ -16,10 +23,11 @@ final class SchemaManager
     private SchemaEnsureStateStore $authStateStore;
 
     /**
-     * @param SchemaEnsurePipeline|null $pipeline Shared schema ensure pipeline.
-     * @param SchemaEnsureStateStore|null $appStateStore App-side schema ensure state store.
-     * @param SchemaEnsureStateStore|null $authStateStore Auth-side schema ensure state store.
-     * @return void
+     * Wires the pipeline and per-side state stores used by the public ensure methods.
+     *
+     * @param SchemaEnsurePipeline|null      $pipeline       Shared schema ensure pipeline; defaults to a fresh instance.
+     * @param SchemaEnsureStateStore|null    $appStateStore  App-side schema ensure state store; defaults to standard paths.
+     * @param SchemaEnsureStateStore|null    $authStateStore Auth-side schema ensure state store; defaults to auth-specific paths.
      */
     public function __construct(
         ?SchemaEnsurePipeline $pipeline = null,

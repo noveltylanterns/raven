@@ -36,7 +36,7 @@ final class AuthSchemaBuilder
      */
     public function ensureAuthSchema(PDO $authDb, string $driver, string $prefix): void
     {
-        if (!$this->introspector->authUsersTableExists($authDb, $driver, $prefix)) {
+        if (!$this->introspector->tableExists($authDb, $driver, $prefix . 'users')) {
             $schema = $this->loadDelightSchema($driver);
 
             if ($schema === null) {
@@ -136,34 +136,34 @@ final class AuthSchemaBuilder
         if ($driver === 'sqlite') {
             // SQLite ADD COLUMN is safe to call repeatedly; each path is guarded
             // by a column-existence check before issuing DDL.
-            if (!$this->introspector->authColumnExistsSqlite($db, $usersTable, 'theme')) {
+            if (!$this->introspector->columnExists($db, 'sqlite', $usersTable, 'theme')) {
                 $db->exec('ALTER TABLE ' . $usersTable . ' ADD COLUMN theme TEXT NOT NULL DEFAULT \'default\'');
             }
-            if (!$this->introspector->authColumnExistsSqlite($db, $usersTable, 'name')) {
+            if (!$this->introspector->columnExists($db, 'sqlite', $usersTable, 'name')) {
                 $db->exec('ALTER TABLE ' . $usersTable . ' ADD COLUMN name TEXT NULL');
             }
-            if (!$this->introspector->authColumnExistsSqlite($db, $usersTable, 'bio')) {
+            if (!$this->introspector->columnExists($db, 'sqlite', $usersTable, 'bio')) {
                 $db->exec('ALTER TABLE ' . $usersTable . ' ADD COLUMN bio TEXT NULL');
             }
-            if (!$this->introspector->authColumnExistsSqlite($db, $usersTable, 'avatar')) {
+            if (!$this->introspector->columnExists($db, 'sqlite', $usersTable, 'avatar')) {
                 $db->exec('ALTER TABLE ' . $usersTable . ' ADD COLUMN avatar TEXT NULL');
             }
-            if (!$this->introspector->authColumnExistsSqlite($db, $usersTable, 'cover_image')) {
+            if (!$this->introspector->columnExists($db, 'sqlite', $usersTable, 'cover_image')) {
                 $db->exec('ALTER TABLE ' . $usersTable . ' ADD COLUMN cover_image TEXT NULL');
             }
-            if (!$this->introspector->authColumnExistsSqlite($db, $usersTable, 'string')) {
+            if (!$this->introspector->columnExists($db, 'sqlite', $usersTable, 'string')) {
                 $db->exec('ALTER TABLE ' . $usersTable . ' ADD COLUMN string TEXT NULL');
             }
-            if (!$this->introspector->authColumnExistsSqlite($db, $usersTable, 'contact')) {
+            if (!$this->introspector->columnExists($db, 'sqlite', $usersTable, 'contact')) {
                 $db->exec('ALTER TABLE ' . $usersTable . ' ADD COLUMN contact TEXT NULL');
             }
-            if (!$this->introspector->authColumnExistsSqlite($db, $usersTable, 'two_factor')) {
+            if (!$this->introspector->columnExists($db, 'sqlite', $usersTable, 'two_factor')) {
                 $db->exec('ALTER TABLE ' . $usersTable . ' ADD COLUMN two_factor TEXT NULL');
             }
-            if (!$this->introspector->authColumnExistsSqlite($db, $usersTable, 'group')) {
+            if (!$this->introspector->columnExists($db, 'sqlite', $usersTable, 'group')) {
                 $db->exec('ALTER TABLE ' . $usersTable . ' ADD COLUMN "group" INTEGER NULL');
             }
-            if (!$this->introspector->authColumnExistsSqlite($db, $usersTable, 'timezone')) {
+            if (!$this->introspector->columnExists($db, 'sqlite', $usersTable, 'timezone')) {
                 $db->exec('ALTER TABLE ' . $usersTable . ' ADD COLUMN timezone TEXT NOT NULL DEFAULT \'\'');
             }
             $db->exec('CREATE UNIQUE INDEX IF NOT EXISTS uniq_' . $usersTable . '_string ON ' . $usersTable . ' (string)');
@@ -173,37 +173,37 @@ final class AuthSchemaBuilder
         }
 
         if ($driver === 'mysql') {
-            if (!$this->introspector->authColumnExistsMySql($db, $usersTable, 'theme')) {
+            if (!$this->introspector->columnExists($db, 'mysql', $usersTable, 'theme')) {
                 $db->exec('ALTER TABLE ' . $usersTable . ' ADD COLUMN theme VARCHAR(50) NOT NULL DEFAULT \'default\'');
             }
-            if (!$this->introspector->authColumnExistsMySql($db, $usersTable, 'name')) {
+            if (!$this->introspector->columnExists($db, 'mysql', $usersTable, 'name')) {
                 $db->exec('ALTER TABLE ' . $usersTable . ' ADD COLUMN name VARCHAR(160) NULL');
             }
-            if (!$this->introspector->authColumnExistsMySql($db, $usersTable, 'avatar')) {
+            if (!$this->introspector->columnExists($db, 'mysql', $usersTable, 'avatar')) {
                 $db->exec('ALTER TABLE ' . $usersTable . ' ADD COLUMN avatar VARCHAR(255) NULL');
             }
-            if (!$this->introspector->authColumnExistsMySql($db, $usersTable, 'cover_image')) {
+            if (!$this->introspector->columnExists($db, 'mysql', $usersTable, 'cover_image')) {
                 $db->exec('ALTER TABLE ' . $usersTable . ' ADD COLUMN cover_image VARCHAR(255) NULL');
             }
-            if (!$this->introspector->authColumnExistsMySql($db, $usersTable, 'contact')) {
+            if (!$this->introspector->columnExists($db, 'mysql', $usersTable, 'contact')) {
                 $db->exec('ALTER TABLE ' . $usersTable . ' ADD COLUMN contact TEXT NULL');
             }
-            if (!$this->introspector->authColumnExistsMySql($db, $usersTable, 'two_factor')) {
+            if (!$this->introspector->columnExists($db, 'mysql', $usersTable, 'two_factor')) {
                 $db->exec('ALTER TABLE ' . $usersTable . ' ADD COLUMN two_factor LONGTEXT NULL');
             }
-            if (!$this->introspector->authColumnExistsMySql($db, $usersTable, 'bio')) {
+            if (!$this->introspector->columnExists($db, 'mysql', $usersTable, 'bio')) {
                 $db->exec('ALTER TABLE ' . $usersTable . ' ADD COLUMN bio TEXT NULL');
             }
-            if (!$this->introspector->authColumnExistsMySql($db, $usersTable, 'string')) {
+            if (!$this->introspector->columnExists($db, 'mysql', $usersTable, 'string')) {
                 $db->exec('ALTER TABLE ' . $usersTable . ' ADD COLUMN string VARCHAR(128) NULL');
             }
-            if (!$this->introspector->mySqlIndexExists($db, $usersTable, 'uniq_' . $usersTable . '_string')) {
+            if (!$this->introspector->indexExistsMySql($db, $usersTable, 'uniq_' . $usersTable . '_string')) {
                 $db->exec('ALTER TABLE ' . $usersTable . ' ADD UNIQUE INDEX uniq_' . $usersTable . '_string (string)');
             }
-            if (!$this->introspector->authColumnExistsMySql($db, $usersTable, 'group')) {
+            if (!$this->introspector->columnExists($db, 'mysql', $usersTable, 'group')) {
                 $db->exec('ALTER TABLE ' . $usersTable . ' ADD COLUMN `group` BIGINT UNSIGNED NULL');
             }
-            if (!$this->introspector->authColumnExistsMySql($db, $usersTable, 'timezone')) {
+            if (!$this->introspector->columnExists($db, 'mysql', $usersTable, 'timezone')) {
                 $db->exec('ALTER TABLE ' . $usersTable . ' ADD COLUMN timezone VARCHAR(64) NOT NULL DEFAULT \'\'');
             }
 
@@ -212,37 +212,37 @@ final class AuthSchemaBuilder
         }
 
         // PostgreSQL.
-        if (!$this->introspector->authColumnExistsPgSql($db, $usersTable, 'theme')) {
+        if (!$this->introspector->columnExists($db, 'pgsql', $usersTable, 'theme')) {
             $db->exec('ALTER TABLE ' . $usersTable . ' ADD COLUMN theme VARCHAR(50) NOT NULL DEFAULT \'default\'');
         }
-        if (!$this->introspector->authColumnExistsPgSql($db, $usersTable, 'name')) {
+        if (!$this->introspector->columnExists($db, 'pgsql', $usersTable, 'name')) {
             $db->exec('ALTER TABLE ' . $this->introspector->quotePgIdentifier($usersTable) . ' ADD COLUMN name VARCHAR(160) NULL');
         }
-        if (!$this->introspector->authColumnExistsPgSql($db, $usersTable, 'avatar')) {
+        if (!$this->introspector->columnExists($db, 'pgsql', $usersTable, 'avatar')) {
             $db->exec('ALTER TABLE ' . $this->introspector->quotePgIdentifier($usersTable) . ' ADD COLUMN avatar VARCHAR(255) NULL');
         }
-        if (!$this->introspector->authColumnExistsPgSql($db, $usersTable, 'cover_image')) {
+        if (!$this->introspector->columnExists($db, 'pgsql', $usersTable, 'cover_image')) {
             $db->exec('ALTER TABLE ' . $this->introspector->quotePgIdentifier($usersTable) . ' ADD COLUMN cover_image VARCHAR(255) NULL');
         }
-        if (!$this->introspector->authColumnExistsPgSql($db, $usersTable, 'contact')) {
+        if (!$this->introspector->columnExists($db, 'pgsql', $usersTable, 'contact')) {
             $db->exec('ALTER TABLE ' . $this->introspector->quotePgIdentifier($usersTable) . ' ADD COLUMN contact TEXT NULL');
         }
-        if (!$this->introspector->authColumnExistsPgSql($db, $usersTable, 'two_factor')) {
+        if (!$this->introspector->columnExists($db, 'pgsql', $usersTable, 'two_factor')) {
             $db->exec('ALTER TABLE ' . $this->introspector->quotePgIdentifier($usersTable) . ' ADD COLUMN two_factor TEXT NULL');
         }
-        if (!$this->introspector->authColumnExistsPgSql($db, $usersTable, 'bio')) {
+        if (!$this->introspector->columnExists($db, 'pgsql', $usersTable, 'bio')) {
             $db->exec('ALTER TABLE ' . $this->introspector->quotePgIdentifier($usersTable) . ' ADD COLUMN bio TEXT NULL');
         }
-        if (!$this->introspector->authColumnExistsPgSql($db, $usersTable, 'string')) {
+        if (!$this->introspector->columnExists($db, 'pgsql', $usersTable, 'string')) {
             $db->exec('ALTER TABLE ' . $this->introspector->quotePgIdentifier($usersTable) . ' ADD COLUMN string VARCHAR(128) NULL');
         }
-        if (!$this->introspector->pgSqlIndexExists($db, $usersTable, 'uniq_' . $usersTable . '_string')) {
+        if (!$this->introspector->indexExistsPgSql($db, $usersTable, 'uniq_' . $usersTable . '_string')) {
             $db->exec('CREATE UNIQUE INDEX IF NOT EXISTS ' . $this->introspector->quotePgIdentifier('uniq_' . $usersTable . '_string') . ' ON ' . $this->introspector->quotePgIdentifier($usersTable) . ' (string)');
         }
-        if (!$this->introspector->authColumnExistsPgSql($db, $usersTable, 'group')) {
+        if (!$this->introspector->columnExists($db, 'pgsql', $usersTable, 'group')) {
             $db->exec('ALTER TABLE ' . $this->introspector->quotePgIdentifier($usersTable) . ' ADD COLUMN "group" BIGINT NULL');
         }
-        if (!$this->introspector->authColumnExistsPgSql($db, $usersTable, 'timezone')) {
+        if (!$this->introspector->columnExists($db, 'pgsql', $usersTable, 'timezone')) {
             $db->exec('ALTER TABLE ' . $this->introspector->quotePgIdentifier($usersTable) . ' ADD COLUMN timezone VARCHAR(64) NOT NULL DEFAULT \'\'');
         }
         $db->exec("UPDATE " . $usersTable . " SET theme = 'default' WHERE theme IS NULL OR theme = ''");
@@ -332,7 +332,7 @@ final class AuthSchemaBuilder
             try {
                 $db->exec($statement);
             } catch (\PDOException $exception) {
-                if ($this->introspector->isAlreadyExistsSchemaError($exception)) {
+                if ($this->introspector->isAlreadyExistsError($exception)) {
                     continue;
                 }
 

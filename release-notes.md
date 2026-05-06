@@ -2,6 +2,13 @@
 
 *The machine is supposed to be logging patches & mods to this file. Sometimes it does, sometimes it doesn't. It might be useful for historical architectural context to your Agent at one point.*
 
+### May 6, 2026 — lib/Database/ refactor cleanup
+
+- **SchemaIntrospector thin-wrapper purge** — deleted `authUsersTableExists()`, `authColumnExistsSqlite()`, `authColumnExistsMySql()`, `authColumnExistsPgSql()` (byte-for-byte duplicates of the `app*` / `tableExists()` equivalents); made `appColumnExistsSqlite()`, `appColumnExistsMySql()`, `appColumnExistsPgSql()` private; all `AuthSchemaBuilder` callers updated to `columnExists()` and `tableExists()` dispatch.
+- **SchemaBuilder thin-wrapper purge** — deleted private `taxonomyColumnExists()` (zero-logic pass-through); updated its two callers in `ensureTaxonomyImageColumns()` to call `$this->introspector->columnExists()` directly; updated all `appColumnExistsSqlite()` direct calls in taxonomy/icon/set methods to `columnExists($db, 'sqlite', ...)`.
+- **Naming sweep** — `SqliteConnectionBootstrap::ensureDirectory()` → `ensureDir()`; `DriverConfigNormalizer::sqliteBasePath()` → `sqlitePath()`; `ExtensionSchemaRunner::ensureEnabledExtensionSchemas()` → `ensureExtensionSchemas()`; `SeedInstaller::ensureStockGroups()` → `ensureGroups()`, `ensureSeedPages()` → `ensurePages()`; `SqlUpsertPolicy::idempotentInsertSql()` → `insertIgnoreSql()`; `SchemaIntrospector::isAlreadyExistsSchemaError()` → `isAlreadyExistsError()`; `mySqlIndexExists()` / `pgSqlIndexExists()` → `indexExistsMySql()` / `indexExistsPgSql()`; all call sites in `DatabaseFactory`, `SchemaEnsurePipeline`, `AuthSchemaBuilder`, and `Scribe/PageScribe` updated.
+- **File header + PHPDoc sweep** — added Raven file headers and complete PHPDoc blocks (`@param`/`@return`/`@throws`) to all public and protected methods across: `ProfiledPDO`, `ProfiledPDOStatement`, `QueryProfilerInterface`, `DriverConfigNormalizer`, `DsnBuilder`, `SqliteConnectionBootstrap`, `SqlitePathResolver`, `SchemaManager`, `SchemaEnsureStateStore`, `SchemaComponentFactory`, `SchemaBuilder`, `SchemaIntrospector`, `ExtensionSchemaRunner`, `SeedInstaller`, `SqlUpsertPolicy`; fixed missing blank line before `looksLikeFilePath` in `SqlitePathResolver`.
+
 ### May 6, 2026 — lib/View refactor cleanup
 
 - **View error split** — removed `private/lib/View/Error.php`; added `private/lib/View/Public/Error.php` as the canonical public-themed status renderer used by both public route gates and panel guest fallback paths.

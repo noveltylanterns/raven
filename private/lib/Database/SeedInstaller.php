@@ -27,7 +27,14 @@ final class SeedInstaller
         $this->tables = $tables ?? new TableNameResolver();
     }
 
-    public function ensureStockGroups(PDO $db, string $driver, string $prefix): void
+    /**
+     * Inserts missing stock groups, normalizes their IDs to canonical positions, and syncs permission masks.
+     *
+     * @param PDO    $db     Active Raven database connection.
+     * @param string $driver Database driver identifier: sqlite, mysql, or pgsql.
+     * @param string $prefix Table name prefix from the site configuration.
+     */
+    public function ensureGroups(PDO $db, string $driver, string $prefix): void
     {
         $groupsTable = $this->tables->resolve($driver, $prefix, 'groups');
         $now = gmdate('Y-m-d H:i:s');
@@ -102,7 +109,14 @@ final class SeedInstaller
         }
     }
 
-    public function ensureSeedPages(PDO $db, string $driver, string $prefix): void
+    /**
+     * Inserts the starter home page when no users and no root pages exist yet.
+     *
+     * @param PDO    $db     Active Raven database connection.
+     * @param string $driver Database driver identifier: sqlite, mysql, or pgsql.
+     * @param string $prefix Table name prefix from the site configuration.
+     */
+    public function ensurePages(PDO $db, string $driver, string $prefix): void
     {
         $pagesTable = $this->tables->resolve($driver, $prefix, 'pages');
         $usersTable = $prefix . 'users';

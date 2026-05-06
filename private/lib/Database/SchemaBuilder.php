@@ -22,12 +22,25 @@ final class SchemaBuilder
     private SchemaIntrospector $introspector;
     private TableNameResolver $tables;
 
+    /**
+     * Wires the introspector and optional table-name resolver used by all ensure methods.
+     *
+     * @param SchemaIntrospector    $introspector Cross-driver column/index/table inspection helper.
+     * @param TableNameResolver|null $tables       Optional resolver; defaults to a plain TableNameResolver.
+     */
     public function __construct(SchemaIntrospector $introspector, ?TableNameResolver $tables = null)
     {
         $this->introspector = $introspector;
         $this->tables = $tables ?? new TableNameResolver();
     }
 
+    /**
+     * Adds the published and expires scheduling columns to the pages table when missing.
+     *
+     * @param PDO    $db     Active Raven database connection.
+     * @param string $driver Database driver identifier: sqlite, mysql, or pgsql.
+     * @param string $prefix Table name prefix from the site configuration.
+     */
     public function ensurePageScheduleColumns(PDO $db, string $driver, string $prefix): void
     {
         $pagesTable = $prefix . 'pages';
@@ -53,6 +66,13 @@ final class SchemaBuilder
         }
     }
 
+    /**
+     * Adds the description column to the pages table when missing.
+     *
+     * @param PDO    $db     Active Raven database connection.
+     * @param string $driver Database driver identifier: sqlite, mysql, or pgsql.
+     * @param string $prefix Table name prefix from the site configuration.
+     */
     public function ensurePageDescriptionColumn(PDO $db, string $driver, string $prefix): void
     {
         $pagesTable = $prefix . 'pages';
@@ -61,6 +81,13 @@ final class SchemaBuilder
         }
     }
 
+    /**
+     * Adds the display_title boolean column to the pages table when missing.
+     *
+     * @param PDO    $db     Active Raven database connection.
+     * @param string $driver Database driver identifier: sqlite, mysql, or pgsql.
+     * @param string $prefix Table name prefix from the site configuration.
+     */
     public function ensurePageDisplayTitleColumn(PDO $db, string $driver, string $prefix): void
     {
         $pagesTable = $prefix . 'pages';
@@ -75,11 +102,25 @@ final class SchemaBuilder
         }
     }
 
+    /**
+     * No-op retained for pipeline call-site compatibility; gallery_enabled was superseded by content blocks.
+     *
+     * @param PDO    $db     Active Raven database connection.
+     * @param string $driver Database driver identifier: sqlite, mysql, or pgsql.
+     * @param string $prefix Table name prefix from the site configuration.
+     */
     public function ensurePageGalleryEnabledColumn(PDO $db, string $driver, string $prefix): void
     {
         // `gallery_enabled` was superseded by content blocks and is intentionally gone.
     }
 
+    /**
+     * Creates driver-appropriate unique indexes enforcing per-channel slug uniqueness on the pages table.
+     *
+     * @param PDO    $db     Active Raven database connection.
+     * @param string $driver Database driver identifier: sqlite, mysql, or pgsql.
+     * @param string $prefix Table name prefix from the site configuration.
+     */
     public function ensurePageSlugScopeUniqueness(PDO $db, string $driver, string $prefix): void
     {
         $pagesTable = $prefix . 'pages';
@@ -116,6 +157,13 @@ final class SchemaBuilder
         }
     }
 
+    /**
+     * Normalizes NULL channel values to 0 in pages and redirects, then rebuilds slug-scope indexes.
+     *
+     * @param PDO    $db     Active Raven database connection.
+     * @param string $driver Database driver identifier: sqlite, mysql, or pgsql.
+     * @param string $prefix Table name prefix from the site configuration.
+     */
     public function ensureRootChannelScope(PDO $db, string $driver, string $prefix): void
     {
         $pagesTable = $prefix . 'pages';
@@ -138,6 +186,13 @@ final class SchemaBuilder
         }
     }
 
+    /**
+     * Backfills slug and route values for all groups, deduplicating slugs and locking system groups to route=0.
+     *
+     * @param PDO    $db     Active Raven database connection.
+     * @param string $driver Database driver identifier: sqlite, mysql, or pgsql.
+     * @param string $prefix Table name prefix from the site configuration.
+     */
     public function ensureGroupRoutingColumns(PDO $db, string $driver, string $prefix): void
     {
         $groupsTable = $this->tables->resolve($driver, $prefix, 'groups');
@@ -202,6 +257,13 @@ final class SchemaBuilder
         }
     }
 
+    /**
+     * Adds cover_image and preview_image columns to the categories and tags tables when missing.
+     *
+     * @param PDO    $db     Active Raven database connection.
+     * @param string $driver Database driver identifier: sqlite, mysql, or pgsql.
+     * @param string $prefix Table name prefix from the site configuration.
+     */
     public function ensureTaxonomyImageColumns(PDO $db, string $driver, string $prefix): void
     {
         $taxonomyTables = ['categories', 'tags'];
@@ -209,10 +271,10 @@ final class SchemaBuilder
         if ($driver === 'sqlite') {
             foreach ($taxonomyTables as $table) {
                 $qualifiedTable = $this->tables->resolve($driver, $prefix, $table);
-                if (!$this->introspector->appColumnExistsSqlite($db, $qualifiedTable, 'cover_image')) {
+                if (!$this->introspector->columnExists($db, 'sqlite', $qualifiedTable, 'cover_image')) {
                     $db->exec('ALTER TABLE ' . $qualifiedTable . ' ADD COLUMN cover_image TEXT NULL');
                 }
-                if (!$this->introspector->appColumnExistsSqlite($db, $qualifiedTable, 'preview_image')) {
+                if (!$this->introspector->columnExists($db, 'sqlite', $qualifiedTable, 'preview_image')) {
                     $db->exec('ALTER TABLE ' . $qualifiedTable . ' ADD COLUMN preview_image TEXT NULL');
                 }
                 $db->exec('UPDATE ' . $qualifiedTable . ' SET cover_image = NULL WHERE TRIM(COALESCE(cover_image, \'\')) = \'\'');
@@ -223,15 +285,22 @@ final class SchemaBuilder
 
         foreach ($taxonomyTables as $table) {
             $physicalTable = $prefix . $table;
-            if (!$this->taxonomyColumnExists($db, $driver, $physicalTable, 'cover_image')) {
+            if (!$this->introspector->columnExists($db, $driver, $physicalTable, 'cover_image')) {
                 $db->exec('ALTER TABLE ' . $physicalTable . ' ADD COLUMN cover_image VARCHAR(255) NULL');
             }
-            if (!$this->taxonomyColumnExists($db, $driver, $physicalTable, 'preview_image')) {
+            if (!$this->introspector->columnExists($db, $driver, $physicalTable, 'preview_image')) {
                 $db->exec('ALTER TABLE ' . $physicalTable . ' ADD COLUMN preview_image VARCHAR(255) NULL');
             }
         }
     }
 
+    /**
+     * Adds the icon_image column to the categories, tags, and groups tables when missing.
+     *
+     * @param PDO    $db     Active Raven database connection.
+     * @param string $driver Database driver identifier: sqlite, mysql, or pgsql.
+     * @param string $prefix Table name prefix from the site configuration.
+     */
     public function ensureTaxonomyIconColumn(PDO $db, string $driver, string $prefix): void
     {
         $tables = ['categories', 'tags', 'groups'];
@@ -239,7 +308,7 @@ final class SchemaBuilder
         if ($driver === 'sqlite') {
             foreach ($tables as $table) {
                 $qualifiedTable = $this->tables->resolve($driver, $prefix, $table);
-                if (!$this->introspector->appColumnExistsSqlite($db, $qualifiedTable, 'icon_image')) {
+                if (!$this->introspector->columnExists($db, 'sqlite', $qualifiedTable, 'icon_image')) {
                     $db->exec('ALTER TABLE ' . $qualifiedTable . ' ADD COLUMN icon_image TEXT NULL');
                 }
             }
@@ -255,6 +324,13 @@ final class SchemaBuilder
         }
     }
 
+    /**
+     * Adds the `set` bitfield column and its index to the categories and tags tables when missing.
+     *
+     * @param PDO    $db     Active Raven database connection.
+     * @param string $driver Database driver identifier: sqlite, mysql, or pgsql.
+     * @param string $prefix Table name prefix from the site configuration.
+     */
     public function ensureTaxonomySetColumns(PDO $db, string $driver, string $prefix): void
     {
         $taxonomyTables = ['categories', 'tags'];
@@ -263,7 +339,7 @@ final class SchemaBuilder
         if ($driver === 'sqlite') {
             foreach ($taxonomyTables as $table) {
                 $qualifiedTable = $this->tables->resolve($driver, $prefix, $table);
-                if (!$this->introspector->appColumnExistsSqlite($db, $qualifiedTable, 'set')) {
+                if (!$this->introspector->columnExists($db, 'sqlite', $qualifiedTable, 'set')) {
                     $db->exec('ALTER TABLE ' . $qualifiedTable . ' ADD COLUMN ' . $setColumn . ' INTEGER NOT NULL DEFAULT 1');
                 }
                 $db->exec('UPDATE ' . $qualifiedTable . ' SET ' . $setColumn . ' = 1 WHERE ' . $setColumn . ' IS NULL OR ' . $setColumn . ' = 0');
@@ -305,6 +381,13 @@ final class SchemaBuilder
         }
     }
 
+    /**
+     * Creates composite lookup indexes on join and redirect tables to speed up panel list queries.
+     *
+     * @param PDO    $db     Active Raven database connection.
+     * @param string $driver Database driver identifier: sqlite, mysql, or pgsql.
+     * @param string $prefix Table name prefix from the site configuration.
+     */
     public function ensurePanelPerformanceIndexes(PDO $db, string $driver, string $prefix): void
     {
         if ($driver === 'sqlite') {
@@ -355,6 +438,13 @@ final class SchemaBuilder
         }
     }
 
+    /**
+     * Normalizes NULL redirect channel values to 0 and ensures redirect lookup indexes.
+     *
+     * @param PDO    $db     Active Raven database connection.
+     * @param string $driver Database driver identifier: sqlite, mysql, or pgsql.
+     * @param string $prefix Table name prefix from the site configuration.
+     */
     public function ensureRedirectDescriptionColumn(PDO $db, string $driver, string $prefix): void
     {
         // Normalise null channel values and ensure redirect lookup indexes.
@@ -482,11 +572,6 @@ final class SchemaBuilder
         return preg_replace('/[^a-zA-Z0-9_]/', '', $table) ?? $table;
     }
 
-
-    private function taxonomyColumnExists(PDO $db, string $driver, string $table, string $column): bool
-    {
-        return $this->introspector->columnExists($db, $driver, $table, $column);
-    }
 
 
     private function taxonomySetColumnSql(string $driver): string

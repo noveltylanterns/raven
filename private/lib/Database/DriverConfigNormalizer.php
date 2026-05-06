@@ -1,5 +1,12 @@
 <?php
 
+/**
+ * RAVEN CMS
+ * ~/private/lib/Database/DriverConfigNormalizer.php
+ * Normalizes backend driver selection and per-driver config payloads.
+ * Docs: https://raven.lanterns.io
+ */
+
 declare(strict_types=1);
 
 namespace Raven\Lib\Database;
@@ -12,7 +19,11 @@ use RuntimeException;
 final class DriverConfigNormalizer
 {
     /**
-     * @param array<string, mixed> $config
+     * Returns the canonical driver slug from the database config array.
+     *
+     * @param array<string, mixed> $config Raven database configuration array.
+     * @return string Canonical driver slug: sqlite, mysql, or pgsql.
+     * @throws RuntimeException When the configured driver is not supported.
      */
     public function driver(array $config): string
     {
@@ -25,7 +36,10 @@ final class DriverConfigNormalizer
     }
 
     /**
-     * @param array<string, mixed> $config
+     * Returns the sanitized table name prefix from the database config array.
+     *
+     * @param array<string, mixed> $config Raven database configuration array.
+     * @return string Table prefix string, empty when not configured.
      */
     public function prefix(array $config): string
     {
@@ -34,8 +48,10 @@ final class DriverConfigNormalizer
     }
 
     /**
-     * @param array<string, mixed> $config
-     * @return array<string, mixed>
+     * Returns the MySQL-specific config section from the database config array.
+     *
+     * @param array<string, mixed> $config Raven database configuration array.
+     * @return array<string, mixed> MySQL connection parameters.
      */
     public function mysql(array $config): array
     {
@@ -43,8 +59,10 @@ final class DriverConfigNormalizer
     }
 
     /**
-     * @param array<string, mixed> $config
-     * @return array<string, mixed>
+     * Returns the PostgreSQL-specific config section from the database config array.
+     *
+     * @param array<string, mixed> $config Raven database configuration array.
+     * @return array<string, mixed> PostgreSQL connection parameters.
      */
     public function pgsql(array $config): array
     {
@@ -52,9 +70,13 @@ final class DriverConfigNormalizer
     }
 
     /**
-     * @param array<string, mixed> $config
+     * Returns the configured SQLite base path, trimmed of trailing slashes.
+     *
+     * @param array<string, mixed> $config Raven database configuration array.
+     * @return string Absolute base path to the SQLite data directory or file.
+     * @throws RuntimeException When no SQLite path is configured.
      */
-    public function sqliteBasePath(array $config): string
+    public function sqlitePath(array $config): string
     {
         $sqlite = $this->section($config, 'sqlite');
         $basePath = rtrim((string) ($sqlite['path'] ?? ''), '/');
@@ -66,8 +88,11 @@ final class DriverConfigNormalizer
     }
 
     /**
-     * @param array<string, mixed> $config
-     * @return array<string, mixed>
+     * Extracts a named subsection from the config array, defaulting to an empty array.
+     *
+     * @param array<string, mixed> $config Raven database configuration array.
+     * @param string               $key    Section key to extract (e.g., 'mysql', 'sqlite').
+     * @return array<string, mixed> Config sub-array for the named driver or section.
      */
     private function section(array $config, string $key): array
     {

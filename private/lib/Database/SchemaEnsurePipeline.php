@@ -72,10 +72,10 @@ final class SchemaEnsurePipeline
         $schemaBuilder->ensureTaxonomyIconColumn($rvnDb, $driver, $prefix);
         $schemaBuilder->ensurePanelPerformanceIndexes($rvnDb, $driver, $prefix);
         $schemaBuilder->ensureEventLogTable($rvnDb, $driver, $prefix);
-        $components->extensionSchemaRunner()->ensureEnabledExtensionSchemas($rvnDb, $driver, $prefix);
+        $components->extensionSchemaRunner()->ensureExtensionSchemas($rvnDb, $driver, $prefix);
 
-        $seedInstaller->ensureStockGroups($rvnDb, $driver, $prefix);
-        $seedInstaller->ensureSeedPages($rvnDb, $driver, $prefix);
+        $seedInstaller->ensureGroups($rvnDb, $driver, $prefix);
+        $seedInstaller->ensurePages($rvnDb, $driver, $prefix);
     }
 
     /**

@@ -26,6 +26,17 @@ final class SchemaComponentFactory
     private ?SeedInstaller $seedInstaller;
     private ?ExtensionSchemaRunner $extensionSchemaRunner;
 
+    /**
+     * Accepts optional pre-wired component instances, defaulting to lazy construction on first use.
+     *
+     * @param SchemaIntrospector|null    $schemaIntrospector  Optional shared introspector; created on first use if null.
+     * @param TableNameResolver|null     $tableNameResolver   Optional shared table-name resolver; created on first use if null.
+     * @param SchemaBootstrap|null       $schemaBootstrap     Optional base app schema bootstrapper; created on first use if null.
+     * @param AuthSchemaBuilder|null     $authSchemaBuilder   Optional auth schema builder; created on first use if null.
+     * @param SchemaBuilder|null         $schemaBuilder       Optional app schema builder; created on first use if null.
+     * @param SeedInstaller|null         $seedInstaller       Optional seed installer; created on first use if null.
+     * @param ExtensionSchemaRunner|null $extensionSchemaRunner Optional extension schema runner; created on first use if null.
+     */
     public function __construct(
         ?SchemaIntrospector $schemaIntrospector = null,
         ?TableNameResolver $tableNameResolver = null,

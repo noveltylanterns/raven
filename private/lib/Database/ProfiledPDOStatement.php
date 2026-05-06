@@ -1,5 +1,12 @@
 <?php
 
+/**
+ * RAVEN CMS
+ * ~/private/lib/Database/ProfiledPDOStatement.php
+ * PDOStatement subclass that records bind values and execution timing through QueryProfilerInterface.
+ * Docs: https://raven.lanterns.io
+ */
+
 declare(strict_types=1);
 
 namespace Raven\Lib\Database;
@@ -7,6 +14,9 @@ namespace Raven\Lib\Database;
 use PDO;
 use Throwable;
 
+/**
+ * PDOStatement subclass that captures bind values and feeds execution timing into the query profiler.
+ */
 final class ProfiledPDOStatement extends \PDOStatement
 {
     private string $connectionLabel = 'app';
@@ -14,18 +24,45 @@ final class ProfiledPDOStatement extends \PDOStatement
     private array $boundValues = [];
     private ?QueryProfilerInterface $queryProfiler = null;
 
+    /**
+     * Receives the connection label and optional profiler injected by ProfiledPDO via ATTR_STATEMENT_CLASS.
+     *
+     * @param string                      $connectionLabel Profiler label identifying the parent connection.
+     * @param QueryProfilerInterface|null $queryProfiler   Profiler instance; null disables recording for this statement.
+     */
     protected function __construct(string $connectionLabel = 'app', ?QueryProfilerInterface $queryProfiler = null)
     {
         $this->connectionLabel = strtolower(trim($connectionLabel)) !== '' ? strtolower(trim($connectionLabel)) : 'app';
         $this->queryProfiler = $queryProfiler;
     }
 
+    /**
+     * Binds a value and records it for inclusion in the profiler payload on execute.
+     *
+     * @param string|int $param Parameter identifier (named :placeholder or positional index).
+     * @param mixed      $value Value to bind.
+     * @param int        $type  PDO::PARAM_* type constant.
+     * @return bool True on success.
+     */
     public function bindValue(string|int $param, mixed $value, int $type = PDO::PARAM_STR): bool
     {
         $this->boundValues[$param] = $value;
         return parent::bindValue($param, $value, $type);
     }
 
+    /**
+     * Binds a variable by reference and records a placeholder in the profiler payload.
+     *
+     * The recorded value is the sentinel string '[bound-by-reference]' because the
+     * variable's final value is not known until execute() is called.
+     *
+     * @param string|int $param         Parameter identifier (named :placeholder or positional index).
+     * @param mixed      $var           Variable to bind by reference.
+     * @param int        $type          PDO::PARAM_* type constant.
+     * @param int        $maxLength     Pre-allocation hint for output parameters.
+     * @param mixed      $driverOptions Driver-specific options.
+     * @return bool True on success.
+     */
     public function bindParam(
         string|int $param,
         mixed &$var,
@@ -37,6 +74,12 @@ final class ProfiledPDOStatement extends \PDOStatement
         return parent::bindParam($param, $var, $type, $maxLength, $driverOptions);
     }
 
+    /**
+     * Executes the statement and records its query, parameters, and duration in the profiler.
+     *
+     * @param array<int|string, mixed>|null $params Optional parameter array; merged with any bound values.
+     * @return bool True on success.
+     */
     public function execute(?array $params = null): bool
     {
         $startedAt = microtime(true);
@@ -73,4 +116,3 @@ final class ProfiledPDOStatement extends \PDOStatement
         );
     }
 }
-

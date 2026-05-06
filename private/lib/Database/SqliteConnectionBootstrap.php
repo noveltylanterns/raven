@@ -1,5 +1,12 @@
 <?php
 
+/**
+ * RAVEN CMS
+ * ~/private/lib/Database/SqliteConnectionBootstrap.php
+ * SQLite filesystem and pragma initialization helpers.
+ * Docs: https://raven.lanterns.io
+ */
+
 declare(strict_types=1);
 
 namespace Raven\Lib\Database;
@@ -12,7 +19,13 @@ use RuntimeException;
  */
 final class SqliteConnectionBootstrap
 {
-    public function ensureDirectory(string $path): void
+    /**
+     * Creates the parent directory of an SQLite database file when it does not exist.
+     *
+     * @param string $path Absolute path to the SQLite database file (not the directory itself).
+     * @throws RuntimeException When the directory cannot be created.
+     */
+    public function ensureDir(string $path): void
     {
         $directory = dirname($path);
         if (is_dir($directory)) {
@@ -24,9 +37,13 @@ final class SqliteConnectionBootstrap
         }
     }
 
+    /**
+     * Applies mandatory SQLite PRAGMAs to a freshly opened connection.
+     *
+     * @param PDO $pdo SQLite PDO connection to initialize.
+     */
     public function bootstrap(PDO $pdo): void
     {
         $pdo->exec('PRAGMA foreign_keys = ON');
     }
 }
-

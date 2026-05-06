@@ -34,7 +34,14 @@ final class ExtensionSchemaRunner
         $this->bootstrapResolver = $bootstrapResolver ?? new Bootstrap();
     }
 
-    public function ensureEnabledExtensionSchemas(PDO $db, string $driver, string $prefix): void
+    /**
+     * Runs each enabled extension's schema provider, skipping extensions without storage declarations.
+     *
+     * @param PDO    $db     Active Raven database connection.
+     * @param string $driver Database driver identifier: sqlite, mysql, or pgsql.
+     * @param string $prefix Table name prefix from the site configuration.
+     */
+    public function ensureExtensionSchemas(PDO $db, string $driver, string $prefix): void
     {
         $root = dirname(__DIR__, 3);
         foreach (Registry::enabledDirectories($root, true) as $directory) {

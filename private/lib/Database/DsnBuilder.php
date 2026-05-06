@@ -1,5 +1,12 @@
 <?php
 
+/**
+ * RAVEN CMS
+ * ~/private/lib/Database/DsnBuilder.php
+ * Builds backend DSN strings from normalized driver config payloads.
+ * Docs: https://raven.lanterns.io
+ */
+
 declare(strict_types=1);
 
 namespace Raven\Lib\Database;
@@ -10,7 +17,10 @@ namespace Raven\Lib\Database;
 final class DsnBuilder
 {
     /**
-     * @param array<string, mixed> $mysql
+     * Returns a MySQL DSN string from a normalized MySQL config section.
+     *
+     * @param array<string, mixed> $mysql MySQL connection parameters (host, port, name, charset).
+     * @return string PDO DSN string for the MySQL driver.
      */
     public function mysql(array $mysql): string
     {
@@ -24,7 +34,10 @@ final class DsnBuilder
     }
 
     /**
-     * @param array<string, mixed> $pgsql
+     * Returns a PostgreSQL DSN string from a normalized PostgreSQL config section.
+     *
+     * @param array<string, mixed> $pgsql PostgreSQL connection parameters (host, port, name).
+     * @return string PDO DSN string for the pgsql driver.
      */
     public function pgsql(array $pgsql): string
     {
