@@ -21,6 +21,12 @@ final class SchemaAuth
 {
     private SchemaIntrospector $introspector;
 
+    /**
+     * Wires the schema introspector used for auth table/column/index checks.
+     *
+     * @param SchemaIntrospector $introspector Cross-driver schema inspection helper.
+     * @return void
+     */
     public function __construct(SchemaIntrospector $introspector)
     {
         $this->introspector = $introspector;

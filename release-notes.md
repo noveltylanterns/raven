@@ -2,6 +2,13 @@
 
 *The machine is supposed to be logging patches & mods to this file. Sometimes it does, sometimes it doesn't. It might be useful for historical architectural context to your Agent at one point.*
 
+### May 6, 2026 — sys/Schema refactor cleanup (final section)
+
+- **Legacy/thin-wrapper purge in schema pipeline** — removed `SchemaBuilder::ensurePageGalleryEnabledColumn()` (documented no-op compatibility shim) and removed unused `SchemaPipeline::ensure(...)` wrapper that only chained app/auth ensures. Updated pipeline calls accordingly.
+- **Schema naming accuracy sweep** — renamed `SchemaBuilder::ensureRedirectDescriptionColumn()` to `ensureRedirectLookupScope()` to match actual behavior (redirect channel normalization + lookup index enforcement), and tightened private helper naming `prefixlessTableName()` → `sanitizeIndexToken()` and `taxonomySetColumnSql()` → `setColumnIdentifier()`.
+- **Schema PHPDoc sweep closeout** — added missing method PHPDoc blocks across `sys/Schema` including constructors and private helpers in `SchemaAuth`, `SchemaExtension`, `SchemaPipeline`, `SchemaComponents`, `SchemaBuilder`, and `SchemaInstaller`.
+- **Legacy fallback audit** — re-audited schema compatibility paths and retained only `SchemaBootstrap::renameLegacyMediaTables()` (tracked in `build/todo.md` Legacy Fallback Log with current audit date).
+
 ### May 6, 2026 — sys/Schema refactor cleanup (first 2/3 sections)
 
 - **Schema class rename sweep completed** — renamed six `Raven\Core\Schema` classes/files and updated all callers/imports: `SchemaEnsureStateStore` → `SchemaState`, `SchemaEnsurePipeline` → `SchemaPipeline`, `SchemaComponentFactory` → `SchemaComponents`, `SeedInstaller` → `SchemaInstaller`, `AuthSchemaBuilder` → `SchemaAuth`, `ExtensionSchemaRunner` → `SchemaExtension`. Updated schema source-mtime tracking in `SchemaState`, plus schema invalidation callers in `lib/Extension/StateWrite` and `lib/Archive/Update`.

@@ -20,24 +20,15 @@ final class SchemaPipeline
 {
     private SchemaComponents $components;
 
+    /**
+     * Wires the lazy schema-component factory used by app/auth ensure flows.
+     *
+     * @param SchemaComponents|null $components Optional component factory; defaults to a fresh lazy instance.
+     * @return void
+     */
     public function __construct(?SchemaComponents $components = null)
     {
         $this->components = $components ?? new SchemaComponents();
-    }
-
-    /**
-     * Ensures the full app + auth schema pipeline in one pass.
-     *
-     * @param PDO $rvnDb App database connection.
-     * @param PDO $authDb Auth database connection.
-     * @param string $driver Active PDO driver name.
-     * @param string $prefix Active Raven table prefix.
-     * @return void
-     */
-    public function ensure(PDO $rvnDb, PDO $authDb, string $driver, string $prefix): void
-    {
-        $this->ensureApp($rvnDb, $driver, $prefix);
-        $this->ensureAuth($authDb, $driver, $prefix);
     }
 
     /**
@@ -63,9 +54,8 @@ final class SchemaPipeline
         $schemaBuilder->ensurePageScheduleColumns($rvnDb, $driver, $prefix);
         $schemaBuilder->ensurePageDescriptionColumn($rvnDb, $driver, $prefix);
         $schemaBuilder->ensurePageDisplayTitleColumn($rvnDb, $driver, $prefix);
-        $schemaBuilder->ensurePageGalleryEnabledColumn($rvnDb, $driver, $prefix);
         $schemaBuilder->ensurePageSlugScopeUniqueness($rvnDb, $driver, $prefix);
-        $schemaBuilder->ensureRedirectDescriptionColumn($rvnDb, $driver, $prefix);
+        $schemaBuilder->ensureRedirectLookupScope($rvnDb, $driver, $prefix);
         $schemaBuilder->ensureGroupRoutingColumns($rvnDb, $driver, $prefix);
         $schemaBuilder->ensureTaxonomySetColumns($rvnDb, $driver, $prefix);
         $schemaBuilder->ensureTaxonomyImageColumns($rvnDb, $driver, $prefix);

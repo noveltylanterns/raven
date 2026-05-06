@@ -119,6 +119,11 @@ final class SchemaComponents
         return $this->schemaExtension;
     }
 
+    /**
+     * Returns the shared schema introspector on first use.
+     *
+     * @return SchemaIntrospector Cross-driver table/column/index inspection helper.
+     */
     private function schemaIntrospector(): SchemaIntrospector
     {
         if ($this->schemaIntrospector === null) {

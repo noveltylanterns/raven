@@ -100,18 +100,6 @@ final class SchemaBuilder
     }
 
     /**
-     * No-op retained for pipeline call-site compatibility; gallery_enabled was superseded by content blocks.
-     *
-     * @param PDO    $db     Active Raven database connection.
-     * @param string $driver Database driver identifier: sqlite, mysql, or pgsql.
-     * @param string $prefix Table name prefix from the site configuration.
-     */
-    public function ensurePageGalleryEnabledColumn(PDO $db, string $driver, string $prefix): void
-    {
-        // `gallery_enabled` was superseded by content blocks and is intentionally gone.
-    }
-
-    /**
      * Creates driver-appropriate unique indexes enforcing per-channel slug uniqueness on the pages table.
      *
      * @param PDO    $db     Active Raven database connection.
@@ -331,7 +319,7 @@ final class SchemaBuilder
     public function ensureTaxonomySetColumns(PDO $db, string $driver, string $prefix): void
     {
         $taxonomyTables = ['categories', 'tags'];
-        $setColumn = $this->taxonomySetColumnSql($driver);
+        $setColumn = $this->setColumnIdentifier($driver);
 
         if ($driver === 'sqlite') {
             foreach ($taxonomyTables as $table) {
@@ -442,7 +430,7 @@ final class SchemaBuilder
      * @param string $driver Database driver identifier: sqlite, mysql, or pgsql.
      * @param string $prefix Table name prefix from the site configuration.
      */
-    public function ensureRedirectDescriptionColumn(PDO $db, string $driver, string $prefix): void
+    public function ensureRedirectLookupScope(PDO $db, string $driver, string $prefix): void
     {
         // Normalise null channel values and ensure redirect lookup indexes.
         if ($driver === 'sqlite') {
@@ -457,6 +445,13 @@ final class SchemaBuilder
         $this->ensureRedirectIndexes($db, $driver, $table);
     }
 
+    /**
+     * Rebuilds SQLite page-slug scope and sort indexes using partial unique-index semantics.
+     *
+     * @param PDO    $db         Active Raven database connection.
+     * @param string $pagesTable Physical pages table name.
+     * @return void
+     */
     private function ensurePageSlugScopeUniquenessSqlite(PDO $db, string $pagesTable): void
     {
         $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $pagesTable . '_created ON ' . $pagesTable . ' (created DESC)');
@@ -465,6 +460,13 @@ final class SchemaBuilder
         $db->exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_' . $pagesTable . '_channel_slug_unique ON ' . $pagesTable . ' (channel, slug) WHERE channel IS NOT NULL AND channel <> 0');
     }
 
+    /**
+     * Ensures SQLite redirect lookup indexes that back slug/channel route matching.
+     *
+     * @param PDO    $db    Active Raven database connection.
+     * @param string $table Physical redirects table name.
+     * @return void
+     */
     private function ensureRedirectIndexesSqlite(PDO $db, string $table): void
     {
         $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $table . '_slug ON ' . $table . ' (slug)');
@@ -472,9 +474,17 @@ final class SchemaBuilder
         $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $table . '_lookup ON ' . $table . ' (slug, channel, active)');
     }
 
+    /**
+     * Ensures redirect lookup indexes for MySQL/PostgreSQL routes after scope normalization.
+     *
+     * @param PDO    $db     Active Raven database connection.
+     * @param string $driver Database driver identifier: mysql or pgsql.
+     * @param string $table  Physical redirects table name.
+     * @return void
+     */
     private function ensureRedirectIndexes(PDO $db, string $driver, string $table): void
     {
-        $indexPrefix = 'idx_' . $this->prefixlessTableName($table);
+        $indexPrefix = 'idx_' . $this->sanitizeIndexToken($table);
 
         if ($driver === 'mysql') {
             if (!$this->introspector->indexExists($db, 'mysql', $table, $indexPrefix . '_slug')) {
@@ -564,18 +574,34 @@ final class SchemaBuilder
         $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $table . '_severity ON ' . $table . ' (severity)');
     }
 
-    private function prefixlessTableName(string $table): string
+    /**
+     * Normalizes one SQL identifier token for use in generated index names.
+     *
+     * @param string $value Raw table token.
+     * @return string Sanitized token containing only alphanumerics and underscores.
+     */
+    private function sanitizeIndexToken(string $value): string
     {
-        return preg_replace('/[^a-zA-Z0-9_]/', '', $table) ?? $table;
+        return preg_replace('/[^a-zA-Z0-9_]/', '', $value) ?? $value;
     }
 
-
-
-    private function taxonomySetColumnSql(string $driver): string
+    /**
+     * Returns a driver-safe quoted identifier for the reserved taxonomy `set` column.
+     *
+     * @param string $driver Database driver identifier.
+     * @return string Quoted column identifier string.
+     */
+    private function setColumnIdentifier(string $driver): string
     {
         return $driver === 'mysql' ? '`set`' : '"set"';
     }
 
+    /**
+     * Converts one group name/slug candidate into Raven's canonical slug token shape.
+     *
+     * @param string $value Raw group label or slug.
+     * @return string Normalized slug token, or an empty string when normalization fails.
+     */
     private function slugifyGroupName(string $value): string
     {
         $value = strtolower(trim($value));

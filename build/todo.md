@@ -64,13 +64,13 @@ This is the default Build Mode backlog file. If the user asks about goals, unpat
 - [x] `SchemaIntrospector` stays read/introspection focused and does not absorb orchestration, seed, or provider-execution behavior.
 
 ### Cleanup
-- [ ] Make sure no Schema/ class is pulling up dead function/class/dependency weight irrelevant to the data type that class handles.
-- [ ] Scan the whole Schema/ directory for legacy aliases, compatability shims, and thin wrappers that don't add any extra logic. Purge all of them. Update all callers to use actual source functions.
-- [ ] Explicitly audit legacy migration shims in schema bootstrap/builders and log any intentionally retained fallback in Legacy Fallback Log.
-- [ ] A lot of the functions in our Schema/ classes have really long & unclear names. Do a sweep of every class and make sure the function/variable names are concise+accurate.
-- [ ] Do a sweep of all classes in Schema/ making sure PHPdoc blocks are present+accurate for ALL headings, classes & functions.
-- [ ] Run caller-surface sweep after refactors across runtime bootstrap, installer paths, and any extension schema invocations.
-- [ ] Update release-notes.md and check off list.
+- [x] Made sure no Schema/ class is pulling up dead function/class/dependency weight irrelevant to the data type that class handles.
+- [x] Scanned the whole Schema/ directory for legacy aliases, compatability shims, and thin wrappers that didn't add extra logic; purged them and updated callers.
+- [x] Explicitly audited legacy migration shims in schema bootstrap/builders and logged intentionally retained fallback in Legacy Fallback Log.
+- [x] Did naming sweep so function/variable names are concise+accurate.
+- [x] Swept all Schema/ classes so PHPdoc blocks are present+accurate for headings, classes, and functions.
+- [x] Ran caller-surface sweep after refactors across runtime bootstrap, installer paths, and extension schema invocations.
+- [x] Updated release-notes.md and checked off list.
 
 
 ## 2) sys/Repository/ Refactor & Cleanup (Pending Plan, DO NOT PROCEED)
@@ -124,6 +124,7 @@ Lingering issues & reorganization tasks. Make a plan to deal with them all in on
 
 ## sys/Debug/ Refactor Cleanup
 Lingering issues & reorganization tasks. Make a plan to deal with them all in one clean sweep. Append it as a detailed checklist to this section in case we lose session or we have to bounce between agents:
+- [ ] Rename PdoQueryProfiler to QueryProfilerPdo, and PdoStmtProfiler to QueryProfilerStatement
 - [ ] Make sure no Debug/ class is pulling up dead function/class/dependency weight irrelevant to the class/method being loaded.
 - [ ] Scan the whole Debug/ directory for legacy aliases, compatability shims, and thin wrappers that don't add any extra logic. Purge all of them. Update all callers to use actual source functions.
 - [ ] A lot of the functions in our Debug/ classes have really long & unclear names. Do a sweep of every class and make sure the function/variable names are concise+accurate.
@@ -172,6 +173,6 @@ Items below are the remaining classified legacy/compatibility lanes after the cu
 
 ---
 
-- **SchemaBootstrap::renameLegacyMediaTables()** — migration shim that renames `{prefix}page_images` → `{prefix}media` and `{prefix}page_image_variants` → `{prefix}media_variants` on first bootstrap after the namespace rename. Safe to remove once all active installs have been through a bootstrap with the new table names. Check before pruning.
+- **SchemaBootstrap::renameLegacyMediaTables()** — migration shim that renames `{prefix}page_images` → `{prefix}media` and `{prefix}page_image_variants` → `{prefix}media_variants` on first bootstrap after the namespace rename. Safe to remove once all active installs have been through a bootstrap with the new table names. Check before pruning. Audited on 2026-05-06; intentionally retained as the sole remaining Schema compatibility path.
 
 ---

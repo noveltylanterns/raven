@@ -24,6 +24,12 @@ final class SchemaExtension
 {
     private Bootstrap $bootstrapResolver;
 
+    /**
+     * Wires the extension bootstrap resolver used to validate provider contracts.
+     *
+     * @param Bootstrap|null $bootstrapResolver Optional resolver; defaults to the canonical extension bootstrap helper.
+     * @return void
+     */
     public function __construct(
         ?Bootstrap $bootstrapResolver = null
     )

@@ -155,6 +155,16 @@ final class SchemaInstaller
         ]);
     }
 
+    /**
+     * Reassigns one stock group to its canonical ID and updates membership references atomically.
+     *
+     * @param PDO    $db       Active Raven database connection.
+     * @param string $driver   Database driver identifier: sqlite, mysql, or pgsql.
+     * @param string $prefix   Table name prefix from the site configuration.
+     * @param string $slug     Canonical stock group slug to normalize.
+     * @param int    $targetId Canonical numeric ID assigned to the stock slug.
+     * @return void
+     */
     private function ensureStockGroupId(PDO $db, string $driver, string $prefix, string $slug, int $targetId): void
     {
         $slug = strtolower(trim($slug));
@@ -247,6 +257,12 @@ final class SchemaInstaller
         }
     }
 
+    /**
+     * Converts one group name/slug candidate into Raven's canonical slug token shape.
+     *
+     * @param string $value Raw group label or slug.
+     * @return string Normalized slug token, or an empty string when normalization fails.
+     */
     private function slugifyGroupName(string $value): string
     {
         $value = strtolower(trim($value));
