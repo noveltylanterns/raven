@@ -12,7 +12,7 @@ declare(strict_types=1);
 namespace Raven\Core\Runtime;
 
 use PDO;
-use Raven\Core\Debug\PdoQueryProfiler;
+use Raven\Core\Debug\QueryProfilerPdo;
 use Raven\Core\Debug\RequestProfilerAdapter;
 use Raven\Lib\Database\DbDriver;
 use Raven\Lib\Database\MysqlConfig;
@@ -118,7 +118,7 @@ final class DatabaseFactory
     {
         $this->sqliteBootstrap->ensureDir($path);
 
-        $pdo = new PdoQueryProfiler('sqlite:' . $path, null, null, $this->defaultPdoOptions(), $connectionLabel, $this->queryProfiler);
+        $pdo = new QueryProfilerPdo('sqlite:' . $path, null, null, $this->defaultPdoOptions(), $connectionLabel, $this->queryProfiler);
         $this->sqliteBootstrap->bootstrap($pdo);
 
         return $pdo;
@@ -136,7 +136,7 @@ final class DatabaseFactory
         if ($driver === 'mysql') {
             $mysql = MysqlConfig::fromConfig($this->config);
 
-            return new PdoQueryProfiler(
+            return new QueryProfilerPdo(
                 $mysql->dsn(),
                 $mysql->username(),
                 $mysql->password(),
@@ -148,7 +148,7 @@ final class DatabaseFactory
 
         $pgsql = PgsqlConfig::fromConfig($this->config);
 
-        return new PdoQueryProfiler(
+        return new QueryProfilerPdo(
             $pgsql->dsn(),
             $pgsql->username(),
             $pgsql->password(),

@@ -80,7 +80,7 @@ final class RequestProfiler
      * Stores one normalized SQL query record on the current request snapshot.
      *
      * @param string $connection Logical connection label such as `app` or `auth`.
-     * @param string $mode Query execution mode reported by `PdoQueryProfiler`.
+     * @param string $mode Query execution mode reported by `QueryProfilerPdo`.
      * @param string $sql Raw SQL text for the executed statement.
      * @param array<int|string, mixed>|null $params Bound parameters captured for the statement.
      * @param float $durationMs Query duration in milliseconds.
@@ -282,6 +282,8 @@ final class RequestProfiler
     }
 
     /**
+     * Normalizes one bound-parameter payload into profiler-safe scalar representations.
+     *
      * @param array<int|string, mixed> $params
      * @return array<int|string, mixed>
      */
@@ -295,6 +297,12 @@ final class RequestProfiler
         return $normalized;
     }
 
+    /**
+     * Normalizes one arbitrary bound value into a compact profiler-safe representation.
+     *
+     * @param mixed $value Raw bound parameter value.
+     * @return mixed Normalized scalar/placeholder value suitable for profiler output.
+     */
     private static function normalizeValue(mixed $value): mixed
     {
         if ($value === null || is_bool($value) || is_int($value) || is_float($value)) {
@@ -322,6 +330,12 @@ final class RequestProfiler
         return '[' . gettype($value) . ']';
     }
 
+    /**
+     * Truncates long scalar payloads so profiler output remains bounded and readable.
+     *
+     * @param string $value Raw scalar value.
+     * @return string Possibly truncated scalar string.
+     */
     private static function truncateValue(string $value): string
     {
         if (strlen($value) <= 400) {

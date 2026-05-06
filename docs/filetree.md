@@ -115,7 +115,7 @@ This file is the fast system map for Raven CMS. Use it to quickly understand the
 - `private/sys/Debug`
   - Debug and profiling infrastructure (`Raven\Core\Debug`).
   - `OutputProfilerConfig`, `OutputProfilerSanitizer`, and `OutputProfiler` own the fixed-bottom HTML output-profiler UI injected into eligible responses (`OutputProfiler` now also owns the response-hook arming seam).
-  - `PdoQueryProfiler` and `PdoStmtProfiler` wrap PDO/PDOStatement for query-level profiling instrumentation and emit events through `QueryProfiler`.
+  - `QueryProfilerPdo` and `QueryProfilerStatement` wrap PDO/PDOStatement for query-level profiling instrumentation and emit events through `QueryProfiler`.
   - `RequestProfiler`, `RequestProfilerAdapter`, and `RequestProfilerOutput` own request-scoped query/render collection plus pluggable custom request-profiler outputs used by the output profiler and profiled PDO wrappers.
   - `ClientProfiler` owns visitor network-context normalization and reverse-DNS hostname resolution used by request diagnostics, captcha checks, and throttle keys.
   - `LocalProfiler` owns localhost/runtime environment snapshot collection for debug tooling.

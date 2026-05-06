@@ -17,7 +17,10 @@ namespace Raven\Core\Debug;
 final class OutputProfilerSanitizer
 {
     /**
+     * Encodes one associative payload as pretty-printed JSON for debug display.
+     *
      * @param array<int|string, mixed> $value
+     * @return string Pretty-printed JSON string, or `{}` when encoding fails.
      */
     public static function prettyJson(array $value): string
     {
@@ -30,7 +33,10 @@ final class OutputProfilerSanitizer
     }
 
     /**
+     * Recursively sanitizes one nested array, redacting sensitive keys and hostile payloads.
+     *
      * @param array<int|string, mixed> $value
+     * @param int $depth Current recursion depth used to enforce max nesting.
      * @return array<int|string, mixed>
      */
     public static function sanitizeArray(array $value, int $depth = 0): array
@@ -74,6 +80,8 @@ final class OutputProfilerSanitizer
     }
 
     /**
+     * Filters the server payload down to a safe allow-list for profiler rendering.
+     *
      * @param array<string, mixed> $server
      * @return array<string, mixed>
      */
@@ -111,6 +119,8 @@ final class OutputProfilerSanitizer
     }
 
     /**
+     * Normalizes uploaded-file metadata into one compact debug-safe structure.
+     *
      * @param array<string, mixed> $files
      * @return array<string, mixed>
      */
@@ -133,6 +143,12 @@ final class OutputProfilerSanitizer
         return $normalized;
     }
 
+    /**
+     * Sanitizes one scalar string, truncating oversized values and filtering hostile patterns.
+     *
+     * @param string $value Raw scalar string.
+     * @return string Sanitized value safe for debug rendering.
+     */
     private static function sanitizeStringValue(string $value): string
     {
         $value = trim($value);

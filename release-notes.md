@@ -2,6 +2,14 @@
 
 *The machine is supposed to be logging patches & mods to this file. Sometimes it does, sometimes it doesn't. It might be useful for historical architectural context to your Agent at one point.*
 
+### May 6, 2026 — sys/Debug refactor cleanup
+
+- **PDO profiler class rename completed** — renamed `PdoQueryProfiler` to `QueryProfilerPdo` and `PdoStmtProfiler` to `QueryProfilerStatement` in `sys/Debug`, updated statement-class injection in the PDO wrapper, and rewired all runtime callers/imports (including `sys/Runtime/DatabaseFactory`).
+- **Debug wrapper/alias sweep** — audited all `sys/Debug` classes for legacy aliases and no-op wrappers; no compatibility alias files remain. Removed the completed Debug cleanup section from `build/todo.md`.
+- **Naming sweep** — replaced ambiguous `OutputProfiler::e()` with `OutputProfiler::escapeHtml()` and updated every call site in the output-profiler renderer.
+- **PHPDoc sweep closeout** — added/fixed method-level PHPDoc coverage across Debug classes, including missing constructor and private-helper documentation in `QueryProfilerPdo`, `QueryProfilerStatement`, `RouteProfiler`, `RequestProfiler`, `OutputProfiler`, and `OutputProfilerSanitizer`.
+- **Docs sync** — updated `docs/filetree.md` Debug inventory to the new class names (`QueryProfilerPdo`, `QueryProfilerStatement`).
+
 ### May 6, 2026 — sys/Schema refactor cleanup (final section)
 
 - **Legacy/thin-wrapper purge in schema pipeline** — removed `SchemaBuilder::ensurePageGalleryEnabledColumn()` (documented no-op compatibility shim) and removed unused `SchemaPipeline::ensure(...)` wrapper that only chained app/auth ensures. Updated pipeline calls accordingly.

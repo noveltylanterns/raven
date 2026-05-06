@@ -30,7 +30,7 @@ This is the default Build Mode backlog file. If the user asks about goals, unpat
 - [x] `SqlTable.php` — resolve prefixed SQL table names for call sites.
 - [x] `SqlInsert.php` — build plain and duplicate-safe INSERT SQL across supported drivers.
 - [x] `QueryProfiler.php` moved to `sys/Debug/` ownership as debug-facing query-profiler contract.
-- [x] `PdoQueryProfiler.php` + `PdoStmtProfiler.php` moved to `sys/Debug/` ownership and removed from `lib/Database/`.
+- [x] `QueryProfilerPdo.php` + `QueryProfilerStatement.php` moved to `sys/Debug/` ownership and removed from `lib/Database/`.
 
 ### Dependency-boundary pass by lane
 - [x] Config lane (`DbDriver`, `MysqlConfig`, `PgsqlConfig`, `SqliteConfig`) kept focused on config/path only.
@@ -41,7 +41,7 @@ This is the default Build Mode backlog file. If the user asks about goals, unpat
 ### Cleanup
 - [x] Removed dead/overlapping Database primitives (`DsnBuilder`, `SqlUpsertPolicy`, prior SQLite class names).
 - [x] Updated all known callers to use current canonical classes/methods.
-- [x] Naming sweep completed for this pass (`DbDriver`, `SqlTable`, `SqlInsert`, `SqliteConfig`, `PdoQueryProfiler`, `PdoStmtProfiler`).
+- [x] Naming sweep completed for this pass (`DbDriver`, `SqlTable`, `SqlInsert`, `SqliteConfig`, `QueryProfilerPdo`, `QueryProfilerStatement`).
 - [x] PHPDoc/header sweep completed on current Database primitives.
 - [x] Release notes and docs updated for completed refactor items.
 - [x] Optional naming pass complete: `DriverConfigNormalizer` -> `DbDriver`, `TableNameResolver` -> `SqlTable`.
@@ -120,15 +120,6 @@ Lingering issues & reorganization tasks. Make a plan to deal with them all in on
 - [ ] Scan the whole Controller/ directory for legacy aliases, compatability shims, and thin wrappers that don't add any extra logic. Purge all of them. Update all callers to use actual source functions.
 - [ ] A lot of the functions in our Controller/ classes have really long & unclear names. Do a sweep of every class and make sure the function/variable names are concise+accurate.
 - [ ] Do a sweep of all classes in Controller/ making sure PHPdoc blocks are present+accurate for ALL headings, classes & functions.
-- [ ] Update release-notes.md, clear completed section out of todo.md, and commit.
-
-## sys/Debug/ Refactor Cleanup
-Lingering issues & reorganization tasks. Make a plan to deal with them all in one clean sweep. Append it as a detailed checklist to this section in case we lose session or we have to bounce between agents:
-- [ ] Rename PdoQueryProfiler to QueryProfilerPdo, and PdoStmtProfiler to QueryProfilerStatement
-- [ ] Make sure no Debug/ class is pulling up dead function/class/dependency weight irrelevant to the class/method being loaded.
-- [ ] Scan the whole Debug/ directory for legacy aliases, compatability shims, and thin wrappers that don't add any extra logic. Purge all of them. Update all callers to use actual source functions.
-- [ ] A lot of the functions in our Debug/ classes have really long & unclear names. Do a sweep of every class and make sure the function/variable names are concise+accurate.
-- [ ] Do a sweep of all classes in Debug/ making sure PHPdoc blocks are present+accurate for ALL headings, classes & functions.
 - [ ] Update release-notes.md, clear completed section out of todo.md, and commit.
 
 ## sys/Router/ Refactor

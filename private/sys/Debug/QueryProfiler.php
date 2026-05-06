@@ -3,7 +3,7 @@
 /**
  * RAVEN CMS
  * ~/private/sys/Debug/QueryProfiler.php
- * Contract for query profiler implementations used by PdoQueryProfiler and PdoStmtProfiler.
+ * Contract for query profiler implementations used by QueryProfilerPdo and QueryProfilerStatement.
  * Docs: https://raven.lanterns.io
  */
 
@@ -30,6 +30,7 @@ interface QueryProfiler
      * @param float                         $durationMs  Wall-clock execution time in milliseconds.
      * @param bool                          $success     True when the query completed without error.
      * @param string|null                   $error       Error message on failure, null on success.
+     * @return void
      */
     public function recordQuery(
         string $connection,

@@ -2,7 +2,7 @@
 
 /**
  * RAVEN CMS
- * ~/private/sys/Debug/PdoQueryProfiler.php
+ * ~/private/sys/Debug/QueryProfilerPdo.php
  * PDO subclass that records every query through an optional QueryProfiler.
  * Docs: https://raven.lanterns.io
  */
@@ -18,7 +18,7 @@ use Throwable;
 /**
  * PDO subclass that feeds every query into the active query profiler when enabled.
  */
-final class PdoQueryProfiler extends PDO
+final class QueryProfilerPdo extends PDO
 {
     private string $connectionLabel;
     private ?QueryProfiler $queryProfiler;
@@ -32,6 +32,7 @@ final class PdoQueryProfiler extends PDO
      * @param array<int|string, mixed>    $options         PDO driver options.
      * @param string                      $connectionLabel Profiler label identifying this connection (e.g., 'app', 'auth').
      * @param QueryProfiler|null $queryProfiler   Profiler instance; null disables query recording.
+     * @return void
      */
     public function __construct(
         string $dsn,
@@ -46,7 +47,7 @@ final class PdoQueryProfiler extends PDO
         parent::__construct($dsn, $username, $password, $options);
 
         $this->setAttribute(PDO::ATTR_STATEMENT_CLASS, [
-            PdoStmtProfiler::class,
+            QueryProfilerStatement::class,
             [$this->connectionLabel, $this->queryProfiler],
         ]);
     }
@@ -62,7 +63,7 @@ final class PdoQueryProfiler extends PDO
     {
         if (!isset($options[PDO::ATTR_STATEMENT_CLASS])) {
             $options[PDO::ATTR_STATEMENT_CLASS] = [
-                PdoStmtProfiler::class,
+                QueryProfilerStatement::class,
                 [$this->connectionLabel, $this->queryProfiler],
             ];
         }
@@ -118,7 +119,15 @@ final class PdoQueryProfiler extends PDO
     }
 
     /**
+     * Forwards one query record into the active profiler when query collection is enabled.
+     *
+     * @param string $mode Query execution mode label (`exec`, `query`, `execute`).
+     * @param string $sql Executed SQL string.
      * @param array<int|string, mixed>|null $params
+     * @param float $durationMs Query duration in milliseconds.
+     * @param bool $success Whether execution completed successfully.
+     * @param string|null $error Optional driver error text when execution fails.
+     * @return void
      */
     private function record(
         string $mode,

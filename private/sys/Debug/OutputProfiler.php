@@ -206,13 +206,13 @@ final class OutputProfiler
             <button type="button" class="rvnd-expand" data-rvn-debug-toggle="1" aria-expanded="false"><span class="rvnd-expand-label">Expand</span><span class="rvnd-caret" aria-hidden="true">^</span></button>
         </div>
         <div class="rvnd-right">
-            <span class="rvnd-summary-queries">' . self::e($summaryQueries) . '</span>
-            <span class="rvnd-summary-duration">' . self::e($summaryDuration) . '</span>
-            <span class="rvnd-summary-sql">' . self::e($summarySql) . '</span>
-            <span class="rvnd-summary-peak">' . self::e($summaryPeak) . '</span>
-            <span class="rvnd-summary-scope">' . self::e($summaryScope) . '</span>
-            <span class="rvnd-summary-method">' . self::e($summaryMethod) . '</span>
-            <span class="rvnd-summary-status">' . self::e($summaryStatus) . '</span>
+            <span class="rvnd-summary-queries">' . self::escapeHtml($summaryQueries) . '</span>
+            <span class="rvnd-summary-duration">' . self::escapeHtml($summaryDuration) . '</span>
+            <span class="rvnd-summary-sql">' . self::escapeHtml($summarySql) . '</span>
+            <span class="rvnd-summary-peak">' . self::escapeHtml($summaryPeak) . '</span>
+            <span class="rvnd-summary-scope">' . self::escapeHtml($summaryScope) . '</span>
+            <span class="rvnd-summary-method">' . self::escapeHtml($summaryMethod) . '</span>
+            <span class="rvnd-summary-status">' . self::escapeHtml($summaryStatus) . '</span>
         </div>
     </div>
     <div id="rvnd-inside" aria-hidden="true">
@@ -302,6 +302,7 @@ final class OutputProfiler
     /**
      * @param array<string, mixed> $profile
      * @param array<string, mixed> $context
+     * @return string
      */
     private static function renderBenchmarks(array $profile, array $context): string
     {
@@ -317,7 +318,7 @@ final class OutputProfiler
 
         $html = '<table><tbody>';
         foreach ($rows as $row) {
-            $html .= '<tr><th scope="row">' . self::e($row[0]) . '</th><td>' . self::e($row[1]) . '</td></tr>';
+            $html .= '<tr><th scope="row">' . self::escapeHtml($row[0]) . '</th><td>' . self::escapeHtml($row[1]) . '</td></tr>';
         }
         $html .= '</tbody></table>';
         return $html;
@@ -325,6 +326,8 @@ final class OutputProfiler
 
     /**
      * @param array<int, array<string, mixed>> $queries
+     * @param int $droppedCount
+     * @return string
      */
     private static function renderQueries(array $queries, int $droppedCount): string
     {
@@ -332,9 +335,9 @@ final class OutputProfiler
             return '<p class="rvnd-empty">No SQL queries were recorded in this request.</p>';
         }
 
-        $html = '<div class="rvnd-muted" style="margin-bottom:8px">Logged ' . self::e((string) count($queries)) . ' query row(s)';
+        $html = '<div class="rvnd-muted" style="margin-bottom:8px">Logged ' . self::escapeHtml((string) count($queries)) . ' query row(s)';
         if ($droppedCount > 0) {
-            $html .= '; dropped ' . self::e((string) $droppedCount) . ' due to profiler cap';
+            $html .= '; dropped ' . self::escapeHtml((string) $droppedCount) . ' due to profiler cap';
         }
         $html .= '.</div>';
         $html .= '<table><thead><tr><th>Connection</th><th>Mode</th><th>Duration</th><th>SQL</th><th>Bindings</th></tr></thead><tbody>';
@@ -351,11 +354,11 @@ final class OutputProfiler
             $error = trim((string) ($query['error'] ?? ''));
 
             $html .= '<tr>'
-                . '<td>' . self::e($connection) . '</td>'
-                . '<td>' . self::e($mode) . '</td>'
-                . '<td>' . self::e($duration) . '</td>'
-                . '<td><pre>' . self::e($sql) . ($error !== '' ? ("\n\nERROR: " . self::e($error)) : '') . '</pre></td>'
-                . '<td><pre>' . self::e($bindingsText) . '</pre></td>'
+                . '<td>' . self::escapeHtml($connection) . '</td>'
+                . '<td>' . self::escapeHtml($mode) . '</td>'
+                . '<td>' . self::escapeHtml($duration) . '</td>'
+                . '<td><pre>' . self::escapeHtml($sql) . ($error !== '' ? ("\n\nERROR: " . self::escapeHtml($error)) : '') . '</pre></td>'
+                . '<td><pre>' . self::escapeHtml($bindingsText) . '</pre></td>'
                 . '</tr>';
         }
 
@@ -365,6 +368,7 @@ final class OutputProfiler
 
     /**
      * @param array<int, string> $trace
+     * @return string
      */
     private static function renderTrace(array $trace): string
     {
@@ -372,9 +376,14 @@ final class OutputProfiler
             return '<p class="rvnd-empty">No render stack trace snapshot was captured.</p>';
         }
 
-        return '<pre>' . self::e(implode("\n", $trace)) . '</pre>';
+        return '<pre>' . self::escapeHtml(implode("\n", $trace)) . '</pre>';
     }
 
+    /**
+     * Renders sanitized request superglobals for the request-data profiler section.
+     *
+     * @return string HTML fragment containing sanitized request payload JSON.
+     */
     private static function renderRequestData(): string
     {
         $payload = [
@@ -385,9 +394,17 @@ final class OutputProfiler
             '_SERVER' => OutputProfilerSanitizer::sanitizeServer($_SERVER),
         ];
 
-        return '<pre>' . self::e(OutputProfilerSanitizer::prettyJson($payload)) . '</pre>';
+        return '<pre>' . self::escapeHtml(OutputProfilerSanitizer::prettyJson($payload)) . '</pre>';
     }
 
+    /**
+     * Renders request/runtime metadata for the environment profiler section.
+     *
+     * @param string $scope Current request scope label.
+     * @param string $hostname Current request host label.
+     * @param string $requestPath Current normalized request path.
+     * @return string HTML fragment containing environment payload JSON.
+     */
     private static function renderEnvironment(string $scope, string $hostname, string $requestPath): string
     {
         $info = [
@@ -401,14 +418,31 @@ final class OutputProfiler
             'included_files_count' => count(get_included_files()),
         ];
 
-        return '<pre>' . self::e(OutputProfilerSanitizer::prettyJson($info)) . '</pre>';
+        return '<pre>' . self::escapeHtml(OutputProfilerSanitizer::prettyJson($info)) . '</pre>';
     }
 
+    /**
+     * Wraps one profiler section title/body pair in the standard panel markup shell.
+     *
+     * @param string $title Section heading label.
+     * @param string $body Section body markup.
+     * @return string Section HTML fragment.
+     */
     private static function section(string $title, string $body): string
     {
-        return '<section class="rvnd-section"><h3>' . self::e($title) . '</h3><div class="rvnd-body">' . $body . '</div></section>';
+        return '<section class="rvnd-section"><h3>' . self::escapeHtml($title) . '</h3><div class="rvnd-body">' . $body . '</div></section>';
     }
 
+    /**
+     * Appends one rendered section when its corresponding feature flag is enabled.
+     *
+     * @param array<int, string> $sections Mutable list of rendered section fragments.
+     * @param array<string, bool> $settings Profiler feature-flag map.
+     * @param string $flag Feature-flag key controlling this section.
+     * @param string $title Section title label.
+     * @param callable(): string $render Callback that renders the section body.
+     * @return void
+     */
     private static function appendSection(
         array &$sections,
         array $settings,
@@ -421,6 +455,12 @@ final class OutputProfiler
         }
     }
 
+    /**
+     * Formats raw byte counts into human-readable units for profiler summaries.
+     *
+     * @param int $bytes Raw byte count.
+     * @return string Human-readable size string.
+     */
     private static function formatBytes(int $bytes): string
     {
         if ($bytes < 1) {
@@ -434,7 +474,13 @@ final class OutputProfiler
         return number_format($value, $index === 0 ? 0 : 2) . ' ' . $units[$index];
     }
 
-    private static function e(string $value): string
+    /**
+     * Escapes one string for safe HTML output inside profiler markup.
+     *
+     * @param string $value Raw string value.
+     * @return string HTML-escaped string.
+     */
+    private static function escapeHtml(string $value): string
     {
         return htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
     }

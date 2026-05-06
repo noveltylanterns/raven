@@ -2,7 +2,7 @@
 
 /**
  * RAVEN CMS
- * ~/private/sys/Debug/PdoStmtProfiler.php
+ * ~/private/sys/Debug/QueryProfilerStatement.php
  * PDOStatement subclass that records bind values and execution timing through QueryProfiler.
  * Docs: https://raven.lanterns.io
  */
@@ -17,7 +17,7 @@ use Throwable;
 /**
  * PDOStatement subclass that captures bind values and feeds execution timing into the query profiler.
  */
-final class PdoStmtProfiler extends \PDOStatement
+final class QueryProfilerStatement extends \PDOStatement
 {
     private string $connectionLabel = 'app';
     /** @var array<int|string, mixed> */
@@ -25,10 +25,11 @@ final class PdoStmtProfiler extends \PDOStatement
     private ?QueryProfiler $queryProfiler = null;
 
     /**
-     * Receives the connection label and optional profiler injected by PdoQueryProfiler via ATTR_STATEMENT_CLASS.
+     * Receives the connection label and optional profiler injected by QueryProfilerPdo via ATTR_STATEMENT_CLASS.
      *
      * @param string                      $connectionLabel Profiler label identifying the parent connection.
      * @param QueryProfiler|null $queryProfiler   Profiler instance; null disables recording for this statement.
+     * @return void
      */
     protected function __construct(string $connectionLabel = 'app', ?QueryProfiler $queryProfiler = null)
     {
@@ -97,7 +98,14 @@ final class PdoStmtProfiler extends \PDOStatement
     }
 
     /**
+     * Forwards one prepared-statement execution record into the active query profiler.
+     *
+     * @param string $sql Executed SQL string.
      * @param array<int|string, mixed> $params
+     * @param float $durationMs Query duration in milliseconds.
+     * @param bool $success Whether statement execution completed successfully.
+     * @param string|null $error Optional driver error text on failure.
+     * @return void
      */
     private function record(string $sql, array $params, float $durationMs, bool $success, ?string $error): void
     {

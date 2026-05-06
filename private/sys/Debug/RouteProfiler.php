@@ -26,6 +26,7 @@ final class RouteProfiler
 
     /**
      * @param InputSanitizer $input Shared text/path normalization helper.
+     * @return void
      */
     public function __construct(InputSanitizer $input)
     {
