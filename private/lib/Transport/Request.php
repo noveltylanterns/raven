@@ -12,7 +12,7 @@ declare(strict_types=1);
 namespace Raven\Lib\Transport;
 
 /**
- * Resolves request URL/scheme/host and client network context from server vars.
+ * Resolves request URL/scheme/host context from server vars.
  */
 final class Request
 {
@@ -61,20 +61,27 @@ final class Request
     /**
      * Returns normalized public site base URL without a forced trailing slash.
      *
-     * @param array<string, mixed>|null $server
+     * @param string $configuredDomain Site domain fallback from config.
+     * @param string $configuredProtocol Configured protocol override from config.
+     * @param array<string, mixed>|null $server Optional server map; defaults to `$_SERVER`.
+     * @return string Absolute site base URL without forced trailing slash.
      */
     public function siteBaseUrl(string $configuredDomain, string $configuredProtocol = '', ?array $server = null): string
     {
         $serverMap = $server ?? $_SERVER;
         $scheme = $this->resolveRequestScheme($serverMap, $configuredProtocol);
         $host = $this->resolveRequestHost($configuredDomain, $serverMap);
-        $path = $this->resolveConfiguredBasePath($configuredDomain);
+        $path = $this->configuredBasePath($configuredDomain);
 
         return $scheme . '://' . $host . $path;
     }
 
     /**
-     * @param array<string, mixed>|null $server
+     * Resolves the effective request scheme from config and server context.
+     *
+     * @param array<string, mixed>|null $server Optional server map; defaults to `$_SERVER`.
+     * @param string $configuredProtocol Configured protocol override from config.
+     * @return string `http` or `https`.
      */
     public function resolveRequestScheme(?array $server = null, string $configuredProtocol = ''): string
     {
@@ -103,7 +110,11 @@ final class Request
     }
 
     /**
-     * @param array<string, mixed>|null $server
+     * Resolves request host from configured domain with server-host fallback.
+     *
+     * @param string $configuredDomain Site domain value from config.
+     * @param array<string, mixed>|null $server Optional server map; defaults to `$_SERVER`.
+     * @return string Valid host value, optionally including port.
      */
     public function resolveRequestHost(string $configuredDomain, ?array $server = null): string
     {
@@ -120,7 +131,7 @@ final class Request
                         $candidate .= ':' . $parsedPort;
                     }
 
-                    if ($this->isValidHostWithOptionalPort($candidate)) {
+                    if ($this->isValidHost($candidate)) {
                         return $candidate;
                     }
                 }
@@ -128,20 +139,26 @@ final class Request
 
             // Strip any accidental path/query suffix from domain config.
             $configured = preg_replace('/[\/?#].*$/', '', $configured) ?? $configured;
-            if ($this->isValidHostWithOptionalPort($configured)) {
+            if ($this->isValidHost($configured)) {
                 return $configured;
             }
         }
 
         $serverHost = trim((string) ($serverMap['HTTP_HOST'] ?? $serverMap['SERVER_NAME'] ?? 'localhost'));
-        if ($this->isValidHostWithOptionalPort($serverHost)) {
+        if ($this->isValidHost($serverHost)) {
             return $serverHost;
         }
 
         return 'localhost';
     }
 
-    public function isValidHostWithOptionalPort(string $value): bool
+    /**
+     * Returns whether the candidate host is valid with an optional numeric port.
+     *
+     * @param string $value Candidate host value.
+     * @return bool True when valid.
+     */
+    private function isValidHost(string $value): bool
     {
         if ($value === '' || str_contains($value, '/') || str_contains($value, '\\')) {
             return false;
@@ -159,7 +176,13 @@ final class Request
         return preg_match('/^\[[a-f0-9:]+\](?::\d{1,5})?$/i', $value) === 1;
     }
 
-    public function resolveConfiguredBasePath(string $configuredDomain): string
+    /**
+     * Resolves configured domain path suffix into a normalized base-path segment.
+     *
+     * @param string $configuredDomain Site domain value from config.
+     * @return string Normalized base path, or empty string.
+     */
+    private function configuredBasePath(string $configuredDomain): string
     {
         $configuredDomain = trim($configuredDomain);
         if ($configuredDomain === '') {
@@ -176,51 +199,6 @@ final class Request
 
         $path = '/' . trim((string) $path, '/');
         return $path === '/' ? '' : $path;
-    }
-
-    public function normalizeClientIp(string $rawIp): ?string
-    {
-        $rawIp = trim($rawIp);
-        if ($rawIp === '') {
-            return null;
-        }
-
-        // Keep only the first address in chained forwarding values.
-        if (str_contains($rawIp, ',')) {
-            $parts = explode(',', $rawIp);
-            $rawIp = trim((string) ($parts[0] ?? ''));
-        }
-
-        if ($rawIp === '' || filter_var($rawIp, FILTER_VALIDATE_IP) === false) {
-            return null;
-        }
-
-        return substr($rawIp, 0, 45);
-    }
-
-    public function resolveClientHostname(?string $ipAddress): ?string
-    {
-        if ($ipAddress === null || $ipAddress === '') {
-            return null;
-        }
-
-        $rawHostname = @gethostbyaddr($ipAddress);
-        if (!is_string($rawHostname)) {
-            return null;
-        }
-
-        $hostname = strtolower(trim($rawHostname));
-        if ($hostname === '' || $hostname === $ipAddress || filter_var($hostname, FILTER_VALIDATE_IP) !== false) {
-            return null;
-        }
-
-        // Remove optional trailing dot from fully-qualified DNS names.
-        $hostname = rtrim($hostname, '.');
-        if ($hostname === '' || str_contains($hostname, '..') || preg_match('/[^a-z0-9.-]/', $hostname) === 1) {
-            return null;
-        }
-
-        return substr($hostname, 0, 255);
     }
 
     /**

@@ -12,6 +12,7 @@ declare(strict_types=1);
 namespace Raven\Core\Controller\Public;
 
 use Raven\Core\Config;
+use Raven\Core\Debug\ClientProfiler;
 use Raven\Lib\Auth\AuthService;
 use Raven\Lib\Auth\Public\SessionGuard;
 use Raven\Lib\Transport\Response;
@@ -45,6 +46,7 @@ final class SharedController
     private SessionGuard $sessionGuard;
     private bool $captchaScriptIncluded = false;
     private ?Request $requestContextResolver = null;
+    private ?ClientProfiler $clientProfiler = null;
     private ?FeedParser $feedParser = null;
     private ?GroupRouteParser $groupParser = null;
     private ?UserProfileParser $profileContactService = null;
@@ -195,6 +197,20 @@ final class SharedController
     }
 
     /**
+     * Returns normalized client-network helper cached for the current request.
+     *
+     * @return ClientProfiler Shared client-network normalizer/resolver.
+     */
+    public function clientProfiler(): ClientProfiler
+    {
+        if (!$this->clientProfiler instanceof ClientProfiler) {
+            $this->clientProfiler = new ClientProfiler();
+        }
+
+        return $this->clientProfiler;
+    }
+
+    /**
      * Builds one panel URL using the configured panel-path prefix.
      *
      * @param string $suffix Path suffix beginning with `/`.
@@ -335,7 +351,7 @@ final class SharedController
      */
     public function validatePublicCaptcha(): ?string
     {
-        $remoteIp = $this->requestContextResolver()->normalizeClientIp((string) ($_SERVER['REMOTE_ADDR'] ?? ''));
+        $remoteIp = $this->clientProfiler()->normalizeClientIp((string) ($_SERVER['REMOTE_ADDR'] ?? ''));
         return $this->captchaService()->validateSubmission($_POST, $remoteIp);
     }
 

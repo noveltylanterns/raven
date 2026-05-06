@@ -14,6 +14,7 @@ namespace Raven\Core\Controller\Panel;
 use Raven\Core\Repository\ChannelRead;
 use Raven\Core\Repository\RedirectRead;
 use Raven\Core\Repository\RedirectWrite;
+use Raven\Lib\Parser\RedirectParser;
 use Raven\Lib\Transport\Redirect;
 use Raven\Lib\Security\InputSanitizer;
 
@@ -260,7 +261,7 @@ final class RedirectEditController
      */
     private function isAllowedRedirectTargetUrl(string $targetUrl): bool
     {
-        return \Raven\Lib\Transport\Redirect::isAllowedHttpOrRootPath($targetUrl);
+        return RedirectParser::isAllowedHttpOrRootPath($targetUrl);
     }
 
     /**

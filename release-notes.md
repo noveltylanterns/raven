@@ -34,6 +34,11 @@
 - **Auth thin-wrapper cleanup** — removed `lib/Auth/ThrottleClear.php` by folding its clear-path behavior into `ThrottleReturn::clear()` and updating `AuthService::clearFailedLoginAttempts()` to use the consolidated throttle orchestrator.
 - **Auth PHPDoc sweep finalization** — completed the remaining `lib/Auth` public-method PHPDoc gaps (constructor `@return void` tags and missing method summaries/param docs in `AuthService`) so public/protected method blocks are complete across the directory.
 - **Auth naming sweep finalization** — completed a final naming pass across `lib/Auth`; no further identifier renames were required after wrapper cleanup, and method/variable names remain concise and domain-accurate.
+- **Transport redirect-policy split** — moved redirect target validation out of `lib/Transport/Redirect` into canonical `lib/Parser/RedirectParser::isAllowedHttpOrRootPath()`; updated public/page/channel redirect flows and panel redirect editor validation to call parser policy directly, leaving `Redirect` as a pure dispatch primitive.
+- **Transport request-scope cleanup** — removed client-IP and reverse-DNS visitor profiling methods from `lib/Transport/Request`; request transport now stays focused on URL/scheme/host/base-path resolution with tightened method docs and internal host/base-path naming cleanup.
+- **Debug profiler additions** — added `sys/Debug/ClientProfiler.php` (central client IP/hostname normalization) and `sys/Debug/LocalProfiler.php` (local runtime environment snapshot helper). Public auth + shared captcha paths now use `ClientProfiler` for IP normalization.
+- **LoginAttempt transport decoupling** — `lib/Auth/LoginAttempt` no longer depends on `Transport/Request`; it now accepts a normalized client-IP string from callers (`Public/AuthController`, `Panel/AuthController`) for throttle keying.
+- **Transport cleanup closeout** — completed the `build/todo.md` transport refactor/cleanup checklist and updated `docs/filetree.md` transport/debug ownership notes.
 
 ### May 5, 2026 — Public runtime performance fixes: deferred auth DB, corrected schema state paths
 

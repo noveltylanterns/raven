@@ -12,6 +12,7 @@ declare(strict_types=1);
 namespace Raven\Core\Controller\Panel;
 
 use Raven\Core\Config;
+use Raven\Core\Debug\ClientProfiler;
 use Raven\Core\Postmaster;
 use Raven\Core\Renderer;
 use Raven\Lib\Auth\AuthService;
@@ -118,7 +119,7 @@ final class AuthController
         $result = $this->loginAttempt()->attempt(
             $this->auth,
             $post,
-            $_SERVER,
+            $this->loginAttemptClientIpAddress(),
             $this->loginUiState(),
             static function (AuthService $auth, int $userId): array {
                 return [
@@ -464,12 +465,22 @@ final class AuthController
             $this->loginAttempt = new LoginAttempt(
                 $this->config,
                 $this->input,
-                $this->identifierResolver,
-                new \Raven\Lib\Transport\Request()
+                $this->identifierResolver
             );
         }
 
         return $this->loginAttempt;
+    }
+
+    /**
+     * Returns one normalized client IP string for login throttle tracking.
+     *
+     * @return string Normalized client IP or `unknown` fallback.
+     */
+    private function loginAttemptClientIpAddress(): string
+    {
+        $normalized = (new ClientProfiler())->normalizeClientIp((string) ($_SERVER['REMOTE_ADDR'] ?? ''));
+        return $normalized ?? 'unknown';
     }
 
     /**

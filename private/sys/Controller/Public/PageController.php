@@ -21,6 +21,7 @@ use Raven\Lib\Extension\Public\FormRuntime as ExtensionFormRuntime;
 use Raven\Lib\Extension\Public\FormInstance as ExtensionFormInstance;
 use Raven\Lib\Extension\Public\Shortcodes as ExtensionShortcodes;
 use Raven\Lib\Extension\Public\Content as ExtensionContent;
+use Raven\Lib\Parser\RedirectParser;
 use Raven\Lib\Parser\ChannelRouteParser;
 use Raven\Lib\Parser\PageRouteParser;
 use Raven\Lib\Parser\PageBlockParser;
@@ -429,7 +430,7 @@ final class PageController
         }
 
         $targetUrl = trim((string) ($redirectRow['target'] ?? ''));
-        if (!Redirect::isAllowedHttpOrRootPath($targetUrl)) {
+        if (!RedirectParser::isAllowedHttpOrRootPath($targetUrl)) {
             return false;
         }
 

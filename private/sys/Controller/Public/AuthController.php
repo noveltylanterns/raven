@@ -22,6 +22,7 @@ use Raven\Lib\Auth\LoginChallenge;
 use Raven\Lib\Auth\LoginEmail;
 use Raven\Lib\Auth\LoginIdentifier;
 use Raven\Lib\Auth\LoginUiState;
+use Raven\Lib\Parser\RedirectParser;
 use Raven\Lib\Transport\Redirect;
 
 /**
@@ -115,7 +116,7 @@ final class AuthController
         $result = $this->loginAttempt()->attempt(
             $this->context->auth(),
             $post,
-            $_SERVER,
+            $this->loginAttemptClientIpAddress(),
             $this->loginUiState()
         );
 
@@ -542,8 +543,7 @@ final class AuthController
             $this->loginAttempt = new LoginAttempt(
                 $this->context->config(),
                 $this->context->input(),
-                $this->identifierResolver,
-                $this->context->requestContextResolver()
+                $this->identifierResolver
             );
         }
 
@@ -624,7 +624,7 @@ final class AuthController
         }
 
         $referer = trim((string) ($_SERVER['HTTP_REFERER'] ?? ''));
-        if ($referer !== '' && Redirect::isAllowedHttpOrRootPath($referer)) {
+        if ($referer !== '' && RedirectParser::isAllowedHttpOrRootPath($referer)) {
             $parts = parse_url($referer);
             if (is_array($parts)) {
                 $host = strtolower(trim((string) ($parts['host'] ?? '')));
@@ -831,7 +831,7 @@ final class AuthController
      */
     private function loginAttemptClientIpAddress(): string
     {
-        $normalized = $this->context->requestContextResolver()->normalizeClientIp((string) ($_SERVER['REMOTE_ADDR'] ?? ''));
+        $normalized = $this->context->clientProfiler()->normalizeClientIp((string) ($_SERVER['REMOTE_ADDR'] ?? ''));
         return $normalized ?? 'unknown';
     }
 

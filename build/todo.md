@@ -125,20 +125,20 @@ Lingering issues & reorganization tasks. Make a plan to deal with them all in on
 
 # lib/Transport/ Refactor
 Lingering issues & reorganization tasks. Make a plan to deal with them all in one clean sweep. Append it as a detailed checklist to this section in case we lose session or we have to bounce between agents:
-- [ ] Redirect.php has a function isAllowedHttpOrRootPath which is beyond the scope of this class. It should be extracted out of Redirect.php and merged into lib/Parser/RedirectParser.php
-- [ ] Request.php has a lot of functions in it that feel outside the scope of basic Request primitives:
+- [x] Redirect.php has a function isAllowedHttpOrRootPath which is beyond the scope of this class. It was extracted out of Redirect.php and merged into lib/Parser/RedirectParser.php
+- [x] Request.php has a lot of functions in it that feel outside the scope of basic Request primitives:
 	- Most are missing PHPdoc blocks, obscuring the problem.
 	- Many have really long function/variable names that should be assessed for length & accuracy.
 	- resolveClientHostname & normalizeClientIp (and anything that records stuff like that about visitors) should be centralized in sys/Debug/ClientProfiler.php.
 	- Other functions look like basic config parsing & URL assembly that arent quite just request primitives, but I do not know where to put them.
-- [ ] While you're in sys/Debug/, a new corresponding Debug/LocalProfiler.php (for getting debug/environment information of the localhost Raven is installed on) would be useful to have too.
-- [ ] It should go without saying but all lib/Transport/ classes should be public/panel/extension-agnostic primitives.
+- [x] While you're in sys/Debug/, a new corresponding Debug/LocalProfiler.php (for getting debug/environment information of the localhost Raven is installed on) was added.
+- [x] It should go without saying but all lib/Transport/ classes are now public/panel/extension-agnostic primitives.
 ### lib/Transport/ Cleanup
-- [ ] Make sure no Transport class is pulling up dead function/class/dependency weight irrelevant to the transport type that class handles.
-- [ ] Scan the whole Transport/ directory for legacy aliases, compatability shims, and thin wrappers that don't add any extra logic. Purge all of them. Update all callers to use actual source functions.
-- [ ] Some of the functions in our Transport/ classes have really long & unclear names. Do a sweep of every class and make sure the function/variable names are concise+accurate.
-- [ ] Do a sweep of all classes in lib/Transport/ making sure PHPdoc blocks are present+accurate for ALL headings, classes & functions.
-- [ ] Update release-notes.md, clear completed section out of todo.md, and commit.
+- [x] Make sure no Transport class is pulling up dead function/class/dependency weight irrelevant to the transport type that class handles.
+- [x] Scan the whole Transport/ directory for legacy aliases, compatability shims, and thin wrappers that don't add any extra logic. Purge all of them. Update all callers to use actual source functions.
+- [x] Some of the functions in our Transport/ classes have really long & unclear names. Do a sweep of every class and make sure the function/variable names are concise+accurate.
+- [x] Do a sweep of all classes in lib/Transport/ making sure PHPdoc blocks are present+accurate for ALL headings, classes & functions.
+- [x] Update release-notes.md, clear completed section out of todo.md, and commit.
 
 
 

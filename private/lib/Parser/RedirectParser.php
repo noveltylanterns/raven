@@ -117,6 +117,30 @@ final class RedirectParser
     }
 
     /**
+     * Returns whether one redirect target is a safe root-relative path or HTTP(S) URL.
+     *
+     * @param string $targetUrl Redirect target supplied by config, persistence, or request state.
+     * @return bool True when target is safe for redirect emission.
+     */
+    public static function isAllowedHttpOrRootPath(string $targetUrl): bool
+    {
+        if ($targetUrl === '' || str_contains($targetUrl, ' ')) {
+            return false;
+        }
+
+        if (str_starts_with($targetUrl, '/')) {
+            return !str_starts_with($targetUrl, '//');
+        }
+
+        if (filter_var($targetUrl, FILTER_VALIDATE_URL) === false) {
+            return false;
+        }
+
+        $scheme = strtolower((string) parse_url($targetUrl, PHP_URL_SCHEME));
+        return in_array($scheme, ['http', 'https'], true);
+    }
+
+    /**
      * Returns the injected redirect repository for repo-backed reads.
      *
      * @return RedirectRead Repository backing canonical read methods.

@@ -16,7 +16,6 @@ use Raven\Lib\Auth\LoginChallenge;
 use Raven\Lib\Auth\LoginIdentifier;
 use Raven\Lib\Auth\LoginUiState;
 use Raven\Lib\Security\InputSanitizer;
-use Raven\Lib\Transport\Request;
 
 /**
  * Shared password-auth workflow for panel and public login entrypoints.
@@ -30,25 +29,21 @@ final class LoginAttempt
     private Config $config;
     private InputSanitizer $input;
     private LoginIdentifier $identifierResolver;
-    private Request $requestContextResolver;
 
     /**
      * @param Config          $config                 Shared configuration service for login-throttle values and auth mode.
      * @param InputSanitizer  $input                  Shared payload sanitizer for login form fields.
      * @param LoginIdentifier $identifierResolver     Shared helper that resolves login identifier mode and normalization.
-     * @param Request         $requestContextResolver Shared request-context helper for normalized client IP extraction.
      * @return void
      */
     public function __construct(
         Config $config,
         InputSanitizer $input,
-        LoginIdentifier $identifierResolver,
-        Request $requestContextResolver
+        LoginIdentifier $identifierResolver
     ) {
         $this->config = $config;
         $this->input = $input;
         $this->identifierResolver = $identifierResolver;
-        $this->requestContextResolver = $requestContextResolver;
     }
 
     /**
@@ -56,7 +51,7 @@ final class LoginAttempt
      *
      * @param AuthService  $auth        Shared authentication service used for credential verification and lock bookkeeping.
      * @param array<string, mixed> $post Submitted login payload containing identifier/email/username and password fields.
-     * @param array<string, mixed> $server Request server context used for client IP normalization in throttle tracking.
+     * @param string $clientIpAddress Normalized client IP used for throttle tracking.
      * @param LoginUiState $uiState     Login UI state storage used for 2FA method selection and cleanup paths.
      * @param callable(AuthService, int): array{ok: bool, message?: string}|null $accessGuard Optional post-auth access gate for route families like panel login.
      * @return array{
@@ -69,7 +64,7 @@ final class LoginAttempt
     public function attempt(
         AuthService $auth,
         array $post,
-        array $server,
+        string $clientIpAddress,
         LoginUiState $uiState,
         ?callable $accessGuard = null
     ): array {
@@ -96,7 +91,7 @@ final class LoginAttempt
         }
 
         if ($identifier === null) {
-            if ($this->isTemporarilyLocked($auth, $identifierRaw, $server)) {
+            if ($this->isTemporarilyLocked($auth, $identifierRaw, $clientIpAddress)) {
                 return [
                     'status' => 'locked',
                     'message' => 'Too many login attempts. Please wait a few minutes and try again.',
@@ -104,7 +99,7 @@ final class LoginAttempt
                 ];
             }
 
-            $this->recordFailure($auth, $identifierRaw, $server);
+            $this->recordFailure($auth, $identifierRaw, $clientIpAddress);
             return [
                 'status' => 'invalid_credentials',
                 'message' => 'Invalid credentials.',
@@ -112,7 +107,7 @@ final class LoginAttempt
             ];
         }
 
-        if ($this->isTemporarilyLocked($auth, $identifier, $server)) {
+        if ($this->isTemporarilyLocked($auth, $identifier, $clientIpAddress)) {
             return [
                 'status' => 'locked',
                 'message' => 'Too many login attempts. Please wait a few minutes and try again.',
@@ -125,7 +120,7 @@ final class LoginAttempt
             : $auth->attemptLoginByUsername($identifier, $password);
 
         if (!(bool) ($result['ok'] ?? false)) {
-            $this->recordFailure($auth, $identifier, $server);
+            $this->recordFailure($auth, $identifier, $clientIpAddress);
             return [
                 'status' => 'invalid_credentials',
                 'message' => 'Invalid credentials.',
@@ -133,7 +128,7 @@ final class LoginAttempt
             ];
         }
 
-        $this->clearFailures($auth, $identifier, $server);
+        $this->clearFailures($auth, $identifier, $clientIpAddress);
 
         $userId = $auth->userId();
         if ($userId === null) {
@@ -196,14 +191,14 @@ final class LoginAttempt
      *
      * @param AuthService $auth Shared authentication service.
      * @param string $identifier Normalized login identifier.
-     * @param array<string, mixed> $server Request server context.
+     * @param string $clientIpAddress Normalized client IP used for throttle tracking.
      * @return bool True when the identifier/IP pair is currently locked.
      */
-    private function isTemporarilyLocked(AuthService $auth, string $identifier, array $server): bool
+    private function isTemporarilyLocked(AuthService $auth, string $identifier, string $clientIpAddress): bool
     {
         return $auth->isLoginTemporarilyLocked(
             $identifier,
-            $this->clientIpAddress($server),
+            $this->normalizedClientIpAddress($clientIpAddress),
             $this->windowSeconds()
         );
     }
@@ -213,14 +208,14 @@ final class LoginAttempt
      *
      * @param AuthService $auth Shared authentication service.
      * @param string $identifier Normalized login identifier.
-     * @param array<string, mixed> $server Request server context.
+     * @param string $clientIpAddress Normalized client IP used for throttle tracking.
      * @return void
      */
-    private function recordFailure(AuthService $auth, string $identifier, array $server): void
+    private function recordFailure(AuthService $auth, string $identifier, string $clientIpAddress): void
     {
         $auth->recordFailedLoginAttempt(
             $identifier,
-            $this->clientIpAddress($server),
+            $this->normalizedClientIpAddress($clientIpAddress),
             $this->maxAttempts(),
             $this->windowSeconds(),
             $this->lockSeconds()
@@ -232,27 +227,31 @@ final class LoginAttempt
      *
      * @param AuthService $auth Shared authentication service.
      * @param string $identifier Normalized login identifier.
-     * @param array<string, mixed> $server Request server context.
+     * @param string $clientIpAddress Normalized client IP used for throttle tracking.
      * @return void
      */
-    private function clearFailures(AuthService $auth, string $identifier, array $server): void
+    private function clearFailures(AuthService $auth, string $identifier, string $clientIpAddress): void
     {
         $auth->clearFailedLoginAttempts(
             $identifier,
-            $this->clientIpAddress($server)
+            $this->normalizedClientIpAddress($clientIpAddress)
         );
     }
 
     /**
-     * Resolves and normalizes one client IP string from server context.
+     * Normalizes one client-IP value for throttle keying.
      *
-     * @param array<string, mixed> $server Request server context.
+     * @param string $clientIpAddress Candidate client IP.
      * @return string Normalized client IP or `unknown` fallback.
      */
-    private function clientIpAddress(array $server): string
+    private function normalizedClientIpAddress(string $clientIpAddress): string
     {
-        $normalized = $this->requestContextResolver->normalizeClientIp((string) ($server['REMOTE_ADDR'] ?? ''));
-        return $normalized ?? 'unknown';
+        $candidate = trim($clientIpAddress);
+        if ($candidate === '' || filter_var($candidate, FILTER_VALIDATE_IP) === false) {
+            return 'unknown';
+        }
+
+        return substr($candidate, 0, 45);
     }
 
     /**
