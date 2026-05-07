@@ -19,7 +19,7 @@ use Raven\Core\Repository\UserRead;
 use Raven\Core\Repository\UserWrite;
 use Raven\Core\Debug\RequestProfiler;
 use Raven\Lib\Parser\ChannelDataParser;
-use Raven\Lib\Parser\ConfigParser;
+use Raven\Core\Repository\ConfigRead;
 
 error_reporting(E_ALL & ~E_WARNING & ~E_NOTICE & ~E_DEPRECATED);
 ini_set('display_errors', '0');
@@ -202,7 +202,7 @@ final class PanelListProfilerRunner
      */
     private function featureEnabled(array $rvn, string $key, bool $default = true): bool
     {
-        return ConfigParser::bool($rvn['config']->get($key, $default), $default);
+        return ConfigRead::bool($rvn['config']->get($key, $default), $default);
     }
 
     /**

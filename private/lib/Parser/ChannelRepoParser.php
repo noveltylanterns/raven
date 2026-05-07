@@ -22,7 +22,7 @@ use RuntimeException;
  *
  * Do not add instance methods or filesystem I/O here; those belong on the repository seam.
  */
-class ChannelRepoParser
+final class ChannelRepoParser
 {
     /** Id assigned to the implicit root (all-pages) channel. */
     public const ROOT_CHANNEL_ID = 0;

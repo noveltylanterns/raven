@@ -2,6 +2,12 @@
 
 *The machine is supposed to be logging patches & mods to this file. Sometimes it does, sometimes it doesn't. It might be useful for historical architectural context to your Agent at one point.*
 
+### May 7, 2026 — lib/Parser cleanup pass
+
+- **ConfigParser shim deleted** — removed `private/lib/Parser/ConfigParser.php`; it was a pure pass-through façade over `ConfigRead` with no added logic. Dead `$pathSegmentsCache` field was never written or read. Updated `debug/util/profile-panel-lists.php` to call `ConfigRead::bool()` directly; removed two dead pre-override assignments from `debug/smoke/router-inventory.php` (both variables were immediately overwritten by the panel runtime init).
+- **ChannelRepoParser declared final** — class was not marked `final` despite no subclasses; aligned with the rest of the Parser library.
+- **PanelParser PHPDoc** — added full `@param`/`@return` docblocks to `fromConfig()` and `fromRaw()`.
+
 ### May 7, 2026 — sys/Controller refactor cleanup (in progress)
 
 - **Public profile/controller naming alignment** — renamed `private/sys/Controller/Public/UserController.php` to `ProfileController.php` and rewired public runtime/controller payload keys from `public_user_controller` to `public_profile_controller` across `public/index.php`, `Runtime/Public/ControllerFactory`, `Runtime/Public/RuntimeContract`, and `Router/Public/PublicPayload`/`ProfileRouter`.

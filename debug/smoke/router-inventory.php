@@ -19,7 +19,6 @@ use Raven\Core\Runtime\Public\RuntimeBuilder as PublicRuntimeBuilder;
 use Raven\Core\Router\Public\PublicPayload;
 use Raven\Core\Router\Public\PublicPolicy;
 use Raven\Core\Router\Public\PublicRouter;
-use Raven\Lib\Parser\ConfigParser;
 use Raven\Lib\View\Error as ViewError;
 
 $root = dirname(__DIR__, 2);
@@ -183,8 +182,6 @@ final class RouterInventorySmokeRunner
         $panelRequestContext = $this->requireFactory($rvn, 'panel_request_context');
         $initializePanelRuntime = $this->requireFactory($rvn, 'initialize_panel_runtime');
 
-        $categoryEnabled = ConfigParser::bool($rvn['config']->get('category.enabled', true), true);
-        $tagEnabled = ConfigParser::bool($rvn['config']->get('tag.enabled', true), true);
         $internalPath = '/routing-inventory-smoke';
         $rvn = $initializePanelRuntime();
         $categoryEnabled = !empty($rvn['category_enabled']);
