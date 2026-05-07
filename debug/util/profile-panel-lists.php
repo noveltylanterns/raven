@@ -18,7 +18,7 @@ use Raven\Core\Repository\TagRead;
 use Raven\Core\Repository\UserRead;
 use Raven\Core\Repository\UserWrite;
 use Raven\Core\Debug\RequestProfiler;
-use Raven\Lib\Parser\ChannelDataParser;
+use Raven\Lib\Parser\ChannelParser;
 use Raven\Core\Repository\ConfigRead;
 
 error_reporting(E_ALL & ~E_WARNING & ~E_NOTICE & ~E_DEPRECATED);
@@ -291,7 +291,7 @@ final class PanelListProfilerRunner
         $tagEnabled = $this->featureEnabled($rvn, 'tag.enabled', true);
         // Build repos directly; the shared bootstrap service map was removed.
         $channelRepo = new ChannelRead($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix'], (string) $rvn['root'] . '/private/dat/channel');
-        $channelParser = new ChannelDataParser($rvn['config'], $rvn['input'], $channelRepo);
+        $channelParser = new ChannelParser($rvn['config'], $rvn['input'], $channelRepo);
         $pageRepo = new PageRead($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix'], $channelRepo, $categoryEnabled, $tagEnabled);
         $redirectRepo = new RedirectRead($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix'], $channelRepo);
         $groupRepo = new GroupRead($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix']);

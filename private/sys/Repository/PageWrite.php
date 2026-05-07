@@ -12,7 +12,7 @@ namespace Raven\Core\Repository;
 
 use PDO;
 use RuntimeException;
-use Raven\Lib\Parser\ChannelDataParser;
+use Raven\Lib\Parser\ChannelParser;
 use Raven\Core\Repository\ChannelShared;
 use Raven\Core\Debug\UniquenessProfiler;
 use Raven\Lib\Parser\PageBlockParser;
@@ -427,7 +427,7 @@ final class PageWrite
             throw new RuntimeException('The stock <root> channel placeholder cannot be selected directly.');
         }
 
-        return ChannelDataParser::resolveChannelIdBySlug(
+        return ChannelParser::resolveChannelIdBySlug(
             $slug,
             fn (string $normalized): ?int => $this->channelRepo->idBySlug($normalized),
             'Selected channel does not exist.'

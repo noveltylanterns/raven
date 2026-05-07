@@ -17,8 +17,8 @@ use Raven\Core\Config;
  * Static routing policy helpers: route-mode normalization, separator resolution, and config-backed effective-mode resolution.
  *
  * The Config-taking methods (globalPageRouteMode, effectiveChannelRouteMode, resolveChannelSeparator) are the
- * canonical entry point for any code that needs to resolve URL policy without loading the full ChannelDataParser stack.
- * Shared by ChannelDataParser, ChannelRead, PagePolicy, and panel/public controllers.
+ * canonical entry point for any code that needs to resolve URL policy without loading the full ChannelParser stack.
+ * Shared by ChannelParser, ChannelRead, PagePolicy, and panel/public controllers.
  */
 final class ChannelPolicy
 {

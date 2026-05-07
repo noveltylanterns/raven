@@ -2,6 +2,10 @@
 
 *The machine is supposed to be logging patches & mods to this file. Sometimes it does, sometimes it doesn't. It might be useful for historical architectural context to your Agent at one point.*
 
+### May 7, 2026 — ChannelDataParser renamed to ChannelParser
+
+- **ChannelDataParser → ChannelParser** — `DataParser` suffix was redundant; renamed class, file, and all callers (`PageWrite`, `RedirectWrite`, two debug profilers). `docs/filetree.md` updated.
+
 ### May 7, 2026 — TaxonomyParser moved to lib/View/Taxonomy
 
 - **TaxonomyParser → lib/View/Taxonomy** — mixed taxonomy aggregate belongs with view-layer services, not the parser library. Renamed to `Taxonomy`, moved to `Raven\Lib\View` namespace. Updated all callers: `PageEditController`, `RoutingController`, `Runtime/Panel/RepoFactory`, `Runtime/Public/RepoFactory`, `debug/util/profile-public-pages.php` (also carried a stale pre-rename `TaxonomyRepoParser` import). Old file deleted. `docs/filetree.md` updated.

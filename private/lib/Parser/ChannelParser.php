@@ -2,7 +2,7 @@
 
 /**
  * RAVEN CMS
- * ~/private/lib/Parser/ChannelDataParser.php
+ * ~/private/lib/Parser/ChannelParser.php
  * Channel slug resolution helpers shared by write-side repository classes.
  * Docs: https://raven.lanterns.io
  */
@@ -20,7 +20,7 @@ use RuntimeException;
  * (PageWrite, RedirectWrite) that need to resolve a channel id from a slug
  * before persisting records, without depending on ChannelRead directly.
  */
-final class ChannelDataParser
+final class ChannelParser
 {
     /**
      * Resolves a channel id from a slug string using a caller-provided lookup callback.

@@ -23,7 +23,7 @@ use Raven\Core\Repository\GroupRead;
 use Raven\Core\Repository\PageRead;
 use Raven\Core\Repository\UserRead;
 use Raven\Core\Runtime\Public\RuntimeBuilder;
-use Raven\Lib\Parser\ChannelDataParser;
+use Raven\Lib\Parser\ChannelParser;
 use Raven\Lib\View\Taxonomy;
 
 error_reporting(E_ALL & ~E_WARNING & ~E_NOTICE & ~E_DEPRECATED);
@@ -183,7 +183,7 @@ final class PublicRouteProfilerRunner
 
         // Build repos directly; the shared bootstrap service map was removed.
         $channelRepo = new ChannelRead($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix'], (string) $rvn['root'] . '/private/dat/channel');
-        $channelParser = new ChannelDataParser($rvn['config'], $rvn['input'], $channelRepo);
+        $channelParser = new ChannelParser($rvn['config'], $rvn['input'], $channelRepo);
         $categoryEnabled = (bool) ($configSnapshot['category']['enabled'] ?? false);
         $tagEnabled = (bool) ($configSnapshot['tag']['enabled'] ?? false);
         /** @var PageRead $pages */

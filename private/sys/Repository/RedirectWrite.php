@@ -12,7 +12,7 @@ namespace Raven\Core\Repository;
 
 use PDO;
 use Raven\Lib\Database\SqlTable;
-use Raven\Lib\Parser\ChannelDataParser;
+use Raven\Lib\Parser\ChannelParser;
 use Raven\Core\Repository\ChannelShared;
 use Raven\Core\Debug\UniquenessProfiler;
 use RuntimeException;
@@ -178,7 +178,7 @@ final class RedirectWrite
             return 0;
         }
 
-        return ChannelDataParser::resolveChannelIdBySlug(
+        return ChannelParser::resolveChannelIdBySlug(
             $slug,
             fn (string $normalized): ?int => $this->channelRepo->idBySlug($normalized),
             'Selected channel does not exist.'
