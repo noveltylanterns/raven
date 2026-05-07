@@ -547,7 +547,6 @@ final class ControllerFactory
                 $userDomain['user_read'],
                 $userDomain['invite_read'],
                 new SessionFlash('_raven_flash_list'),
-                new UserPolicy($rvn['config'], $rvn['input']),
                 new LoginIdentifier()
             );
 
@@ -609,8 +608,7 @@ final class ControllerFactory
                 $requestContextFactory(),
                 $rvn['input'],
                 $userDomain['invite_write'],
-                new SessionFlash('_raven_flash_list'),
-                new UserPolicy($rvn['config'], $rvn['input'])
+                new SessionFlash('_raven_flash_list')
             );
 
             return $userInviteController;

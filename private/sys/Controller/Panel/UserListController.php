@@ -18,7 +18,6 @@ use Raven\Core\Repository\InviteRead;
 use Raven\Core\Repository\UserRead;
 use Raven\Lib\Auth\LoginIdentifier;
 use Raven\Lib\Auth\SessionFlash;
-use Raven\Core\Router\UserPolicy;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\Transport\Redirect;
 use Raven\Lib\View\Pagination;
@@ -40,7 +39,6 @@ final class UserListController
     private Closure $inviteReadResolver;
     private ?InviteRead $inviteRead = null;
     private SessionFlash $flashList;
-    private UserPolicy $groupParser;
     private LoginIdentifier $loginIdentifier;
 
     /**
@@ -51,7 +49,6 @@ final class UserListController
      * @param UserRead $userRead User repository read side for user list and invite creator map.
      * @param callable(): InviteRead $inviteReadResolver Lazy invite read resolver for token listings.
      * @param SessionFlash $flashList List-style flash store for pulling generated token batches.
-     * @param UserPolicy $groupParser Shared group/profile routing-policy parser.
      * @param LoginIdentifier $loginIdentifier Shared login-identifier normalization helper.
      * @return void
      */
@@ -63,7 +60,6 @@ final class UserListController
         UserRead $userRead,
         callable $inviteReadResolver,
         SessionFlash $flashList,
-        UserPolicy $groupParser,
         LoginIdentifier $loginIdentifier
     ) {
         $this->context = $context;
@@ -73,7 +69,6 @@ final class UserListController
         $this->userRead = $userRead;
         $this->inviteReadResolver = Closure::fromCallable($inviteReadResolver);
         $this->flashList = $flashList;
-        $this->groupParser = $groupParser;
         $this->loginIdentifier = $loginIdentifier;
     }
 
@@ -239,7 +234,8 @@ final class UserListController
      */
     private function registrationMode(): string
     {
-        return $this->groupParser->registrationMode();
+        $mode = strtolower(trim((string) $this->config->get('user.auth.registration', 'closed')));
+        return in_array($mode, ['open', 'invite', 'closed'], true) ? $mode : 'closed';
     }
 
     /**

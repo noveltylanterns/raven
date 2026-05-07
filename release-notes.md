@@ -2,6 +2,10 @@
 
 *The machine is supposed to be logging patches & mods to this file. Sometimes it does, sometimes it doesn't. It might be useful for historical architectural context to your Agent at one point.*
 
+### May 7, 2026 — registrationMode inlined at call sites; removed from UserPolicy
+
+- **UserPolicy::registrationMode() removed** — a direct `ConfigRead`-style read with a simple allowlist; no reason to live on a routing policy class. Inlined as a private `registrationMode()` helper in `UserInviteController`, `UserListController`, and `AuthController`. `UserPolicy` injection removed from `UserInviteController` and `UserListController` constructors and their `ControllerFactory` slots; `AuthController` self-instantiated `UserPolicy` solely for this method and that instantiation is also removed.
+
 ### May 7, 2026 — GroupPolicy split into UserPolicy + GroupPolicy
 
 - **GroupPolicy split** — user profile methods (`profileRoutePrefix`, `profileSelector`, `profileMode`, `profileRoutesEnabledForRoutingTable`, `registrationMode`) extracted into new `sys/Router/UserPolicy`. `GroupPolicy` now holds only group methods (`groupRoutePrefix`, `groupMode`, `groupRoutesEnabledForRoutingTable`). Pure user callers updated to `UserPolicy`: `UserListController`, `UserEditController`, `UserInviteController`, `AuthController`, `ProfileController`. Mixed callers (`RoutingController`, `PublicPolicy`, `ControllerFactory`) updated to use both. `docs/filetree.md` updated.

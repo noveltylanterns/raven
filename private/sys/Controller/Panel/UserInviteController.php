@@ -14,7 +14,6 @@ namespace Raven\Core\Controller\Panel;
 use Closure;
 use Raven\Core\Repository\InviteWrite;
 use Raven\Lib\Auth\SessionFlash;
-use Raven\Core\Router\UserPolicy;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\Transport\Redirect;
 
@@ -28,28 +27,24 @@ final class UserInviteController
     private Closure $inviteWriteResolver;
     private ?InviteWrite $inviteWrite = null;
     private SessionFlash $flashList;
-    private UserPolicy $groupParser;
 
     /**
      * @param SharedController $context Shared panel request context.
      * @param InputSanitizer $input Shared request input sanitizer.
      * @param callable(): InviteWrite $inviteWriteResolver Lazy invite write resolver for token creation/deletion.
      * @param SessionFlash $flashList List-style flash store for generated token batches.
-     * @param UserPolicy $groupParser Shared group/profile routing-policy parser.
      * @return void
      */
     public function __construct(
         SharedController $context,
         InputSanitizer $input,
         callable $inviteWriteResolver,
-        SessionFlash $flashList,
-        UserPolicy $groupParser
+        SessionFlash $flashList
     ) {
         $this->context = $context;
         $this->input = $input;
         $this->inviteWriteResolver = Closure::fromCallable($inviteWriteResolver);
         $this->flashList = $flashList;
-        $this->groupParser = $groupParser;
     }
 
     /**
@@ -228,11 +223,12 @@ final class UserInviteController
     /**
      * Resolves configured public registration mode.
      *
-     * @return string Normalized public registration mode.
+     * @return string One of 'open', 'invite', or 'closed'.
      */
     private function registrationMode(): string
     {
-        return $this->groupParser->registrationMode();
+        $mode = strtolower(trim((string) $this->context->config()->get('user.auth.registration', 'closed')));
+        return in_array($mode, ['open', 'invite', 'closed'], true) ? $mode : 'closed';
     }
 
     /**

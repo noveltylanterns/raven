@@ -97,20 +97,6 @@ final class UserPolicy
     }
 
     /**
-     * Returns the normalized user registration mode.
-     *
-     * @return string One of 'open', 'invite', or 'closed'.
-     */
-    public function registrationMode(): string
-    {
-        return $this->normalizeMode(
-            (string) $this->config->get('user.auth.registration', 'closed'),
-            ['open', 'invite', 'closed'],
-            'closed'
-        );
-    }
-
-    /**
      * Normalizes a mode string against an allowed list, applying optional aliases first.
      *
      * @param string               $value    Raw mode value from config.

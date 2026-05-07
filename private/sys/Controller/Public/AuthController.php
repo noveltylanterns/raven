@@ -23,7 +23,6 @@ use Raven\Lib\Auth\LoginEmail;
 use Raven\Lib\Auth\LoginIdentifier;
 use Raven\Lib\Auth\LoginUiState;
 use Raven\Lib\Auth\SessionFlash;
-use Raven\Core\Router\UserPolicy;
 use Raven\Lib\Parser\PanelParser;
 use Raven\Lib\Parser\RedirectParser;
 use Raven\Lib\Transport\Request;
@@ -46,7 +45,6 @@ final class AuthController
     private ?InviteWrite $inviteWrite = null;
     private SessionFlash $flashStore;
     private LoginIdentifier $loginIdentifier;
-    private UserPolicy $groupRouteParser;
     private Request $request;
     private ClientProfiler $clientProfiler;
     private PublicCaptchaFlow $publicCaptchaFlow;
@@ -76,7 +74,6 @@ final class AuthController
         $this->inviteWriteResolver = Closure::fromCallable($inviteWriteResolver);
         $this->flashStore = new SessionFlash('_raven_public_flash');
         $this->loginIdentifier = new LoginIdentifier();
-        $this->groupRouteParser = new UserPolicy($context->config(), $context->input());
         $this->request = new Request();
         $this->clientProfiler = new ClientProfiler();
         $this->publicCaptchaFlow = new PublicCaptchaFlow(
@@ -111,7 +108,7 @@ final class AuthController
             'flashError' => $this->pullFlash('error'),
             'loginPath' => $this->loginPathWithRedirect($redirectPath),
             'registrationPath' => '/register',
-            'registrationMode' => $this->groupRouteParser->registrationMode(),
+            'registrationMode' => $this->registrationMode(),
             'loginIdentifierMode' => $loginIdentifierMode,
             'loginIdentifierLabel' => $loginIdentifierMode === 'email' ? 'Email' : 'Username or Email',
             'postLoginRedirectPath' => $redirectPath,
@@ -333,7 +330,7 @@ final class AuthController
      */
     public function register(): void
     {
-        $registrationMode = $this->groupRouteParser->registrationMode();
+        $registrationMode = $this->registrationMode();
         $loginIdentifierMode = $this->loginIdentifier->modeFromConfig($this->context->config());
         $this->context->renderPublic('auth/register', [
             'site' => $this->context->siteData(),
@@ -363,7 +360,7 @@ final class AuthController
             Redirect::redirect('/register');
         }
 
-        $registrationMode = $this->groupRouteParser->registrationMode();
+        $registrationMode = $this->registrationMode();
         if ($registrationMode === 'closed') {
             $this->flash('error', 'Registration is currently closed.');
             Redirect::redirect('/register');
@@ -818,6 +815,17 @@ final class AuthController
      *
      * @return bool True when registration is temporarily locked.
      */
+    /**
+     * Returns the normalized user registration mode from site config.
+     *
+     * @return string One of 'open', 'invite', or 'closed'.
+     */
+    private function registrationMode(): string
+    {
+        $mode = strtolower(trim((string) $this->context->config()->get('user.auth.registration', 'closed')));
+        return in_array($mode, ['open', 'invite', 'closed'], true) ? $mode : 'closed';
+    }
+
     private function isRegistrationTemporarilyLocked(): bool
     {
         return $this->context->auth()->isLoginTemporarilyLocked(
