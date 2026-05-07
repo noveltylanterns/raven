@@ -16,7 +16,7 @@ namespace Raven\Lib\Parser;
  *
  * Static methods carry shared constants and data-normalization rules; instance
  * methods handle read-side loading of the PHP-file-backed set store on disk.
- * Writes and storage-layout repair live in `Raven\Lib\Scribe\SetScribe`.
+ * Writes and storage-layout repair live in `Raven\Core\Repository\SetWrite`.
  */
 final class SetParser
 {
