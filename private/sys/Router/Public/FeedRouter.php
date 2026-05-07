@@ -13,7 +13,6 @@ namespace Raven\Core\Router\Public;
 
 use Raven\Core\Router\RouteValidator;
 use Raven\Core\Router\RouteHandler;
-use Raven\Lib\Security\InputSanitizer;
 
 /**
  * Registers public feed routes, including taxonomy-scoped feed endpoints.
@@ -21,7 +20,7 @@ use Raven\Lib\Security\InputSanitizer;
 final class FeedRouter
 {
     /**
-     * Registers feed routes from one shared dependency payload.
+     * Registers the public feed route family from one shared dependency payload.
      *
      * @param RouteHandler $router Mutable router receiving feed routes.
      * @param PublicPayload $deps Shared public route dependency payload.
@@ -29,39 +28,11 @@ final class FeedRouter
      */
     public static function registerWithDeps(RouteHandler $router, PublicPayload $deps): void
     {
-        self::register(
-            $router,
-            $deps->publicFeedController,
-            $deps->publicRequestContext,
-            $deps->input,
-            $deps->routeConfig
-        );
-    }
+        $publicFeedController = $deps->publicFeedController;
+        $publicRequestContext = $deps->publicRequestContext;
+        $input = $deps->input;
+        $routeConfig = $deps->routeConfig;
 
-    /**
-     * Registers the public feed route family.
-     *
-     * @param RouteHandler $router Mutable router receiving feed routes.
-     * @param callable(): object $publicFeedController Lazy public-feed controller factory.
-     * @param callable(): object $publicRequestContext Lazy public request-context factory.
-     * @param InputSanitizer $input Shared input normalizer for route params.
-     * @param array{
-     *   feeds_enabled: bool,
-     *   rss_feed_route: string,
-     *   atom_feed_route: string,
-     *   category_prefix: string,
-     *   tag_prefix: string,
-     *   reserved_prefixes: array<int, string>
-     * } $routeConfig Normalized public route policy.
-     * @return void
-     */
-    public static function register(
-        RouteHandler $router,
-        callable $publicFeedController,
-        callable $publicRequestContext,
-        InputSanitizer $input,
-        array $routeConfig
-    ): void {
         $feedsEnabled = !empty($routeConfig['feeds_enabled']);
         $rssFeedRoute = (string) ($routeConfig['rss_feed_route'] ?? '');
         $atomFeedRoute = (string) ($routeConfig['atom_feed_route'] ?? '');
@@ -162,6 +133,5 @@ final class FeedRouter
                 });
             }
         }
-
     }
 }

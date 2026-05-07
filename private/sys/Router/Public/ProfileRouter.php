@@ -12,7 +12,6 @@ declare(strict_types=1);
 namespace Raven\Core\Router\Public;
 
 use Raven\Core\Router\RouteHandler;
-use Raven\Lib\Security\InputSanitizer;
 
 /**
  * Registers public profile routes.
@@ -20,7 +19,7 @@ use Raven\Lib\Security\InputSanitizer;
 final class ProfileRouter
 {
     /**
-     * Registers profile routes from one shared dependency payload.
+     * Registers the public profile route family from one shared dependency payload.
      *
      * @param RouteHandler $router Mutable router receiving profile routes.
      * @param PublicPayload $deps Shared public route dependency payload.
@@ -28,33 +27,11 @@ final class ProfileRouter
      */
     public static function registerWithDeps(RouteHandler $router, PublicPayload $deps): void
     {
-        self::register(
-            $router,
-            $deps->publicProfileController,
-            $deps->publicRequestContext,
-            $deps->input,
-            $deps->routeConfig
-        );
-    }
+        $publicProfileController = $deps->publicProfileController;
+        $publicRequestContext = $deps->publicRequestContext;
+        $input = $deps->input;
+        $profilePrefix = (string) ($deps->routeConfig['profile_prefix'] ?? '');
 
-    /**
-     * Registers the public profile route family.
-     *
-     * @param RouteHandler $router Mutable router receiving profile routes.
-     * @param callable(): object $publicProfileController Lazy public-profile controller factory.
-     * @param callable(): object $publicRequestContext Lazy public request-context factory.
-     * @param InputSanitizer $input Shared input normalizer for route params.
-     * @param array{profile_prefix: string} $routeConfig Normalized public route policy.
-     * @return void
-     */
-    public static function register(
-        RouteHandler $router,
-        callable $publicProfileController,
-        callable $publicRequestContext,
-        InputSanitizer $input,
-        array $routeConfig
-    ): void {
-        $profilePrefix = (string) ($routeConfig['profile_prefix'] ?? '');
         if ($profilePrefix === '') {
             return;
         }

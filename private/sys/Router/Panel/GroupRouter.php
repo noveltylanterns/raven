@@ -13,7 +13,6 @@ namespace Raven\Core\Router\Panel;
 
 use Raven\Core\Router\RouteValidator;
 use Raven\Core\Router\RouteHandler;
-use Raven\Lib\Security\InputSanitizer;
 
 /**
  * Registers group-management routes for the panel runtime.
@@ -21,7 +20,7 @@ use Raven\Lib\Security\InputSanitizer;
 final class GroupRouter
 {
     /**
-     * Registers group routes from one shared dependency payload.
+     * Registers the panel group route family from one shared dependency payload.
      *
      * @param RouteHandler $router Mutable router receiving group routes.
      * @param PanelPayload $deps Shared panel route dependency payload.
@@ -29,32 +28,11 @@ final class GroupRouter
      */
     public static function registerWithDeps(RouteHandler $router, PanelPayload $deps): void
     {
-        self::register(
-            $router,
-            $deps->panelGroupListController,
-            $deps->panelGroupEditController,
-            $deps->input,
-            $deps->renderNotFound
-        );
-    }
+        $panelGroupListController = $deps->panelGroupListController;
+        $panelGroupEditController = $deps->panelGroupEditController;
+        $input = $deps->input;
+        $renderNotFound = $deps->renderNotFound;
 
-    /**
-     * Registers the panel group route family.
-     *
-     * @param RouteHandler $router Mutable router receiving group routes.
-     * @param callable(): object $panelGroupListController Lazy group list controller factory for GET /group.
-     * @param callable(): object $panelGroupEditController Lazy group edit controller factory for create/edit/save/delete routes.
-     * @param InputSanitizer $input Shared input normalizer for route params.
-     * @param callable(): void $renderNotFound Renders a 404 response when a route param is invalid.
-     * @return void
-     */
-    public static function register(
-        RouteHandler $router,
-        callable $panelGroupListController,
-        callable $panelGroupEditController,
-        InputSanitizer $input,
-        callable $renderNotFound
-    ): void {
         $router->add('GET', '/group', static function () use ($panelGroupListController): void {
             $panelGroupListController()->groupList();
         });

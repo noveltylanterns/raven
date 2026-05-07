@@ -19,7 +19,7 @@ use Raven\Core\Router\RouteHandler;
 final class ExtensionRouter
 {
     /**
-     * Registers extension-manager routes from one shared dependency payload.
+     * Registers the panel extension-manager route family from one shared dependency payload.
      *
      * @param RouteHandler $router Mutable router receiving extension-manager routes.
      * @param PanelPayload $deps Shared panel route dependency payload.
@@ -27,18 +27,8 @@ final class ExtensionRouter
      */
     public static function registerWithDeps(RouteHandler $router, PanelPayload $deps): void
     {
-        self::register($router, $deps->panelExtensionController);
-    }
+        $panelExtensionController = $deps->panelExtensionController;
 
-    /**
-     * Registers the panel extension-manager route family.
-     *
-     * @param RouteHandler $router Mutable router receiving extension-manager routes.
-     * @param callable(): object $panelExtensionController Lazy extension controller factory.
-     * @return void
-     */
-    public static function register(RouteHandler $router, callable $panelExtensionController): void
-    {
         $router->add('GET', '/extensions', static function () use ($panelExtensionController): void {
             $panelExtensionController()->extensions();
         });

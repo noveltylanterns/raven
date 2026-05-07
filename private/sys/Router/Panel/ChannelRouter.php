@@ -13,7 +13,6 @@ namespace Raven\Core\Router\Panel;
 
 use Raven\Core\Router\RouteValidator;
 use Raven\Core\Router\RouteHandler;
-use Raven\Lib\Security\InputSanitizer;
 
 /**
  * Registers channel-management routes for the panel runtime.
@@ -21,7 +20,7 @@ use Raven\Lib\Security\InputSanitizer;
 final class ChannelRouter
 {
     /**
-     * Registers channel routes from one shared dependency payload.
+     * Registers the panel channel route family from one shared dependency payload.
      *
      * @param RouteHandler $router Mutable router receiving channel routes.
      * @param PanelPayload $deps Shared panel route dependency payload.
@@ -29,32 +28,11 @@ final class ChannelRouter
      */
     public static function registerWithDeps(RouteHandler $router, PanelPayload $deps): void
     {
-        self::register(
-            $router,
-            $deps->panelChannelListController,
-            $deps->panelChannelEditController,
-            $deps->input,
-            $deps->renderNotFound
-        );
-    }
+        $panelChannelListController = $deps->panelChannelListController;
+        $panelChannelEditController = $deps->panelChannelEditController;
+        $input = $deps->input;
+        $renderNotFound = $deps->renderNotFound;
 
-    /**
-     * Registers the panel channel route family.
-     *
-     * @param RouteHandler $router Mutable router receiving channel routes.
-     * @param callable(): object $panelChannelListController Lazy channel list controller factory for GET /channel.
-     * @param callable(): object $panelChannelEditController Lazy channel edit controller factory for create/edit/save/delete routes.
-     * @param InputSanitizer $input Shared input normalizer for route params.
-     * @param callable(): void $renderNotFound Renders a 404 response when a route param is invalid.
-     * @return void
-     */
-    public static function register(
-        RouteHandler $router,
-        callable $panelChannelListController,
-        callable $panelChannelEditController,
-        InputSanitizer $input,
-        callable $renderNotFound
-    ): void {
         $router->add('GET', '/channel', static function () use ($panelChannelListController): void {
             $panelChannelListController()->channelList();
         });

@@ -22,12 +22,12 @@ This is the default Build Mode backlog file. If the user asks about goals, unpat
 ## 1) sys/Router/ Refactor
 Lingering issues & reorganization tasks. Make a plan to deal with them all in one clean sweep. Append it as a detailed checklist to this section, and check off each item as you go, in case we lose session or we have to bounce between agents:
 ### sys/Router/ Cleanup
-- [ ] Routers generally come in clearly matched sets with corresponding Controllers. Bring to my attention the ones that do not (itemized w/ purpose & scope) so we can decide what (if anything) to do with them.
-- [ ] Make sure no Router is pulling up dead function/class/dependency weight irrelevant to route being loaded.
-- [ ] Scan the whole Router/ directory for legacy aliases, compatability shims, and thin wrappers that don't add any extra logic. Purge all of them. Update all callers to use actual source functions.
-- [ ] A lot of the functions in our Router/ classes have really long & unclear names. Do a sweep of every class and make sure the function/variable names are concise+accurate.
-- [ ] Do a sweep of all classes in Router/ making sure PHPdoc blocks are present+accurate for ALL headings, classes & functions.
-- [ ] Update release-notes.md, clear completed section out of todo.md, and commit.
+- [x] Routers generally come in clearly matched sets with corresponding Controllers. Bring to my attention the ones that do not (itemized w/ purpose & scope) so we can decide what (if anything) to do with them.
+- [x] Make sure no Router is pulling up dead function/class/dependency weight irrelevant to route being loaded.
+- [x] Scan the whole Router/ directory for legacy aliases, compatability shims, and thin wrappers that don't add any extra logic. Purge all of them. Update all callers to use actual source functions.
+- [x] A lot of the functions in our Router/ classes have really long & unclear names. Do a sweep of every class and make sure the function/variable names are concise+accurate.
+- [x] Do a sweep of all classes in Router/ making sure PHPdoc blocks are present+accurate for ALL headings, classes & functions.
+- [x] Update release-notes.md, clear completed section out of todo.md, and commit.
 
 ## 2) sys/Runtime/ Refactor Cleanup
 Lingering issues & reorganization tasks. Make a plan to deal with them all in one clean sweep. Append it as a detailed checklist to this section, and check off each item as you go, in case we lose session or we have to bounce between agents:

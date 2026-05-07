@@ -13,7 +13,6 @@ namespace Raven\Core\Router\Public;
 
 use Raven\Core\Router\RouteValidator;
 use Raven\Core\Router\RouteHandler;
-use Raven\Lib\Security\InputSanitizer;
 
 /**
  * Registers homepage, channel-qualified page, and embedded-form routes for the public runtime.
@@ -21,7 +20,7 @@ use Raven\Lib\Security\InputSanitizer;
 final class PageRouter
 {
     /**
-     * Registers page and embedded-form routes from one shared dependency payload.
+     * Registers the public page and embedded-form route family from one shared dependency payload.
      *
      * @param RouteHandler $router Mutable router receiving page and form routes.
      * @param PublicPayload $deps Shared public route dependency payload.
@@ -29,34 +28,11 @@ final class PageRouter
      */
     public static function registerWithDeps(RouteHandler $router, PublicPayload $deps): void
     {
-        self::register(
-            $router,
-            $deps->publicPageController,
-            $deps->publicRequestContext,
-            $deps->input,
-            $deps->routeConfig
-        );
-    }
-
-    /**
-     * Registers the public page and embedded-form route family.
-     *
-     * @param RouteHandler $router Mutable router receiving page and form routes.
-     * @param callable(): object $publicPageController Lazy public-page controller factory.
-     * @param callable(): object $publicRequestContext Lazy public request-context factory.
-     * @param InputSanitizer $input Shared input normalizer for route params.
-     * @param array{reserved_prefixes: array<int, string>} $routeConfig Normalized public route policy.
-     * @return void
-     */
-    public static function register(
-        RouteHandler $router,
-        callable $publicPageController,
-        callable $publicRequestContext,
-        InputSanitizer $input,
-        array $routeConfig
-    ): void {
-        $reservedPrefixes = is_array($routeConfig['reserved_prefixes'] ?? null)
-            ? array_values($routeConfig['reserved_prefixes'])
+        $publicPageController = $deps->publicPageController;
+        $publicRequestContext = $deps->publicRequestContext;
+        $input = $deps->input;
+        $reservedPrefixes = is_array($deps->routeConfig['reserved_prefixes'] ?? null)
+            ? array_values($deps->routeConfig['reserved_prefixes'])
             : [];
 
         // Embedded-form submission; extension-agnostic and globally available to all

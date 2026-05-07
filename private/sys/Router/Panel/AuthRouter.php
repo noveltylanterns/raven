@@ -19,7 +19,7 @@ use Raven\Core\Router\RouteHandler;
 final class AuthRouter
 {
     /**
-     * Registers panel auth routes from one shared dependency payload.
+     * Registers the panel auth route family from one shared dependency payload.
      *
      * @param RouteHandler $router Mutable router receiving the auth routes.
      * @param PanelPayload $deps Shared panel route dependency payload.
@@ -27,18 +27,8 @@ final class AuthRouter
      */
     public static function registerWithDeps(RouteHandler $router, PanelPayload $deps): void
     {
-        self::register($router, $deps->authController);
-    }
+        $authController = $deps->authController;
 
-    /**
-     * Registers the panel auth route family.
-     *
-     * @param RouteHandler $router Mutable router receiving the auth routes.
-     * @param callable(): object $authController Lazy panel-auth controller factory.
-     * @return void
-     */
-    public static function register(RouteHandler $router, callable $authController): void
-    {
         $router->add('GET', '/login', static function () use ($authController): void {
             $authController()->showLogin();
         });

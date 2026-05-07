@@ -19,7 +19,7 @@ use Raven\Core\Router\RouteHandler;
 final class UpdateRouter
 {
     /**
-     * Registers updater routes from one shared dependency payload.
+     * Registers the panel updater route family from one shared dependency payload.
      *
      * @param RouteHandler $router Mutable router receiving updater routes.
      * @param PanelPayload $deps Shared panel route dependency payload.
@@ -27,20 +27,8 @@ final class UpdateRouter
      */
     public static function registerWithDeps(RouteHandler $router, PanelPayload $deps): void
     {
-        self::register($router, $deps->panelUpdateController);
-    }
+        $panelUpdateController = $deps->panelUpdateController;
 
-    /**
-     * Registers the panel updater route family.
-     *
-     * @param RouteHandler $router Mutable router receiving updater routes.
-     * @param callable(): object $panelUpdateController Lazy updater controller factory.
-     * @return void
-     */
-    public static function register(
-        RouteHandler $router,
-        callable $panelUpdateController
-    ): void {
         $router->add('GET', '/update', static function () use ($panelUpdateController): void {
             $panelUpdateController()->update();
         });

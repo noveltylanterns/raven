@@ -19,7 +19,7 @@ use Raven\Core\Router\RouteHandler;
 final class DashboardRouter
 {
     /**
-     * Registers dashboard routes from one shared dependency payload.
+     * Registers the dashboard landing route from one shared dependency payload.
      *
      * @param RouteHandler $router Mutable router receiving the dashboard route.
      * @param PanelPayload $deps Shared panel route dependency payload.
@@ -27,18 +27,8 @@ final class DashboardRouter
      */
     public static function registerWithDeps(RouteHandler $router, PanelPayload $deps): void
     {
-        self::register($router, $deps->panelDashboardController);
-    }
+        $panelDashboardController = $deps->panelDashboardController;
 
-    /**
-     * Registers the dashboard landing route.
-     *
-     * @param RouteHandler $router Mutable router receiving the dashboard route.
-     * @param callable(): object $panelDashboardController Lazy dashboard controller factory.
-     * @return void
-     */
-    public static function register(RouteHandler $router, callable $panelDashboardController): void
-    {
         $router->add('GET', '/', static function () use ($panelDashboardController): void {
             $panelDashboardController()->dashboard();
         });

@@ -69,7 +69,7 @@ final class PanelRouter
     /**
      * Dispatches one normalized request through the isolated panel route map.
      *
-     * @param RouteRequest  Normalized routing request payload.
+     * @param RouteRequest $request Normalized routing request payload.
      * @return RouteResponse Dispatch result indicating match state and params.
      */
     public function dispatch(RouteRequest $request): RouteResponse

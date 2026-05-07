@@ -27,18 +27,8 @@ final class AuthRouter
      */
     public static function registerWithDeps(RouteHandler $router, PublicPayload $deps): void
     {
-        self::register($router, $deps->publicAuthController);
-    }
+        $publicAuthController = $deps->publicAuthController;
 
-    /**
-     * Registers the public auth route family.
-     *
-     * @param RouteHandler $router Mutable router receiving the auth routes.
-     * @param callable(): object $publicAuthController Lazy public-auth controller factory.
-     * @return void
-     */
-    public static function register(RouteHandler $router, callable $publicAuthController): void
-    {
         $router->add('GET', '/login', static function () use ($publicAuthController): void {
             $publicAuthController()->login();
         });

@@ -13,7 +13,6 @@ namespace Raven\Core\Router\Panel;
 
 use Raven\Core\Router\RouteValidator;
 use Raven\Core\Router\RouteHandler;
-use Raven\Lib\Security\InputSanitizer;
 
 /**
  * Registers redirect-management routes for the panel runtime.
@@ -21,7 +20,7 @@ use Raven\Lib\Security\InputSanitizer;
 final class RedirectRouter
 {
     /**
-     * Registers redirect routes from one shared dependency payload.
+     * Registers the panel redirect route family from one shared dependency payload.
      *
      * @param RouteHandler $router Mutable router receiving redirect routes.
      * @param PanelPayload $deps Shared panel route dependency payload.
@@ -29,32 +28,11 @@ final class RedirectRouter
      */
     public static function registerWithDeps(RouteHandler $router, PanelPayload $deps): void
     {
-        self::register(
-            $router,
-            $deps->panelRedirectListController,
-            $deps->panelRedirectEditController,
-            $deps->input,
-            $deps->renderNotFound
-        );
-    }
+        $panelRedirectListController = $deps->panelRedirectListController;
+        $panelRedirectEditController = $deps->panelRedirectEditController;
+        $input = $deps->input;
+        $renderNotFound = $deps->renderNotFound;
 
-    /**
-     * Registers the panel redirect route family.
-     *
-     * @param RouteHandler $router Mutable router receiving redirect routes.
-     * @param callable(): object $panelRedirectListController Lazy redirect list controller factory for GET /redirect.
-     * @param callable(): object $panelRedirectEditController Lazy redirect edit controller factory for create/edit/save/delete routes.
-     * @param InputSanitizer $input Shared input normalizer for route params.
-     * @param callable(): void $renderNotFound Renders a 404 response when a route param is invalid.
-     * @return void
-     */
-    public static function register(
-        RouteHandler $router,
-        callable $panelRedirectListController,
-        callable $panelRedirectEditController,
-        InputSanitizer $input,
-        callable $renderNotFound
-    ): void {
         $router->add('GET', '/redirect', static function () use ($panelRedirectListController): void {
             $panelRedirectListController()->redirectList();
         });

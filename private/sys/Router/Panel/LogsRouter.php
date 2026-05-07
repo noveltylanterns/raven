@@ -19,7 +19,7 @@ use Raven\Core\Router\RouteHandler;
 final class LogsRouter
 {
     /**
-     * Registers log routes from one shared dependency payload.
+     * Registers the panel logs route family from one shared dependency payload.
      *
      * @param RouteHandler $router Mutable router receiving logs routes.
      * @param PanelPayload $deps Shared panel route dependency payload.
@@ -27,20 +27,8 @@ final class LogsRouter
      */
     public static function registerWithDeps(RouteHandler $router, PanelPayload $deps): void
     {
-        self::register($router, $deps->panelLogsController);
-    }
+        $panelLogsController = $deps->panelLogsController;
 
-    /**
-     * Registers the panel logs route family.
-     *
-     * @param RouteHandler $router Mutable router receiving log routes.
-     * @param callable(): object $panelLogsController Lazy logs controller factory.
-     * @return void
-     */
-    public static function register(
-        RouteHandler $router,
-        callable $panelLogsController
-    ): void {
         $router->add('GET', '/logs', static function () use ($panelLogsController): void {
             $panelLogsController()->logs();
         });

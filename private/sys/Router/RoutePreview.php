@@ -92,7 +92,7 @@ final class RoutePreview
     /**
      * Picks the best landing-page slug per channel from one page row set.
      *
-     * @param array<int, array<string, mixed>> $pagesForRouting
+     * @param array<int, array<string, mixed>> $pagesForRouting Full page row set to scan for landing candidates.
      * @return array<string, string> Map of channel slug to chosen landing-page slug.
      */
     public function channelLandingMapFromPages(array $pagesForRouting): array
@@ -179,7 +179,8 @@ final class RoutePreview
     /**
      * Normalizes the reserved public-prefix list used by routing diagnostics.
      *
-     * @param array<int, string> $routePrefixes
+     * @param string $panelPath Panel path prefix to exclude from public routing.
+     * @param array<int, string> $routePrefixes Additional reserved prefix strings to include.
      * @return array<int, string> Deduplicated lowercase reserved prefixes.
      */
     public function reservedPublicPrefixes(string $panelPath, array $routePrefixes = []): array

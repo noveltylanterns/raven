@@ -13,7 +13,6 @@ namespace Raven\Core\Router\Panel;
 
 use Raven\Core\Router\RouteValidator;
 use Raven\Core\Router\RouteHandler;
-use Raven\Lib\Security\InputSanitizer;
 
 /**
  * Registers user-management routes for the panel runtime.
@@ -21,7 +20,7 @@ use Raven\Lib\Security\InputSanitizer;
 final class UserRouter
 {
     /**
-     * Registers user routes from one shared dependency payload.
+     * Registers the panel user route family from one shared dependency payload.
      *
      * @param RouteHandler $router Mutable router receiving user routes.
      * @param PanelPayload $deps Shared panel route dependency payload.
@@ -29,35 +28,12 @@ final class UserRouter
      */
     public static function registerWithDeps(RouteHandler $router, PanelPayload $deps): void
     {
-        self::register(
-            $router,
-            $deps->panelUserListController,
-            $deps->panelUserEditController,
-            $deps->panelUserInviteController,
-            $deps->input,
-            $deps->renderNotFound
-        );
-    }
+        $panelUserListController = $deps->panelUserListController;
+        $panelUserEditController = $deps->panelUserEditController;
+        $panelUserInviteController = $deps->panelUserInviteController;
+        $input = $deps->input;
+        $renderNotFound = $deps->renderNotFound;
 
-    /**
-     * Registers the panel user route family.
-     *
-     * @param RouteHandler $router Mutable router receiving user routes.
-     * @param callable(): object $panelUserListController Lazy user list controller factory for GET /user and GET /user/invites.
-     * @param callable(): object $panelUserEditController Lazy user edit controller factory for create/edit/save/delete routes.
-     * @param callable(): object $panelUserInviteController Lazy user invite controller factory for invite write routes.
-     * @param InputSanitizer $input Shared input normalizer for route params.
-     * @param callable(): void $renderNotFound Renders a 404 response when a route param is invalid.
-     * @return void
-     */
-    public static function register(
-        RouteHandler $router,
-        callable $panelUserListController,
-        callable $panelUserEditController,
-        callable $panelUserInviteController,
-        InputSanitizer $input,
-        callable $renderNotFound
-    ): void {
         $router->add('GET', '/user', static function () use ($panelUserListController): void {
             $panelUserListController()->userList();
         });

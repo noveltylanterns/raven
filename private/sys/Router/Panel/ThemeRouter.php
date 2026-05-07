@@ -19,7 +19,7 @@ use Raven\Core\Router\RouteHandler;
 final class ThemeRouter
 {
     /**
-     * Registers theme routes from one shared dependency payload.
+     * Registers the panel theme-manager route family from one shared dependency payload.
      *
      * @param RouteHandler $router Mutable router receiving theme routes.
      * @param PanelPayload $deps Shared panel route dependency payload.
@@ -27,18 +27,8 @@ final class ThemeRouter
      */
     public static function registerWithDeps(RouteHandler $router, PanelPayload $deps): void
     {
-        self::register($router, $deps->panelThemeController);
-    }
+        $panelThemeController = $deps->panelThemeController;
 
-    /**
-     * Registers the panel theme-manager route family.
-     *
-     * @param RouteHandler $router Mutable router receiving theme routes.
-     * @param callable(): object $panelThemeController Lazy theme controller factory.
-     * @return void
-     */
-    public static function register(RouteHandler $router, callable $panelThemeController): void
-    {
         $router->add('GET', '/themes', static function () use ($panelThemeController): void {
             $panelThemeController()->themes();
         });
@@ -64,4 +54,3 @@ final class ThemeRouter
         });
     }
 }
-

@@ -19,7 +19,7 @@ use Raven\Core\Router\RouteHandler;
 final class PreferencesRouter
 {
     /**
-     * Registers preference routes from one shared dependency payload.
+     * Registers the panel preferences route family from one shared dependency payload.
      *
      * @param RouteHandler $router Mutable router receiving preferences routes.
      * @param PanelPayload $deps Shared panel route dependency payload.
@@ -27,18 +27,8 @@ final class PreferencesRouter
      */
     public static function registerWithDeps(RouteHandler $router, PanelPayload $deps): void
     {
-        self::register($router, $deps->panelPreferencesController);
-    }
+        $panelPreferencesController = $deps->panelPreferencesController;
 
-    /**
-     * Registers the panel preferences route family.
-     *
-     * @param RouteHandler $router Mutable router receiving preferences routes.
-     * @param callable(): object $panelPreferencesController Lazy preferences controller factory.
-     * @return void
-     */
-    public static function register(RouteHandler $router, callable $panelPreferencesController): void
-    {
         $router->add('GET', '/preferences', static function () use ($panelPreferencesController): void {
             $panelPreferencesController()->preferences();
         });
