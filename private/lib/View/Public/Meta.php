@@ -2,7 +2,7 @@
 
 /**
  * RAVEN CMS
- * ~/private/lib/View/Public/MetaService.php
+ * ~/private/lib/View/Public/Meta.php
  * Public site metadata payload builder and social-image URL resolver.
  * Docs: https://raven.lanterns.io
 */
@@ -19,7 +19,7 @@ use Raven\Lib\Parser\UserProfileParser;
 /**
  * Shared site/public meta payload builder and social-image URL resolver.
  */
-final class MetaService
+final class Meta
 {
     private Request $requestContextResolver;
     private ThemeCatalog $themeCatalogService;

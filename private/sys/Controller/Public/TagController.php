@@ -19,7 +19,7 @@ use Raven\Lib\Parser\PageRouteParser;
 use Raven\Lib\Parser\TagRouteParser;
 use Raven\Lib\Parser\UserProfileParser;
 use Raven\Lib\Transport\Request;
-use Raven\Lib\View\Public\MetaService;
+use Raven\Lib\View\Public\Meta;
 use Raven\Lib\View\Public\TemplateDecorator;
 use Raven\Lib\View\Public\ThemeCatalog;
 use Raven\Lib\View\Public\ThemeTemplate;
@@ -36,7 +36,7 @@ final class TagController
     private FeedParser $feedParser;
     private TemplateDecorator $templateDecorator;
     private ThemeCatalog $themeCatalog;
-    private MetaService $metaService;
+    private Meta $metaService;
     private ?ThemeTemplate $themeTemplate = null;
 
     /**
@@ -63,7 +63,7 @@ final class TagController
             dirname(__DIR__, 4)
         );
         $this->themeCatalog = $themeCatalog;
-        $this->metaService = new MetaService(
+        $this->metaService = new Meta(
             $this->request,
             $this->themeCatalog,
             new UserProfileParser($context->input()),

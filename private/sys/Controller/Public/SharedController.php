@@ -22,7 +22,7 @@ use Raven\Lib\Parser\UserProfileParser;
 use Raven\Lib\Security\Csrf;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\View\Public\Error as PublicError;
-use Raven\Lib\View\Public\MetaService;
+use Raven\Lib\View\Public\Meta;
 use Raven\Lib\View\Public\TemplateDecorator;
 use Raven\Lib\View\Public\ThemeCatalog;
 use Raven\Lib\View\Public\ThemeBrace;
@@ -46,7 +46,7 @@ final class SharedController
     private ?FeedParser $feedParser = null;
     private ?UserProfileParser $profileParser = null;
     private ThemeCatalog $themeCatalog;
-    private ?MetaService $metaService = null;
+    private ?Meta $metaService = null;
     private ?TemplateDecorator $templateDecorator = null;
     private ?ThemeTemplate $themeTemplate = null;
 
@@ -354,12 +354,12 @@ final class SharedController
     /**
      * Returns the cached public meta service.
      *
-     * @return MetaService Shared public meta helper.
+     * @return Meta Shared public meta helper.
      */
-    private function metaService(): MetaService
+    private function metaService(): Meta
     {
-        if (!$this->metaService instanceof MetaService) {
-            $this->metaService = new MetaService(
+        if (!$this->metaService instanceof Meta) {
+            $this->metaService = new Meta(
                 $this->request(),
                 $this->themeCatalog,
                 $this->profileParser(),

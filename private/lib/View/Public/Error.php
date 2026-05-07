@@ -27,7 +27,7 @@ final class Error
     private ThemeCatalog $themeCatalog;
     private ThemeTemplate $themeTemplate;
     private ThemeBrace $themeBrace;
-    private MetaService $meta;
+    private Meta $meta;
 
     /**
      * @param Config $config Runtime configuration reader.
@@ -35,7 +35,7 @@ final class Error
      * @param ThemeCatalog|null $themeCatalog Optional injected public-theme catalog.
      * @param ThemeTemplate|null $themeTemplate Optional injected public template resolver.
      * @param ThemeBrace|null $themeBrace Optional injected template renderer.
-     * @param MetaService|null $meta Optional injected public meta payload service.
+     * @param Meta|null $meta Optional injected public meta payload service.
      * @return void
      */
     public function __construct(
@@ -44,7 +44,7 @@ final class Error
         ?ThemeCatalog $themeCatalog = null,
         ?ThemeTemplate $themeTemplate = null,
         ?ThemeBrace $themeBrace = null,
-        ?MetaService $meta = null
+        ?Meta $meta = null
     ) {
         $this->config = $config;
         $this->root = rtrim($root, '/\\');
@@ -53,7 +53,7 @@ final class Error
         $this->themeCatalog = $themeCatalog ?? new ThemeCatalog($this->root . '/public/theme', $input);
         $this->themeTemplate = $themeTemplate ?? new ThemeTemplate($input);
         $this->themeBrace = $themeBrace ?? new ThemeBrace($this->root . '/.tmp/template_tag_cache');
-        $this->meta = $meta ?? new MetaService(
+        $this->meta = $meta ?? new Meta(
             new Request(),
             $this->themeCatalog,
             new UserProfileParser($input),

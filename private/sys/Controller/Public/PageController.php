@@ -30,7 +30,7 @@ use Raven\Lib\Parser\UserProfileParser;
 use Raven\Lib\Transport\Request;
 use Raven\Lib\Security\PublicCaptchaFlow;
 use Raven\Lib\Transport\Redirect;
-use Raven\Lib\View\Public\MetaService;
+use Raven\Lib\View\Public\Meta;
 use Raven\Lib\View\Public\PageBlocks;
 use Raven\Lib\View\Public\PageMarkdown;
 use Raven\Lib\View\Public\TemplateDecorator;
@@ -57,7 +57,7 @@ final class PageController
     private ?array $blockTypeDefsCache = null;
     private ThemeCatalog $themeCatalog;
     private ?ThemeTemplate $themeTemplate = null;
-    private ?MetaService $metaService = null;
+    private ?Meta $metaService = null;
     private ?TemplateDecorator $templateDecorator = null;
     private ?PageMarkdown $pageMarkdown = null;
     private ?PageBlockParser $pageBlockParser = null;
@@ -552,12 +552,12 @@ final class PageController
     /**
      * Returns the shared public meta service.
      *
-     * @return MetaService Shared public meta service.
+     * @return Meta Shared public meta service.
      */
-    private function metaService(): MetaService
+    private function metaService(): Meta
     {
-        if (!$this->metaService instanceof MetaService) {
-            $this->metaService = new MetaService(
+        if (!$this->metaService instanceof Meta) {
+            $this->metaService = new Meta(
                 $this->request,
                 $this->themeCatalog,
                 $this->profileParser(),
