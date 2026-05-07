@@ -50,6 +50,7 @@ use Raven\Lib\Media\CoverDelete;
 use Raven\Lib\Media\CoverUpload;
 use Raven\Core\Router\FeedPolicy;
 use Raven\Core\Router\GroupPolicy;
+use Raven\Core\Router\UserPolicy;
 use Raven\Lib\Parser\UserProfileParser;
 use Raven\Lib\View\Panel\EditorMeta;
 use Raven\Lib\Security\PasswordValidator;
@@ -546,7 +547,7 @@ final class ControllerFactory
                 $userDomain['user_read'],
                 $userDomain['invite_read'],
                 new SessionFlash('_raven_flash_list'),
-                new GroupPolicy($rvn['config'], $rvn['input']),
+                new UserPolicy($rvn['config'], $rvn['input']),
                 new LoginIdentifier()
             );
 
@@ -573,7 +574,7 @@ final class ControllerFactory
                 $userDomain['user_read'],
                 $userDomain['user_write'],
                 $userDomain['auth_write'],
-                new GroupPolicy($rvn['config'], $rvn['input']),
+                new UserPolicy($rvn['config'], $rvn['input']),
                 new LoginIdentifier(),
                 $rvn['panel_editor_tabs'](),
                 $rvn['panel_editor_blocks'](),
@@ -609,7 +610,7 @@ final class ControllerFactory
                 $rvn['input'],
                 $userDomain['invite_write'],
                 new SessionFlash('_raven_flash_list'),
-                new GroupPolicy($rvn['config'], $rvn['input'])
+                new UserPolicy($rvn['config'], $rvn['input'])
             );
 
             return $userInviteController;

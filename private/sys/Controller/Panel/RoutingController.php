@@ -26,6 +26,7 @@ use Raven\Core\Router\ChannelPolicy;
 use Raven\Core\Router\FeedPolicy;
 use Raven\Core\Router\GroupPolicy;
 use Raven\Core\Router\TagPolicy;
+use Raven\Core\Router\UserPolicy;
 use Raven\Lib\View\Taxonomy;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Core\Router\RoutePreview;
@@ -55,7 +56,8 @@ final class RoutingController
     private ?RouteProfiler $routeProfiler = null;
     private ?Csv $csvHandler = null;
     private ?FeedPolicy $feedParser = null;
-    private ?GroupPolicy $groupParser = null;
+    private ?UserPolicy $userPolicy = null;
+    private ?GroupPolicy $groupPolicy = null;
     private ThemeCatalog $themeCatalog;
     private ?RoutePreview $routePreview = null;
 
@@ -260,7 +262,7 @@ final class RoutingController
             return null;
         }
 
-        return match ($this->groupParser()->profileSelector()) {
+        return match ($this->userPolicy()->profileSelector()) {
             'string' => $this->currentUserString($user),
             'username' => $this->normalizeIdentifier((string) ($user['username'] ?? '')),
             default => (string) $userId,
@@ -504,7 +506,7 @@ final class RoutingController
      */
     private function profileRoutePrefix(): string
     {
-        return $this->groupParser()->profileRoutePrefix();
+        return $this->userPolicy()->profileRoutePrefix();
     }
 
     /**
@@ -512,7 +514,7 @@ final class RoutingController
      */
     private function profileRoutesEnabledForRoutingTable(): bool
     {
-        return $this->groupParser()->profileRoutesEnabledForRoutingTable();
+        return $this->userPolicy()->profileRoutesEnabledForRoutingTable();
     }
 
     /**
@@ -520,7 +522,7 @@ final class RoutingController
      */
     private function groupRoutePrefix(): string
     {
-        return $this->groupParser()->groupRoutePrefix();
+        return $this->groupPolicy()->groupRoutePrefix();
     }
 
     /**
@@ -528,7 +530,7 @@ final class RoutingController
      */
     private function groupRoutesEnabledForRoutingTable(): bool
     {
-        return $this->groupParser()->groupRoutesEnabledForRoutingTable();
+        return $this->groupPolicy()->groupRoutesEnabledForRoutingTable();
     }
 
     /**
@@ -557,15 +559,27 @@ final class RoutingController
     }
 
     /**
-     * Returns the group route parser on first use.
+     * Returns the user routing policy on first use.
      */
-    private function groupParser(): GroupPolicy
+    private function userPolicy(): UserPolicy
     {
-        if (!$this->groupParser instanceof GroupPolicy) {
-            $this->groupParser = new GroupPolicy($this->config, $this->input);
+        if (!$this->userPolicy instanceof UserPolicy) {
+            $this->userPolicy = new UserPolicy($this->config, $this->input);
         }
 
-        return $this->groupParser;
+        return $this->userPolicy;
+    }
+
+    /**
+     * Returns the group routing policy on first use.
+     */
+    private function groupPolicy(): GroupPolicy
+    {
+        if (!$this->groupPolicy instanceof GroupPolicy) {
+            $this->groupPolicy = new GroupPolicy($this->config, $this->input);
+        }
+
+        return $this->groupPolicy;
     }
 
     /**

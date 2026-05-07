@@ -23,7 +23,7 @@ use Raven\Lib\Auth\LoginEmail;
 use Raven\Lib\Auth\LoginIdentifier;
 use Raven\Lib\Auth\LoginUiState;
 use Raven\Lib\Auth\SessionFlash;
-use Raven\Core\Router\GroupPolicy;
+use Raven\Core\Router\UserPolicy;
 use Raven\Lib\Parser\PanelParser;
 use Raven\Lib\Parser\RedirectParser;
 use Raven\Lib\Transport\Request;
@@ -46,7 +46,7 @@ final class AuthController
     private ?InviteWrite $inviteWrite = null;
     private SessionFlash $flashStore;
     private LoginIdentifier $loginIdentifier;
-    private GroupPolicy $groupRouteParser;
+    private UserPolicy $groupRouteParser;
     private Request $request;
     private ClientProfiler $clientProfiler;
     private PublicCaptchaFlow $publicCaptchaFlow;
@@ -76,7 +76,7 @@ final class AuthController
         $this->inviteWriteResolver = Closure::fromCallable($inviteWriteResolver);
         $this->flashStore = new SessionFlash('_raven_public_flash');
         $this->loginIdentifier = new LoginIdentifier();
-        $this->groupRouteParser = new GroupPolicy($context->config(), $context->input());
+        $this->groupRouteParser = new UserPolicy($context->config(), $context->input());
         $this->request = new Request();
         $this->clientProfiler = new ClientProfiler();
         $this->publicCaptchaFlow = new PublicCaptchaFlow(

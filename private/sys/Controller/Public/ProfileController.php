@@ -13,7 +13,7 @@ namespace Raven\Core\Controller\Public;
 
 use Raven\Core\Repository\UserRead;
 use Raven\Lib\Auth\LoginIdentifier;
-use Raven\Core\Router\GroupPolicy;
+use Raven\Core\Router\UserPolicy;
 use Raven\Lib\Parser\UserProfileParser;
 use Raven\Lib\View\Public\TemplateDecorator;
 
@@ -25,7 +25,7 @@ final class ProfileController
     private SharedController $context;
     private UserRead $userRead;
     private LoginIdentifier $loginIdentifier;
-    private GroupPolicy $groupRouteParser;
+    private UserPolicy $groupRouteParser;
     private UserProfileParser $profileParser;
     private TemplateDecorator $templateDecorator;
 
@@ -41,7 +41,7 @@ final class ProfileController
         $this->context = $context;
         $this->userRead = $userRead;
         $this->loginIdentifier = new LoginIdentifier();
-        $this->groupRouteParser = new GroupPolicy($context->config(), $context->input());
+        $this->groupRouteParser = new UserPolicy($context->config(), $context->input());
         $this->profileParser = new UserProfileParser($context->input());
         $this->templateDecorator = new TemplateDecorator(
             $context->config(),

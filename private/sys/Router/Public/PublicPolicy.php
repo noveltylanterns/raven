@@ -16,6 +16,7 @@ use Raven\Core\Router\CategoryPolicy;
 use Raven\Core\Router\FeedPolicy;
 use Raven\Core\Router\GroupPolicy;
 use Raven\Core\Router\TagPolicy;
+use Raven\Core\Router\UserPolicy;
 use Raven\Lib\Security\InputSanitizer;
 
 /**
@@ -42,13 +43,14 @@ final class PublicPolicy
      */
     public static function build(Config $config, InputSanitizer $input): array
     {
+        $userRouteParser = new UserPolicy($config, $input);
         $groupRouteParser = new GroupPolicy($config, $input);
         $feedRouteParser = new FeedPolicy($config, $input);
 
         $panelPath = (string) $config->get('panel.path', 'panel');
         $categoryPrefix = CategoryPolicy::routePrefix($config, $input);
         $tagPrefix = TagPolicy::routePrefix($config, $input);
-        $profilePrefix = $groupRouteParser->profileRoutePrefix();
+        $profilePrefix = $userRouteParser->profileRoutePrefix();
         $groupPrefix = $groupRouteParser->groupRoutePrefix();
         $feedsEnabled = $feedRouteParser->feedEnabled();
         $rssFeedRoute = $feedRouteParser->rssFeedRoute();

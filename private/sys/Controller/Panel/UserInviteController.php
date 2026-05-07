@@ -14,7 +14,7 @@ namespace Raven\Core\Controller\Panel;
 use Closure;
 use Raven\Core\Repository\InviteWrite;
 use Raven\Lib\Auth\SessionFlash;
-use Raven\Core\Router\GroupPolicy;
+use Raven\Core\Router\UserPolicy;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\Transport\Redirect;
 
@@ -28,14 +28,14 @@ final class UserInviteController
     private Closure $inviteWriteResolver;
     private ?InviteWrite $inviteWrite = null;
     private SessionFlash $flashList;
-    private GroupPolicy $groupParser;
+    private UserPolicy $groupParser;
 
     /**
      * @param SharedController $context Shared panel request context.
      * @param InputSanitizer $input Shared request input sanitizer.
      * @param callable(): InviteWrite $inviteWriteResolver Lazy invite write resolver for token creation/deletion.
      * @param SessionFlash $flashList List-style flash store for generated token batches.
-     * @param GroupPolicy $groupParser Shared group/profile routing-policy parser.
+     * @param UserPolicy $groupParser Shared group/profile routing-policy parser.
      * @return void
      */
     public function __construct(
@@ -43,7 +43,7 @@ final class UserInviteController
         InputSanitizer $input,
         callable $inviteWriteResolver,
         SessionFlash $flashList,
-        GroupPolicy $groupParser
+        UserPolicy $groupParser
     ) {
         $this->context = $context;
         $this->input = $input;
