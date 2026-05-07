@@ -12,6 +12,7 @@ declare(strict_types=1);
 namespace Raven\Lib\Parser;
 
 use Raven\Core\Config;
+use Raven\Core\Repository\ConfigRead;
 use Raven\Lib\Security\InputSanitizer;
 
 /**
@@ -31,7 +32,7 @@ final class TagRouteParser
      */
     public static function tagRoutePrefix(Config $config, InputSanitizer $input): string
     {
-        if (!ConfigParser::bool($config->get('tag.enabled', false), false)) {
+        if (!ConfigRead::bool($config->get('tag.enabled', false), false)) {
             return '';
         }
 

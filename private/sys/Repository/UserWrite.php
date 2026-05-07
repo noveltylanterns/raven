@@ -13,14 +13,13 @@ namespace Raven\Core\Repository;
 use PDO;
 use Raven\Lib\Database\SqlTable;
 use Raven\Lib\Parser\UserContactParser;
-use Raven\Lib\Scribe\UserScribe;
+use Raven\Lib\Security\UserString;
+use RuntimeException;
 
 /**
  * INSERT, UPDATE, and DELETE methods for user accounts and group memberships.
  *
  * Read operations (SELECT, lookup, profile resolution) live in UserRead.
- * All SQL mutations are delegated to UserScribe.
- * Auth rows (users/passwords) and app rows (group memberships) can live in different DB handles.
  */
 final class UserWrite
 {
@@ -28,7 +27,7 @@ final class UserWrite
     private PDO $rvnDb;
     private string $driver;
     private string $prefix;
-    private UserScribe $userScribe;
+    private UserString $userStringService;
 
     /**
      * @param PDO    $authDb Auth-database connection (users/passwords).
@@ -43,14 +42,11 @@ final class UserWrite
         $this->rvnDb = $rvnDb;
         $this->driver = $driver;
         $this->prefix = preg_replace('/[^a-zA-Z0-9_]/', '', $prefix) ?? '';
-        $this->userScribe = new UserScribe();
+        $this->userStringService = new UserString();
     }
 
     /**
      * Creates or updates one user and sets group memberships.
-     *
-     * When `id` is null a new user row is inserted; otherwise the existing row is updated.
-     * Group memberships are replaced atomically via setUserGroups.
      *
      * @param array{
      *   id: int|null,
@@ -89,31 +85,119 @@ final class UserWrite
         $coverImage = $coverImage !== '' ? $coverImage : null;
         $stringLength = isset($data['string_length']) ? (int) $data['string_length'] : 28;
 
-        return $this->userScribe->saveUser(
-            $this->authDb,
-            $this->rvnDb,
-            $this->authTable('users'),
-            $this->groupTable('user_groups'),
-            [
-                'id' => $id,
-                'username' => $username,
-                'display_name' => $displayName,
-                'email' => $email,
-                'bio' => $bio,
-                'theme' => $theme,
-                'password' => $password,
-                'primary_group_id' => $primaryGroupId > 0 ? $primaryGroupId : null,
-                'group_ids' => $groupIds,
-                'contact_profiles' => $contactProfilesEncoded,
-                'set_avatar' => $setAvatar,
-                'avatar_path' => $avatarPath,
-                'cover_image' => $coverImage,
-                'string_length' => $stringLength,
-            ],
-            function (int $userId, int $groupId): void {
-                $this->attachUserToGroup($userId, $groupId);
+        if ($email === '') {
+            throw new RuntimeException('Email is required.');
+        }
+
+        if (($id === null || $id <= 0) && $username === '') {
+            // Legacy create flow falls back to email-as-username when no explicit username was submitted.
+            $username = $email;
+        }
+
+        $usersTable = $this->authTable('users');
+        $userGroupsTable = $this->groupTable('user_groups');
+        $stringLength = $this->userStringService->normalizeLength($stringLength);
+
+        if ($id !== null && $id > 0) {
+            if ($username !== '' && $this->usernameExistsForOtherUser($id, $username)) {
+                throw new RuntimeException('Username is already in use.');
             }
-        );
+
+            if ($this->emailExistsForOtherUser($id, $email)) {
+                throw new RuntimeException('Email is already in use.');
+            }
+
+            $userString = $this->userStringById($id);
+            if ($userString === null || $userString === '') {
+                $userString = $this->generateUniqueUserString($usersTable, $stringLength);
+            }
+
+            $fields = [
+                'username = :username',
+                'name = :display_name',
+                'email = :email',
+                'bio = :bio',
+                'theme = :theme',
+                'string = :string',
+                'cover_image = :cover_image',
+                'contact = :contact_profiles',
+                '"group" = :primary_group_id',
+            ];
+
+            $params = [
+                ':id' => $id,
+                ':username' => $username,
+                ':display_name' => $displayName,
+                ':email' => $email,
+                ':bio' => $bio,
+                ':theme' => $theme,
+                ':string' => $userString,
+                ':cover_image' => $coverImage,
+                ':contact_profiles' => $contactProfilesEncoded,
+                ':primary_group_id' => $primaryGroupId > 0 ? $primaryGroupId : null,
+            ];
+
+            if ($password !== null && $password !== '') {
+                $fields[] = 'password = :password';
+                $params[':password'] = password_hash($password, PASSWORD_DEFAULT);
+            }
+
+            if ($setAvatar) {
+                $fields[] = 'avatar = :avatar_path';
+                $params[':avatar_path'] = $avatarPath;
+            }
+
+            $stmt = $this->authDb->prepare(
+                'UPDATE ' . $usersTable . '
+                 SET ' . implode(', ', $fields) . '
+                 WHERE id = :id'
+            );
+            $stmt->execute($params);
+
+            $this->setUserGroups($id, $groupIds);
+
+            return $id;
+        }
+
+        if ($username !== '' && $this->usernameExistsForOtherUser(0, $username)) {
+            throw new RuntimeException('Username is already in use.');
+        }
+
+        if ($this->emailExistsForOtherUser(0, $email)) {
+            throw new RuntimeException('Email is already in use.');
+        }
+
+        if ($password === null || $password === '') {
+            throw new RuntimeException('Password is required when creating a user.');
+        }
+
+        $userString = $this->generateUniqueUserString($usersTable, $stringLength);
+
+        $insertParams = [
+            ':email' => $email,
+            ':password' => password_hash($password, PASSWORD_DEFAULT),
+            ':username' => $username,
+            ':display_name' => $displayName,
+            ':bio' => $bio,
+            ':theme' => $theme,
+            ':avatar_path' => $setAvatar ? $avatarPath : null,
+            ':cover_image' => $coverImage,
+            ':string' => $userString,
+            ':contact_profiles' => $contactProfilesEncoded,
+            ':primary_group_id' => $primaryGroupId > 0 ? $primaryGroupId : null,
+            ':status' => 0,
+            ':verified' => 1,
+            ':resettable' => 1,
+            ':roles_mask' => 0,
+            ':registered' => time(),
+            ':last_login' => null,
+            ':force_logout' => 0,
+        ];
+
+        $newId = $this->insertUserAndReturnId($usersTable, $insertParams);
+        $this->setUserGroups($newId, $groupIds);
+
+        return $newId;
     }
 
     /**
@@ -124,19 +208,19 @@ final class UserWrite
      */
     public function deleteById(int $id): void
     {
-        $this->userScribe->deleteUserById(
-            $this->authDb,
-            $this->rvnDb,
-            $this->authTable('users'),
-            $this->groupTable('user_groups'),
-            $id
+        $deleteMemberships = $this->rvnDb->prepare(
+            'DELETE FROM ' . $this->groupTable('user_groups') . ' WHERE user = :user'
         );
+        $deleteMemberships->execute([':user' => $id]);
+
+        $deleteUser = $this->authDb->prepare(
+            'DELETE FROM ' . $this->authTable('users') . ' WHERE id = :id'
+        );
+        $deleteUser->execute([':id' => $id]);
     }
 
     /**
      * Replaces one user's group memberships atomically.
-     *
-     * All existing membership rows are removed and the new set is inserted.
      *
      * @param int        $userId   User whose memberships to replace.
      * @param array<int> $groupIds New group id list; duplicates and non-positive values are removed.
@@ -144,22 +228,33 @@ final class UserWrite
      */
     public function setUserGroups(int $userId, array $groupIds): void
     {
-        $this->userScribe->setUserGroups(
-            $this->rvnDb,
-            $this->groupTable('user_groups'),
-            $userId,
-            $this->normalizeGroupIds($groupIds),
-            function (int $memberUserId, int $groupId): void {
-                $this->attachUserToGroup($memberUserId, $groupId);
+        $groupIds = $this->normalizeGroupIds($groupIds);
+        $userGroupsTable = $this->groupTable('user_groups');
+
+        $this->rvnDb->beginTransaction();
+
+        try {
+            $delete = $this->rvnDb->prepare(
+                'DELETE FROM ' . $userGroupsTable . ' WHERE user = :user'
+            );
+            $delete->execute([':user' => $userId]);
+
+            foreach ($groupIds as $groupId) {
+                $this->attachUserToGroup($userId, $groupId);
             }
-        );
+
+            $this->rvnDb->commit();
+        } catch (\Throwable $exception) {
+            if ($this->rvnDb->inTransaction()) {
+                $this->rvnDb->rollBack();
+            }
+
+            throw $exception;
+        }
     }
 
     /**
      * Inserts one user-group link idempotently, ignoring pre-existing rows.
-     *
-     * Uses backend-specific INSERT … DO NOTHING / INSERT IGNORE syntax to avoid
-     * a separate EXISTS check that could race under concurrent requests.
      *
      * @param int $userId  User id to attach to the group.
      * @param int $groupId Group id to attach the user to.
@@ -167,7 +262,7 @@ final class UserWrite
      */
     private function attachUserToGroup(int $userId, int $groupId): void
     {
-        $table  = $this->groupTable('user_groups');
+        $table = $this->groupTable('user_groups');
         $driver = strtolower(trim($this->driver));
         if ($driver === 'mysql') {
             $stmt = $this->rvnDb->prepare(
@@ -189,6 +284,170 @@ final class UserWrite
         }
 
         $stmt->execute([':user_id' => $userId, ':group_id' => $groupId]);
+    }
+
+    /**
+     * @param int $id
+     * @param string $username
+     * @return bool
+     */
+    private function usernameExistsForOtherUser(int $id, string $username): bool
+    {
+        if (trim($username) === '') {
+            return false;
+        }
+
+        $usersTable = $this->authTable('users');
+        if ($id > 0) {
+            $stmt = $this->authDb->prepare(
+                'SELECT 1 FROM ' . $usersTable . ' WHERE username = :username AND id <> :id LIMIT 1'
+            );
+            $stmt->execute([
+                ':username' => $username,
+                ':id' => $id,
+            ]);
+
+            return $stmt->fetchColumn() !== false;
+        }
+
+        $stmt = $this->authDb->prepare(
+            'SELECT 1 FROM ' . $usersTable . ' WHERE username = :username LIMIT 1'
+        );
+        $stmt->execute([':username' => $username]);
+
+        return $stmt->fetchColumn() !== false;
+    }
+
+    /**
+     * @param int $id
+     * @param string $email
+     * @return bool
+     */
+    private function emailExistsForOtherUser(int $id, string $email): bool
+    {
+        $usersTable = $this->authTable('users');
+        if ($id > 0) {
+            $stmt = $this->authDb->prepare(
+                'SELECT 1 FROM ' . $usersTable . ' WHERE email = :email AND id <> :id LIMIT 1'
+            );
+            $stmt->execute([
+                ':email' => $email,
+                ':id' => $id,
+            ]);
+
+            return $stmt->fetchColumn() !== false;
+        }
+
+        $stmt = $this->authDb->prepare(
+            'SELECT 1 FROM ' . $usersTable . ' WHERE email = :email LIMIT 1'
+        );
+        $stmt->execute([':email' => $email]);
+
+        return $stmt->fetchColumn() !== false;
+    }
+
+    /**
+     * @param int $id
+     * @return string|null
+     */
+    private function userStringById(int $id): ?string
+    {
+        if ($id < 1) {
+            return null;
+        }
+
+        $stmt = $this->authDb->prepare(
+            'SELECT string
+             FROM ' . $this->authTable('users') . '
+             WHERE id = :id
+             LIMIT 1'
+        );
+        $stmt->execute([':id' => $id]);
+
+        $value = $stmt->fetchColumn();
+        if ($value === false) {
+            return null;
+        }
+
+        $normalized = trim((string) $value);
+        return $normalized !== '' ? $normalized : null;
+    }
+
+    /**
+     * @param string $usersTable
+     * @param int $length
+     * @return string
+     */
+    private function generateUniqueUserString(string $usersTable, int $length): string
+    {
+        return $this->userStringService->generateUnique(
+            $length,
+            fn (string $candidate): bool => $this->userStringExistsForOtherUser($usersTable, 0, $candidate)
+        );
+    }
+
+    /**
+     * @param string $usersTable
+     * @param int $id
+     * @param string $userString
+     * @return bool
+     */
+    private function userStringExistsForOtherUser(string $usersTable, int $id, string $userString): bool
+    {
+        if (trim($userString) === '') {
+            return false;
+        }
+
+        if ($id > 0) {
+            $stmt = $this->authDb->prepare(
+                'SELECT 1 FROM ' . $usersTable . ' WHERE string = :string AND id <> :id LIMIT 1'
+            );
+            $stmt->execute([
+                ':string' => $userString,
+                ':id' => $id,
+            ]);
+
+            return $stmt->fetchColumn() !== false;
+        }
+
+        $stmt = $this->authDb->prepare(
+            'SELECT 1 FROM ' . $usersTable . ' WHERE string = :string LIMIT 1'
+        );
+        $stmt->execute([':string' => $userString]);
+
+        return $stmt->fetchColumn() !== false;
+    }
+
+    /**
+     * Inserts one user row and resolves the inserted id across supported drivers.
+     *
+     * @param string               $usersTable Physical users table name.
+     * @param array<string, mixed> $params     Bound insert parameters.
+     * @throws RuntimeException When the inserted id cannot be resolved.
+     * @return int Inserted user id.
+     */
+    private function insertUserAndReturnId(string $usersTable, array $params): int
+    {
+        $sql = 'INSERT INTO ' . $usersTable . '
+            (email, password, username, name, bio, theme, avatar, cover_image, string, contact, "group", status, verified, resettable, roles_mask, registered, last_login, force_logout)
+            VALUES (:email, :password, :username, :display_name, :bio, :theme, :avatar_path, :cover_image, :string, :contact_profiles, :primary_group_id, :status, :verified, :resettable, :roles_mask, :registered, :last_login, :force_logout)';
+
+        $driver = strtolower((string) $this->authDb->getAttribute(PDO::ATTR_DRIVER_NAME));
+        if ($driver === 'pgsql') {
+            $stmt = $this->authDb->prepare($sql . ' RETURNING id');
+            $stmt->execute($params);
+            $newId = (int) $stmt->fetchColumn();
+        } else {
+            $stmt = $this->authDb->prepare($sql);
+            $stmt->execute($params);
+            $newId = (int) $this->authDb->lastInsertId();
+        }
+
+        if ($newId < 1) {
+            throw new RuntimeException('Failed to resolve inserted user id.');
+        }
+
+        return $newId;
     }
 
     /**

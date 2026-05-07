@@ -25,7 +25,7 @@ use Raven\Lib\Database\SqlTable;
 use Raven\Lib\Format\Json;
 use Raven\Lib\Parser\UserContactParser;
 use Raven\Lib\Security\TotpCipher;
-use Raven\Lib\Scribe\AuthProfileScribe;
+use Raven\Lib\Scribe\AuthScribe;
 use Raven\Lib\Security\PhraseValidate;
 use Raven\Lib\Security\TotpVerify;
 use Raven\Lib\View\Preferences as PreferencesView;
@@ -56,7 +56,7 @@ final class Gatekeeper
     private PanelAuthService $panelAuthService;
     private PublicAuthService $publicAuthService;
     private LoginEmail $loginEmail;
-    private AuthProfileScribe $authProfileScribe;
+    private AuthScribe $authScribe;
 
     /** Session key for the pending-challenge user id (set after password auth, before 2FA). */
     private const SESSION_2FA_PENDING_USER_ID = '_raven_2fa_pending_user_id';
@@ -117,7 +117,7 @@ final class Gatekeeper
             fn (): bool => $this->isLoggedIn()
         );
         $this->loginEmail = new LoginEmail();
-        $this->authProfileScribe = new AuthProfileScribe($authDb, $driver, $this->prefix);
+        $this->authScribe = new AuthScribe($authDb, $driver, $this->prefix);
 
         $this->bootstrapDelightAuth();
     }
@@ -529,7 +529,7 @@ final class Gatekeeper
 
         $normalized = Login2fa::normalizeStored($methods);
         $encoded = $this->encodeTwoFactorMethods($normalized);
-        $this->authProfileScribe->updateTwoFactorMethods($userId, $encoded);
+        $this->authScribe->updateTwoFactorMethods($userId, $encoded);
 
         unset($this->userPreferencesCache[$userId]);
         return ['ok' => true, 'errors' => []];
@@ -705,7 +705,7 @@ final class Gatekeeper
             return ['ok' => false, 'errors' => $errors];
         }
 
-        $this->authProfileScribe->updatePreferences($userId, [
+        $this->authScribe->updatePreferences($userId, [
             'username' => $username,
             'display_name' => $displayName,
             'email' => $email,

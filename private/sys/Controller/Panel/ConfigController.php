@@ -16,10 +16,10 @@ use Raven\Core\Config;
 use Raven\Core\Repository\ChannelRead;
 use Raven\Core\Repository\SetRead;
 use Raven\Lib\Parser\ChannelRouteParser;
-use Raven\Lib\Parser\ConfigParser;
+use Raven\Core\Repository\ConfigRead;
 use Raven\Lib\Parser\UserProfileParser;
 use Raven\Lib\Security\InputSanitizer;
-use Raven\Lib\Scribe\ConfigScribe;
+use Raven\Core\Repository\ConfigWrite;
 use Raven\Lib\View\Panel\EditorWrapper;
 use Raven\Lib\View\Panel\EditorBlocks;
 use Raven\Lib\View\Panel\EditorTabs;
@@ -302,11 +302,11 @@ final class ConfigController
                         $rawValue,
                         $channelRoutingOptions
                     );
-                    ConfigScribe::setNested($nextConfig, $segments, $normalized);
+                    ConfigWrite::setNested($nextConfig, $segments, $normalized);
                     continue;
                 }
 
-                $rawValue = ConfigParser::readNestedString($rawConfigValues, $segments);
+                $rawValue = ConfigRead::readNestedString($rawConfigValues, $segments);
                 $normalized = $this->normalizeFieldValue(
                     $path,
                     $type,
@@ -320,7 +320,7 @@ final class ConfigController
                     $categorySetOptions,
                     $tagSetOptions
                 );
-                ConfigScribe::setNested($nextConfig, $segments, $normalized);
+                ConfigWrite::setNested($nextConfig, $segments, $normalized);
             }
         } catch (\RuntimeException $exception) {
             $this->context->flash('error', $exception->getMessage());
@@ -434,7 +434,7 @@ final class ConfigController
      */
     private function persistConfigSnapshot(array $nextConfig): void
     {
-        ConfigScribe::persist($this->config->path(), $nextConfig);
+        ConfigWrite::persist($this->config->path(), $nextConfig);
         $this->config = new Config($this->config->path());
         $this->publicThemeOptionsCache = null;
     }
@@ -748,19 +748,19 @@ final class ConfigController
 
             $isCategoryPath = $path === 'category.prefix';
             $thisEnabled = $isCategoryPath
-                ? ConfigParser::bool(
-                    ConfigParser::get($workingConfig, 'category.enabled', $this->config->get('category.enabled', false)),
+                ? ConfigRead::bool(
+                    ConfigRead::get($workingConfig, 'category.enabled', $this->config->get('category.enabled', false)),
                     false
                 )
-                : ConfigParser::bool(
-                    ConfigParser::get($workingConfig, 'tag.enabled', $this->config->get('tag.enabled', false)),
+                : ConfigRead::bool(
+                    ConfigRead::get($workingConfig, 'tag.enabled', $this->config->get('tag.enabled', false)),
                     false
                 );
             if (!$thisEnabled) {
                 return $prefix;
             }
 
-            $panelPathValue = (string) ConfigParser::get($workingConfig, 'panel.path', $this->config->get('panel.path', 'panel'));
+            $panelPathValue = (string) ConfigRead::get($workingConfig, 'panel.path', $this->config->get('panel.path', 'panel'));
             $panelPrefix = $this->input->slug($panelPathValue);
             if ($panelPrefix !== null && $prefix === $panelPrefix) {
                 throw new \RuntimeException($path . ' cannot match panel.path.');
@@ -773,15 +773,15 @@ final class ConfigController
             $otherPath = $path === 'category.prefix' ? 'tag.prefix' : 'category.prefix';
             $otherDefault = $path === 'category.prefix' ? 'tag' : 'cat';
             $otherEnabled = $isCategoryPath
-                ? ConfigParser::bool(
-                    ConfigParser::get($workingConfig, 'tag.enabled', $this->config->get('tag.enabled', false)),
+                ? ConfigRead::bool(
+                    ConfigRead::get($workingConfig, 'tag.enabled', $this->config->get('tag.enabled', false)),
                     false
                 )
-                : ConfigParser::bool(
-                    ConfigParser::get($workingConfig, 'category.enabled', $this->config->get('category.enabled', false)),
+                : ConfigRead::bool(
+                    ConfigRead::get($workingConfig, 'category.enabled', $this->config->get('category.enabled', false)),
                     false
                 );
-            $otherRaw = (string) ConfigParser::get($workingConfig, $otherPath, $this->config->get($otherPath, $otherDefault));
+            $otherRaw = (string) ConfigRead::get($workingConfig, $otherPath, $this->config->get($otherPath, $otherDefault));
             $otherPrefix = $this->input->slug($otherRaw);
             if ($otherEnabled && $otherPrefix !== null && $otherPrefix !== '' && $otherPrefix === $prefix) {
                 throw new \RuntimeException('category.prefix and tag.prefix must be different values.');
@@ -801,15 +801,15 @@ final class ConfigController
                 throw new \RuntimeException($path . ' must be a valid slug.');
             }
 
-            $feedEnabled = ConfigParser::bool(
-                ConfigParser::get($workingConfig, 'feed.enabled', $this->config->get('feed.enabled', false)),
+            $feedEnabled = ConfigRead::bool(
+                ConfigRead::get($workingConfig, 'feed.enabled', $this->config->get('feed.enabled', false)),
                 false
             );
             if (!$feedEnabled) {
                 return $prefix;
             }
 
-            $panelPathValue = (string) ConfigParser::get($workingConfig, 'panel.path', $this->config->get('panel.path', 'panel'));
+            $panelPathValue = (string) ConfigRead::get($workingConfig, 'panel.path', $this->config->get('panel.path', 'panel'));
             $panelPrefix = $this->input->slug($panelPathValue);
             if ($panelPrefix !== null && $prefix === $panelPrefix) {
                 throw new \RuntimeException($path . ' cannot match panel.path.');
@@ -820,10 +820,10 @@ final class ConfigController
             }
 
             $categoryPrefix = $this->input->slug(
-                (string) ConfigParser::get($workingConfig, 'category.prefix', $this->config->get('category.prefix', 'cat'))
+                (string) ConfigRead::get($workingConfig, 'category.prefix', $this->config->get('category.prefix', 'cat'))
             );
-            $categoryEnabled = ConfigParser::bool(
-                ConfigParser::get($workingConfig, 'category.enabled', $this->config->get('category.enabled', false)),
+            $categoryEnabled = ConfigRead::bool(
+                ConfigRead::get($workingConfig, 'category.enabled', $this->config->get('category.enabled', false)),
                 false
             );
             if ($categoryEnabled && $categoryPrefix !== null && $categoryPrefix !== '' && $prefix === $categoryPrefix) {
@@ -831,10 +831,10 @@ final class ConfigController
             }
 
             $tagPrefix = $this->input->slug(
-                (string) ConfigParser::get($workingConfig, 'tag.prefix', $this->config->get('tag.prefix', 'tag'))
+                (string) ConfigRead::get($workingConfig, 'tag.prefix', $this->config->get('tag.prefix', 'tag'))
             );
-            $tagEnabled = ConfigParser::bool(
-                ConfigParser::get($workingConfig, 'tag.enabled', $this->config->get('tag.enabled', false)),
+            $tagEnabled = ConfigRead::bool(
+                ConfigRead::get($workingConfig, 'tag.enabled', $this->config->get('tag.enabled', false)),
                 false
             );
             if ($tagEnabled && $tagPrefix !== null && $tagPrefix !== '' && $prefix === $tagPrefix) {
@@ -842,14 +842,14 @@ final class ConfigController
             }
 
             $userPrefix = $this->input->slug(
-                (string) ConfigParser::get($workingConfig, 'user.prefix', $this->config->get('user.prefix', 'user'))
+                (string) ConfigRead::get($workingConfig, 'user.prefix', $this->config->get('user.prefix', 'user'))
             );
             if ($userPrefix !== null && $userPrefix !== '' && $prefix === $userPrefix) {
                 throw new \RuntimeException($path . ' cannot match user.prefix.');
             }
 
             $groupPrefix = $this->input->slug(
-                (string) ConfigParser::get($workingConfig, 'group.prefix', $this->config->get('group.prefix', 'group'))
+                (string) ConfigRead::get($workingConfig, 'group.prefix', $this->config->get('group.prefix', 'group'))
             );
             if ($groupPrefix !== null && $groupPrefix !== '' && $prefix === $groupPrefix) {
                 throw new \RuntimeException($path . ' cannot match group.prefix.');
@@ -857,7 +857,7 @@ final class ConfigController
 
             $otherPath = $path === 'feed.rss' ? 'feed.atom' : 'feed.rss';
             $otherDefault = $path === 'feed.rss' ? 'atom' : 'rss';
-            $otherRaw = (string) ConfigParser::get($workingConfig, $otherPath, $this->config->get($otherPath, $otherDefault));
+            $otherRaw = (string) ConfigRead::get($workingConfig, $otherPath, $this->config->get($otherPath, $otherDefault));
             $otherPrefix = $this->input->slug($otherRaw);
             if ($otherPrefix !== null && $otherPrefix !== '' && $otherPrefix === $prefix) {
                 throw new \RuntimeException('feed.rss and feed.atom must be different values.');
@@ -899,7 +899,7 @@ final class ConfigController
                 throw new \RuntimeException('user.selector must be id, username, or string.');
             }
 
-            $loginMode = strtolower(trim((string) ConfigParser::get($workingConfig, 'user.auth.method', $this->config->get('user.auth.method', 'email'))));
+            $loginMode = strtolower(trim((string) ConfigRead::get($workingConfig, 'user.auth.method', $this->config->get('user.auth.method', 'email'))));
             if ($selector === 'username' && $loginMode !== 'username') {
                 throw new \RuntimeException('user.selector can only use username when user.auth.method is username.');
             }
@@ -918,17 +918,17 @@ final class ConfigController
                 throw new \RuntimeException('user.prefix must be a valid slug.');
             }
 
-            $panelPathValue = (string) ConfigParser::get($workingConfig, 'panel.path', $this->config->get('panel.path', 'panel'));
+            $panelPathValue = (string) ConfigRead::get($workingConfig, 'panel.path', $this->config->get('panel.path', 'panel'));
             $panelPrefix = $this->input->slug($panelPathValue);
             if ($panelPrefix !== null && $prefix === $panelPrefix) {
                 throw new \RuntimeException('user.prefix cannot match panel.path.');
             }
 
             $categoryPrefix = $this->input->slug(
-                (string) ConfigParser::get($workingConfig, 'category.prefix', $this->config->get('category.prefix', 'cat'))
+                (string) ConfigRead::get($workingConfig, 'category.prefix', $this->config->get('category.prefix', 'cat'))
             );
-            $categoryEnabled = ConfigParser::bool(
-                ConfigParser::get($workingConfig, 'category.enabled', $this->config->get('category.enabled', false)),
+            $categoryEnabled = ConfigRead::bool(
+                ConfigRead::get($workingConfig, 'category.enabled', $this->config->get('category.enabled', false)),
                 false
             );
             if ($categoryEnabled && $categoryPrefix !== null && $prefix === $categoryPrefix) {
@@ -936,10 +936,10 @@ final class ConfigController
             }
 
             $tagPrefix = $this->input->slug(
-                (string) ConfigParser::get($workingConfig, 'tag.prefix', $this->config->get('tag.prefix', 'tag'))
+                (string) ConfigRead::get($workingConfig, 'tag.prefix', $this->config->get('tag.prefix', 'tag'))
             );
-            $tagEnabled = ConfigParser::bool(
-                ConfigParser::get($workingConfig, 'tag.enabled', $this->config->get('tag.enabled', false)),
+            $tagEnabled = ConfigRead::bool(
+                ConfigRead::get($workingConfig, 'tag.enabled', $this->config->get('tag.enabled', false)),
                 false
             );
             if ($tagEnabled && $tagPrefix !== null && $prefix === $tagPrefix) {
@@ -947,7 +947,7 @@ final class ConfigController
             }
 
             $groupPrefix = $this->input->slug(
-                (string) ConfigParser::get($workingConfig, 'group.prefix', $this->config->get('group.prefix', 'group'))
+                (string) ConfigRead::get($workingConfig, 'group.prefix', $this->config->get('group.prefix', 'group'))
             );
             if ($groupPrefix !== null && $groupPrefix !== '' && $prefix === $groupPrefix) {
                 throw new \RuntimeException('user.prefix cannot match group.prefix.');
@@ -985,17 +985,17 @@ final class ConfigController
                 throw new \RuntimeException('group.prefix must be a valid slug.');
             }
 
-            $panelPathValue = (string) ConfigParser::get($workingConfig, 'panel.path', $this->config->get('panel.path', 'panel'));
+            $panelPathValue = (string) ConfigRead::get($workingConfig, 'panel.path', $this->config->get('panel.path', 'panel'));
             $panelPrefix = $this->input->slug($panelPathValue);
             if ($panelPrefix !== null && $prefix === $panelPrefix) {
                 throw new \RuntimeException('group.prefix cannot match panel.path.');
             }
 
             $categoryPrefix = $this->input->slug(
-                (string) ConfigParser::get($workingConfig, 'category.prefix', $this->config->get('category.prefix', 'cat'))
+                (string) ConfigRead::get($workingConfig, 'category.prefix', $this->config->get('category.prefix', 'cat'))
             );
-            $categoryEnabled = ConfigParser::bool(
-                ConfigParser::get($workingConfig, 'category.enabled', $this->config->get('category.enabled', false)),
+            $categoryEnabled = ConfigRead::bool(
+                ConfigRead::get($workingConfig, 'category.enabled', $this->config->get('category.enabled', false)),
                 false
             );
             if ($categoryEnabled && $categoryPrefix !== null && $prefix === $categoryPrefix) {
@@ -1003,10 +1003,10 @@ final class ConfigController
             }
 
             $tagPrefix = $this->input->slug(
-                (string) ConfigParser::get($workingConfig, 'tag.prefix', $this->config->get('tag.prefix', 'tag'))
+                (string) ConfigRead::get($workingConfig, 'tag.prefix', $this->config->get('tag.prefix', 'tag'))
             );
-            $tagEnabled = ConfigParser::bool(
-                ConfigParser::get($workingConfig, 'tag.enabled', $this->config->get('tag.enabled', false)),
+            $tagEnabled = ConfigRead::bool(
+                ConfigRead::get($workingConfig, 'tag.enabled', $this->config->get('tag.enabled', false)),
                 false
             );
             if ($tagEnabled && $tagPrefix !== null && $prefix === $tagPrefix) {
@@ -1014,7 +1014,7 @@ final class ConfigController
             }
 
             $profilePrefix = $this->input->slug(
-                (string) ConfigParser::get($workingConfig, 'user.prefix', $this->config->get('user.prefix', 'user'))
+                (string) ConfigRead::get($workingConfig, 'user.prefix', $this->config->get('user.prefix', 'user'))
             );
             if ($profilePrefix !== null && $profilePrefix !== '' && $prefix === $profilePrefix) {
                 throw new \RuntimeException('group.prefix cannot match user.prefix.');
@@ -1091,8 +1091,8 @@ final class ConfigController
         }
 
         if (in_array($path, ['meta.image', 'meta.apple_touch_icon', 'panel.brand_logo'], true)) {
-            $siteProtocol = (string) ConfigParser::get($workingConfig, 'site.protocol', $this->config->get('site.protocol', 'https'));
-            $siteDomain = (string) ConfigParser::get($workingConfig, 'site.domain', $this->config->get('site.domain', ''));
+            $siteProtocol = (string) ConfigRead::get($workingConfig, 'site.protocol', $this->config->get('site.protocol', 'https'));
+            $siteDomain = (string) ConfigRead::get($workingConfig, 'site.domain', $this->config->get('site.domain', ''));
 
             return $this->normalizeMetaAbsoluteUrlPathValue($siteProtocol, $siteDomain, $value);
         }
@@ -1309,8 +1309,8 @@ final class ConfigController
                 'path' => $path,
                 'segments' => $pathSegments,
                 'label' => $this->labelFromPath($path),
-                'type' => ConfigParser::detectScalarType($value),
-                'value' => ConfigParser::stringifyScalar($value),
+                'type' => ConfigRead::detectScalarType($value),
+                'value' => ConfigRead::stringifyScalar($value),
             ];
         }
     }
@@ -1358,7 +1358,7 @@ final class ConfigController
         if (!array_key_exists('enabled', $feed)) {
             $feed['enabled'] = false;
         } else {
-            $feed['enabled'] = ConfigParser::bool($feed['enabled'], false);
+            $feed['enabled'] = ConfigRead::bool($feed['enabled'], false);
         }
 
         $channelsWereExplicit = array_key_exists('channels', $feed);
@@ -1505,7 +1505,7 @@ final class ConfigController
         if (!array_key_exists('enabled', $category)) {
             $category['enabled'] = false;
         } else {
-            $category['enabled'] = ConfigParser::bool($category['enabled'], false);
+            $category['enabled'] = ConfigRead::bool($category['enabled'], false);
         }
         if (!array_key_exists('set', $category)) {
             $category['set'] = 1;
@@ -1534,7 +1534,7 @@ final class ConfigController
         if (!array_key_exists('enabled', $tag)) {
             $tag['enabled'] = false;
         } else {
-            $tag['enabled'] = ConfigParser::bool($tag['enabled'], false);
+            $tag['enabled'] = ConfigRead::bool($tag['enabled'], false);
         }
         if (!array_key_exists('set', $tag)) {
             $tag['set'] = 1;
@@ -1946,13 +1946,13 @@ final class ConfigController
             $debug = [];
         }
 
-        $debug['show_public'] = ConfigParser::bool($debug['show_public'] ?? false, false);
-        $debug['show_private'] = ConfigParser::bool($debug['show_private'] ?? false, false);
-        $debug['show_benchmarks'] = ConfigParser::bool($debug['show_benchmarks'] ?? true, true);
-        $debug['show_queries'] = ConfigParser::bool($debug['show_queries'] ?? true, true);
-        $debug['show_trace'] = ConfigParser::bool($debug['show_trace'] ?? true, true);
-        $debug['show_request'] = ConfigParser::bool($debug['show_request'] ?? true, true);
-        $debug['show_environment'] = ConfigParser::bool($debug['show_environment'] ?? true, true);
+        $debug['show_public'] = ConfigRead::bool($debug['show_public'] ?? false, false);
+        $debug['show_private'] = ConfigRead::bool($debug['show_private'] ?? false, false);
+        $debug['show_benchmarks'] = ConfigRead::bool($debug['show_benchmarks'] ?? true, true);
+        $debug['show_queries'] = ConfigRead::bool($debug['show_queries'] ?? true, true);
+        $debug['show_trace'] = ConfigRead::bool($debug['show_trace'] ?? true, true);
+        $debug['show_request'] = ConfigRead::bool($debug['show_request'] ?? true, true);
+        $debug['show_environment'] = ConfigRead::bool($debug['show_environment'] ?? true, true);
         $config['debug'] = $debug;
 
         return $config;

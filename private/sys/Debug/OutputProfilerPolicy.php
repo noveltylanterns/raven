@@ -12,7 +12,7 @@ declare(strict_types=1);
 namespace Raven\Core\Debug;
 
 use Raven\Core\Config;
-use Raven\Lib\Parser\ConfigParser;
+use Raven\Core\Repository\ConfigRead;
 
 /**
  * Shared resolver for output profiler config flags.
@@ -36,13 +36,13 @@ final class OutputProfilerPolicy
     public static function fromConfig(Config $config): array
     {
         return [
-            'show_on_public' => ConfigParser::bool($config->get('debug.show_public', false), false),
-            'show_on_panel' => ConfigParser::bool($config->get('debug.show_private', false), false),
-            'show_benchmarks' => ConfigParser::bool($config->get('debug.show_benchmarks', true), true),
-            'show_queries' => ConfigParser::bool($config->get('debug.show_queries', true), true),
-            'show_stack_trace' => ConfigParser::bool($config->get('debug.show_trace', true), true),
-            'show_request' => ConfigParser::bool($config->get('debug.show_request', true), true),
-            'show_environment' => ConfigParser::bool($config->get('debug.show_environment', true), true),
+            'show_on_public' => ConfigRead::bool($config->get('debug.show_public', false), false),
+            'show_on_panel' => ConfigRead::bool($config->get('debug.show_private', false), false),
+            'show_benchmarks' => ConfigRead::bool($config->get('debug.show_benchmarks', true), true),
+            'show_queries' => ConfigRead::bool($config->get('debug.show_queries', true), true),
+            'show_stack_trace' => ConfigRead::bool($config->get('debug.show_trace', true), true),
+            'show_request' => ConfigRead::bool($config->get('debug.show_request', true), true),
+            'show_environment' => ConfigRead::bool($config->get('debug.show_environment', true), true),
         ];
     }
 }

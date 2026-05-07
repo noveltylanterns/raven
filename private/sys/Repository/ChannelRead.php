@@ -15,7 +15,6 @@ use Raven\Lib\Database\SqlTable;
 use Raven\Lib\Parser\ChannelRepoParser;
 use Raven\Lib\Parser\ChannelRouteParser;
 use Raven\Lib\Parser\SetParser;
-use Raven\Lib\Scribe\ChannelScribe;
 
 /**
  * SELECT and lookup methods for channel records.
@@ -32,7 +31,6 @@ class ChannelRead
     private string $driver;
     private string $prefix;
     private string $channelDirectory;
-    private ChannelScribe $channelFileScribe;
     /** @var array<int, array<string, mixed>>|null */
     private ?array $channelsCache = null;
 
@@ -49,7 +47,6 @@ class ChannelRead
         $this->driver = $driver;
         $this->prefix = preg_replace('/[^a-zA-Z0-9_]/', '', $prefix) ?? '';
         $this->channelDirectory = rtrim($channelDirectory ?? (dirname(__DIR__, 3) . '/dat/channel'), '/');
-        $this->channelFileScribe = new ChannelScribe($this->channelDirectory);
     }
 
     /**
@@ -100,7 +97,7 @@ class ChannelRead
         }
 
         $this->ensureRootChannelRecord();
-        $this->channelFileScribe->normalizeStorageLayout();
+        ChannelWrite::normalizeStorageLayout($this->channelDirectory);
         $paths = $this->listChannelFilePaths();
         $records = [];
         $usedIds = [];
@@ -140,13 +137,13 @@ class ChannelRead
 
             $record['id'] = $id;
             $records[] = $record;
-            $slug = (string) ($record['slug'] ?? '');
-            if ($slug !== '') {
-                try {
-                    $this->channelFileScribe->persistChannelId($slug, $id);
-                } catch (\Throwable) {
-                    // Read paths should stay resilient even if best-effort id repair cannot be persisted.
-                }
+                $slug = (string) ($record['slug'] ?? '');
+                if ($slug !== '') {
+                    try {
+                        ChannelWrite::persistChannelId($this->channelDirectory, $slug, $id);
+                    } catch (\Throwable) {
+                        // Read paths should stay resilient even if best-effort id repair cannot be persisted.
+                    }
             }
         }
 
@@ -564,7 +561,8 @@ class ChannelRead
         ];
 
         if ($raw === [] || $this->rootRecordNeedsRewrite($raw)) {
-            $this->channelFileScribe->writeRecordById(
+            ChannelWrite::writeRecordById(
+                $this->channelDirectory,
                 ChannelRepoParser::ROOT_CHANNEL_ID,
                 ChannelRepoParser::ROOT_CHANNEL_SLUG,
                 $record

@@ -11,7 +11,6 @@ declare(strict_types=1);
 namespace Raven\Core\Repository;
 
 use Raven\Lib\Parser\SetParser;
-use Raven\Lib\Scribe\SetScribe;
 
 /**
  * SELECT and lookup methods for taxonomy set records.
@@ -22,8 +21,8 @@ use Raven\Lib\Scribe\SetScribe;
 class SetRead
 {
     private string $taxonomyType;
+    private string $setDirectory;
     private SetParser $setParser;
-    private SetScribe $fileScribe;
     /** @var array<int, array<string, mixed>>|null */
     private ?array $cache = null;
 
@@ -35,8 +34,8 @@ class SetRead
     public function __construct(string $taxonomyType, string $setDirectory)
     {
         $this->taxonomyType = strtolower(trim($taxonomyType));
+        $this->setDirectory = rtrim($setDirectory, '/');
         $this->setParser = new SetParser($setDirectory, $this->taxonomyType);
-        $this->fileScribe = new SetScribe($setDirectory, $this->taxonomyType);
     }
 
     /**
@@ -52,7 +51,7 @@ class SetRead
             return $this->cache;
         }
 
-        $this->fileScribe->ensureRootRecord($this->rootRecord());
+        SetWrite::ensureRootRecord($this->setDirectory, $this->taxonomyType, $this->rootRecord());
 
         $rows = [];
         foreach ($this->setParser->listSetFilePaths() as $path) {

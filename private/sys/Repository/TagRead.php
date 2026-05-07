@@ -245,7 +245,7 @@ class TagRead
     /**
      * Returns only ids that currently exist in storage.
      *
-     * Used by TagWrite to filter incoming save payloads before delegating to TagScribe.
+     * Used by TagWrite to filter incoming save payloads before persistence.
      *
      * @param array<int> $ids Candidate id list; non-positive values are ignored.
      * @return array<int> Subset of ids that match rows in the tags table.

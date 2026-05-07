@@ -15,7 +15,7 @@ use Raven\Core\Config;
 use Raven\Lib\Archive\Update as ArchiveUpdate;
 use Raven\Lib\Archive\Upstream;
 use Raven\Lib\Format\Git;
-use Raven\Lib\Scribe\ConfigScribe;
+use Raven\Core\Repository\ConfigWrite;
 use Raven\Lib\Security\InputSanitizer;
 
 /**
@@ -118,7 +118,7 @@ final class UpdateController
         }
 
         try {
-            ConfigScribe::persistValue(
+            ConfigWrite::persistValue(
                 $this->config->path(),
                 $this->config->all(),
                 'update.source',

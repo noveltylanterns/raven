@@ -20,7 +20,7 @@ use Raven\Core\Runtime\Public\RuntimeInitializer;
 use Raven\Core\Renderer;
 use Raven\Core\Gatekeeper;
 use Raven\Lib\Extension\Public\Content as ExtensionContent;
-use Raven\Lib\Parser\ConfigParser;
+use Raven\Core\Repository\ConfigRead;
 use Raven\Lib\View\Public\ThemeCatalog;
 use RuntimeException;
 
@@ -54,8 +54,8 @@ final class RuntimeBuilder
         $themeCatalogService = null;
 
         $rvn['view'] = new Renderer((string) $rvn['root'] . '/private/tpl/public');
-        $categoryEnabled = ConfigParser::bool($rvn['config']->get('category.enabled', false), false);
-        $tagEnabled = ConfigParser::bool($rvn['config']->get('tag.enabled', false), false);
+        $categoryEnabled = ConfigRead::bool($rvn['config']->get('category.enabled', false), false);
+        $tagEnabled = ConfigRead::bool($rvn['config']->get('tag.enabled', false), false);
 
         /**
          * Resolves the lazy auth DB handle only for public factories that truly need it.

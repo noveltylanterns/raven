@@ -20,7 +20,7 @@ use Raven\Core\Postmaster;
 use Raven\Lib\Parser\PageRepoParser;
 use Raven\Core\Gatekeeper;
 use Raven\Lib\Auth\SessionCookie;
-use Raven\Lib\Parser\ConfigParser;
+use Raven\Core\Repository\ConfigRead;
 use Raven\Lib\Extension\Registry;
 use Raven\Lib\Extension\Resolver;
 use Raven\Lib\Scheduler\Registry as SchedulerRegistry;
@@ -180,8 +180,8 @@ final class Raven
     };
 
     $input = new InputSanitizer();
-    $categoryEnabled = ConfigParser::bool($config->get('category.enabled', false), false);
-    $tagEnabled = ConfigParser::bool($config->get('tag.enabled', false), false);
+    $categoryEnabled = ConfigRead::bool($config->get('category.enabled', false), false);
+    $tagEnabled = ConfigRead::bool($config->get('tag.enabled', false), false);
     $loggingConfig = (array) $config->get('logging', []);
     $logger = null;
     $loggerResolver = static function () use (&$logger, $rvnDb, $driver, $prefix, $loggingConfig): Logger {

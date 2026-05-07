@@ -31,7 +31,7 @@ final class ChannelWrite
     private string $driver;
     private string $prefix;
     private ChannelRead $read;
-    private ChannelScribe $channelFileScribe;
+    private string $channelDirectory;
 
     /**
      * @param PDO         $db               Active database connection.
@@ -47,8 +47,7 @@ final class ChannelWrite
         $this->driver = $driver;
         $this->prefix = preg_replace('/[^a-zA-Z0-9_]/', '', $prefix) ?? '';
         $this->read = $read;
-        $resolvedDir = $channelDirectory ?? (dirname(__DIR__, 3) . '/dat/channel');
-        $this->channelFileScribe = new ChannelScribe($resolvedDir);
+        $this->channelDirectory = rtrim($channelDirectory ?? (dirname(__DIR__, 3) . '/dat/channel'), '/');
     }
 
     /**
@@ -139,7 +138,7 @@ final class ChannelWrite
             'created_at' => $createdAt,
         ];
 
-        $this->channelFileScribe->writeRecordById($channelId, $slug, $record);
+        self::writeRecordById($this->channelDirectory, $channelId, $slug, $record);
         $this->read->clearCache();
         return $channelId;
     }
@@ -207,7 +206,7 @@ final class ChannelWrite
                 : gmdate('Y-m-d H:i:s'),
         ];
 
-        $this->channelFileScribe->writeRecordById((int) ($record['id'] ?? $id), $slug, $raw);
+        self::writeRecordById($this->channelDirectory, (int) ($record['id'] ?? $id), $slug, $raw);
         $this->read->clearCache();
     }
 
@@ -265,8 +264,62 @@ final class ChannelWrite
             throw $exception;
         }
 
-        $this->channelFileScribe->deleteById($id);
+        self::deleteRecordById($this->channelDirectory, $id);
         $this->read->clearCache();
+    }
+
+    /**
+     * Ensures all stored channel files use canonical filenames and canonical field values.
+     *
+     * @param string $channelDirectory Absolute path to the channel file directory.
+     * @throws RuntimeException When the directory or one rewritten file cannot be persisted.
+     * @return void
+     */
+    public static function normalizeStorageLayout(string $channelDirectory): void
+    {
+        (new ChannelScribe(rtrim($channelDirectory, '/')))->normalizeStorageLayout();
+    }
+
+    /**
+     * Atomically writes one channel record to disk.
+     *
+     * @param string $channelDirectory Absolute path to the channel file directory.
+     * @param int $id Channel id to write.
+     * @param string $slug Slug for the canonical filename.
+     * @param array<string, mixed> $record Record data array to persist.
+     * @throws RuntimeException When the file cannot be written or renamed into place.
+     * @return void
+     */
+    public static function writeRecordById(string $channelDirectory, int $id, string $slug, array $record): void
+    {
+        (new ChannelScribe(rtrim($channelDirectory, '/')))->writeRecordById($id, $slug, $record);
+    }
+
+    /**
+     * Deletes all channel files on disk that belong to the given channel id.
+     *
+     * @param string $channelDirectory Absolute path to the channel file directory.
+     * @param int $id Channel id whose files should be removed.
+     * @throws RuntimeException When a matched file exists but cannot be deleted.
+     * @return void
+     */
+    public static function deleteRecordById(string $channelDirectory, int $id): void
+    {
+        (new ChannelScribe(rtrim($channelDirectory, '/')))->deleteById($id);
+    }
+
+    /**
+     * Re-persists one channel file under the correct canonical path after an id change.
+     *
+     * @param string $channelDirectory Absolute path to the channel file directory.
+     * @param string $slug Channel slug to locate the existing file.
+     * @param int $id New channel id to assign.
+     * @throws RuntimeException When the rewritten file cannot be persisted.
+     * @return void
+     */
+    public static function persistChannelId(string $channelDirectory, string $slug, int $id): void
+    {
+        (new ChannelScribe(rtrim($channelDirectory, '/')))->persistChannelId($slug, $id);
     }
 
     /**

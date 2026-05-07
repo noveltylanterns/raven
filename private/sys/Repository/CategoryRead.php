@@ -245,7 +245,7 @@ class CategoryRead
     /**
      * Returns only ids that currently exist in storage.
      *
-     * Used by CategoryWrite to filter incoming save payloads before delegating to CategoryScribe.
+     * Used by CategoryWrite to filter incoming save payloads before persistence.
      *
      * @param array<int> $ids Candidate id list; non-positive values are ignored.
      * @return array<int> Subset of ids that match rows in the categories table.

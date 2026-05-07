@@ -15,7 +15,7 @@ use Raven\Core\Config;
 use Raven\Lib\Archive\Folder as ArchiveDelete;
 use Raven\Lib\Archive\Install as ArchiveInstall;
 use Raven\Lib\Archive\Package as ArchivePackage;
-use Raven\Lib\Scribe\ConfigScribe;
+use Raven\Core\Repository\ConfigWrite;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\Transport\Upload;
 use Raven\Lib\Transport\Redirect;
@@ -119,7 +119,7 @@ final class ThemeController
         }
 
         try {
-            ConfigScribe::persistValue($this->config->path(), $this->config->all(), 'site.theme', $themeSlug);
+            ConfigWrite::persistValue($this->config->path(), $this->config->all(), 'site.theme', $themeSlug);
             $this->config = new Config($this->config->path());
         } catch (\RuntimeException $exception) {
             $this->context->flash('error', 'Failed to update active theme: ' . $exception->getMessage());
@@ -249,7 +249,7 @@ final class ThemeController
 
         if ($setActive) {
             try {
-                ConfigScribe::persistValue($this->config->path(), $this->config->all(), 'site.theme', $themeSlug);
+                ConfigWrite::persistValue($this->config->path(), $this->config->all(), 'site.theme', $themeSlug);
                 $this->config = new Config($this->config->path());
             } catch (\RuntimeException $exception) {
                 $this->directoryTree()->removeTree($themePath);

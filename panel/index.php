@@ -19,7 +19,7 @@ use Raven\Core\Router\Panel\PanelRouter;
 use Raven\Lib\Transport\Request as HttpRequest;
 use Raven\Core\Runtime\Panel\RuntimeBuilder;
 use Raven\Core\Router\Panel\PanelPayload;
-use Raven\Lib\Parser\ConfigParser;
+use Raven\Core\Repository\ConfigRead;
 use Raven\Lib\Parser\PanelParser;
 use Raven\Lib\Scheduler\Cron;
 use Raven\Lib\View\Public\Error as PublicError;
@@ -123,8 +123,8 @@ $isPanelAuthHelperInternalPath = static function (string $path) use ($internalPa
     ], true);
 };
 
-$categoryEnabled = ConfigParser::bool($rvn['config']->get('category.enabled', true), true);
-$tagEnabled = ConfigParser::bool($rvn['config']->get('tag.enabled', true), true);
+$categoryEnabled = ConfigRead::bool($rvn['config']->get('category.enabled', true), true);
+$tagEnabled = ConfigRead::bool($rvn['config']->get('tag.enabled', true), true);
 $_SESSION['_raven_category_enabled'] = $categoryEnabled;
 $_SESSION['_raven_tag_enabled'] = $tagEnabled;
 

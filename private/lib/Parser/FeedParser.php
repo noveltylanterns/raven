@@ -12,7 +12,7 @@ declare(strict_types=1);
 namespace Raven\Lib\Parser;
 
 use Raven\Core\Config;
-use Raven\Lib\Parser\ConfigParser;
+use Raven\Core\Repository\ConfigRead;
 use Raven\Lib\Security\InputSanitizer;
 
 /**
@@ -46,7 +46,7 @@ final class FeedParser
      */
     public function feedEnabled(): bool
     {
-        return ConfigParser::bool($this->config->get('feed.enabled', false), false);
+        return ConfigRead::bool($this->config->get('feed.enabled', false), false);
     }
 
     /**

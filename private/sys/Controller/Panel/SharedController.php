@@ -18,7 +18,7 @@ use Raven\Lib\Auth\Panel\PermissionBase as PanelAccess;
 use Raven\Lib\Auth\Panel\SessionGuard;
 use Raven\Lib\Auth\SessionFlash;
 use Raven\Lib\Extension\Resolver;
-use Raven\Lib\Parser\ConfigParser;
+use Raven\Core\Repository\ConfigRead;
 use Raven\Lib\Parser\PanelParser;
 use Raven\Lib\Security\Csrf;
 use Raven\Lib\View\Panel\Footer;
@@ -638,8 +638,8 @@ final class SharedController
             'panel_brand_name' => (string) $this->config->get('panel.brand_name', ''),
             'panel_brand_logo' => (string) $this->config->get('panel.brand_logo', ''),
             'domain' => (string) $this->config->get('site.domain', 'localhost'),
-            'category_enabled' => ConfigParser::bool($this->config->get('category.enabled', true), true),
-            'tag_enabled' => ConfigParser::bool($this->config->get('tag.enabled', true), true),
+            'category_enabled' => ConfigRead::bool($this->config->get('category.enabled', true), true),
+            'tag_enabled' => ConfigRead::bool($this->config->get('tag.enabled', true), true),
         ];
     }
 

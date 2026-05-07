@@ -29,7 +29,7 @@ use Raven\Lib\Extension\Resolver;
 use Raven\Lib\Extension\StateRead;
 use Raven\Lib\Scheduler\Registry as SchedulerRegistry;
 use Raven\Lib\Security\InputSanitizer;
-use Raven\Lib\Scribe\ConfigScribe;
+use Raven\Core\Repository\ConfigWrite;
 use Raven\Lib\Transport\Upload;
 use Raven\Lib\View\Public\ThemeDiscovery;
 use Raven\Lib\View\Public\ThemeGenerator;
@@ -1907,7 +1907,7 @@ function raven_cli_command_config(RavenCliContext $context, array $tokens): int
             $exists = raven_cli_has_config_key($config, $key);
             $existingValue = $exists ? raven_cli_get_config_value($config, $key) : null;
             $parsedValue = raven_cli_parse_typed_value((string) $valueRaw, $type, $existingValue, $exists);
-            $config = ConfigScribe::persistValue($configObject->path(), $config, $key, $parsedValue);
+            $config = ConfigWrite::persistValue($configObject->path(), $config, $key, $parsedValue);
 
             if ($context->json) {
                 $context->printJson(['ok' => true, 'key' => $key, 'value' => $parsedValue]);
@@ -1932,7 +1932,7 @@ function raven_cli_command_config(RavenCliContext $context, array $tokens): int
             $added = [];
             $merged = raven_cli_merge_missing_config_defaults($config, $dist, $added);
             if ($added !== []) {
-                ConfigScribe::persist($configObject->path(), $merged);
+                ConfigWrite::persist($configObject->path(), $merged);
             }
 
             if ($context->json) {
@@ -2423,7 +2423,7 @@ function raven_cli_command_theme(RavenCliContext $context, array $tokens): int
                 throw new RuntimeException('Config service unavailable.');
             }
 
-            ConfigScribe::persistValue($rvn['config']->path(), $rvn['config']->all(), 'site.theme', $slug);
+            ConfigWrite::persistValue($rvn['config']->path(), $rvn['config']->all(), 'site.theme', $slug);
 
             if ($context->json) {
                 $context->printJson(['ok' => true, 'slug' => $slug, 'enabled' => true]);
@@ -2521,7 +2521,7 @@ function raven_cli_command_theme(RavenCliContext $context, array $tokens): int
                 if (!isset($rvn['config']) || !$rvn['config'] instanceof Config) {
                     throw new RuntimeException('Config service unavailable.');
                 }
-                ConfigScribe::persistValue($rvn['config']->path(), $rvn['config']->all(), 'site.theme', $slug);
+                ConfigWrite::persistValue($rvn['config']->path(), $rvn['config']->all(), 'site.theme', $slug);
             }
 
             if ($context->json) {

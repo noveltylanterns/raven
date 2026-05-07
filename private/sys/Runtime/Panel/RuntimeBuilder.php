@@ -24,7 +24,7 @@ use Raven\Lib\Extension\Panel\Content as ExtensionContent;
 use Raven\Lib\Extension\Panel\Manager as ExtensionManager;
 use Raven\Lib\Extension\Panel\Permissions as ExtensionPermissions;
 use Raven\Lib\Extension\StateRead;
-use Raven\Lib\Parser\ConfigParser;
+use Raven\Core\Repository\ConfigRead;
 use Raven\Lib\Media\MediaUpload;
 use Raven\Lib\View\Panel\EditorWrapper;
 use Raven\Lib\View\Panel\EditorBlocks;
@@ -74,8 +74,8 @@ final class RuntimeBuilder
         $themeCatalogService = null;
 
         $rvn['view'] = new Renderer((string) $rvn['root'] . '/private/tpl');
-        $categoryEnabled = ConfigParser::bool($rvn['config']->get('category.enabled', true), true);
-        $tagEnabled = ConfigParser::bool($rvn['config']->get('tag.enabled', true), true);
+        $categoryEnabled = ConfigRead::bool($rvn['config']->get('category.enabled', true), true);
+        $tagEnabled = ConfigRead::bool($rvn['config']->get('tag.enabled', true), true);
 
 
         /**

@@ -3,7 +3,7 @@
 /**
  * RAVEN CMS
  * ~/private/lib/Parser/ConfigParser.php
- * Lightweight config-reading and scalar type-coercion helpers.
+ * Backward-compatibility wrapper for config read helpers.
  * Docs: https://raven.lanterns.io
  */
 
@@ -11,16 +11,10 @@ declare(strict_types=1);
 
 namespace Raven\Lib\Parser;
 
+use Raven\Core\Repository\ConfigRead;
+
 /**
- * Standalone scalar type-coercion helpers for Raven config values.
- *
- * Accepts the common string/numeric/boolean forms that Raven stores in config
- * files and HTML forms, normalizing them to typed PHP primitives. Kept separate
- * from the runtime `Config` class so extension code and lib services can import
- * just the parsing primitive without pulling in I/O concerns.
- *
- * Call this class directly when only value parsing is needed without the full
- * config I/O surface (`Raven\Core\Config`).
+ * Compatibility shim that forwards legacy parser calls to `ConfigRead`.
  */
 final class ConfigParser
 {
@@ -28,222 +22,95 @@ final class ConfigParser
     private static array $pathSegmentsCache = [];
 
     /**
-     * Returns cached dot-path segments for one config key.
-     *
-     * Config-heavy request paths such as routing and the panel configuration
-     * editor repeatedly resolve the same keys, so cache the split segments once
-     * per request instead of re-running `explode()` on every access.
-     *
-     * @param string $key Dot-delimited config key path.
-     * @return array<int, string> Cached path segments.
+     * @param string $key
+     * @return array<int, string>
      */
     public static function segments(string $key): array
     {
-        $normalized = trim($key);
-        if ($normalized === '') {
-            return [];
-        }
-
-        if (isset(self::$pathSegmentsCache[$normalized])) {
-            return self::$pathSegmentsCache[$normalized];
-        }
-
-        self::$pathSegmentsCache[$normalized] = str_contains($normalized, '.')
-            ? explode('.', $normalized)
-            : [$normalized];
-
-        return self::$pathSegmentsCache[$normalized];
+        return ConfigRead::segments($key);
     }
 
     /**
-     * Reads one config value from a nested array using dot notation.
-     *
-     * @param array<string, mixed> $config Config tree to read from.
-     * @param string $key Dot-delimited config key path.
-     * @param mixed $default Value returned when the path does not resolve.
-     * @return mixed Resolved config value or the provided default.
+     * @param array<string, mixed> $config
+     * @param string $key
+     * @param mixed $default
+     * @return mixed
      */
     public static function get(array $config, string $key, mixed $default = null): mixed
     {
-        return self::getBySegments($config, self::segments($key), $default);
+        return ConfigRead::get($config, $key, $default);
     }
 
     /**
-     * Reads one config value from a nested array using pre-split path segments.
-     *
-     * @param array<string, mixed> $config Config tree to read from.
-     * @param array<int, string> $segments Pre-split config path segments.
-     * @param mixed $default Value returned when the path does not resolve.
-     * @return mixed Resolved config value or the provided default.
+     * @param array<string, mixed> $config
+     * @param array<int, string> $segments
+     * @param mixed $default
+     * @return mixed
      */
     public static function getBySegments(array $config, array $segments, mixed $default = null): mixed
     {
-        $cursor = $config;
-
-        foreach ($segments as $segment) {
-            if (!is_array($cursor) || !array_key_exists($segment, $cursor)) {
-                return $default;
-            }
-
-            $cursor = $cursor[$segment];
-        }
-
-        return $cursor;
+        return ConfigRead::getBySegments($config, $segments, $default);
     }
 
     /**
-     * Normalizes one mixed config value into a boolean.
-     *
-     * Accepts the common string/numeric forms that Raven stores in config files
-     * and HTML forms so callers can normalize without repeating local parsing.
-     *
-     * @param mixed $value   Raw config value.
-     * @param bool  $default Fallback when the input cannot be normalized.
-     * @return bool Normalized boolean config value.
+     * @param mixed $value
+     * @param bool $default
+     * @return bool
      */
     public static function bool(mixed $value, bool $default = false): bool
     {
-        if (is_bool($value)) {
-            return $value;
-        }
-
-        if (is_int($value) || is_float($value)) {
-            return ((int) $value) !== 0;
-        }
-
-        if (is_string($value)) {
-            $normalized = strtolower(trim($value));
-            if (in_array($normalized, ['1', 'true', 'yes', 'on'], true)) {
-                return true;
-            }
-
-            if (in_array($normalized, ['0', 'false', 'no', 'off', ''], true)) {
-                return false;
-            }
-        }
-
-        return $default;
+        return ConfigRead::bool($value, $default);
     }
 
     /**
-     * Normalizes one mixed config value into an integer.
-     *
-     * @param mixed    $value   Raw config value.
-     * @param int      $default Fallback when the input cannot be normalized.
-     * @param int|null $min     Optional lower bound applied after parsing.
-     * @param int|null $max     Optional upper bound applied after parsing.
-     * @return int Normalized integer config value.
+     * @param mixed $value
+     * @param int $default
+     * @param int|null $min
+     * @param int|null $max
+     * @return int
      */
     public static function int(mixed $value, int $default, ?int $min = null, ?int $max = null): int
     {
-        $parsed = $default;
-        if (is_int($value) || is_float($value)) {
-            $parsed = (int) $value;
-        } elseif (is_string($value) && trim($value) !== '' && is_numeric(trim($value))) {
-            $parsed = (int) trim($value);
-        }
-
-        if ($min !== null && $parsed < $min) {
-            $parsed = $min;
-        }
-        if ($max !== null && $parsed > $max) {
-            $parsed = $max;
-        }
-
-        return $parsed;
+        return ConfigRead::int($value, $default, $min, $max);
     }
 
     /**
-     * Normalizes one mixed config value into a float.
-     *
-     * @param mixed      $value   Raw config value.
-     * @param float      $default Fallback when the input cannot be normalized.
-     * @param float|null $min     Optional lower bound applied after parsing.
-     * @param float|null $max     Optional upper bound applied after parsing.
-     * @return float Normalized float config value.
+     * @param mixed $value
+     * @param float $default
+     * @param float|null $min
+     * @param float|null $max
+     * @return float
      */
     public static function float(mixed $value, float $default, ?float $min = null, ?float $max = null): float
     {
-        $parsed = $default;
-        if (is_int($value) || is_float($value)) {
-            $parsed = (float) $value;
-        } elseif (is_string($value) && trim($value) !== '' && is_numeric(trim($value))) {
-            $parsed = (float) trim($value);
-        }
-
-        if ($min !== null && $parsed < $min) {
-            $parsed = $min;
-        }
-        if ($max !== null && $parsed > $max) {
-            $parsed = $max;
-        }
-
-        return $parsed;
+        return ConfigRead::float($value, $default, $min, $max);
     }
 
     /**
-     * Reads one submitted nested scalar value and normalizes it to a string.
-     *
-     * @param array<string, mixed> $submitted Nested submitted data.
-     * @param array<int, string> $segments Nested config path segments.
-     * @return string Submitted scalar value, or an empty string when absent.
+     * @param array<string, mixed> $submitted
+     * @param array<int, string> $segments
+     * @return string
      */
     public static function readNestedString(array $submitted, array $segments): string
     {
-        $cursor = $submitted;
-
-        foreach ($segments as $segment) {
-            if (!is_array($cursor) || !array_key_exists($segment, $cursor)) {
-                return '';
-            }
-
-            $cursor = $cursor[$segment];
-        }
-
-        if (is_string($cursor)) {
-            return $cursor;
-        }
-
-        if (is_int($cursor) || is_float($cursor) || is_bool($cursor)) {
-            return (string) $cursor;
-        }
-
-        return '';
+        return ConfigRead::readNestedString($submitted, $segments);
     }
 
     /**
-     * Detects the scalar type label used by the panel config editor.
-     *
-     * @param mixed $value Raw config value.
-     * @return string Scalar type label for form normalization.
+     * @param mixed $value
+     * @return string
      */
     public static function detectScalarType(mixed $value): string
     {
-        return match (true) {
-            is_int($value) => 'int',
-            is_float($value) => 'float',
-            is_bool($value) => 'bool',
-            $value === null => 'null',
-            default => 'string',
-        };
+        return ConfigRead::detectScalarType($value);
     }
 
     /**
-     * Stringifies one scalar config value for panel form fields.
-     *
-     * @param mixed $value Raw config value.
-     * @return string Normalized string form used by the panel editor.
+     * @param mixed $value
+     * @return string
      */
     public static function stringifyScalar(mixed $value): string
     {
-        if (is_bool($value)) {
-            return $value ? 'true' : 'false';
-        }
-
-        if ($value === null) {
-            return '';
-        }
-
-        return (string) $value;
+        return ConfigRead::stringifyScalar($value);
     }
 }
