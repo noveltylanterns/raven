@@ -19,11 +19,14 @@ use Raven\Core\Repository\UserWrite;
 use Raven\Lib\Auth\LoginIdentifier;
 use Raven\Lib\Auth\Panel\PermissionBase as PanelAccess;
 use Raven\Lib\Media\AvatarConfig;
+use Raven\Lib\Media\AvatarDelete;
+use Raven\Lib\Media\AvatarUpload;
 use Raven\Lib\Media\AvatarValidator;
 use Raven\Lib\Media\CoverConfig;
+use Raven\Lib\Media\CoverDelete;
+use Raven\Lib\Media\CoverUpload;
 use Raven\Lib\Parser\GroupRouteParser;
 use Raven\Lib\Parser\UserProfileParser;
-use Raven\Lib\Scribe\UserScribe;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\Transport\Redirect;
 use Raven\Lib\View\Form2fa;
@@ -56,8 +59,12 @@ final class UserEditController
     private MediaConfig $mediaConfig;
     private UserProfileParser $profileParser;
     private Form2fa $form2fa;
-    private UserScribe $userMediaScribe;
     private CoverConfig $coverConfig;
+    private string $projectRoot;
+    private AvatarUpload $avatarUpload;
+    private CoverUpload $coverUpload;
+    private AvatarDelete $avatarDelete;
+    private CoverDelete $coverDelete;
 
     /**
      * @param SharedController $context Shared panel request context.
@@ -75,8 +82,12 @@ final class UserEditController
      * @param MediaConfig $mediaConfig Shared non-avatar media-limit helper.
      * @param UserProfileParser $profileParser Shared profile-contact normalizer.
      * @param Form2fa $form2fa Shared 2FA list normalizer.
-     * @param UserScribe $userMediaScribe Shared user-media write helper.
      * @param CoverConfig $coverConfig Shared user cover-image URL resolver.
+     * @param string $projectRoot Absolute project root for user-media filesystem writes.
+     * @param AvatarUpload $avatarUpload Avatar upload storage and extension normalization helper.
+     * @param CoverUpload $coverUpload Cover image upload storage helper.
+     * @param AvatarDelete $avatarDelete Avatar file and thumbnail deletion helper.
+     * @param CoverDelete $coverDelete Cover image file deletion helper.
      * @return void
      */
     public function __construct(
@@ -95,8 +106,12 @@ final class UserEditController
         MediaConfig $mediaConfig,
         UserProfileParser $profileParser,
         Form2fa $form2fa,
-        UserScribe $userMediaScribe,
-        CoverConfig $coverConfig
+        CoverConfig $coverConfig,
+        string $projectRoot,
+        AvatarUpload $avatarUpload,
+        CoverUpload $coverUpload,
+        AvatarDelete $avatarDelete,
+        CoverDelete $coverDelete
     ) {
         $this->context = $context;
         $this->config = $config;
@@ -114,8 +129,12 @@ final class UserEditController
         $this->mediaConfig = $mediaConfig;
         $this->profileParser = $profileParser;
         $this->form2fa = $form2fa;
-        $this->userMediaScribe = $userMediaScribe;
         $this->coverConfig = $coverConfig;
+        $this->projectRoot = $projectRoot;
+        $this->avatarUpload = $avatarUpload;
+        $this->coverUpload = $coverUpload;
+        $this->avatarDelete = $avatarDelete;
+        $this->coverDelete = $coverDelete;
     }
 
     /**
@@ -426,14 +445,14 @@ final class UserEditController
                 Redirect::redirect($editUrl);
             }
 
-            $normalizedExtension = $this->userMediaScribe->normalizeExtension((string) ($result['extension'] ?? ''));
+            $normalizedExtension = $this->avatarUpload->normalizeExtension((string) ($result['extension'] ?? ''));
             if ($normalizedExtension === null) {
                 $this->context->flash('error', 'Avatar upload format is not supported.');
                 Redirect::redirect($editUrl);
             }
 
             if ($id !== null) {
-                $storeResult = $this->userMediaScribe->storeAvatarUpload($id, $avatarUpload, $normalizedExtension);
+                $storeResult = $this->avatarUpload->storeForUser($id, $avatarUpload, $normalizedExtension, $this->projectRoot);
                 if (!(bool) ($storeResult['ok'] ?? false)) {
                     $this->context->flash('error', (string) ($storeResult['error'] ?? 'Avatar upload failed.'));
                     Redirect::redirect($editUrl);
@@ -459,14 +478,14 @@ final class UserEditController
                 Redirect::redirect($editUrl);
             }
 
-            $normalizedExtension = $this->userMediaScribe->normalizeExtension((string) ($coverResult['extension'] ?? ''));
+            $normalizedExtension = $this->avatarUpload->normalizeExtension((string) ($coverResult['extension'] ?? ''));
             if ($normalizedExtension === null) {
                 $this->context->flash('error', 'Cover image upload format is not supported.');
                 Redirect::redirect($editUrl);
             }
 
             if ($id !== null) {
-                $storeResult = $this->userMediaScribe->storeCoverUpload($id, $coverUpload, $normalizedExtension);
+                $storeResult = $this->coverUpload->storeForUser($id, $coverUpload, $normalizedExtension, $this->projectRoot);
                 if (!(bool) ($storeResult['ok'] ?? false)) {
                     $this->context->flash('error', (string) ($storeResult['error'] ?? 'Cover image upload failed.'));
                     Redirect::redirect($editUrl);
@@ -524,7 +543,7 @@ final class UserEditController
                 }
 
                 if (is_array($pendingAvatarUpload) && is_string($pendingAvatarExtension)) {
-                    $storeResult = $this->userMediaScribe->storeAvatarUpload($savedId, $pendingAvatarUpload, $pendingAvatarExtension);
+                    $storeResult = $this->avatarUpload->storeForUser($savedId, $pendingAvatarUpload, $pendingAvatarExtension, $this->projectRoot);
                     if (!(bool) ($storeResult['ok'] ?? false)) {
                         throw new \RuntimeException((string) ($storeResult['error'] ?? 'Avatar upload failed.'));
                     }
@@ -535,7 +554,7 @@ final class UserEditController
                 }
 
                 if (is_array($pendingCoverUpload) && is_string($pendingCoverExtension)) {
-                    $storeResult = $this->userMediaScribe->storeCoverUpload($savedId, $pendingCoverUpload, $pendingCoverExtension);
+                    $storeResult = $this->coverUpload->storeForUser($savedId, $pendingCoverUpload, $pendingCoverExtension, $this->projectRoot);
                     if (!(bool) ($storeResult['ok'] ?? false)) {
                         throw new \RuntimeException((string) ($storeResult['error'] ?? 'Cover image upload failed.'));
                     }
@@ -565,10 +584,10 @@ final class UserEditController
             }
         } catch (\Throwable $exception) {
             if ($uploadedAvatarFilename !== null) {
-                $this->userMediaScribe->deleteAvatarFile($uploadedAvatarFilename);
+                $this->avatarDelete->deleteFile($uploadedAvatarFilename);
             }
             if ($uploadedCoverFilename !== null) {
-                $this->userMediaScribe->deleteCoverFile($uploadedCoverFilename);
+                $this->coverDelete->deleteFile($uploadedCoverFilename);
             }
 
             if ($id === null && $createdUserId !== null) {
@@ -607,10 +626,10 @@ final class UserEditController
         }
 
         if ($avatarSet && is_string($currentAvatarPath) && $currentAvatarPath !== '' && $currentAvatarPath !== $avatarFilename) {
-            $this->userMediaScribe->deleteAvatarFile($currentAvatarPath);
+            $this->avatarDelete->deleteFile($currentAvatarPath);
         }
         if ($currentCoverImage !== null && $currentCoverImage !== '' && $currentCoverImage !== $coverImage) {
-            $this->userMediaScribe->deleteCoverFile($currentCoverImage);
+            $this->coverDelete->deleteFile($currentCoverImage);
         }
 
         if ($twoFactorUpdateError !== null) {

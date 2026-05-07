@@ -18,9 +18,12 @@ use Raven\Core\Repository\AuthWrite;
 use Raven\Core\Repository\UserRead;
 use Raven\Lib\Auth\LoginIdentifier;
 use Raven\Lib\Media\AvatarConfig;
+use Raven\Lib\Media\AvatarDelete;
+use Raven\Lib\Media\AvatarUpload;
 use Raven\Lib\Media\AvatarValidator;
 use Raven\Lib\Media\CoverConfig;
-use Raven\Lib\Scribe\UserScribe;
+use Raven\Lib\Media\CoverDelete;
+use Raven\Lib\Media\CoverUpload;
 use Raven\Lib\Security\PasswordValidator;
 use Raven\Lib\View\Preferences as PreferencesView;
 use Raven\Lib\View\Qr;
@@ -54,11 +57,15 @@ final class PreferencesController
     private MediaConfig $mediaConfig;
     private UserProfileParser $profileParser;
     private Form2fa $form2fa;
-    private UserScribe $userMediaScribe;
     private CoverConfig $coverConfig;
     private PasswordValidator $passwordValidator;
     private UserRead $userRead;
     private AuthWrite $authWrite;
+    private string $projectRoot;
+    private AvatarUpload $avatarUpload;
+    private CoverUpload $coverUpload;
+    private AvatarDelete $avatarDelete;
+    private CoverDelete $coverDelete;
 
     /**
      * @param SharedController $context Shared panel request context.
@@ -71,11 +78,15 @@ final class PreferencesController
      * @param MediaConfig $mediaConfig Shared non-avatar media-limit helper.
      * @param UserProfileParser $profileParser Shared profile-contact normalizer.
      * @param Form2fa $form2fa Shared 2FA helper set.
-     * @param UserScribe $userMediaScribe Shared user-media write helper.
      * @param CoverConfig $coverConfig Shared user cover-image URL resolver.
      * @param PasswordValidator $passwordValidator Shared password validation policy.
      * @param UserRead $userRead User repository read side for uniqueness checks.
      * @param AuthWrite $authWrite Auth-user write repository for preference persistence.
+     * @param string $projectRoot Absolute project root for user-media filesystem writes.
+     * @param AvatarUpload $avatarUpload Avatar upload storage and extension normalization helper.
+     * @param CoverUpload $coverUpload Cover image upload storage helper.
+     * @param AvatarDelete $avatarDelete Avatar file and thumbnail deletion helper.
+     * @param CoverDelete $coverDelete Cover image file deletion helper.
      * @return void
      */
     public function __construct(
@@ -89,11 +100,15 @@ final class PreferencesController
         MediaConfig $mediaConfig,
         UserProfileParser $profileParser,
         Form2fa $form2fa,
-        UserScribe $userMediaScribe,
         CoverConfig $coverConfig,
         PasswordValidator $passwordValidator,
         UserRead $userRead,
-        AuthWrite $authWrite
+        AuthWrite $authWrite,
+        string $projectRoot,
+        AvatarUpload $avatarUpload,
+        CoverUpload $coverUpload,
+        AvatarDelete $avatarDelete,
+        CoverDelete $coverDelete
     ) {
         $this->context = $context;
         $this->config = $config;
@@ -106,11 +121,15 @@ final class PreferencesController
         $this->mediaConfig = $mediaConfig;
         $this->profileParser = $profileParser;
         $this->form2fa = $form2fa;
-        $this->userMediaScribe = $userMediaScribe;
         $this->coverConfig = $coverConfig;
         $this->passwordValidator = $passwordValidator;
         $this->userRead = $userRead;
         $this->authWrite = $authWrite;
+        $this->projectRoot = $projectRoot;
+        $this->avatarUpload = $avatarUpload;
+        $this->coverUpload = $coverUpload;
+        $this->avatarDelete = $avatarDelete;
+        $this->coverDelete = $coverDelete;
     }
 
     /**
@@ -298,11 +317,11 @@ final class PreferencesController
             if (!(bool) $result['ok']) {
                 $errors[] = (string) ($result['error'] ?? 'Avatar upload failed.');
             } else {
-                $normalizedExtension = $this->userMediaScribe->normalizeExtension((string) ($result['extension'] ?? ''));
+                $normalizedExtension = $this->avatarUpload->normalizeExtension((string) ($result['extension'] ?? ''));
                 if ($normalizedExtension === null) {
                     $errors[] = 'Avatar upload format is not supported.';
                 } else {
-                    $storeResult = $this->userMediaScribe->storeAvatarUpload($userId, $avatarUpload, $normalizedExtension);
+                    $storeResult = $this->avatarUpload->storeForUser($userId, $avatarUpload, $normalizedExtension, $this->projectRoot);
                     if (!(bool) ($storeResult['ok'] ?? false)) {
                         $errors[] = (string) ($storeResult['error'] ?? 'Avatar upload failed.');
                     } else {
@@ -324,11 +343,11 @@ final class PreferencesController
             if (!(bool) $result['ok']) {
                 $errors[] = (string) ($result['error'] ?? 'Cover image upload failed.');
             } else {
-                $normalizedExtension = $this->userMediaScribe->normalizeExtension((string) ($result['extension'] ?? ''));
+                $normalizedExtension = $this->avatarUpload->normalizeExtension((string) ($result['extension'] ?? ''));
                 if ($normalizedExtension === null) {
                     $errors[] = 'Cover image upload format is not supported.';
                 } else {
-                    $storeResult = $this->userMediaScribe->storeCoverUpload($userId, $coverUpload, $normalizedExtension);
+                    $storeResult = $this->coverUpload->storeForUser($userId, $coverUpload, $normalizedExtension, $this->projectRoot);
                     if (!(bool) ($storeResult['ok'] ?? false)) {
                         $errors[] = (string) ($storeResult['error'] ?? 'Cover image upload failed.');
                     } else {
@@ -341,10 +360,10 @@ final class PreferencesController
 
         if ($errors !== []) {
             if ($uploadedAvatarFilename !== null) {
-                $this->userMediaScribe->deleteAvatarFile($uploadedAvatarFilename);
+                $this->avatarDelete->deleteFile($uploadedAvatarFilename);
             }
             if ($uploadedCoverFilename !== null) {
-                $this->userMediaScribe->deleteCoverFile($uploadedCoverFilename);
+                $this->coverDelete->deleteFile($uploadedCoverFilename);
             }
 
             $this->context->flash('error', implode(' ', $errors));
@@ -368,10 +387,10 @@ final class PreferencesController
 
         if (!$update['ok']) {
             if ($uploadedAvatarFilename !== null) {
-                $this->userMediaScribe->deleteAvatarFile($uploadedAvatarFilename);
+                $this->avatarDelete->deleteFile($uploadedAvatarFilename);
             }
             if ($uploadedCoverFilename !== null) {
-                $this->userMediaScribe->deleteCoverFile($uploadedCoverFilename);
+                $this->coverDelete->deleteFile($uploadedCoverFilename);
             }
 
             $this->context->flash('error', implode(' ', $update['errors']));
@@ -380,10 +399,10 @@ final class PreferencesController
 
         $oldAvatar = $current['avatar'] ?? null;
         if (is_string($oldAvatar) && $oldAvatar !== '' && $oldAvatar !== $avatarFilename && $avatarSet) {
-            $this->userMediaScribe->deleteAvatarFile($oldAvatar);
+            $this->avatarDelete->deleteFile($oldAvatar);
         }
         if ($currentCoverImage !== null && $currentCoverImage !== '' && $currentCoverImage !== $coverImage) {
-            $this->userMediaScribe->deleteCoverFile($currentCoverImage);
+            $this->coverDelete->deleteFile($currentCoverImage);
         }
 
         $this->context->auth()->markTwoFactorVerified($userId);

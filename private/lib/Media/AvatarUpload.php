@@ -178,6 +178,36 @@ final class AvatarUpload
     }
 
     /**
+     * Stores one avatar upload for a user and returns the stored relative path.
+     *
+     * Writes the file to `public/uploads/user/{userId}/avatar.ext` under the given
+     * project root and generates a 120px square thumbnail alongside it.
+     *
+     * @param int $userId Numeric user id used as the per-user directory name.
+     * @param array<string, mixed> $upload Validated upload payload from the panel file input.
+     * @param string $extension Submitted or pre-normalized extension token.
+     * @param string $projectRoot Absolute project root for filesystem path resolution.
+     * @return array{ok: bool, path?: string, error?: string} Result with stored relative path on success.
+     */
+    public function storeForUser(int $userId, array $upload, string $extension, string $projectRoot): array
+    {
+        $normalizedExtension = $this->normalizeExtension($extension);
+        if ($normalizedExtension === null) {
+            return ['ok' => false, 'error' => 'Avatar upload format is not supported.'];
+        }
+
+        $directory = $this->userDirectory($userId, $projectRoot);
+        $filename = 'avatar.' . $normalizedExtension;
+        $destination = $directory . '/' . $filename;
+        $storeError = $this->storeSanitizedUpload($upload, $destination);
+        if ($storeError !== null) {
+            return ['ok' => false, 'error' => $storeError];
+        }
+
+        return ['ok' => true, 'path' => 'uploads/user/' . $userId . '/' . $filename];
+    }
+
+    /**
      * Deletes one avatar file and its thumbnail from legacy flat storage.
      *
      * @param string $projectRoot Absolute Raven project root.
@@ -497,6 +527,23 @@ final class AvatarUpload
         }
 
         return null;
+    }
+
+    /**
+     * Resolves and creates the per-user upload directory for a given user id.
+     *
+     * @param int $userId Numeric user id used as the directory name segment.
+     * @param string $projectRoot Absolute project root.
+     * @return string Absolute path to the user upload directory.
+     */
+    private function userDirectory(int $userId, string $projectRoot): string
+    {
+        $directory = rtrim($projectRoot, '/\\') . '/public/uploads/user/' . $userId;
+        if (!is_dir($directory)) {
+            @mkdir($directory, 0775, true);
+        }
+
+        return $directory;
     }
 
     /**

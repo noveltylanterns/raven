@@ -44,12 +44,14 @@ use Raven\Lib\Auth\SessionFlash;
 use Raven\Lib\Extension\Panel\Manager as ExtensionManager;
 use Raven\Lib\Media\PreviewConfig;
 use Raven\Lib\Media\CoverConfig;
+use Raven\Lib\Media\AvatarDelete;
 use Raven\Lib\Media\AvatarUpload;
+use Raven\Lib\Media\CoverDelete;
+use Raven\Lib\Media\CoverUpload;
 use Raven\Lib\Parser\FeedParser;
 use Raven\Lib\Parser\GroupRouteParser;
 use Raven\Lib\Parser\UserProfileParser;
 use Raven\Lib\View\Panel\EditorMeta;
-use Raven\Lib\Scribe\UserScribe;
 use Raven\Lib\Security\PasswordValidator;
 use Raven\Lib\Transport\Upload;
 use Raven\Lib\View\Public\Error as PublicError;
@@ -579,8 +581,12 @@ final class ControllerFactory
                 new MediaConfig($rvn['config']),
                 new UserProfileParser($rvn['input']),
                 new Form2fa($rvn['input']),
-                new UserScribe((string) $rvn['root'], new AvatarUpload()),
-                new CoverConfig()
+                new CoverConfig(),
+                (string) $rvn['root'],
+                new AvatarUpload(),
+                new CoverUpload(),
+                new AvatarDelete((string) $rvn['root']),
+                new CoverDelete((string) $rvn['root'])
             );
 
             return $userEditController;
@@ -691,11 +697,15 @@ final class ControllerFactory
                 new MediaConfig($rvn['config']),
                 new UserProfileParser($rvn['input']),
                 new Form2fa($rvn['input']),
-                new UserScribe((string) $rvn['root'], new AvatarUpload()),
                 new CoverConfig(),
                 new PasswordValidator(),
                 $userDomain['user_read'],
-                $userDomain['auth_write']
+                $userDomain['auth_write'],
+                (string) $rvn['root'],
+                new AvatarUpload(),
+                new CoverUpload(),
+                new AvatarDelete((string) $rvn['root']),
+                new CoverDelete((string) $rvn['root'])
             );
 
             return $preferencesController;
