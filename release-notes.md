@@ -30,6 +30,10 @@
 - **Panel AuthController docblock sweep** — added missing `@param`/`@return` tags to all public action methods (`showLogin`, `login`, `showLoginTwoFactor`, `loginTwoFactor`, `loginTwoFactorSelect`, `loginTwoFactorWebauthnOptions`, `loginTwoFactorWebauthnVerify`, `logout`).
 - **Panel SharedController docblock sweep** — added missing `@return` tags to the three public accessor methods (`auth()`, `csrf()`, `config()`).
 - **Phase D validation** — `php -l` syntax pass over all `private/sys/Controller/` files clean; `php debug/smoke/cli.php` passed.
+- **Dead Parser class removal** — deleted 9 fully dead `lib/Parser/` classes with no external callers: `CategoryDataParser`, `TagDataParser`, `ChannelDataParser`, `PageDataParser`, `GroupDataParser`, `UserDataParser`, `TaxonomyDataParser`, `MediaParser`, `InviteParser`. Removed stale docblock reference to `InviteParser`/`InviteScribe` from `Repository/InviteRead`.
+- **CategoryRepoParser + TagRepoParser elimination** — both classes were dead outside `TaxonomyRepoParser`; inlined their two simple routing-option queries directly into `TaxonomyRepoParser` (which already held the DB primitives) and deleted both parser files.
+- **Dead Scribe class removal** — deleted `lib/Scribe/InviteScribe.php` (no callers). Restored `TaxonomyScribe` after discovering `CategoryScribe` and `TagScribe` extend it.
+- **Validation** — `php -l` clean on all remaining `lib/Parser/` and `lib/Scribe/` files; `php debug/smoke/cli.php` passed.
 
 ### May 6, 2026 — lib/Scribe refactor cleanup
 

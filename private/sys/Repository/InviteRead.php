@@ -17,8 +17,7 @@ use Raven\Lib\Database\SqlTable;
  * SELECT, token normalization, and token generation methods for invite records.
  *
  * Write operations (createToken, consume, deleteById) live in InviteWrite.
- * The public normalization and generation helpers here are also called by InviteWrite
- * and by InviteParser/InviteScribe extension wrappers that delegate to this class.
+ * The public normalization and generation helpers here are also called by InviteWrite.
  */
 class InviteRead
 {

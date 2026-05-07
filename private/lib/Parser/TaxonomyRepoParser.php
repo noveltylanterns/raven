@@ -21,8 +21,7 @@ use Raven\Lib\Database\SqlTable;
 /**
  * Repository-backed parser for mixed channel/category/tag option sets.
  *
- * CategoryRepoParser and TagRepoParser own single-taxonomy slug lookups. This
- * class remains the aggregate seam for controller flows that intentionally
+ * This class is the aggregate seam for controller flows that intentionally
  * assemble both taxonomies into one payload, such as routing inventory and the
  * page editor taxonomy pickers.
  */
@@ -32,8 +31,6 @@ final class TaxonomyRepoParser
     private string $driver;
     private string $prefix;
     private ChannelRead $channelRepo;
-    private CategoryRepoParser $categoryRepoParser;
-    private TagRepoParser $tagRepoParser;
 
     /**
      * Initializes the mixed taxonomy lookup parser.
@@ -50,8 +47,6 @@ final class TaxonomyRepoParser
         $this->driver = $driver;
         $this->prefix = preg_replace('/[^a-zA-Z0-9_]/', '', $prefix) ?? '';
         $this->channelRepo = $channelRepo;
-        $this->categoryRepoParser = new CategoryRepoParser($db, $driver, $prefix);
-        $this->tagRepoParser = new TagRepoParser($db, $driver, $prefix);
     }
 
     /**
@@ -67,8 +62,8 @@ final class TaxonomyRepoParser
     {
         return [
             'channel_options' => $this->channelRepo->listRoutingOptions(),
-            'category_options_all' => $this->categoryRepoParser->listRoutingOptions(),
-            'tag_options_all' => $this->tagRepoParser->listRoutingOptions(),
+            'category_options_all' => $this->listCategoryRoutingOptions(),
+            'tag_options_all' => $this->listTagRoutingOptions(),
         ];
     }
 
@@ -92,8 +87,8 @@ final class TaxonomyRepoParser
     ): array {
         $result = [
             'channel_options' => $this->channelRepo->listRoutingOptions(),
-            'category_options_all' => $includeCategories ? $this->categoryRepoParser->listRoutingOptions() : [],
-            'tag_options_all' => $includeTags ? $this->tagRepoParser->listRoutingOptions() : [],
+            'category_options_all' => $includeCategories ? $this->listCategoryRoutingOptions() : [],
+            'tag_options_all' => $includeTags ? $this->listTagRoutingOptions() : [],
             'redirect_rows' => [],
         ];
 
@@ -236,6 +231,68 @@ final class TaxonomyRepoParser
                     $result['tag_options_selected'][] = $entry;
                 }
             }
+        }
+
+        return $result;
+    }
+
+    /**
+     * Returns lightweight category routing options for mixed routing inventories.
+     *
+     * Formerly delegated to CategoryRepoParser; inlined here since this class
+     * already holds the DB connection and TaxonomyRepoParser is the only caller.
+     *
+     * @return array<int, array{id: int, name: string, slug: string}> Category routing option rows.
+     */
+    private function listCategoryRoutingOptions(): array
+    {
+        $stmt = $this->db->prepare(
+            'SELECT id, name, slug
+             FROM ' . $this->table('categories') . '
+             ORDER BY name ASC, id ASC'
+        );
+        $stmt->execute();
+
+        $rows = $stmt->fetchAll() ?: [];
+        $result = [];
+        foreach ($rows as $row) {
+            $id = (int) ($row['id'] ?? 0);
+            $slug = trim((string) ($row['slug'] ?? ''));
+            if ($id < 1 || $slug === '') {
+                continue;
+            }
+            $result[] = ['id' => $id, 'name' => (string) ($row['name'] ?? ''), 'slug' => $slug];
+        }
+
+        return $result;
+    }
+
+    /**
+     * Returns lightweight tag routing options for mixed routing inventories.
+     *
+     * Formerly delegated to TagRepoParser; inlined here since this class
+     * already holds the DB connection and TaxonomyRepoParser is the only caller.
+     *
+     * @return array<int, array{id: int, name: string, slug: string}> Tag routing option rows.
+     */
+    private function listTagRoutingOptions(): array
+    {
+        $stmt = $this->db->prepare(
+            'SELECT id, name, slug
+             FROM ' . $this->table('tags') . '
+             ORDER BY name ASC, id ASC'
+        );
+        $stmt->execute();
+
+        $rows = $stmt->fetchAll() ?: [];
+        $result = [];
+        foreach ($rows as $row) {
+            $id = (int) ($row['id'] ?? 0);
+            $slug = trim((string) ($row['slug'] ?? ''));
+            if ($id < 1 || $slug === '') {
+                continue;
+            }
+            $result[] = ['id' => $id, 'name' => (string) ($row['name'] ?? ''), 'slug' => $slug];
         }
 
         return $result;
