@@ -2,6 +2,14 @@
 
 *The machine is supposed to be logging patches & mods to this file. Sometimes it does, sometimes it doesn't. It might be useful for historical architectural context to your Agent at one point.*
 
+### May 7, 2026 — lib/Parser + lib/Scheduler repo-parser boundary cleanup
+
+- **ChannelRepoParser boundary tightened** — removed 4 read-only methods (`normalizeChannelId`, `channelsByIdMap`, `applyBasicChannelContext`, `applyPageChannelContext`) and `resolveChannelIdBySlug` from `ChannelRepoParser`. The three context-hydration statics now live as `public static` methods on `ChannelRead`; `normalizeChannelId` is inlined as a `private static` on `ChannelRead`. Updated all callers: `PageRead`, `RedirectRead` (also dropped its stale `ChannelRepoParser` import), and the internal `TaxonomyParser` calls.
+- **ChannelDataParser created** — new `lib/Parser/ChannelDataParser.php` holds `resolveChannelIdBySlug` for write-side repos that need channel-id resolution without a `ChannelRead` dependency. `PageWrite` and `RedirectWrite` updated to import and call it.
+- **applySchedule moved to Scheduler\Queue** — extracted `PageRepoParser::applySchedule` into new `lib/Scheduler/Queue::applySchedule`. `Raven.php` updated to import and call `Queue`; stale `PageRepoParser` import removed. Matching stale comments in `PageRead` and `PageWrite` updated.
+- **TaxonomyRepoParser renamed to TaxonomyParser** — class was a pure read-side aggregate service with no write counterpart; "Repo" was a misnomer. File, class name, and all callers (`PageEditController`, `RoutingController`, `Runtime/Panel/RepoFactory`, `Runtime/Public/RepoFactory`) updated. Internal calls to moved `ChannelRepoParser` statics updated to `ChannelRead::*`.
+- **Validation** — `php -l` clean on all touched files; `php debug/smoke/cli.php` passed.
+
 ### May 7, 2026 — lib/Parser cleanup pass
 
 - **ConfigParser shim deleted** — removed `private/lib/Parser/ConfigParser.php`; it was a pure pass-through façade over `ConfigRead` with no added logic. Dead `$pathSegmentsCache` field was never written or read. Updated `debug/util/profile-panel-lists.php` to call `ConfigRead::bool()` directly; removed two dead pre-override assignments from `debug/smoke/router-inventory.php` (both variables were immediately overwritten by the panel runtime init).

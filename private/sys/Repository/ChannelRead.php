@@ -478,16 +478,6 @@ class ChannelRead
     }
 
     /**
-     * Returns all channel records indexed by id for O(1) lookup during page hydration.
-     *
-     * @return array<int, array<string, mixed>>
-     */
-    private function channelsByIdMap(): array
-    {
-        return ChannelRepoParser::channelsByIdMap($this->listRecords());
-    }
-
-    /**
      * Returns the next available channel id, skipping any ids already in use.
      *
      * @param array<int, bool> $usedIds Mutable set of already-allocated ids (updated in place).
@@ -512,9 +502,23 @@ class ChannelRead
      * @param mixed $value Raw value from the channel record file.
      * @return int|null Normalized channel id, or null when the value is not a valid id.
      */
-    private function normalizeChannelId(mixed $value): ?int
+    private static function normalizeChannelId(mixed $value): ?int
     {
-        return ChannelRepoParser::normalizeChannelId($value);
+        if (!is_scalar($value) && $value !== null) {
+            return null;
+        }
+
+        if ($value === null) {
+            return null;
+        }
+
+        $normalized = trim((string) $value);
+        if ($normalized === '' || preg_match('/^-?\d+$/', $normalized) !== 1) {
+            return null;
+        }
+
+        $id = (int) $normalized;
+        return $id >= ChannelRepoParser::ROOT_CHANNEL_ID ? $id : null;
     }
 
     /**
@@ -578,7 +582,7 @@ class ChannelRead
      */
     private function rootRecordNeedsRewrite(array $raw): bool
     {
-        if (ChannelRepoParser::normalizeChannelId($raw['id'] ?? null) !== ChannelRepoParser::ROOT_CHANNEL_ID) {
+        if (self::normalizeChannelId($raw['id'] ?? null) !== ChannelRepoParser::ROOT_CHANNEL_ID) {
             return true;
         }
 
@@ -740,7 +744,7 @@ class ChannelRead
      */
     private function recordIdFromRaw(array $raw, string $path): ?int
     {
-        $rawId = ChannelRepoParser::normalizeChannelId($raw['id'] ?? null);
+        $rawId = self::normalizeChannelId($raw['id'] ?? null);
         if ($rawId !== null) {
             return $rawId;
         }
@@ -1018,7 +1022,7 @@ class ChannelRead
      */
     public static function recordIdFromRawStatic(array $raw, string $path): ?int
     {
-        $rawId = ChannelRepoParser::normalizeChannelId($raw['id'] ?? null);
+        $rawId = self::normalizeChannelId($raw['id'] ?? null);
         if ($rawId !== null) {
             return $rawId;
         }
@@ -1181,6 +1185,71 @@ class ChannelRead
         if (function_exists('opcache_invalidate')) {
             @opcache_invalidate($normalized, true);
         }
+    }
+
+    /**
+     * Builds a map of channel id → channel record from a flat list of channel rows.
+     *
+     * Shared static so PageRead, RedirectRead, and TaxonomyParser can build the same map
+     * without re-implementing the loop.
+     *
+     * @param array<int, array<string, mixed>> $channelRecords Flat list of channel record arrays.
+     * @return array<int, array<string, mixed>>               Map keyed by integer channel id.
+     */
+    public static function channelsByIdMap(array $channelRecords): array
+    {
+        $map = [];
+        foreach ($channelRecords as $channel) {
+            if (!is_array($channel)) {
+                continue;
+            }
+
+            $id = (int) ($channel['id'] ?? 0);
+            if ($id < 1) {
+                continue;
+            }
+
+            $map[$id] = $channel;
+        }
+
+        return $map;
+    }
+
+    /**
+     * Applies channel slug and name context fields to a row array.
+     *
+     * @param array<string, mixed>      $row     Row array to augment.
+     * @param array<string, mixed>|null $channel Channel record, or null when the row has no channel.
+     * @return array<string, mixed>              Row with channel_slug and channel_name fields populated.
+     */
+    public static function applyBasicChannelContext(array $row, ?array $channel): array
+    {
+        $row['channel_slug'] = $channel !== null ? (string) ($channel['slug'] ?? '') : '';
+        $row['channel_name'] = $channel !== null ? (string) ($channel['name'] ?? '') : '';
+
+        return $row;
+    }
+
+    /**
+     * Applies channel routing context fields to a page row array.
+     *
+     * Includes basic channel context plus effective route mode and separator values.
+     *
+     * @param array<string, mixed>      $row     Page row array to augment.
+     * @param array<string, mixed>|null $channel Channel record, or null when the page has no channel.
+     * @return array<string, mixed>              Row with channel context and routing fields populated.
+     */
+    public static function applyPageChannelContext(array $row, ?array $channel): array
+    {
+        $row = self::applyBasicChannelContext($row, $channel);
+        $row['route_mode_effective'] = $channel !== null
+            ? (string) ($channel['route_mode'] ?? 'inherit')
+            : 'inherit';
+        $row['route_separator_effective'] = $channel !== null
+            ? (string) ($channel['route_separator'] ?? 'inherit')
+            : 'inherit';
+
+        return $row;
     }
 
     /**

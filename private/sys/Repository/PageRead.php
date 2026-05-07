@@ -20,7 +20,7 @@ use Raven\Lib\Database\SqlTable;
  * SELECT and lookup methods for pages, public listings, and taxonomy filters.
  *
  * Write operations (save, deleteById) live in PageWrite.
- * Schedule flipping (applySchedule) lives in PageRepoParser so public routes
+ * Schedule flipping (applySchedule) lives in Scheduler\Queue so public routes
  * can call it without loading this class or PageWrite.
  */
 class PageRead
@@ -1289,14 +1289,14 @@ class PageRead
      */
     private function channelsByIdMap(): array
     {
-        return ChannelRepoParser::channelsByIdMap($this->channelRepo->listRecords());
+        return ChannelRead::channelsByIdMap($this->channelRepo->listRecords());
     }
 
     /**
      * Hydrates one page row with channel metadata resolved from file-backed channels.
      *
      * Resolves the channel row from the channels-by-id map when not provided directly,
-     * then delegates context injection to ChannelRepoParser.
+     * then delegates context injection to ChannelRead.
      *
      * @param array<string, mixed>      $row          Hydrated page row.
      * @param array<string, mixed>|null $channel      Pre-resolved channel row, or null to auto-resolve.
@@ -1314,7 +1314,7 @@ class PageRead
             }
         }
 
-        return ChannelRepoParser::applyPageChannelContext($row, $resolvedChannel);
+        return ChannelRead::applyPageChannelContext($row, $resolvedChannel);
     }
 
     /**

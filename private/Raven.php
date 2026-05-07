@@ -17,7 +17,7 @@ use Raven\Core\Runtime\DatabaseFactory;
 use Raven\Core\Schema\SchemaManager;
 use Raven\Core\Logger;
 use Raven\Core\Postmaster;
-use Raven\Lib\Parser\PageRepoParser;
+use Raven\Lib\Scheduler\Queue;
 use Raven\Core\Gatekeeper;
 use Raven\Lib\Auth\SessionCookie;
 use Raven\Core\Repository\ConfigRead;
@@ -307,9 +307,9 @@ final class Raven
     // request traffic without a server crontab. Operators may disable site.scheduler and point
     // their own crontab at rvn-cron instead.
     $scheduler->registerJob('core', 'page-schedule', 60, static function () use ($rvnDb, $driver, $prefix, $root, $categoryEnabled, $tagEnabled): void {
-        // PageRepoParser::applySchedule() runs the schedule flip without loading PageRead or PageWrite,
+        // Queue::applySchedule() runs the schedule flip without loading PageRead or PageWrite,
         // keeping this hot-path job lean regardless of which repos are in scope at bootstrap time.
-        PageRepoParser::applySchedule($rvnDb, $driver, $prefix);
+        Queue::applySchedule($rvnDb, $driver, $prefix);
     });
 
     // Built-in core job: prune event log entries older than the configured retention period.

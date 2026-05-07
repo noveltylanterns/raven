@@ -12,6 +12,7 @@ namespace Raven\Core\Repository;
 
 use PDO;
 use RuntimeException;
+use Raven\Lib\Parser\ChannelDataParser;
 use Raven\Lib\Parser\ChannelRepoParser;
 use Raven\Core\Debug\UniquenessProfiler;
 use Raven\Lib\Parser\PageBlockParser;
@@ -23,7 +24,7 @@ use Raven\Lib\Database\SqlTable;
  * INSERT, UPDATE, and DELETE methods for page records.
  *
  * Read operations (SELECT, lookup, taxonomy listing) live in PageRead.
- * Schedule flipping (applySchedule) lives in PageRepoParser so public routes
+ * Schedule flipping (applySchedule) lives in Scheduler\Queue so public routes
  * can call it without loading this class.
  * SQL mutations are owned directly by this repository write seam.
  */
@@ -426,7 +427,7 @@ final class PageWrite
             throw new RuntimeException('The stock <root> channel placeholder cannot be selected directly.');
         }
 
-        return ChannelRepoParser::resolveChannelIdBySlug(
+        return ChannelDataParser::resolveChannelIdBySlug(
             $slug,
             fn (string $normalized): ?int => $this->channelRepo->idBySlug($normalized),
             'Selected channel does not exist.'

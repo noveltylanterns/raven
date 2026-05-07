@@ -2,7 +2,7 @@
 
 /**
  * RAVEN CMS
- * ~/private/lib/Parser/TaxonomyRepoParser.php
+ * ~/private/lib/Parser/TaxonomyParser.php
  * Mixed taxonomy lookup parser for category/tag routing inventory and page-editor payloads.
  * Docs: https://raven.lanterns.io
  */
@@ -25,7 +25,7 @@ use Raven\Lib\Database\SqlTable;
  * assemble both taxonomies into one payload, such as routing inventory and the
  * page editor taxonomy pickers.
  */
-final class TaxonomyRepoParser
+final class TaxonomyParser
 {
     private PDO $db;
     private string $driver;
@@ -121,7 +121,7 @@ final class TaxonomyRepoParser
                 'active' => (int) ($row['active'] ?? 0),
                 'target' => (string) ($row['target'] ?? ''),
             ];
-            $result['redirect_rows'][] = ChannelRepoParser::applyBasicChannelContext($redirectRow, $channel);
+            $result['redirect_rows'][] = ChannelRead::applyBasicChannelContext($redirectRow, $channel);
         }
 
         return $result;
@@ -240,7 +240,7 @@ final class TaxonomyRepoParser
      * Returns lightweight category routing options for mixed routing inventories.
      *
      * Formerly delegated to CategoryRepoParser; inlined here since this class
-     * already holds the DB connection and TaxonomyRepoParser is the only caller.
+     * already holds the DB connection and TaxonomyParser is the only caller.
      *
      * @return array<int, array{id: int, name: string, slug: string}> Category routing option rows.
      */
@@ -271,7 +271,7 @@ final class TaxonomyRepoParser
      * Returns lightweight tag routing options for mixed routing inventories.
      *
      * Formerly delegated to TagRepoParser; inlined here since this class
-     * already holds the DB connection and TaxonomyRepoParser is the only caller.
+     * already holds the DB connection and TaxonomyParser is the only caller.
      *
      * @return array<int, array{id: int, name: string, slug: string}> Tag routing option rows.
      */
@@ -305,7 +305,7 @@ final class TaxonomyRepoParser
      */
     private function channelsByIdMap(): array
     {
-        return ChannelRepoParser::channelsByIdMap($this->channelRepo->listRecords());
+        return ChannelRead::channelsByIdMap($this->channelRepo->listRecords());
     }
 
     /**

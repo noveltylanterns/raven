@@ -11,7 +11,7 @@ declare(strict_types=1);
 namespace Raven\Core\Repository;
 
 use PDO;
-use Raven\Lib\Parser\ChannelRepoParser;
+use Raven\Core\Repository\ChannelRead;
 use Raven\Lib\Database\SqlTable;
 
 /**
@@ -349,7 +349,7 @@ class RedirectRead
      */
     private function channelsByIdMap(): array
     {
-        return ChannelRepoParser::channelsByIdMap($this->channelRepo->listRecords());
+        return ChannelRead::channelsByIdMap($this->channelRepo->listRecords());
     }
 
     /**
@@ -369,7 +369,7 @@ class RedirectRead
         $row['created'] = (string) ($row['created'] ?? '');
         $row['updated'] = (string) ($row['updated'] ?? '');
 
-        return ChannelRepoParser::applyBasicChannelContext($row, $channel);
+        return ChannelRead::applyBasicChannelContext($row, $channel);
     }
 
     /**

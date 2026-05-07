@@ -23,7 +23,7 @@ use Raven\Core\Repository\RedirectRead;
 use Raven\Core\Repository\TagRead;
 use Raven\Core\Repository\UserRead;
 use Raven\Core\Repository\UserWrite;
-use Raven\Lib\Parser\TaxonomyRepoParser;
+use Raven\Lib\Parser\TaxonomyParser;
 
 /**
  * Builds request-scoped memoized public repository and parser factory closures.
@@ -170,8 +170,8 @@ final class RepoFactory
         /**
          * Builds taxonomy lookup parsing only for public routes that actually resolve channel/category/tag slugs.
          */
-        $taxonomyLookupRepository = $memoize(static function () use ($rvn, $channelReadFactory): TaxonomyRepoParser {
-            return new TaxonomyRepoParser(
+        $taxonomyLookupRepository = $memoize(static function () use ($rvn, $channelReadFactory): TaxonomyParser {
+            return new TaxonomyParser(
                 $rvn['db'],
                 (string) $rvn['driver'],
                 (string) $rvn['prefix'],
