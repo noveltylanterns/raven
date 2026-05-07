@@ -486,9 +486,7 @@ final class PageEditController
             Redirect::redirect($this->context->panelUrl('/page'));
         }
 
-        /** @var mixed $rawUploads */
-        $rawUploads = $files['gallery_upload_image'] ?? null;
-        $uploads = $this->upload()->normalize($rawUploads);
+        $uploads = $this->editorMedia()->galleryUploadsFromFiles($files, $this->upload());
 
         if ($uploads === []) {
             $this->context->flash('error', 'Please select one or more images to upload.');
@@ -518,18 +516,9 @@ final class PageEditController
             ));
         }
 
-        $successCount = 0;
-        $errors = [];
-
-        foreach ($uploads as $upload) {
-            $result = $this->mediaUpload()->uploadForPage($pageId, $upload);
-            if ((bool) ($result['ok'] ?? false)) {
-                $successCount++;
-                continue;
-            }
-
-            $errors[] = (string) ($result['error'] ?? 'Failed to upload one image.');
-        }
+        $batch = $this->editorMedia()->runGalleryUploadBatch($this->mediaUpload(), $pageId, $uploads);
+        $successCount = (int) ($batch['success_count'] ?? 0);
+        $errors = is_array($batch['errors'] ?? null) ? $batch['errors'] : [];
 
         if ($successCount > 0) {
             $this->context->flash(
@@ -620,16 +609,9 @@ final class PageEditController
             ));
         }
 
-        $deletedCount = 0;
-        $failedCount = 0;
-
-        foreach ($selectedImageIds as $selectedImageId) {
-            if ($this->mediaUpload()->deleteImageForPage($pageId, $selectedImageId)) {
-                $deletedCount++;
-            } else {
-                $failedCount++;
-            }
-        }
+        $batch = $this->editorMedia()->runGalleryDeleteBatch($this->mediaUpload(), $pageId, $selectedImageIds);
+        $deletedCount = (int) ($batch['deleted_count'] ?? 0);
+        $failedCount = (int) ($batch['failed_count'] ?? 0);
 
         if ($deletedCount > 0) {
             $message = 'Deleted ' . $deletedCount . ' image' . ($deletedCount === 1 ? '' : 's') . '.';

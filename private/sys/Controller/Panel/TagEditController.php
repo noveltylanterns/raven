@@ -20,7 +20,7 @@ use Raven\Core\Repository\TagWrite;
 use Raven\Lib\Media\PreviewConfig;
 use Raven\Lib\Parser\SetParser;
 use Raven\Lib\Parser\TagRouteParser;
-use Raven\Lib\Scribe\MediaScribe;
+use Raven\Lib\View\Panel\EditorMeta;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\Transport\Redirect;
 use Raven\Lib\Transport\Upload;
@@ -47,7 +47,7 @@ final class TagEditController
     private ?SetWrite $tagSetWrite = null;
     private bool $tagEnabled;
     private PreviewConfig $taxonomyImageService;
-    private MediaScribe $mediaScribe;
+    private EditorMeta $editorMeta;
     private ChannelRead $channelRead;
     private EditorTabs $editorTabs;
     private Upload $upload;
@@ -61,7 +61,7 @@ final class TagEditController
      * @param callable $tagSetWriteResolver Lazy tag-set write resolver; resolved on tag-set save and delete routes.
      * @param bool $tagEnabled Whether tag features are enabled in runtime config.
      * @param PreviewConfig $taxonomyImageService Read-side taxonomy image config and path helper.
-     * @param MediaScribe $mediaScribe Write-side meta-image upload and cleanup helper.
+     * @param EditorMeta $editorMeta Write-side meta-image upload and cleanup helper.
      * @param ChannelRead $channelRead Channel repository for tag-set channel-assignment counts on delete.
      * @param EditorTabs $editorTabs Panel editor tab normalization and tab-preserving URL builder.
      * @param Upload $upload Normalizer for $_FILES upload groups.
@@ -76,7 +76,7 @@ final class TagEditController
         callable $tagSetWriteResolver,
         bool $tagEnabled,
         PreviewConfig $taxonomyImageService,
-        MediaScribe $mediaScribe,
+        EditorMeta $editorMeta,
         ChannelRead $channelRead,
         EditorTabs $editorTabs,
         Upload $upload
@@ -89,7 +89,7 @@ final class TagEditController
         $this->tagSetWriteResolver = Closure::fromCallable($tagSetWriteResolver);
         $this->tagEnabled = $tagEnabled;
         $this->taxonomyImageService = $taxonomyImageService;
-        $this->mediaScribe = $mediaScribe;
+        $this->editorMeta = $editorMeta;
         $this->channelRead = $channelRead;
         $this->editorTabs = $editorTabs;
         $this->upload = $upload;
@@ -247,9 +247,9 @@ final class TagEditController
         }
 
         if (isset($coverUploads[0])) {
-            $coverResult = $this->mediaScribe->storeMetaImageUpload('tags', $savedId, 'cover', $coverUploads[0]);
+            $coverResult = $this->editorMeta->storeMetaImageUpload('tags', $savedId, 'cover', $coverUploads[0]);
             if (!$coverResult['ok']) {
-                $this->mediaScribe->cleanupMetaImagePathSets('tags', $savedId, $newPathSets);
+                $this->editorMeta->cleanupMetaImagePathSets('tags', $savedId, $newPathSets);
                 $this->context->flash('error', (string) ($coverResult['error'] ?? 'Failed to upload cover image.'));
                 Redirect::redirect($savedEditUrl);
             }
@@ -261,9 +261,9 @@ final class TagEditController
         }
 
         if (isset($previewUploads[0])) {
-            $previewResult = $this->mediaScribe->storeMetaImageUpload('tags', $savedId, 'preview', $previewUploads[0]);
+            $previewResult = $this->editorMeta->storeMetaImageUpload('tags', $savedId, 'preview', $previewUploads[0]);
             if (!$previewResult['ok']) {
-                $this->mediaScribe->cleanupMetaImagePathSets('tags', $savedId, $newPathSets);
+                $this->editorMeta->cleanupMetaImagePathSets('tags', $savedId, $newPathSets);
                 $this->context->flash('error', (string) ($previewResult['error'] ?? 'Failed to upload preview image.'));
                 Redirect::redirect($savedEditUrl);
             }
@@ -275,9 +275,9 @@ final class TagEditController
         }
 
         if (isset($iconUploads[0])) {
-            $iconResult = $this->mediaScribe->storeMetaImageUpload('tags', $savedId, 'icon', $iconUploads[0]);
+            $iconResult = $this->editorMeta->storeMetaImageUpload('tags', $savedId, 'icon', $iconUploads[0]);
             if (!$iconResult['ok']) {
-                $this->mediaScribe->cleanupMetaImagePathSets('tags', $savedId, $newPathSets);
+                $this->editorMeta->cleanupMetaImagePathSets('tags', $savedId, $newPathSets);
                 $this->context->flash('error', (string) ($iconResult['error'] ?? 'Failed to upload icon image.'));
                 Redirect::redirect($savedEditUrl);
             }
@@ -292,14 +292,14 @@ final class TagEditController
             $this->tagWrite()->updateImageFiles($savedId, $nextStorage);
         } catch (\Throwable) {
             // Keep DB and filesystem in sync when image-path persistence fails.
-            $this->mediaScribe->cleanupMetaImagePathSets('tags', $savedId, $newPathSets);
+            $this->editorMeta->cleanupMetaImagePathSets('tags', $savedId, $newPathSets);
             $this->context->flash('error', 'Failed to save tag image selections.');
             Redirect::redirect($savedEditUrl);
         }
 
         $nextPaths = $this->taxonomyImageService->imagePathsFromStoragePayload('tags', $savedId, $nextStorage);
         $obsoletePaths = $this->taxonomyImageService->removedPaths($currentPaths, $nextPaths);
-        $this->mediaScribe->deleteMetaImageStoredPaths('tags', $savedId, $obsoletePaths);
+        $this->editorMeta->deleteMetaImageStoredPaths('tags', $savedId, $obsoletePaths);
 
         $this->context->flash('success', 'Changes saved.');
         Redirect::redirect($savedEditUrl);
@@ -339,7 +339,7 @@ final class TagEditController
             }
 
             if ($record !== null) {
-                $this->mediaScribe->deleteMetaImageStoredPaths(
+                $this->editorMeta->deleteMetaImageStoredPaths(
                     'tags',
                     $id,
                     $this->taxonomyImageService->imagePathsFromRecord('tags', $id, $record)
@@ -366,7 +366,7 @@ final class TagEditController
                 // Continue deleting remaining ids even if one operation throws.
                 $this->tagWrite()->deleteById($selectedId);
                 if ($record !== null) {
-                    $this->mediaScribe->deleteMetaImageStoredPaths(
+                    $this->editorMeta->deleteMetaImageStoredPaths(
                         'tags',
                         $selectedId,
                         $this->taxonomyImageService->imagePathsFromRecord('tags', $selectedId, $record)

@@ -48,7 +48,7 @@ use Raven\Lib\Media\AvatarUpload;
 use Raven\Lib\Parser\FeedParser;
 use Raven\Lib\Parser\GroupRouteParser;
 use Raven\Lib\Parser\UserProfileParser;
-use Raven\Lib\Scribe\MediaScribe;
+use Raven\Lib\View\Panel\EditorMeta;
 use Raven\Lib\Scribe\UserScribe;
 use Raven\Lib\Security\PasswordValidator;
 use Raven\Lib\Transport\Upload;
@@ -327,7 +327,7 @@ final class ControllerFactory
                 $taxonomyDomain['category_enabled'],
                 $taxonomyDomain['tag_enabled'],
                 new PreviewConfig($rvn['config']),
-                new MediaScribe($rvn['db'], $rvn['driver'], $rvn['prefix'], $rvn['config'], (string) $rvn['root']),
+                new EditorMeta($rvn['config'], (string) $rvn['root']),
                 new FeedParser($rvn['config'], $rvn['input']),
                 $rvn['panel_editor_tabs'](),
                 $rvn['panel_editor'](),
@@ -382,7 +382,7 @@ final class ControllerFactory
                 $taxonomyDomain['category_set_write'],
                 $taxonomyDomain['category_enabled'],
                 new PreviewConfig($rvn['config']),
-                new MediaScribe($rvn['db'], $rvn['driver'], $rvn['prefix'], $rvn['config'], (string) $rvn['root']),
+                new EditorMeta($rvn['config'], (string) $rvn['root']),
                 $taxonomyDomain['channel_read'],
                 $rvn['panel_editor_tabs'](),
                 new Upload()
@@ -480,7 +480,7 @@ final class ControllerFactory
                 $taxonomyDomain['tag_set_write'],
                 $taxonomyDomain['tag_enabled'],
                 new PreviewConfig($rvn['config']),
-                new MediaScribe($rvn['db'], $rvn['driver'], $rvn['prefix'], $rvn['config'], (string) $rvn['root']),
+                new EditorMeta($rvn['config'], (string) $rvn['root']),
                 $taxonomyDomain['channel_read'],
                 $rvn['panel_editor_tabs'](),
                 new Upload()
@@ -652,7 +652,7 @@ final class ControllerFactory
                 $rvn['panel_editor_tabs'](),
                 $rvn['panel_editor'](),
                 new PreviewConfig($rvn['config']),
-                new MediaScribe($rvn['db'], $rvn['driver'], $rvn['prefix'], $rvn['config'], (string) $rvn['root']),
+                new EditorMeta($rvn['config'], (string) $rvn['root']),
                 new EditorPermissions(),
                 new Upload(),
                 static function () use (&$rvn): array {

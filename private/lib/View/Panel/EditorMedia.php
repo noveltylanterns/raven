@@ -12,7 +12,9 @@ declare(strict_types=1);
 
 namespace Raven\Lib\View\Panel;
 
+use Raven\Lib\Media\MediaUpload;
 use Raven\Lib\Security\InputSanitizer;
+use Raven\Lib\Transport\Upload;
 
 /**
  * Gallery data helpers for the page editor: DB row hydration and POST payload normalization.
@@ -140,98 +142,75 @@ final class EditorMedia
         return $updates;
     }
 
-    // --- Methods below are disabled pending confirmation they are no longer wired up. ---
-    // stripEditorMediaColumns() and hydrate() had zero callers as of 2026-05-07.
-    // Leaving them commented out rather than deleted to surface any breakage.
-
-    /*
-    public function stripEditorMediaColumns(array $row): array
+    /**
+     * Normalizes one gallery upload input group into a flat upload list.
+     *
+     * @param array<string, mixed> $files Full `$_FILES` payload from the page editor request.
+     * @param Upload $upload Upload normalizer used to flatten multi-file inputs.
+     * @return array<int, array<string, mixed>> Normalized upload rows.
+     */
+    public function galleryUploadsFromFiles(array $files, Upload $upload): array
     {
-        foreach (array_keys($row) as $column) {
-            $name = (string) $column;
-            if (str_starts_with($name, 'image_') || str_starts_with($name, 'variant_')) {
-                unset($row[$name]);
-            }
-        }
-
-        return $row;
+        /** @var mixed $rawUploads */
+        $rawUploads = $files['gallery_upload_image'] ?? null;
+        return $upload->normalize($rawUploads);
     }
 
-    public function hydrate(array $rows, callable $publicUrlFromStoredPath): array
+    /**
+     * Runs one page-gallery upload batch and returns success/error counters.
+     *
+     * @param MediaUpload $mediaUpload Media upload service for per-file processing.
+     * @param int $pageId Target page id for gallery uploads.
+     * @param array<int, array<string, mixed>> $uploads Normalized upload rows.
+     * @return array{success_count: int, errors: array<int, string>} Batch result payload.
+     */
+    public function runGalleryUploadBatch(MediaUpload $mediaUpload, int $pageId, array $uploads): array
     {
-        if ($rows === []) {
-            return [];
-        }
+        $successCount = 0;
+        $errors = [];
 
-        $imagesById = [];
-        $orderedImageIds = [];
-        foreach ($rows as $row) {
-            $imageId = (int) ($row['image_id'] ?? 0);
-            if ($imageId < 1) {
+        foreach ($uploads as $upload) {
+            $result = $mediaUpload->uploadForPage($pageId, $upload);
+            if ((bool) ($result['ok'] ?? false)) {
+                $successCount++;
                 continue;
             }
 
-            if (!isset($imagesById[$imageId])) {
-                $storedPath = (string) ($row['image_stored_path'] ?? '');
-                $imagesById[$imageId] = [
-                    'id' => $imageId,
-                    'page_id' => (int) ($row['image_page_id'] ?? 0),
-                    'storage_target' => (string) ($row['image_storage_target'] ?? ''),
-                    'original_filename' => (string) ($row['image_original_filename'] ?? ''),
-                    'stored_filename' => (string) ($row['image_stored_filename'] ?? ''),
-                    'stored_path' => $storedPath,
-                    'url' => $publicUrlFromStoredPath($storedPath),
-                    'mime_type' => (string) ($row['image_mime_type'] ?? ''),
-                    'extension' => (string) ($row['image_extension'] ?? ''),
-                    'byte_size' => (int) ($row['image_byte_size'] ?? 0),
-                    'width' => (int) ($row['image_width'] ?? 0),
-                    'height' => (int) ($row['image_height'] ?? 0),
-                    'hash_sha256' => (string) ($row['image_hash_sha256'] ?? ''),
-                    'status' => (string) ($row['image_status'] ?? ''),
-                    'sort_order' => (int) ($row['image_sort_order'] ?? 0),
-                    'is_cover' => (int) ($row['image_is_cover'] ?? 0) === 1,
-                    'include_in_gallery' => (int) ($row['image_include_in_gallery'] ?? 1) === 1,
-                    'alt_text' => (string) ($row['image_alt_text'] ?? ''),
-                    'title_text' => (string) ($row['image_title_text'] ?? ''),
-                    'caption' => (string) ($row['image_caption'] ?? ''),
-                    'credit' => (string) ($row['image_credit'] ?? ''),
-                    'license' => (string) ($row['image_license'] ?? ''),
-                    'focal_x' => $row['image_focal_x'] === null ? null : (float) $row['image_focal_x'],
-                    'focal_y' => $row['image_focal_y'] === null ? null : (float) $row['image_focal_y'],
-                    'created' => (string) ($row['image_created'] ?? ''),
-                    'updated' => (string) ($row['image_updated'] ?? ''),
-                    'variants' => [],
-                ];
-                $orderedImageIds[] = $imageId;
-            }
-
-            $variantKey = trim((string) ($row['variant_key'] ?? ''));
-            if ($variantKey === '') {
-                continue;
-            }
-
-            $variantStoredPath = (string) ($row['variant_stored_path'] ?? '');
-            $imagesById[$imageId]['variants'][$variantKey] = [
-                'variant_key' => $variantKey,
-                'stored_filename' => (string) ($row['variant_stored_filename'] ?? ''),
-                'stored_path' => $variantStoredPath,
-                'url' => $publicUrlFromStoredPath($variantStoredPath),
-                'mime_type' => (string) ($row['variant_mime_type'] ?? ''),
-                'extension' => (string) ($row['variant_extension'] ?? ''),
-                'byte_size' => (int) ($row['variant_byte_size'] ?? 0),
-                'width' => (int) ($row['variant_width'] ?? 0),
-                'height' => (int) ($row['variant_height'] ?? 0),
-            ];
+            $errors[] = (string) ($result['error'] ?? 'Failed to upload one image.');
         }
 
-        $result = [];
-        foreach ($orderedImageIds as $imageId) {
-            $result[] = $imagesById[$imageId];
-        }
-
-        return $result;
+        return [
+            'success_count' => $successCount,
+            'errors' => $errors,
+        ];
     }
-    */
+
+    /**
+     * Runs one page-gallery delete batch and returns deleted/failed counters.
+     *
+     * @param MediaUpload $mediaUpload Media upload service for per-image delete operations.
+     * @param int $pageId Target page id for image deletion.
+     * @param array<int> $imageIds Selected image ids to delete.
+     * @return array{deleted_count: int, failed_count: int} Batch delete counters.
+     */
+    public function runGalleryDeleteBatch(MediaUpload $mediaUpload, int $pageId, array $imageIds): array
+    {
+        $deletedCount = 0;
+        $failedCount = 0;
+
+        foreach ($imageIds as $imageId) {
+            if ($mediaUpload->deleteImageForPage($pageId, $imageId)) {
+                $deletedCount++;
+            } else {
+                $failedCount++;
+            }
+        }
+
+        return [
+            'deleted_count' => $deletedCount,
+            'failed_count' => $failedCount,
+        ];
+    }
 
     /**
      * Normalizes one optional float field while rejecting blanks and out-of-range values.

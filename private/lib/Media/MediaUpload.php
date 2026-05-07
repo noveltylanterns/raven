@@ -28,11 +28,11 @@ final class MediaUpload
     private MediaRead $mediaRead;
     private MediaWrite $mediaWrite;
     private string $projectRoot;
-    private ?ImageExifProcessor $exifProcessor = null;
-    private ?ImageImagickProcessor $imagickProcessor = null;
-    private ?ImageVariantProcessor $variantProcessor = null;
-    private ?MediaStorage $storage = null;
-    private ?Upload $uploadTransport = null;
+    private ImageExifProcessor $exifProcessor;
+    private ImageImagickProcessor $imagickProcessor;
+    private ImageVariantProcessor $variantProcessor;
+    private MediaStorage $storage;
+    private Upload $uploadTransport;
 
     /**
      * Prepares the panel media upload service with split read/write gallery persistence seams.
@@ -56,6 +56,11 @@ final class MediaUpload
         $this->mediaRead = $mediaRead;
         $this->mediaWrite = $mediaWrite;
         $this->projectRoot = rtrim($projectRoot, '/');
+        $this->exifProcessor = new ImageExifProcessor();
+        $this->imagickProcessor = new ImageImagickProcessor();
+        $this->variantProcessor = new ImageVariantProcessor($this->config);
+        $this->storage = new MediaStorage($this->projectRoot);
+        $this->uploadTransport = new Upload();
     }
 
     /**
@@ -80,7 +85,7 @@ final class MediaUpload
             ];
         }
 
-        $validatedUpload = $this->uploadTransport()->validateSingleUpload($upload, 'image', [
+        $validatedUpload = $this->uploadTransport->validateSingleUpload($upload, 'image', [
             'max_bytes' => $this->maxUploadFilesizeBytes(),
             'empty_error' => 'Image appears empty.',
             'too_large_error' => 'Image exceeds configured max filesize.',
@@ -174,7 +179,7 @@ final class MediaUpload
             ];
         }
 
-        if (!$this->storage()->ensurePageDirectory($pageId)) {
+        if (!$this->storage->ensurePageDirectory($pageId)) {
             return [
                 'ok' => false,
                 'error' => 'Failed to create page media directory.',
@@ -184,18 +189,18 @@ final class MediaUpload
         $token = bin2hex(random_bytes(16));
         $baseFilename = 'img_' . $token;
         $originalFilename = $baseFilename . '.' . $canonicalExtension;
-        $originalStoredPath = $this->storage()->storedPathForFilename($pageId, $originalFilename);
-        $originalAbsolutePath = $this->storage()->absolutePublicPath($originalStoredPath);
+        $originalStoredPath = $this->storage->storedPathForFilename($pageId, $originalFilename);
+        $originalAbsolutePath = $this->storage->absolutePublicPath($originalStoredPath);
 
         $writtenPaths = [];
 
         try {
-            $source = $this->imagickProcessor()->readFirstFrame($tmpPath);
-            $this->imagickProcessor()->prepareForWrite(
+            $source = $this->imagickProcessor->readFirstFrame($tmpPath);
+            $this->imagickProcessor->prepareForWrite(
                 $source,
                 $canonicalExtension,
                 (bool) $this->config->get('media.strip_exif', true),
-                $this->exifProcessor()
+                $this->exifProcessor
             );
 
             if (!$source->writeImage($originalAbsolutePath)) {
@@ -207,12 +212,12 @@ final class MediaUpload
             $sourceWidth = (int) $source->getImageWidth();
             $sourceHeight = (int) $source->getImageHeight();
 
-            $variantSpecs = $this->variantSpecs();
+            $variantSpecs = $this->variantProcessor->variantSpecs();
             $variantRows = [];
 
             foreach ($variantSpecs as $variantKey => $spec) {
                 $variant = clone $source;
-                $target = $this->resolveVariantSize(
+                $target = $this->variantProcessor->resolveVariantSize(
                     $sourceWidth,
                     $sourceHeight,
                     (int) $spec['width'],
@@ -235,8 +240,8 @@ final class MediaUpload
                 }
 
                 $variantFilename = $baseFilename . '_' . $variantKey . '.' . $canonicalExtension;
-                $variantStoredPath = $this->storage()->storedPathForFilename($pageId, $variantFilename);
-                $variantAbsolutePath = $this->storage()->absolutePublicPath($variantStoredPath);
+                $variantStoredPath = $this->storage->storedPathForFilename($pageId, $variantFilename);
+                $variantAbsolutePath = $this->storage->absolutePublicPath($variantStoredPath);
 
                 if (!$variant->writeImage($variantAbsolutePath)) {
                     throw new \RuntimeException('Failed to store generated ' . $variantKey . ' variant.');
@@ -289,7 +294,7 @@ final class MediaUpload
         } catch (\Throwable $exception) {
             // Remove partial files if processing or DB insert fails mid-way.
             foreach ($writtenPaths as $storedPath) {
-                $this->deleteStoredPath($storedPath);
+                $this->storage->deleteStoredPath($storedPath);
             }
 
             return [
@@ -314,10 +319,10 @@ final class MediaUpload
         /** @var array<int, string> $storedPaths */
         $storedPaths = (array) ($deleted['stored_paths'] ?? []);
         foreach ($storedPaths as $storedPath) {
-            $this->deleteStoredPath($storedPath);
+            $this->storage->deleteStoredPath($storedPath);
         }
 
-        $this->removePageDirectory($pageId);
+        $this->storage->removePageDirectory($pageId);
 
         return true;
     }
@@ -330,10 +335,10 @@ final class MediaUpload
         $storedPaths = $this->mediaWrite->deleteAllForPage($pageId);
 
         foreach ($storedPaths as $storedPath) {
-            $this->deleteStoredPath($storedPath);
+            $this->storage->deleteStoredPath($storedPath);
         }
 
-        $this->removePageDirectory($pageId);
+        $this->storage->removePageDirectory($pageId);
     }
 
     /**
@@ -375,114 +380,4 @@ final class MediaUpload
         return 10485760;
     }
 
-    /**
-     * Returns target dimensions for generated variants.
-     *
-     * @return array<string, array{width: int, height: int}>
-     */
-    private function variantSpecs(): array
-    {
-        return $this->variantProcessor()->variantSpecs();
-    }
-
-    /**
-     * Resolves one contain-style target size from configured max dimensions.
-     *
-     * Rules:
-     * - `0` width or height means "auto" for that axis.
-     * - Both `0` means keep source size.
-     * - Never upscale above the source size.
-     *
-     * @return array{width: int, height: int}
-     */
-    private function resolveVariantSize(
-        int $sourceWidth,
-        int $sourceHeight,
-        int $maxWidth,
-        int $maxHeight
-    ): array {
-        return $this->variantProcessor()->resolveVariantSize($sourceWidth, $sourceHeight, $maxWidth, $maxHeight);
-    }
-
-    /**
-     * Deletes one stored relative file path if it resolves inside gallery storage.
-     */
-    private function deleteStoredPath(string $storedPath): void
-    {
-        $this->storage()->deleteStoredPath($storedPath);
-    }
-
-    /**
-     * Removes now-empty page directory after image deletion.
-     */
-    private function removePageDirectory(int $pageId): void
-    {
-        $this->storage()->removePageDirectory($pageId);
-    }
-
-    private function exifProcessor(): ImageExifProcessor
-    {
-        if (!$this->exifProcessor instanceof ImageExifProcessor) {
-            $this->exifProcessor = new ImageExifProcessor();
-        }
-
-        return $this->exifProcessor;
-    }
-
-    /**
-     * Returns the shared ImageMagick processing helper.
-     *
-     * @return ImageImagickProcessor
-     */
-    private function imagickProcessor(): ImageImagickProcessor
-    {
-        if (!$this->imagickProcessor instanceof ImageImagickProcessor) {
-            $this->imagickProcessor = new ImageImagickProcessor();
-        }
-
-        return $this->imagickProcessor;
-    }
-
-    /**
-     * Returns the gallery variant config/resize helper.
-     *
-     * @return ImageVariantProcessor
-     */
-    private function variantProcessor(): ImageVariantProcessor
-    {
-        if (!$this->variantProcessor instanceof ImageVariantProcessor) {
-            $this->variantProcessor = new ImageVariantProcessor($this->config);
-        }
-
-        return $this->variantProcessor;
-    }
-
-    /**
-     * Returns the gallery storage/path helper.
-     *
-     * @return MediaStorage
-     */
-    private function storage(): MediaStorage
-    {
-        if (!$this->storage instanceof MediaStorage) {
-            $this->storage = new MediaStorage($this->projectRoot);
-        }
-
-        return $this->storage;
-    }
-
-    /**
-     * Returns the shared upload baseline validator.
-     *
-     * @return Upload
-     */
-    private function uploadTransport(): Upload
-    {
-        if ($this->uploadTransport instanceof Upload) {
-            return $this->uploadTransport;
-        }
-
-        $this->uploadTransport = new Upload();
-        return $this->uploadTransport;
-    }
 }
