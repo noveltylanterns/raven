@@ -12,6 +12,7 @@ declare(strict_types=1);
 namespace Raven\Core;
 
 use PDO;
+use Raven\Core\Repository\AuthWrite;
 use Raven\Lib\Auth\LoginEmail;
 use Raven\Lib\Auth\Login2fa;
 use Raven\Lib\Auth\Membership;
@@ -25,7 +26,6 @@ use Raven\Lib\Database\SqlTable;
 use Raven\Lib\Format\Json;
 use Raven\Lib\Parser\UserContactParser;
 use Raven\Lib\Security\TotpCipher;
-use Raven\Lib\Scribe\AuthScribe;
 use Raven\Lib\Security\PhraseValidate;
 use Raven\Lib\Security\TotpVerify;
 use Raven\Lib\View\Preferences as PreferencesView;
@@ -56,7 +56,7 @@ final class Gatekeeper
     private PanelAuthService $panelAuthService;
     private PublicAuthService $publicAuthService;
     private LoginEmail $loginEmail;
-    private AuthScribe $authScribe;
+    private AuthWrite $authWrite;
 
     /** Session key for the pending-challenge user id (set after password auth, before 2FA). */
     private const SESSION_2FA_PENDING_USER_ID = '_raven_2fa_pending_user_id';
@@ -117,7 +117,7 @@ final class Gatekeeper
             fn (): bool => $this->isLoggedIn()
         );
         $this->loginEmail = new LoginEmail();
-        $this->authScribe = new AuthScribe($authDb, $driver, $this->prefix);
+        $this->authWrite = new AuthWrite($authDb, $driver, $this->prefix);
 
         $this->bootstrapDelightAuth();
     }
@@ -493,7 +493,7 @@ final class Gatekeeper
         }
 
         unset($methods[$matchedIndex]);
-        $updated = $this->updateUserTwoFactorMethods($pendingUserId, array_values($methods));
+        $updated = $this->authWrite->updateTwoFactorMethods($pendingUserId, array_values($methods));
 
         return (bool) ($updated['ok'] ?? false);
     }
@@ -512,27 +512,6 @@ final class Gatekeeper
             $submittedCode,
             $submittedEmail
         );
-    }
-
-    /**
-     * Normalizes and persists user 2FA methods for one account.
-     *
-     * @param int $userId Target user id.
-     * @param array<int, array<string, mixed>> $methods Submitted method rows.
-     * @return array{ok: bool, errors: array<int, string>}
-     */
-    public function updateUserTwoFactorMethods(int $userId, array $methods): array
-    {
-        if ($userId <= 0) {
-            return ['ok' => false, 'errors' => ['Invalid user id.']];
-        }
-
-        $normalized = Login2fa::normalizeStored($methods);
-        $encoded = $this->encodeTwoFactorMethods($normalized);
-        $this->authScribe->updateTwoFactorMethods($userId, $encoded);
-
-        unset($this->userPreferencesCache[$userId]);
-        return ['ok' => true, 'errors' => []];
     }
 
     /**
@@ -566,7 +545,8 @@ final class Gatekeeper
             return;
         }
 
-        $this->updateUserTwoFactorMethods($userId, (array) ($mutation['methods'] ?? []));
+        $this->authWrite->updateTwoFactorMethods($userId, (array) ($mutation['methods'] ?? []));
+        unset($this->userPreferencesCache[$userId]);
     }
 
     /**
@@ -659,74 +639,6 @@ final class Gatekeeper
     }
 
     /**
-     * Updates editable preference fields for one user.
-     *
-     * @param array{
-     *   username: string,
-     *   display_name: string,
-     *   email: string,
-     *   bio?: string,
-     *   theme: string,
-     *   timezone?: string,
-     *   password: string|null,
-     *   contact_profiles?: array<int, array{type: string, value: string}>,
-     *   two_factor_methods?: array<int, array<string, mixed>>,
-     *   set_avatar: bool,
-     *   avatar_path: string|null,
-     *   cover_image?: string|null
-     * } $payload
-     *
-     * @return array{ok: bool, errors: array<int, string>}
-     */
-    public function updateUserPreferences(int $userId, array $payload): array
-    {
-        $normalized = $this->normalizePreferenceUpdatePayload($payload);
-        $username = (string) ($normalized['username'] ?? '');
-        $displayName = (string) ($normalized['display_name'] ?? '');
-        $email = (string) ($normalized['email'] ?? '');
-        $bio = (string) ($normalized['bio'] ?? '');
-        $theme = (string) ($normalized['theme'] ?? 'default');
-        $timezone = (string) ($normalized['timezone'] ?? '');
-        $password = $normalized['password'] ?? null;
-        $contactProfilesEncoded = $normalized['contact_profiles_encoded'] ?? null;
-        $twoFactorMethodsEncoded = $normalized['two_factor_methods_encoded'] ?? null;
-        $setAvatar = (bool) ($normalized['set_avatar'] ?? false);
-        $avatarPath = $normalized['avatar_path'] ?? null;
-        $coverImage = $normalized['cover_image'] ?? null;
-
-        $errors = PreferencesView::validatePreferenceUpdate(
-            $email,
-            is_string($password) ? $password : null,
-            $username !== '' && $this->usernameExistsForOtherUser($userId, $username),
-            $this->emailExistsForOtherUser($userId, $email)
-        );
-
-        if ($errors !== []) {
-            return ['ok' => false, 'errors' => $errors];
-        }
-
-        $this->authScribe->updatePreferences($userId, [
-            'username' => $username,
-            'display_name' => $displayName,
-            'email' => $email,
-            'bio' => $bio,
-            'theme' => $theme,
-            'timezone' => $timezone,
-            'password_hash' => ($password !== null && $password !== '')
-                ? password_hash($password, PASSWORD_DEFAULT)
-                : null,
-            'contact_profiles_encoded' => $contactProfilesEncoded,
-            'two_factor_methods_encoded' => $twoFactorMethodsEncoded,
-            'set_avatar' => $setAvatar,
-            'avatar_path' => $avatarPath,
-            'cover_image' => $coverImage,
-        ]);
-        unset($this->userPreferencesCache[$userId]);
-
-        return ['ok' => true, 'errors' => []];
-    }
-
-    /**
      * Returns the panel authorization service for direct permission checks.
      *
      * Callers on panel routes should call permission methods here rather than through
@@ -765,50 +677,6 @@ final class Gatekeeper
     private function hasInteractiveTwoFactorMethod(int $userId): bool
     {
         return $this->interactiveTwoFactorMethodsForUser($userId) !== [];
-    }
-
-    /**
-     * Returns true when another account already uses this username.
-     */
-    private function usernameExistsForOtherUser(int $userId, string $username): bool
-    {
-        if (trim($username) === '') {
-            return false;
-        }
-
-        $stmt = $this->authDb->prepare(
-            'SELECT 1
-             FROM ' . $this->authTable('users') . '
-             WHERE username = :username
-               AND id <> :id
-             LIMIT 1'
-        );
-        $stmt->execute([
-            ':username' => $username,
-            ':id' => $userId,
-        ]);
-
-        return $stmt->fetchColumn() !== false;
-    }
-
-    /**
-     * Returns true when another account already uses this email.
-     */
-    private function emailExistsForOtherUser(int $userId, string $email): bool
-    {
-        $stmt = $this->authDb->prepare(
-            'SELECT 1
-             FROM ' . $this->authTable('users') . '
-             WHERE email = :email
-               AND id <> :id
-             LIMIT 1'
-        );
-        $stmt->execute([
-            ':email' => $email,
-            ':id' => $userId,
-        ]);
-
-        return $stmt->fetchColumn() !== false;
     }
 
     /**
@@ -864,69 +732,6 @@ final class Gatekeeper
     }
 
     /**
-     * Normalizes and encodes a raw preference update payload for persistence.
-     *
-     * Trims all string fields, normalizes contact profiles and 2FA methods through the
-     * codec, and returns a payload array ready for the scribe writer.
-     *
-     * @param array{
-     *   username: string,
-     *   display_name: string,
-     *   email: string,
-     *   bio?: string,
-     *   theme: string,
-     *   timezone?: string,
-     *   password: string|null,
-     *   contact_profiles?: array<int, array{type: string, value: string}>,
-     *   two_factor_methods?: array<int, array<string, mixed>>,
-     *   set_avatar: bool,
-     *   avatar_path: string|null,
-     *   cover_image?: string|null
-     * } $payload
-     * @return array{
-     *   username: string,
-     *   display_name: string,
-     *   email: string,
-     *   bio: string,
-     *   theme: string,
-     *   timezone: string,
-     *   password: string|null,
-     *   contact_profiles: array<int, array{type: string, value: string}>,
-     *   contact_profiles_encoded: ?string,
-     *   two_factor_methods: array<int, array<string, mixed>>,
-     *   two_factor_methods_encoded: ?string,
-     *   set_avatar: bool,
-     *   avatar_path: string|null,
-     *   cover_image: string|null
-     * }
-     */
-    private function normalizePreferenceUpdatePayload(array $payload): array
-    {
-        $contactProfiles = UserContactParser::normalizeContactProfiles((array) ($payload['contact_profiles'] ?? []));
-        $twoFactorMethods = Login2fa::normalizeStored((array) ($payload['two_factor_methods'] ?? []));
-
-        return [
-            'username' => trim((string) ($payload['username'] ?? '')),
-            'display_name' => trim((string) ($payload['display_name'] ?? '')),
-            'email' => trim((string) ($payload['email'] ?? '')),
-            'bio' => trim((string) ($payload['bio'] ?? '')),
-            'theme' => trim((string) ($payload['theme'] ?? 'default')),
-            // Empty string is valid and means "inherit from site/server default".
-            'timezone' => trim((string) ($payload['timezone'] ?? '')),
-            'password' => $payload['password'] ?? null,
-            'contact_profiles' => $contactProfiles,
-            'contact_profiles_encoded' => UserContactParser::encodeContactProfiles($contactProfiles),
-            'two_factor_methods' => $twoFactorMethods,
-            'two_factor_methods_encoded' => $this->encodeTwoFactorMethods($twoFactorMethods),
-            'set_avatar' => (bool) ($payload['set_avatar'] ?? false),
-            'avatar_path' => $payload['avatar_path'] ?? null,
-            'cover_image' => is_string($payload['cover_image'] ?? null)
-                ? trim((string) $payload['cover_image'])
-                : null,
-        ];
-    }
-
-    /**
      * Decodes a raw JSON two-factor-methods column value into normalized method rows.
      *
      * Decrypts TOTP secrets via the cipher before passing through Login2fa normalization.
@@ -947,23 +752,6 @@ final class Gatekeeper
         }
 
         return Login2fa::normalizeStored($this->totpCipher->decryptMethodSecrets($decoded));
-    }
-
-    /**
-     * Encodes normalized two-factor method rows to a JSON string for persistence.
-     *
-     * Encrypts TOTP secrets via the cipher before encoding. Returns null when empty.
-     *
-     * @param array<int, array<string, mixed>> $methods Normalized 2FA method rows.
-     * @return string|null JSON string, or null when methods is empty.
-     */
-    private function encodeTwoFactorMethods(array $methods): ?string
-    {
-        if ($methods === []) {
-            return null;
-        }
-
-        return Json::encode($this->totpCipher->encryptMethodSecrets($methods), JSON_UNESCAPED_SLASHES);
     }
 
     /**

@@ -162,6 +162,7 @@ final class RuntimeBuilder
         $redirectWriteFactory = $repoFactories['redirect_write'];
         $userReadFactory = $repoFactories['user_read'];
         $userWriteFactory = $repoFactories['user_write'];
+        $authWriteFactory = $repoFactories['auth_write'];
         $categorySetFactory = $repoFactories['category_set'];
         $tagSetFactory = $repoFactories['tag_set'];
         $categorySetWriteFactory = $repoFactories['category_set_write'];
@@ -218,6 +219,7 @@ final class RuntimeBuilder
             $mediaManagerFactory,
             $userReadFactory,
             $userWriteFactory,
+            $authWriteFactory,
             $groupReadFactory,
             $groupWriteFactory,
             $inviteReadFactory,

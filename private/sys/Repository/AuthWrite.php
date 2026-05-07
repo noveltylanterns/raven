@@ -2,36 +2,36 @@
 
 /**
  * RAVEN CMS
- * ~/private/lib/Scribe/AuthScribe.php
- * Write-side persistence helper for auth-user profile and 2FA fields.
+ * ~/private/sys/Repository/AuthWrite.php
+ * Write-side repository for auth-user preference and two-factor fields.
  * Docs: https://raven.lanterns.io
  */
 
 declare(strict_types=1);
 
-namespace Raven\Lib\Scribe;
+namespace Raven\Core\Repository;
 
 use PDO;
+use Raven\Lib\Auth\Login2fa;
 use Raven\Lib\Database\SqlTable;
+use Raven\Lib\Format\Json;
+use Raven\Lib\Security\TotpCipher;
 
 /**
- * Owns auth-table profile and security-field writes for existing users.
- *
- * Gatekeeper keeps the login/session/read facade, while this class
- * centralizes the SQL mutation paths for current-user preference updates,
- * password changes, avatar/cover references, and stored 2FA payload writes.
+ * Owns auth-table writes for user preference and 2FA security payloads.
  */
-class AuthScribe
+final class AuthWrite
 {
     private PDO $authDb;
     private string $driver;
     private string $prefix;
+    private TotpCipher $totpCipher;
 
     /**
-     * Prepares the scribe for auth-user profile writes.
+     * Prepares the auth write repository.
      *
      * @param PDO $authDb Auth-database connection for `users` table writes.
-     * @param string $driver Active PDO driver name used for table resolution.
+     * @param string $driver Active PDO driver name used for table-name resolution.
      * @param string $prefix Configured auth-table prefix before sanitization.
      * @return void
      */
@@ -40,17 +40,25 @@ class AuthScribe
         $this->authDb = $authDb;
         $this->driver = $driver;
         $this->prefix = preg_replace('/[^a-zA-Z0-9_]/', '', $prefix) ?? '';
+        $this->totpCipher = new TotpCipher();
     }
 
     /**
-     * Replaces the stored 2FA payload for one auth user.
+     * Normalizes and persists user 2FA methods for one account.
      *
-     * @param int $userId Auth-user id to update.
-     * @param string|null $encodedMethods JSON-encoded 2FA payload, or null to clear it.
-     * @return void
+     * @param int $userId Target user id.
+     * @param array<int, array<string, mixed>> $methods Submitted 2FA method rows.
+     * @return array{ok: bool, errors: array<int, string>} Write status and validation errors.
      */
-    public function updateTwoFactorMethods(int $userId, ?string $encodedMethods): void
+    public function updateTwoFactorMethods(int $userId, array $methods): array
     {
+        if ($userId <= 0) {
+            return ['ok' => false, 'errors' => ['Invalid user id.']];
+        }
+
+        $normalizedMethods = Login2fa::normalizeStored($methods);
+        $encodedMethods = $this->encodeTwoFactorMethods($normalizedMethods);
+
         $stmt = $this->authDb->prepare(
             'UPDATE ' . $this->usersTable() . '
              SET two_factor = :two_factor
@@ -60,6 +68,8 @@ class AuthScribe
             ':two_factor' => $encodedMethods,
             ':id' => $userId,
         ]);
+
+        return ['ok' => true, 'errors' => []];
     }
 
     /**
@@ -136,5 +146,22 @@ class AuthScribe
     private function usersTable(): string
     {
         return SqlTable::appTable($this->driver, $this->prefix, 'users');
+    }
+
+    /**
+     * Encodes normalized two-factor method rows to a JSON string for persistence.
+     *
+     * Encrypts TOTP secrets before encoding. Returns null when the method list is empty.
+     *
+     * @param array<int, array<string, mixed>> $methods Normalized 2FA method rows.
+     * @return string|null JSON string, or null when methods is empty.
+     */
+    private function encodeTwoFactorMethods(array $methods): ?string
+    {
+        if ($methods === []) {
+            return null;
+        }
+
+        return Json::encode($this->totpCipher->encryptMethodSecrets($methods), JSON_UNESCAPED_SLASHES);
     }
 }

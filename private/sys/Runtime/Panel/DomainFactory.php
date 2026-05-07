@@ -31,6 +31,7 @@ final class DomainFactory
      * @param Closure $mediaManagerFactory Media manager factory closure.
      * @param Closure $userReadFactory User read factory closure.
      * @param Closure $userWriteFactory User write factory closure.
+     * @param Closure $authWriteFactory Auth-user write factory closure.
      * @param Closure $groupReadFactory Group read factory closure.
      * @param Closure $groupWriteFactory Group write factory closure.
      * @param Closure $inviteReadFactory Invite read factory closure.
@@ -67,6 +68,7 @@ final class DomainFactory
         Closure $mediaManagerFactory,
         Closure $userReadFactory,
         Closure $userWriteFactory,
+        Closure $authWriteFactory,
         Closure $groupReadFactory,
         Closure $groupWriteFactory,
         Closure $inviteReadFactory,
@@ -165,6 +167,7 @@ final class DomainFactory
             $groupWriteFactory,
             $userReadFactory,
             $userWriteFactory,
+            $authWriteFactory,
             $inviteReadFactory,
             $inviteWriteFactory
         ): array {
@@ -173,6 +176,7 @@ final class DomainFactory
                 'group_write' => $groupWriteFactory(),
                 'user_read' => $userReadFactory(),
                 'user_write' => $userWriteFactory(),
+                'auth_write' => $authWriteFactory(),
                 'invite_read' => $inviteReadFactory,
                 'invite_write' => $inviteWriteFactory,
             ];

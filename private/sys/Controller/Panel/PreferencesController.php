@@ -14,12 +14,15 @@ namespace Raven\Core\Controller\Panel;
 use lbuchs\WebAuthn\WebAuthn as VendorWebAuthn;
 use lbuchs\WebAuthn\WebAuthnException;
 use Raven\Core\Config;
+use Raven\Core\Repository\AuthWrite;
+use Raven\Core\Repository\UserRead;
 use Raven\Lib\Auth\LoginIdentifier;
 use Raven\Lib\Media\AvatarConfig;
 use Raven\Lib\Media\AvatarValidator;
 use Raven\Lib\Media\CoverConfig;
 use Raven\Lib\Scribe\UserScribe;
 use Raven\Lib\Security\PasswordValidator;
+use Raven\Lib\View\Preferences as PreferencesView;
 use Raven\Lib\View\Qr;
 use Raven\Lib\View\Form2fa;
 use Raven\Lib\View\Panel\EditorBlocks;
@@ -54,6 +57,8 @@ final class PreferencesController
     private UserScribe $userMediaScribe;
     private CoverConfig $coverConfig;
     private PasswordValidator $passwordValidator;
+    private UserRead $userRead;
+    private AuthWrite $authWrite;
 
     /**
      * @param SharedController $context Shared panel request context.
@@ -69,6 +74,8 @@ final class PreferencesController
      * @param UserScribe $userMediaScribe Shared user-media write helper.
      * @param CoverConfig $coverConfig Shared user cover-image URL resolver.
      * @param PasswordValidator $passwordValidator Shared password validation policy.
+     * @param UserRead $userRead User repository read side for uniqueness checks.
+     * @param AuthWrite $authWrite Auth-user write repository for preference persistence.
      * @return void
      */
     public function __construct(
@@ -84,7 +91,9 @@ final class PreferencesController
         Form2fa $form2fa,
         UserScribe $userMediaScribe,
         CoverConfig $coverConfig,
-        PasswordValidator $passwordValidator
+        PasswordValidator $passwordValidator,
+        UserRead $userRead,
+        AuthWrite $authWrite
     ) {
         $this->context = $context;
         $this->config = $config;
@@ -100,6 +109,8 @@ final class PreferencesController
         $this->userMediaScribe = $userMediaScribe;
         $this->coverConfig = $coverConfig;
         $this->passwordValidator = $passwordValidator;
+        $this->userRead = $userRead;
+        $this->authWrite = $authWrite;
     }
 
     /**
@@ -340,7 +351,7 @@ final class PreferencesController
             Redirect::redirect($preferencesUrl);
         }
 
-        $update = $this->context->auth()->updateUserPreferences($userId, [
+        $update = PreferencesView::updateUserPreferences($userId, [
             'username' => is_string($username) ? $username : '',
             'display_name' => $displayName,
             'email' => (string) $email,
@@ -353,7 +364,7 @@ final class PreferencesController
             'set_avatar' => $avatarSet,
             'avatar_path' => $avatarFilename,
             'cover_image' => $coverImage,
-        ]);
+        ], $this->userRead, $this->authWrite);
 
         if (!$update['ok']) {
             if ($uploadedAvatarFilename !== null) {

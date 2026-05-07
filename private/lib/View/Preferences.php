@@ -3,7 +3,7 @@
 /**
  * RAVEN CMS
  * ~/private/lib/View/Preferences.php
- * Pure form-building and validation helpers for user preference flows.
+ * User-preferences helpers for form normalization, validation, and persistence.
  * Docs: https://raven.lanterns.io
  */
 
@@ -11,15 +11,17 @@ declare(strict_types=1);
 
 namespace Raven\Lib\View;
 
+use Raven\Core\Repository\AuthWrite;
+use Raven\Core\Repository\UserRead;
 use Raven\Lib\Auth\Login2fa;
+use Raven\Lib\Format\Json;
+use Raven\Lib\Parser\UserContactParser;
 use Raven\Lib\Security\PhraseValidate;
 use Raven\Lib\Security\Totp;
+use Raven\Lib\Security\TotpCipher;
 
 /**
- * Agnostic helpers for building and validating user preference form data.
- *
- * All methods are pure (static) and carry no dependency on DB access or the auth
- * session, making them safe to call from public, panel, and extension contexts alike.
+ * Shared helpers for building, validating, and persisting preference form data.
  */
 final class Preferences
 {
@@ -167,5 +169,144 @@ final class Preferences
         }
 
         return $errors;
+    }
+
+    /**
+     * Normalizes, validates, and persists one user-preferences payload.
+     *
+     * @param int $userId Target user id for the update.
+     * @param array{
+     *   username: string,
+     *   display_name: string,
+     *   email: string,
+     *   bio?: string,
+     *   theme: string,
+     *   timezone?: string,
+     *   password: string|null,
+     *   contact_profiles?: array<int, array{type: string, value: string}>,
+     *   two_factor_methods?: array<int, array<string, mixed>>,
+     *   set_avatar: bool,
+     *   avatar_path: string|null,
+     *   cover_image?: string|null
+     * } $payload Submitted preference-update payload.
+     * @param UserRead $userRead User read repository used for uniqueness checks.
+     * @param AuthWrite $authWrite Auth write repository used to persist updated fields.
+     * @return array{ok: bool, errors: array<int, string>} Write status and validation errors.
+     */
+    public static function updateUserPreferences(
+        int $userId,
+        array $payload,
+        UserRead $userRead,
+        AuthWrite $authWrite
+    ): array {
+        $normalized = self::normalizePreferenceUpdatePayload($payload);
+        $username = (string) ($normalized['username'] ?? '');
+        $email = (string) ($normalized['email'] ?? '');
+        $password = $normalized['password'] ?? null;
+
+        $errors = self::validatePreferenceUpdate(
+            $email,
+            is_string($password) ? $password : null,
+            $username !== '' && $userRead->usernameExistsForOtherUser($userId, $username),
+            $userRead->emailExistsForOtherUser($userId, $email)
+        );
+        if ($errors !== []) {
+            return ['ok' => false, 'errors' => $errors];
+        }
+
+        $authWrite->updatePreferences($userId, [
+            'username' => $username,
+            'display_name' => (string) ($normalized['display_name'] ?? ''),
+            'email' => $email,
+            'bio' => (string) ($normalized['bio'] ?? ''),
+            'theme' => (string) ($normalized['theme'] ?? 'default'),
+            'timezone' => (string) ($normalized['timezone'] ?? ''),
+            'password_hash' => ($password !== null && $password !== '')
+                ? password_hash($password, PASSWORD_DEFAULT)
+                : null,
+            'contact_profiles_encoded' => $normalized['contact_profiles_encoded'] ?? null,
+            'two_factor_methods_encoded' => $normalized['two_factor_methods_encoded'] ?? null,
+            'set_avatar' => (bool) ($normalized['set_avatar'] ?? false),
+            'avatar_path' => $normalized['avatar_path'] ?? null,
+            'cover_image' => $normalized['cover_image'] ?? null,
+        ]);
+
+        return ['ok' => true, 'errors' => []];
+    }
+
+    /**
+     * Normalizes one raw preference payload for persistence.
+     *
+     * @param array{
+     *   username: string,
+     *   display_name: string,
+     *   email: string,
+     *   bio?: string,
+     *   theme: string,
+     *   timezone?: string,
+     *   password: string|null,
+     *   contact_profiles?: array<int, array{type: string, value: string}>,
+     *   two_factor_methods?: array<int, array<string, mixed>>,
+     *   set_avatar: bool,
+     *   avatar_path: string|null,
+     *   cover_image?: string|null
+     * } $payload Raw user-submitted payload.
+     * @return array{
+     *   username: string,
+     *   display_name: string,
+     *   email: string,
+     *   bio: string,
+     *   theme: string,
+     *   timezone: string,
+     *   password: string|null,
+     *   contact_profiles: array<int, array{type: string, value: string}>,
+     *   contact_profiles_encoded: ?string,
+     *   two_factor_methods: array<int, array<string, mixed>>,
+     *   two_factor_methods_encoded: ?string,
+     *   set_avatar: bool,
+     *   avatar_path: string|null,
+     *   cover_image: string|null
+     * }
+     */
+    private static function normalizePreferenceUpdatePayload(array $payload): array
+    {
+        $contactProfiles = UserContactParser::normalizeContactProfiles((array) ($payload['contact_profiles'] ?? []));
+        $twoFactorMethods = Login2fa::normalizeStored((array) ($payload['two_factor_methods'] ?? []));
+
+        return [
+            'username' => trim((string) ($payload['username'] ?? '')),
+            'display_name' => trim((string) ($payload['display_name'] ?? '')),
+            'email' => trim((string) ($payload['email'] ?? '')),
+            'bio' => trim((string) ($payload['bio'] ?? '')),
+            'theme' => trim((string) ($payload['theme'] ?? 'default')),
+            // Empty string is valid and means "inherit from site/server default".
+            'timezone' => trim((string) ($payload['timezone'] ?? '')),
+            'password' => $payload['password'] ?? null,
+            'contact_profiles' => $contactProfiles,
+            'contact_profiles_encoded' => UserContactParser::encodeContactProfiles($contactProfiles),
+            'two_factor_methods' => $twoFactorMethods,
+            'two_factor_methods_encoded' => self::encodeTwoFactorMethods($twoFactorMethods),
+            'set_avatar' => (bool) ($payload['set_avatar'] ?? false),
+            'avatar_path' => $payload['avatar_path'] ?? null,
+            'cover_image' => is_string($payload['cover_image'] ?? null)
+                ? trim((string) $payload['cover_image'])
+                : null,
+        ];
+    }
+
+    /**
+     * Encodes normalized two-factor methods for storage in the auth users table.
+     *
+     * @param array<int, array<string, mixed>> $methods Normalized 2FA method rows.
+     * @return string|null JSON-encoded payload, or null when methods is empty.
+     */
+    private static function encodeTwoFactorMethods(array $methods): ?string
+    {
+        if ($methods === []) {
+            return null;
+        }
+
+        $totpCipher = new TotpCipher();
+        return Json::encode($totpCipher->encryptMethodSecrets($methods), JSON_UNESCAPED_SLASHES);
     }
 }

@@ -570,6 +570,7 @@ final class ControllerFactory
                 $userDomain['group_read'],
                 $userDomain['user_read'],
                 $userDomain['user_write'],
+                $userDomain['auth_write'],
                 new GroupRouteParser($rvn['config'], $rvn['input']),
                 new LoginIdentifier(),
                 $rvn['panel_editor_tabs'](),
@@ -671,13 +672,14 @@ final class ControllerFactory
         /**
          * Builds the split preferences controller on first use.
          */
-        $rvn['panel_preferences_controller'] = static function () use (&$preferencesController, &$rvn): PreferencesController {
+        $rvn['panel_preferences_controller'] = static function () use (&$preferencesController, &$rvn, $panelUserDomain): PreferencesController {
             if ($preferencesController instanceof PreferencesController) {
                 return $preferencesController;
             }
 
             /** @var callable(): SharedController $requestContextFactory */
             $requestContextFactory = $rvn['panel_request_context'];
+            $userDomain = $panelUserDomain();
             $preferencesController = new PreferencesController(
                 $requestContextFactory(),
                 $rvn['config'],
@@ -691,7 +693,9 @@ final class ControllerFactory
                 new Form2fa($rvn['input']),
                 new UserScribe((string) $rvn['root'], new AvatarUpload()),
                 new CoverConfig(),
-                new PasswordValidator()
+                new PasswordValidator(),
+                $userDomain['user_read'],
+                $userDomain['auth_write']
             );
 
             return $preferencesController;

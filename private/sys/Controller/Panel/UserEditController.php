@@ -12,6 +12,7 @@ declare(strict_types=1);
 namespace Raven\Core\Controller\Panel;
 
 use Raven\Core\Config;
+use Raven\Core\Repository\AuthWrite;
 use Raven\Core\Repository\GroupRead;
 use Raven\Core\Repository\UserRead;
 use Raven\Core\Repository\UserWrite;
@@ -45,6 +46,7 @@ final class UserEditController
     private GroupRead $groupRead;
     private UserRead $userRead;
     private UserWrite $userWrite;
+    private AuthWrite $authWrite;
     private GroupRouteParser $groupParser;
     private LoginIdentifier $loginIdentifier;
     private EditorTabs $editorTabs;
@@ -64,6 +66,7 @@ final class UserEditController
      * @param GroupRead $groupRead Group repository read side for group option reads and slug lookups.
      * @param UserRead $userRead User repository read side for user find and author lookups.
      * @param UserWrite $userWrite User repository write side for panel user saves and deletes.
+     * @param AuthWrite $authWrite Auth-user write repository for 2FA method updates.
      * @param GroupRouteParser $groupParser Shared group/profile routing-policy parser.
      * @param LoginIdentifier $loginIdentifier Shared login-identifier normalization helper.
      * @param EditorTabs $editorTabs Shared editor-tab normalization helper.
@@ -83,6 +86,7 @@ final class UserEditController
         GroupRead $groupRead,
         UserRead $userRead,
         UserWrite $userWrite,
+        AuthWrite $authWrite,
         GroupRouteParser $groupParser,
         LoginIdentifier $loginIdentifier,
         EditorTabs $editorTabs,
@@ -100,6 +104,7 @@ final class UserEditController
         $this->groupRead = $groupRead;
         $this->userRead = $userRead;
         $this->userWrite = $userWrite;
+        $this->authWrite = $authWrite;
         $this->groupParser = $groupParser;
         $this->loginIdentifier = $loginIdentifier;
         $this->editorTabs = $editorTabs;
@@ -590,7 +595,7 @@ final class UserEditController
                 $retainedTwoFactorMethods[] = $method;
             }
 
-            $twoFactorUpdate = $this->context->auth()->updateUserTwoFactorMethods($savedId, $retainedTwoFactorMethods);
+            $twoFactorUpdate = $this->authWrite->updateTwoFactorMethods($savedId, $retainedTwoFactorMethods);
             if (!(bool) ($twoFactorUpdate['ok'] ?? false)) {
                 $rawErrors = is_array($twoFactorUpdate['errors'] ?? null) ? $twoFactorUpdate['errors'] : [];
                 $messages = array_map(static fn (mixed $value): string => trim((string) $value), $rawErrors);

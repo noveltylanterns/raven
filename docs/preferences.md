@@ -104,12 +104,12 @@ Declared in `panel/index.php`:
    - avatars above `120x120` are center-cropped/resized to `120x120` JPEG
    - avatars at or below `120x120` are copied as-is from sanitized original
 9. Stores optional cover uploads at `public/uploads/user/cover/{user_string}.{extension}`.
-10. Persists changes through `AuthService::updateUserPreferences(...)`, including optional `cover_image`.
+10. Persists changes through `Preferences::updateUserPreferences(...)` + `AuthWrite::updatePreferences(...)`, including optional `cover_image`.
 11. Removes superseded avatar and cover files after successful update.
 
 ### Persistence Contract
 
-`AuthService::updateUserPreferences(...)` handles:
+`Preferences::updateUserPreferences(...)` handles:
 
 - unique username/email checks
 - optional password hash update

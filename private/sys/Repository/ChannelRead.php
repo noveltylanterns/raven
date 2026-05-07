@@ -906,6 +906,284 @@ class ChannelRead
     }
 
     /**
+     * Returns all raw file paths in a channel directory without sorting or normalization.
+     *
+     * @param string $channelDirectory Absolute channel directory path.
+     * @return array<int, string> Unsorted absolute file paths.
+     */
+    public static function rawChannelFilePathsInDirectory(string $channelDirectory): array
+    {
+        $normalizedDirectory = rtrim($channelDirectory, '/');
+        $paths = glob($normalizedDirectory . '/*.php') ?: [];
+        sort($paths, SORT_STRING);
+        return $paths;
+    }
+
+    /**
+     * Loads the raw PHP-array payload from a channel file at the given path.
+     *
+     * @param string $path Absolute path to the channel PHP file.
+     * @return array<string, mixed> Deserialized record data, or [] on missing/invalid file.
+     */
+    public static function loadRawByPathStatic(string $path): array
+    {
+        if (!is_file($path)) {
+            return [];
+        }
+
+        self::invalidatePhpFileCacheStatic($path);
+
+        try {
+            /** @var mixed $raw */
+            $raw = require $path;
+        } catch (\Throwable) {
+            return [];
+        }
+
+        return is_array($raw) ? $raw : [];
+    }
+
+    /**
+     * Finds the file path for a channel by slug within one directory, or null if none exists.
+     *
+     * @param string $channelDirectory Absolute channel directory path.
+     * @param string $slug Channel slug.
+     * @return string|null Matching path, or null.
+     */
+    public static function findPathBySlugInDirectory(string $channelDirectory, string $slug): ?string
+    {
+        $normalizedSlug = strtolower(trim($slug));
+        if (!ChannelRepoParser::isValidSlug($normalizedSlug)) {
+            return null;
+        }
+
+        foreach (self::rawChannelFilePathsInDirectory($channelDirectory) as $path) {
+            $raw = self::loadRawByPathStatic($path);
+            if ($raw === []) {
+                continue;
+            }
+
+            $channelId = self::recordIdFromRawStatic($raw, $path);
+            if ($channelId === null) {
+                continue;
+            }
+
+            if (self::recordSlugFromRawStatic($raw, $channelId, basename($path, '.php')) === $normalizedSlug) {
+                return $path;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Returns all file paths that could belong to the given channel id.
+     *
+     * Checks both the canonical filename pattern and the stored id field inside each file.
+     *
+     * @param string $channelDirectory Absolute channel directory path.
+     * @param int $id Channel id to search for.
+     * @return array<int, string> Deduplicated list of matching absolute paths.
+     */
+    public static function candidatePathsForIdInDirectory(string $channelDirectory, int $id): array
+    {
+        $normalizedDirectory = rtrim($channelDirectory, '/');
+        $normalizedId = max(ChannelRepoParser::ROOT_CHANNEL_ID, $id);
+        $paths = [];
+
+        foreach (glob($normalizedDirectory . '/' . $normalizedId . '_*.php') ?: [] as $path) {
+            $paths[] = $path;
+        }
+
+        foreach (self::rawChannelFilePathsInDirectory($normalizedDirectory) as $path) {
+            if (in_array($path, $paths, true)) {
+                continue;
+            }
+
+            $raw = self::loadRawByPathStatic($path);
+            if ((self::recordIdFromRawStatic($raw, $path) ?? -1) === $normalizedId) {
+                $paths[] = $path;
+            }
+        }
+
+        return array_values(array_unique($paths));
+    }
+
+    /**
+     * Resolves the channel id for a raw data array, falling back to the filename if the field is absent.
+     *
+     * @param array<string, mixed> $raw  Raw data loaded from the file.
+     * @param string               $path Absolute path of the file (used for fallback id extraction).
+     * @return int|null Resolved channel id, or null if it cannot be determined.
+     */
+    public static function recordIdFromRawStatic(array $raw, string $path): ?int
+    {
+        $rawId = ChannelRepoParser::normalizeChannelId($raw['id'] ?? null);
+        if ($rawId !== null) {
+            return $rawId;
+        }
+
+        $filenameId = self::filenameIdStatic($path);
+        if ($filenameId >= ChannelRepoParser::ROOT_CHANNEL_ID) {
+            return $filenameId;
+        }
+
+        $fallbackSlug = self::slugFromFilenameStatic($path);
+        if ($fallbackSlug !== '' && ChannelRepoParser::isRootChannelSlug($fallbackSlug)) {
+            return ChannelRepoParser::ROOT_CHANNEL_ID;
+        }
+
+        return null;
+    }
+
+    /**
+     * Derives the canonical slug for a record, falling back through filename and name heuristics.
+     *
+     * @param array<string, mixed> $raw      Raw data loaded from the file.
+     * @param int                  $id       Resolved channel id.
+     * @param string               $fallback Basename (without .php) to try as a slug source.
+     * @return string Canonical slug string.
+     */
+    public static function recordSlugFromRawStatic(array $raw, int $id, string $fallback): string
+    {
+        if ($id === ChannelRepoParser::ROOT_CHANNEL_ID) {
+            return ChannelRepoParser::ROOT_CHANNEL_SLUG;
+        }
+
+        $slug = strtolower(trim((string) ($raw['slug'] ?? '')));
+        if (ChannelRepoParser::isValidSlug($slug)) {
+            return $slug;
+        }
+
+        if (preg_match('/^\d+_([a-z0-9-]+)$/', $fallback, $matches) === 1) {
+            $slug = strtolower(trim((string) ($matches[1] ?? '')));
+            if (ChannelRepoParser::isValidSlug($slug)) {
+                return $slug;
+            }
+        }
+
+        $slug = self::slugFromFilenameStatic($fallback);
+        if ($slug !== '' && ChannelRepoParser::isValidSlug($slug) && !preg_match('/^\d+$/', $slug)) {
+            return $slug;
+        }
+
+        $nameSlug = strtolower(trim((string) ($raw['name'] ?? '')));
+        $nameSlug = preg_replace('/[^a-z0-9]+/', '-', $nameSlug) ?? '';
+        $nameSlug = trim($nameSlug, '-');
+        $nameSlug = preg_replace('/-+/', '-', $nameSlug) ?? '';
+        if ($nameSlug !== '' && ChannelRepoParser::isValidSlug($nameSlug)) {
+            return $nameSlug;
+        }
+
+        return 'channel-' . $id;
+    }
+
+    /**
+     * Builds a canonical channel record array with all fields validated and normalized.
+     *
+     * @param int                  $id   Resolved channel id.
+     * @param string               $slug Resolved channel slug.
+     * @param array<string, mixed> $raw  Source data to normalize.
+     * @return array<string, mixed> Canonicalized channel record.
+     */
+    public static function canonicalizeRecordStatic(int $id, string $slug, array $raw): array
+    {
+        $normalizedId = max(ChannelRepoParser::ROOT_CHANNEL_ID, $id);
+        $normalizedSlug = self::recordSlugFromRawStatic($raw, $normalizedId, $slug);
+        $name = trim((string) ($raw['name'] ?? ''));
+        if ($normalizedId === ChannelRepoParser::ROOT_CHANNEL_ID) {
+            $name = ChannelRepoParser::ROOT_CHANNEL_NAME;
+            $normalizedSlug = ChannelRepoParser::ROOT_CHANNEL_SLUG;
+        } elseif ($name === '') {
+            $name = ucwords(str_replace('-', ' ', $normalizedSlug));
+        }
+
+        $createdAt = trim((string) ($raw['created_at'] ?? ''));
+        if ($createdAt === '') {
+            $createdAt = gmdate('Y-m-d H:i:s');
+        }
+
+        return [
+            'id' => $normalizedId,
+            'name' => $name,
+            'slug' => $normalizedSlug,
+            'description' => trim((string) ($raw['description'] ?? '')),
+            'feed_enabled' => ChannelRepoParser::normalizeFeedEnabled($raw['feed_enabled'] ?? false),
+            'category_sets' => SetParser::normalizeSelection($raw['category_sets'] ?? [], false),
+            'tag_sets' => SetParser::normalizeSelection($raw['tag_sets'] ?? [], false),
+            'editor_override' => ChannelRepoParser::normalizeEditorOverride(
+                (string) ($raw['editor_override'] ?? 'inherit')
+            ),
+            'route_mode' => ChannelRouteParser::normalizeChannelRouteMode((string) ($raw['route_mode'] ?? 'inherit')),
+            'route_separator' => ChannelRouteParser::normalizeChannelSeparator(
+                (string) ($raw['route_separator'] ?? 'inherit')
+            ),
+            'cover_image_path' => ChannelRepoParser::normalizeNullablePath($raw['cover_image_path'] ?? null),
+            'cover_image_sm_path' => ChannelRepoParser::normalizeNullablePath($raw['cover_image_sm_path'] ?? null),
+            'cover_image_md_path' => ChannelRepoParser::normalizeNullablePath($raw['cover_image_md_path'] ?? null),
+            'cover_image_lg_path' => ChannelRepoParser::normalizeNullablePath($raw['cover_image_lg_path'] ?? null),
+            'preview_image_path' => ChannelRepoParser::normalizeNullablePath($raw['preview_image_path'] ?? null),
+            'preview_image_sm_path' => ChannelRepoParser::normalizeNullablePath($raw['preview_image_sm_path'] ?? null),
+            'preview_image_md_path' => ChannelRepoParser::normalizeNullablePath($raw['preview_image_md_path'] ?? null),
+            'preview_image_lg_path' => ChannelRepoParser::normalizeNullablePath($raw['preview_image_lg_path'] ?? null),
+            'custom_fields' => is_array($raw['custom_fields'] ?? null) ? $raw['custom_fields'] : [],
+            'overrides' => is_array($raw['overrides'] ?? null) ? $raw['overrides'] : [],
+            'created_at' => $createdAt,
+        ];
+    }
+
+    /**
+     * Extracts the numeric id component from a channel filename, or -1 if the pattern does not match.
+     *
+     * @param string $path Absolute or relative path to a channel PHP file.
+     * @return int Extracted id, or -1 on no match.
+     */
+    public static function filenameIdStatic(string $path): int
+    {
+        $basename = basename($path, '.php');
+        if (preg_match('/^(\d+)(?:_[a-z0-9-]+)?$/', $basename, $matches) === 1) {
+            return (int) ($matches[1] ?? -1);
+        }
+
+        return -1;
+    }
+
+    /**
+     * Extracts the slug component from a channel filename, or the full basename when no id prefix is present.
+     *
+     * @param string $path Absolute or relative path to a channel PHP file.
+     * @return string Lowercase slug string, or empty string on failure.
+     */
+    public static function slugFromFilenameStatic(string $path): string
+    {
+        $basename = basename($path, '.php');
+        if (preg_match('/^\d+_([a-z0-9-]+)$/', $basename, $matches) === 1) {
+            return strtolower(trim((string) ($matches[1] ?? '')));
+        }
+
+        return strtolower(trim($basename));
+    }
+
+    /**
+     * Clears the PHP stat cache and OPcache entry for a file path before a read.
+     *
+     * @param string $path Absolute path to invalidate.
+     * @return void
+     */
+    public static function invalidatePhpFileCacheStatic(string $path): void
+    {
+        $normalized = trim($path);
+        if ($normalized === '') {
+            return;
+        }
+
+        clearstatcache(true, $normalized);
+        if (function_exists('opcache_invalidate')) {
+            @opcache_invalidate($normalized, true);
+        }
+    }
+
+    /**
      * Maps logical table names into backend-specific physical names.
      *
      * @param string $table Logical unprefixed table name.

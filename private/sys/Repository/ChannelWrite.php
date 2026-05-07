@@ -15,7 +15,6 @@ use Raven\Lib\Database\SqlTable;
 use Raven\Lib\Parser\ChannelRepoParser;
 use Raven\Lib\Parser\ChannelRouteParser;
 use Raven\Lib\Parser\SetParser;
-use Raven\Lib\Scribe\ChannelScribe;
 use RuntimeException;
 
 /**
@@ -277,7 +276,32 @@ final class ChannelWrite
      */
     public static function normalizeStorageLayout(string $channelDirectory): void
     {
-        (new ChannelScribe(rtrim($channelDirectory, '/')))->normalizeStorageLayout();
+        $normalizedDirectory = rtrim($channelDirectory, '/');
+
+        foreach (ChannelRead::rawChannelFilePathsInDirectory($normalizedDirectory) as $path) {
+            $raw = ChannelRead::loadRawByPathStatic($path);
+            if ($raw === []) {
+                continue;
+            }
+
+            $channelId = ChannelRead::recordIdFromRawStatic($raw, $path);
+            if ($channelId === null) {
+                continue;
+            }
+
+            $slug = ChannelRead::recordSlugFromRawStatic($raw, $channelId, basename($path, '.php'));
+            $canonical = ChannelRead::canonicalizeRecordStatic($channelId, $slug, $raw);
+            $targetPath = self::pathForRecord($normalizedDirectory, (int) $canonical['id'], (string) $canonical['slug']);
+            if ($path === $targetPath && $canonical === $raw) {
+                continue;
+            }
+
+            self::writeRecordById($normalizedDirectory, (int) $canonical['id'], (string) $canonical['slug'], $canonical);
+            if ($path !== $targetPath && is_file($path)) {
+                @unlink($path);
+                ChannelRead::invalidatePhpFileCacheStatic($path);
+            }
+        }
     }
 
     /**
@@ -292,7 +316,35 @@ final class ChannelWrite
      */
     public static function writeRecordById(string $channelDirectory, int $id, string $slug, array $record): void
     {
-        (new ChannelScribe(rtrim($channelDirectory, '/')))->writeRecordById($id, $slug, $record);
+        $normalizedDirectory = rtrim($channelDirectory, '/');
+        self::ensureDirectory($normalizedDirectory);
+        $canonical = ChannelRead::canonicalizeRecordStatic($id, $slug, $record);
+        $path = self::pathForRecord($normalizedDirectory, (int) $canonical['id'], (string) $canonical['slug']);
+        $content = "<?php\n\ndeclare(strict_types=1);\n\nreturn " . var_export($canonical, true) . ";\n";
+
+        // Write to a temp file first so the final rename is atomic.
+        $tmpPath = $path . '.tmp';
+        if (file_put_contents($tmpPath, $content, LOCK_EX) === false) {
+            throw new RuntimeException('Failed to write channel file.');
+        }
+
+        if (!@rename($tmpPath, $path)) {
+            @unlink($tmpPath);
+            throw new RuntimeException('Failed to finalize channel file.');
+        }
+
+        ChannelRead::invalidatePhpFileCacheStatic($tmpPath);
+        ChannelRead::invalidatePhpFileCacheStatic($path);
+
+        // Remove any stale files that matched the same id but had a different path.
+        foreach (ChannelRead::candidatePathsForIdInDirectory($normalizedDirectory, (int) $canonical['id']) as $candidatePath) {
+            if ($candidatePath === $path || !is_file($candidatePath)) {
+                continue;
+            }
+
+            @unlink($candidatePath);
+            ChannelRead::invalidatePhpFileCacheStatic($candidatePath);
+        }
     }
 
     /**
@@ -305,7 +357,17 @@ final class ChannelWrite
      */
     public static function deleteRecordById(string $channelDirectory, int $id): void
     {
-        (new ChannelScribe(rtrim($channelDirectory, '/')))->deleteById($id);
+        $normalizedDirectory = rtrim($channelDirectory, '/');
+        foreach (ChannelRead::candidatePathsForIdInDirectory($normalizedDirectory, $id) as $path) {
+            if (!is_file($path)) {
+                continue;
+            }
+
+            if (!@unlink($path)) {
+                throw new RuntimeException('Failed to delete channel file.');
+            }
+            ChannelRead::invalidatePhpFileCacheStatic($path);
+        }
     }
 
     /**
@@ -319,7 +381,22 @@ final class ChannelWrite
      */
     public static function persistChannelId(string $channelDirectory, string $slug, int $id): void
     {
-        (new ChannelScribe(rtrim($channelDirectory, '/')))->persistChannelId($slug, $id);
+        $normalizedDirectory = rtrim($channelDirectory, '/');
+        if ($id < ChannelRepoParser::ROOT_CHANNEL_ID || trim($slug) === '') {
+            return;
+        }
+
+        $path = ChannelRead::findPathBySlugInDirectory($normalizedDirectory, $slug);
+        if ($path === null) {
+            return;
+        }
+
+        $raw = ChannelRead::loadRawByPathStatic($path);
+        if ($raw === []) {
+            return;
+        }
+
+        self::writeRecordById($normalizedDirectory, $id, $slug, $raw);
     }
 
     /**
@@ -349,5 +426,44 @@ final class ChannelWrite
     private function table(string $table): string
     {
         return SqlTable::appTable($this->driver, $this->prefix, $table);
+    }
+
+    /**
+     * Creates the channel directory if it does not already exist.
+     *
+     * @param string $channelDirectory Absolute channel directory path.
+     * @throws RuntimeException When the directory cannot be created.
+     * @return void
+     */
+    private static function ensureDirectory(string $channelDirectory): void
+    {
+        if (is_dir($channelDirectory)) {
+            return;
+        }
+
+        if (!@mkdir($channelDirectory, 0775, true) && !is_dir($channelDirectory)) {
+            throw new RuntimeException('Failed to initialize channel directory.');
+        }
+    }
+
+    /**
+     * Returns the canonical file path for a record given its id and slug.
+     *
+     * @param string $channelDirectory Absolute channel directory path.
+     * @param int $id Channel id.
+     * @param string $slug Channel slug.
+     * @return string Absolute path where this channel's PHP file should live.
+     */
+    private static function pathForRecord(string $channelDirectory, int $id, string $slug): string
+    {
+        $safeId = max(ChannelRepoParser::ROOT_CHANNEL_ID, $id);
+        $safeSlug = strtolower(trim($slug));
+        if (!ChannelRepoParser::isValidSlug($safeSlug)) {
+            $safeSlug = $safeId === ChannelRepoParser::ROOT_CHANNEL_ID
+                ? ChannelRepoParser::ROOT_CHANNEL_SLUG
+                : ('channel-' . $safeId);
+        }
+
+        return $channelDirectory . '/' . $safeId . '_' . $safeSlug . '.php';
     }
 }

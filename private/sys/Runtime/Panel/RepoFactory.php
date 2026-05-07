@@ -12,6 +12,7 @@ declare(strict_types=1);
 namespace Raven\Core\Runtime\Panel;
 
 use Closure;
+use Raven\Core\Repository\AuthWrite;
 use Raven\Core\Repository\CategoryRead;
 use Raven\Core\Repository\CategoryWrite;
 use Raven\Core\Repository\ChannelRead;
@@ -60,6 +61,7 @@ final class RepoFactory
      *   redirect_write: Closure,
      *   user_read: Closure,
      *   user_write: Closure,
+     *   auth_write: Closure,
      *   category_set: Closure,
      *   tag_set: Closure,
      *   category_set_write: Closure,
@@ -227,6 +229,17 @@ final class RepoFactory
         });
 
         /**
+         * Builds auth-user write side for preference and 2FA profile updates.
+         */
+        $authWriteFactory = $memoize(static function () use ($rvn, $resolveAuthDb): AuthWrite {
+            return new AuthWrite(
+                $resolveAuthDb(),
+                (string) $rvn['driver'],
+                (string) $rvn['prefix']
+            );
+        });
+
+        /**
          * Builds the file-backed category set read side only for panel taxonomy editors.
          */
         $categorySetFactory = $memoize(static function () use ($rvn): SetRead {
@@ -349,6 +362,7 @@ final class RepoFactory
             'redirect_write' => $redirectWriteFactory,
             'user_read' => $userReadFactory,
             'user_write' => $userWriteFactory,
+            'auth_write' => $authWriteFactory,
             'category_set' => $categorySetFactory,
             'tag_set' => $tagSetFactory,
             'category_set_write' => $categorySetWriteFactory,

@@ -10,7 +10,10 @@
 declare(strict_types=1);
 
 use Raven\Core\Repository\GroupRead;
+use Raven\Core\Repository\AuthWrite;
+use Raven\Core\Repository\UserRead;
 use Raven\Core\Repository\UserWrite;
+use Raven\Lib\View\Preferences as PreferencesView;
 
 error_reporting(E_ALL & ~E_WARNING & ~E_NOTICE & ~E_DEPRECATED);
 ini_set('display_errors', '0');
@@ -257,6 +260,8 @@ final class OutputProfilerSmokeRunner
         }
         $groupRepo = new GroupRead($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix']);
         $userRepo = new UserWrite($rvn['auth_db'], $rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix']);
+        $userRead = new UserRead($rvn['auth_db'], $rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix']);
+        $authWrite = new AuthWrite($rvn['auth_db'], (string) $rvn['driver'], (string) $rvn['prefix']);
         // Admin group is canonical ID 1; slug lookup kept as fallback.
         $groupId = $groupRepo->idBySlug('admin') ?? 1;
 
@@ -290,7 +295,7 @@ final class OutputProfilerSmokeRunner
             throw new RuntimeException('Unable to load temporary super user preferences.');
         }
 
-        $updateResult = $rvn['auth']->updateUserPreferences($this->tempUserId, [
+        $updateResult = PreferencesView::updateUserPreferences($this->tempUserId, [
             'username' => (string) ($prefs['username'] ?? $this->tempUsername),
             'display_name' => (string) ($prefs['display_name'] ?? ('Codex Debug ' . $this->runId)),
             'email' => (string) ($prefs['email'] ?? $this->tempEmail),
@@ -304,7 +309,7 @@ final class OutputProfilerSmokeRunner
             ]],
             'set_avatar' => false,
             'avatar_path' => $prefs['avatar_path'] ?? null,
-        ]);
+        ], $userRead, $authWrite);
         if (!(bool) ($updateResult['ok'] ?? false)) {
             throw new RuntimeException('Failed to seed temporary super user 2FA methods.');
         }
