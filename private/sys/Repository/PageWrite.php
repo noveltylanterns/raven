@@ -13,10 +13,10 @@ namespace Raven\Core\Repository;
 use PDO;
 use RuntimeException;
 use Raven\Lib\Parser\ChannelDataParser;
-use Raven\Lib\Parser\ChannelRepoParser;
+use Raven\Core\Repository\ChannelShared;
 use Raven\Core\Debug\UniquenessProfiler;
 use Raven\Lib\Parser\PageBlockParser;
-use Raven\Lib\Parser\PageRepoParser;
+use Raven\Core\Repository\PageShared;
 use Raven\Lib\Database\SqlInsert;
 use Raven\Lib\Database\SqlTable;
 
@@ -94,8 +94,8 @@ final class PageWrite
         $now = gmdate('Y-m-d H:i:s');
         $publishAt = $this->normalizeDateTimeField($data['published'] ?? null);
         $expireAt = $this->normalizeDateTimeField($data['expires'] ?? null);
-        $categoryIds = $this->categoryEnabled ? PageRepoParser::normalizeIds($data['category_ids'] ?? []) : [];
-        $tagIds = $this->tagEnabled ? PageRepoParser::normalizeIds($data['tag_ids'] ?? []) : [];
+        $categoryIds = $this->categoryEnabled ? PageShared::normalizeIds($data['category_ids'] ?? []) : [];
+        $tagIds = $this->tagEnabled ? PageShared::normalizeIds($data['tag_ids'] ?? []) : [];
 
         // Optional channel binding by slug; channel id `0` is the stock root scope.
         $channelId = 0;
@@ -423,7 +423,7 @@ final class PageWrite
      */
     private function channelIdBySlug(string $slug): ?int
     {
-        if (ChannelRepoParser::isRootChannelSlug($slug)) {
+        if (ChannelShared::isRootChannelSlug($slug)) {
             throw new RuntimeException('The stock <root> channel placeholder cannot be selected directly.');
         }
 

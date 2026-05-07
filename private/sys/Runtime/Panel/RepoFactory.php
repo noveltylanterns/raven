@@ -33,7 +33,7 @@ use Raven\Core\Repository\TagRead;
 use Raven\Core\Repository\TagWrite;
 use Raven\Core\Repository\UserRead;
 use Raven\Core\Repository\UserWrite;
-use Raven\Lib\Parser\TaxonomyParser;
+use Raven\Lib\View\Taxonomy;
 
 /**
  * Builds request-scoped memoized panel repository and parser factory closures.
@@ -340,8 +340,8 @@ final class RepoFactory
          * Builds taxonomy lookup parsing only for routing and page-editor flows
          * that need category/tag option lookups beyond channel routing.
          */
-        $taxonomyLookupFactory = $memoize(static function () use ($rvn, $channelReadFactory): TaxonomyParser {
-            return new TaxonomyParser(
+        $taxonomyLookupFactory = $memoize(static function () use ($rvn, $channelReadFactory): Taxonomy {
+            return new Taxonomy(
                 $rvn['db'],
                 (string) $rvn['driver'],
                 (string) $rvn['prefix'],

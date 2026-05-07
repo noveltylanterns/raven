@@ -26,7 +26,7 @@ use Raven\Core\Router\ChannelPolicy;
 use Raven\Core\Router\FeedPolicy;
 use Raven\Core\Router\GroupPolicy;
 use Raven\Core\Router\TagPolicy;
-use Raven\Lib\Parser\TaxonomyParser;
+use Raven\Lib\View\Taxonomy;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Core\Router\RoutePreview;
 use Raven\Lib\View\Public\ThemeCatalog;
@@ -48,9 +48,9 @@ final class RoutingController
     private PageRead $pageRepo;
     private RedirectRead $redirectRepo;
     private UserRead $userRepo;
-    /** @var Closure(): TaxonomyParser */
+    /** @var Closure(): Taxonomy */
     private Closure $taxonomyLookupRepoResolver;
-    private ?TaxonomyParser $taxonomyLookupRepo = null;
+    private ?Taxonomy $taxonomyLookupRepo = null;
     private LoginIdentifier $loginIdentifier;
     private ?RouteProfiler $routeProfiler = null;
     private ?Csv $csvHandler = null;
@@ -68,7 +68,7 @@ final class RoutingController
      * @param PageRead $pageRepo Page repository read side for routing inventory rows.
      * @param RedirectRead $redirectRepo Redirect repository read side for routing inventory rows.
      * @param UserRead $userRepo User repository read side for routing inventory rows.
-     * @param callable(): TaxonomyParser $taxonomyLookupRepoResolver Lazy taxonomy lookup parser resolver.
+     * @param callable(): Taxonomy $taxonomyLookupRepoResolver Lazy taxonomy lookup parser resolver.
      * @param ThemeCatalog $themeCatalog Shared public-theme catalog for route preview rendering.
      * @return void
      */
@@ -167,16 +167,16 @@ final class RoutingController
     /**
      * Returns the taxonomy lookup parser on first use.
      *
-     * @return TaxonomyParser Taxonomy lookup parser.
+     * @return Taxonomy Taxonomy lookup parser.
      */
-    private function taxonomyLookupRepo(): TaxonomyParser
+    private function taxonomyLookupRepo(): Taxonomy
     {
-        if ($this->taxonomyLookupRepo instanceof TaxonomyParser) {
+        if ($this->taxonomyLookupRepo instanceof Taxonomy) {
             return $this->taxonomyLookupRepo;
         }
 
         $taxonomyLookupRepo = ($this->taxonomyLookupRepoResolver)();
-        if (!$taxonomyLookupRepo instanceof TaxonomyParser) {
+        if (!$taxonomyLookupRepo instanceof Taxonomy) {
             throw new \RuntimeException('Panel taxonomy lookup parser resolver returned an invalid value.');
         }
 

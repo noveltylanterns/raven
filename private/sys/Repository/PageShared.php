@@ -1,21 +1,22 @@
 <?php
+
 /**
  * RAVEN CMS
- * ~/private/lib/Parser/PageRepoParser.php
+ * ~/private/sys/Repository/PageShared.php
  * Stateless page-repository utility statics shared across read and write sides.
  * Docs: https://raven.lanterns.io
  */
 
 declare(strict_types=1);
 
-namespace Raven\Lib\Parser;
+namespace Raven\Core\Repository;
 
 /**
  * Shared page-repository primitives used by both PageRead and PageWrite.
  *
  * Do not add instance methods or request-context logic here.
  */
-final class PageRepoParser
+final class PageShared
 {
     /**
      * Normalizes an id list into unique positive integers.

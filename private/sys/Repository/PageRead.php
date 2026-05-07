@@ -11,9 +11,9 @@ declare(strict_types=1);
 namespace Raven\Core\Repository;
 
 use PDO;
-use Raven\Lib\Parser\ChannelRepoParser;
+use Raven\Core\Repository\ChannelShared;
 use Raven\Lib\Parser\PageBlockParser;
-use Raven\Lib\Parser\PageRepoParser;
+use Raven\Core\Repository\PageShared;
 use Raven\Lib\Database\SqlTable;
 
 /**
@@ -339,7 +339,7 @@ class PageRead
         $params = [':status' => 'published'];
 
         $channel = null;
-        if ($normalizedChannelSlug === ChannelRepoParser::ROOT_CHANNEL_SLUG) {
+        if ($normalizedChannelSlug === ChannelShared::ROOT_CHANNEL_SLUG) {
             $sql .= ' AND p.channel = 0';
         } elseif ($normalizedChannelSlug !== '') {
             $channel = $this->channelRepo->findBySlug($normalizedChannelSlug);
@@ -415,8 +415,8 @@ class PageRead
         $params = [':status' => 'published'];
 
         $clauses = [];
-        $includeRoot = isset($normalizedSlugs[ChannelRepoParser::ROOT_CHANNEL_SLUG]);
-        unset($normalizedSlugs[ChannelRepoParser::ROOT_CHANNEL_SLUG]);
+        $includeRoot = isset($normalizedSlugs[ChannelShared::ROOT_CHANNEL_SLUG]);
+        unset($normalizedSlugs[ChannelShared::ROOT_CHANNEL_SLUG]);
 
         if ($includeRoot) {
             $clauses[] = 'p.channel = 0';
@@ -956,7 +956,7 @@ class PageRead
      */
     public function taxonomyAssignmentIdsByPage(array $pageIds): array
     {
-        $normalizedPageIds = PageRepoParser::normalizeIds($pageIds);
+        $normalizedPageIds = PageShared::normalizeIds($pageIds);
         if ($normalizedPageIds === []) {
             return [];
         }

@@ -24,7 +24,7 @@ use Raven\Core\Repository\PageRead;
 use Raven\Core\Repository\UserRead;
 use Raven\Core\Runtime\Public\RuntimeBuilder;
 use Raven\Lib\Parser\ChannelDataParser;
-use Raven\Lib\Parser\TaxonomyRepoParser;
+use Raven\Lib\View\Taxonomy;
 
 error_reporting(E_ALL & ~E_WARNING & ~E_NOTICE & ~E_DEPRECATED);
 ini_set('display_errors', '0');
@@ -218,7 +218,7 @@ final class PublicRouteProfilerRunner
         $categories = [];
         $tags = [];
         if ($categoryPrefix !== '' || $tagPrefix !== '') {
-            $taxonomyLookup = new TaxonomyRepoParser(
+            $taxonomyLookup = new Taxonomy(
                 $rvn['db'],
                 (string) $rvn['driver'],
                 (string) $rvn['prefix'],

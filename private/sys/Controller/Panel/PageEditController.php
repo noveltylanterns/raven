@@ -30,7 +30,7 @@ use Raven\Lib\Media\MediaUpload;
 use Raven\Core\Router\ChannelPolicy;
 use Raven\Lib\Parser\PageBlockParser;
 use Raven\Lib\Parser\SetParser;
-use Raven\Lib\Parser\TaxonomyParser;
+use Raven\Lib\View\Taxonomy;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\Transport\Redirect;
 use Raven\Lib\Transport\Upload;
@@ -75,9 +75,9 @@ final class PageEditController
     /** @var Closure(): SetRead */
     private Closure $tagSetRepoResolver;
     private ?SetRead $tagSetRepo = null;
-    /** @var Closure(): TaxonomyParser */
+    /** @var Closure(): Taxonomy */
     private Closure $taxonomyLookupRepoResolver;
-    private ?TaxonomyParser $taxonomyLookupRepo = null;
+    private ?Taxonomy $taxonomyLookupRepo = null;
     /** @var Closure(string): array<string, mixed> */
     private Closure $extensionServices;
     private ?PageBlockParser $pageBlockParser = null;
@@ -812,16 +812,16 @@ final class PageEditController
      * Returns the taxonomy lookup parser on first use so category/tag
      * option lookups stay off requests that do not touch taxonomy-aware UI.
      *
-     * @return TaxonomyParser Taxonomy lookup parser.
+     * @return Taxonomy Taxonomy lookup parser.
      */
-    private function taxonomyLookupRepo(): TaxonomyParser
+    private function taxonomyLookupRepo(): Taxonomy
     {
-        if ($this->taxonomyLookupRepo instanceof TaxonomyParser) {
+        if ($this->taxonomyLookupRepo instanceof Taxonomy) {
             return $this->taxonomyLookupRepo;
         }
 
         $taxonomyLookupRepo = ($this->taxonomyLookupRepoResolver)();
-        if (!$taxonomyLookupRepo instanceof TaxonomyParser) {
+        if (!$taxonomyLookupRepo instanceof Taxonomy) {
             throw new \RuntimeException('Content controller taxonomy lookup parser resolver returned an invalid value.');
         }
 

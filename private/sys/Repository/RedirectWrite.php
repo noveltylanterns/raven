@@ -13,7 +13,7 @@ namespace Raven\Core\Repository;
 use PDO;
 use Raven\Lib\Database\SqlTable;
 use Raven\Lib\Parser\ChannelDataParser;
-use Raven\Lib\Parser\ChannelRepoParser;
+use Raven\Core\Repository\ChannelShared;
 use Raven\Core\Debug\UniquenessProfiler;
 use RuntimeException;
 
@@ -174,7 +174,7 @@ final class RedirectWrite
      */
     private function channelIdBySlug(?string $slug): ?int
     {
-        if (ChannelRepoParser::isRootChannelSlug((string) ($slug ?? ''))) {
+        if (ChannelShared::isRootChannelSlug((string) ($slug ?? ''))) {
             return 0;
         }
 

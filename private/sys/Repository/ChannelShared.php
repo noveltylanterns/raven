@@ -2,26 +2,25 @@
 
 /**
  * RAVEN CMS
- * ~/private/lib/Parser/ChannelRepoParser.php
- * Low-level channel constants and static normalization primitives shared by repositories and parsers.
+ * ~/private/sys/Repository/ChannelShared.php
+ * Low-level channel constants and static normalization primitives shared by channel repositories.
  * Docs: https://raven.lanterns.io
  */
 
 declare(strict_types=1);
 
-namespace Raven\Lib\Parser;
-
+namespace Raven\Core\Repository;
 
 /**
- * Stateless channel normalization primitives and context-hydration helpers.
+ * Stateless channel normalization primitives shared across ChannelRead, ChannelWrite, and their callers.
  *
  * This class exists as a shared constant and static-method primitive layer so that
- * `sys/Repository/` classes can import channel normalization logic without mixing in
- * the filesystem-backed channel-store reads that live on `Repository\ChannelRead`.
+ * repository classes can import channel normalization logic without mixing in the
+ * filesystem-backed channel-store reads that live on ChannelRead.
  *
  * Do not add instance methods or filesystem I/O here; those belong on the repository seam.
  */
-final class ChannelRepoParser
+final class ChannelShared
 {
     /** Id assigned to the implicit root (all-pages) channel. */
     public const ROOT_CHANNEL_ID = 0;
@@ -126,5 +125,4 @@ final class ChannelRepoParser
         $normalized = strtolower(trim((string) ($value ?? '')));
         return in_array($normalized, ['1', 'true', 'yes', 'on'], true);
     }
-
 }

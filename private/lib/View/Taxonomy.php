@@ -2,30 +2,27 @@
 
 /**
  * RAVEN CMS
- * ~/private/lib/Parser/TaxonomyParser.php
- * Mixed taxonomy lookup parser for category/tag routing inventory and page-editor payloads.
+ * ~/private/lib/View/Taxonomy.php
+ * Mixed taxonomy lookup service for category/tag routing inventory and page-editor payloads.
  * Docs: https://raven.lanterns.io
  */
 
-// Inline note: This parser keeps the category+tag aggregate queries that still
-// intentionally assemble both taxonomies into one controller-facing payload.
-
 declare(strict_types=1);
 
-namespace Raven\Lib\Parser;
+namespace Raven\Lib\View;
 
 use PDO;
 use Raven\Core\Repository\ChannelRead;
 use Raven\Lib\Database\SqlTable;
 
 /**
- * Repository-backed parser for mixed channel/category/tag option sets.
+ * Repository-backed service for mixed channel/category/tag option sets.
  *
  * This class is the aggregate seam for controller flows that intentionally
  * assemble both taxonomies into one payload, such as routing inventory and the
  * page editor taxonomy pickers.
  */
-final class TaxonomyParser
+final class Taxonomy
 {
     private PDO $db;
     private string $driver;
@@ -33,7 +30,7 @@ final class TaxonomyParser
     private ChannelRead $channelRepo;
 
     /**
-     * Initializes the mixed taxonomy lookup parser.
+     * Initializes the mixed taxonomy lookup service.
      *
      * @param PDO         $db          App database connection used for mixed option-set reads.
      * @param string      $driver      Active PDO driver name used for table-name resolution.
@@ -239,9 +236,6 @@ final class TaxonomyParser
     /**
      * Returns lightweight category routing options for mixed routing inventories.
      *
-     * Formerly delegated to CategoryRepoParser; inlined here since this class
-     * already holds the DB connection and TaxonomyParser is the only caller.
-     *
      * @return array<int, array{id: int, name: string, slug: string}> Category routing option rows.
      */
     private function listCategoryRoutingOptions(): array
@@ -269,9 +263,6 @@ final class TaxonomyParser
 
     /**
      * Returns lightweight tag routing options for mixed routing inventories.
-     *
-     * Formerly delegated to TagRepoParser; inlined here since this class
-     * already holds the DB connection and TaxonomyParser is the only caller.
      *
      * @return array<int, array{id: int, name: string, slug: string}> Tag routing option rows.
      */

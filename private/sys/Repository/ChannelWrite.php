@@ -12,7 +12,7 @@ namespace Raven\Core\Repository;
 
 use PDO;
 use Raven\Lib\Database\SqlTable;
-use Raven\Lib\Parser\ChannelRepoParser;
+use Raven\Core\Repository\ChannelShared;
 use Raven\Core\Router\ChannelPolicy;
 use Raven\Lib\Parser\SetParser;
 use RuntimeException;
@@ -73,15 +73,15 @@ final class ChannelWrite
         $name = trim((string) ($data['name'] ?? ''));
         $slug = strtolower(trim((string) ($data['slug'] ?? '')));
         $description = trim((string) ($data['description'] ?? ''));
-        $editorOverride = ChannelRepoParser::normalizeEditorOverride((string) ($data['editor_override'] ?? 'inherit'));
+        $editorOverride = ChannelShared::normalizeEditorOverride((string) ($data['editor_override'] ?? 'inherit'));
         $routeMode = ChannelPolicy::normalizeChannelRouteMode((string) ($data['route_mode'] ?? 'inherit'));
         $routeSeparator = ChannelPolicy::normalizeChannelSeparator((string) ($data['route_separator'] ?? 'inherit'));
 
-        if ($name === '' || !ChannelRepoParser::isValidSlug($slug)) {
+        if ($name === '' || !ChannelShared::isValidSlug($slug)) {
             throw new RuntimeException('Channel name and slug are required.');
         }
 
-        if (ChannelRepoParser::isRootChannelSlug($slug) || ($idProvided && ChannelRepoParser::isRootChannelId($id))) {
+        if (ChannelShared::isRootChannelSlug($slug) || ($idProvided && ChannelShared::isRootChannelId($id))) {
             throw new RuntimeException('The stock <root> channel is reserved and cannot be edited.');
         }
 
@@ -100,8 +100,8 @@ final class ChannelWrite
         $customFields = is_array($currentRaw['custom_fields'] ?? null) ? $currentRaw['custom_fields'] : [];
         $overrides = is_array($currentRaw['overrides'] ?? null) ? $currentRaw['overrides'] : [];
         $feedEnabled = array_key_exists('feed_enabled', $data)
-            ? ChannelRepoParser::normalizeFeedEnabled($data['feed_enabled'])
-            : ChannelRepoParser::normalizeFeedEnabled($currentRaw['feed_enabled'] ?? false);
+            ? ChannelShared::normalizeFeedEnabled($data['feed_enabled'])
+            : ChannelShared::normalizeFeedEnabled($currentRaw['feed_enabled'] ?? false);
         $categorySets = array_key_exists('category_sets', $data)
             ? SetParser::normalizeSelection($data['category_sets'], false)
             : SetParser::normalizeSelection($currentRaw['category_sets'] ?? [], false);
@@ -124,14 +124,14 @@ final class ChannelWrite
             'editor_override' => $editorOverride,
             'route_mode' => $routeMode,
             'route_separator' => $routeSeparator,
-            'cover_image_path' => ChannelRepoParser::normalizeNullablePath($currentRaw['cover_image_path'] ?? null),
-            'cover_image_sm_path' => ChannelRepoParser::normalizeNullablePath($currentRaw['cover_image_sm_path'] ?? null),
-            'cover_image_md_path' => ChannelRepoParser::normalizeNullablePath($currentRaw['cover_image_md_path'] ?? null),
-            'cover_image_lg_path' => ChannelRepoParser::normalizeNullablePath($currentRaw['cover_image_lg_path'] ?? null),
-            'preview_image_path' => ChannelRepoParser::normalizeNullablePath($currentRaw['preview_image_path'] ?? null),
-            'preview_image_sm_path' => ChannelRepoParser::normalizeNullablePath($currentRaw['preview_image_sm_path'] ?? null),
-            'preview_image_md_path' => ChannelRepoParser::normalizeNullablePath($currentRaw['preview_image_md_path'] ?? null),
-            'preview_image_lg_path' => ChannelRepoParser::normalizeNullablePath($currentRaw['preview_image_lg_path'] ?? null),
+            'cover_image_path' => ChannelShared::normalizeNullablePath($currentRaw['cover_image_path'] ?? null),
+            'cover_image_sm_path' => ChannelShared::normalizeNullablePath($currentRaw['cover_image_sm_path'] ?? null),
+            'cover_image_md_path' => ChannelShared::normalizeNullablePath($currentRaw['cover_image_md_path'] ?? null),
+            'cover_image_lg_path' => ChannelShared::normalizeNullablePath($currentRaw['cover_image_lg_path'] ?? null),
+            'preview_image_path' => ChannelShared::normalizeNullablePath($currentRaw['preview_image_path'] ?? null),
+            'preview_image_sm_path' => ChannelShared::normalizeNullablePath($currentRaw['preview_image_sm_path'] ?? null),
+            'preview_image_md_path' => ChannelShared::normalizeNullablePath($currentRaw['preview_image_md_path'] ?? null),
+            'preview_image_lg_path' => ChannelShared::normalizeNullablePath($currentRaw['preview_image_lg_path'] ?? null),
             'custom_fields' => $customFields,
             'overrides' => $overrides,
             'created_at' => $createdAt,
@@ -176,7 +176,7 @@ final class ChannelWrite
             'name' => (string) ($record['name'] ?? ''),
             'slug' => $slug,
             'description' => (string) ($record['description'] ?? ''),
-            'feed_enabled' => ChannelRepoParser::normalizeFeedEnabled(
+            'feed_enabled' => ChannelShared::normalizeFeedEnabled(
                 $currentRaw['feed_enabled'] ?? ($record['feed_enabled'] ?? false)
             ),
             'category_sets' => SetParser::normalizeSelection(
@@ -190,14 +190,14 @@ final class ChannelWrite
             'editor_override' => (string) ($record['editor_override'] ?? 'inherit'),
             'route_mode' => (string) ($record['route_mode'] ?? 'inherit'),
             'route_separator' => (string) ($record['route_separator'] ?? 'inherit'),
-            'cover_image_path' => ChannelRepoParser::normalizeNullablePath($paths['cover_image_path'] ?? null),
-            'cover_image_sm_path' => ChannelRepoParser::normalizeNullablePath($paths['cover_image_sm_path'] ?? null),
-            'cover_image_md_path' => ChannelRepoParser::normalizeNullablePath($paths['cover_image_md_path'] ?? null),
-            'cover_image_lg_path' => ChannelRepoParser::normalizeNullablePath($paths['cover_image_lg_path'] ?? null),
-            'preview_image_path' => ChannelRepoParser::normalizeNullablePath($paths['preview_image_path'] ?? null),
-            'preview_image_sm_path' => ChannelRepoParser::normalizeNullablePath($paths['preview_image_sm_path'] ?? null),
-            'preview_image_md_path' => ChannelRepoParser::normalizeNullablePath($paths['preview_image_md_path'] ?? null),
-            'preview_image_lg_path' => ChannelRepoParser::normalizeNullablePath($paths['preview_image_lg_path'] ?? null),
+            'cover_image_path' => ChannelShared::normalizeNullablePath($paths['cover_image_path'] ?? null),
+            'cover_image_sm_path' => ChannelShared::normalizeNullablePath($paths['cover_image_sm_path'] ?? null),
+            'cover_image_md_path' => ChannelShared::normalizeNullablePath($paths['cover_image_md_path'] ?? null),
+            'cover_image_lg_path' => ChannelShared::normalizeNullablePath($paths['cover_image_lg_path'] ?? null),
+            'preview_image_path' => ChannelShared::normalizeNullablePath($paths['preview_image_path'] ?? null),
+            'preview_image_sm_path' => ChannelShared::normalizeNullablePath($paths['preview_image_sm_path'] ?? null),
+            'preview_image_md_path' => ChannelShared::normalizeNullablePath($paths['preview_image_md_path'] ?? null),
+            'preview_image_lg_path' => ChannelShared::normalizeNullablePath($paths['preview_image_lg_path'] ?? null),
             'custom_fields' => is_array($currentRaw['custom_fields'] ?? null) ? $currentRaw['custom_fields'] : [],
             'overrides' => is_array($currentRaw['overrides'] ?? null) ? $currentRaw['overrides'] : [],
             'created_at' => trim((string) ($currentRaw['created_at'] ?? '')) !== ''
@@ -218,7 +218,7 @@ final class ChannelWrite
      */
     public function deleteById(int $id): void
     {
-        if (ChannelRepoParser::isRootChannelId($id)) {
+        if (ChannelShared::isRootChannelId($id)) {
             throw new RuntimeException('The stock <root> channel cannot be deleted.');
         }
 
@@ -242,7 +242,7 @@ final class ChannelWrite
                 'UPDATE ' . $pages . ' SET channel = :root_channel WHERE channel = :channel_id'
             );
             $detachPages->execute([
-                ':root_channel' => ChannelRepoParser::ROOT_CHANNEL_ID,
+                ':root_channel' => ChannelShared::ROOT_CHANNEL_ID,
                 ':channel_id' => $id,
             ]);
 
@@ -250,7 +250,7 @@ final class ChannelWrite
                 'UPDATE ' . $redirects . ' SET channel = :root_channel WHERE channel = :channel_id'
             );
             $detachRedirects->execute([
-                ':root_channel' => ChannelRepoParser::ROOT_CHANNEL_ID,
+                ':root_channel' => ChannelShared::ROOT_CHANNEL_ID,
                 ':channel_id' => $id,
             ]);
 
@@ -382,7 +382,7 @@ final class ChannelWrite
     public static function persistChannelId(string $channelDirectory, string $slug, int $id): void
     {
         $normalizedDirectory = rtrim($channelDirectory, '/');
-        if ($id < ChannelRepoParser::ROOT_CHANNEL_ID || trim($slug) === '') {
+        if ($id < ChannelShared::ROOT_CHANNEL_ID || trim($slug) === '') {
             return;
         }
 
@@ -456,11 +456,11 @@ final class ChannelWrite
      */
     private static function pathForRecord(string $channelDirectory, int $id, string $slug): string
     {
-        $safeId = max(ChannelRepoParser::ROOT_CHANNEL_ID, $id);
+        $safeId = max(ChannelShared::ROOT_CHANNEL_ID, $id);
         $safeSlug = strtolower(trim($slug));
-        if (!ChannelRepoParser::isValidSlug($safeSlug)) {
-            $safeSlug = $safeId === ChannelRepoParser::ROOT_CHANNEL_ID
-                ? ChannelRepoParser::ROOT_CHANNEL_SLUG
+        if (!ChannelShared::isValidSlug($safeSlug)) {
+            $safeSlug = $safeId === ChannelShared::ROOT_CHANNEL_ID
+                ? ChannelShared::ROOT_CHANNEL_SLUG
                 : ('channel-' . $safeId);
         }
 

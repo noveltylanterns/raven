@@ -11,7 +11,7 @@ declare(strict_types=1);
 
 namespace Raven\Core\Debug;
 
-use Raven\Lib\Parser\ChannelRepoParser;
+use Raven\Core\Repository\ChannelShared;
 use Raven\Lib\Security\InputSanitizer;
 
 /**
@@ -200,8 +200,8 @@ final class RouteProfiler
                 continue;
             }
 
-            $isRootChannel = ChannelRepoParser::isRootChannelId($channelId)
-                || ChannelRepoParser::isRootChannelSlug($channelSlug);
+            $isRootChannel = ChannelShared::isRootChannelId($channelId)
+                || ChannelShared::isRootChannelSlug($channelSlug);
             $landingSlug = $isRootChannel
                 ? $this->rootLandingSlug($pagesForRouting)
                 : trim((string) ($channelLandingMap[$channelSlug] ?? ''));
@@ -573,7 +573,7 @@ final class RouteProfiler
         foreach ($pagesForRouting as $page) {
             $channelId = (int) ($page['channel'] ?? 0);
             $channelSlug = trim((string) ($page['channel_slug'] ?? ''));
-            if ($channelId !== ChannelRepoParser::ROOT_CHANNEL_ID && $channelSlug !== '') {
+            if ($channelId !== ChannelShared::ROOT_CHANNEL_ID && $channelSlug !== '') {
                 continue;
             }
 

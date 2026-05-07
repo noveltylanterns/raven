@@ -12,7 +12,7 @@ namespace Raven\Core\Repository;
 
 use PDO;
 use Raven\Lib\Database\SqlTable;
-use Raven\Lib\Parser\ChannelRepoParser;
+use Raven\Core\Repository\ChannelShared;
 use Raven\Core\Router\ChannelPolicy;
 use Raven\Lib\Parser\SetParser;
 
@@ -64,8 +64,8 @@ class ChannelRead
         }
 
         usort($channels, static function (array $a, array $b): int {
-            $aIsRoot = ChannelRepoParser::isRootChannelId((int) ($a['id'] ?? -1));
-            $bIsRoot = ChannelRepoParser::isRootChannelId((int) ($b['id'] ?? -1));
+            $aIsRoot = ChannelShared::isRootChannelId((int) ($a['id'] ?? -1));
+            $bIsRoot = ChannelShared::isRootChannelId((int) ($b['id'] ?? -1));
             if ($aIsRoot !== $bIsRoot) {
                 // Root channel sorts last in listings.
                 return $aIsRoot ? 1 : -1;
@@ -244,7 +244,7 @@ class ChannelRead
     {
         $rows = [];
         foreach ($this->listRecords() as $channel) {
-            if (ChannelRepoParser::isRootChannelId((int) ($channel['id'] ?? -1))) {
+            if (ChannelShared::isRootChannelId((int) ($channel['id'] ?? -1))) {
                 continue;
             }
 
@@ -295,8 +295,8 @@ class ChannelRead
         }
 
         usort($rows, static function (array $a, array $b): int {
-            $aIsRoot = ChannelRepoParser::isRootChannelId((int) ($a['id'] ?? -1));
-            $bIsRoot = ChannelRepoParser::isRootChannelId((int) ($b['id'] ?? -1));
+            $aIsRoot = ChannelShared::isRootChannelId((int) ($a['id'] ?? -1));
+            $bIsRoot = ChannelShared::isRootChannelId((int) ($b['id'] ?? -1));
             if ($aIsRoot !== $bIsRoot) {
                 return $aIsRoot ? -1 : 1;
             }
@@ -331,7 +331,7 @@ class ChannelRead
      */
     public function findById(int $id): ?array
     {
-        if ($id < ChannelRepoParser::ROOT_CHANNEL_ID) {
+        if ($id < ChannelShared::ROOT_CHANNEL_ID) {
             return null;
         }
 
@@ -518,7 +518,7 @@ class ChannelRead
         }
 
         $id = (int) $normalized;
-        return $id >= ChannelRepoParser::ROOT_CHANNEL_ID ? $id : null;
+        return $id >= ChannelShared::ROOT_CHANNEL_ID ? $id : null;
     }
 
     /**
@@ -530,33 +530,33 @@ class ChannelRead
      */
     private function ensureRootChannelRecord(): void
     {
-        $raw = $this->loadRawBySlug(ChannelRepoParser::ROOT_CHANNEL_SLUG);
+        $raw = $this->loadRawBySlug(ChannelShared::ROOT_CHANNEL_SLUG);
         $createdAt = trim((string) ($raw['created_at'] ?? ''));
         if ($createdAt === '') {
             $createdAt = gmdate('Y-m-d H:i:s');
         }
 
         $record = [
-            'id' => ChannelRepoParser::ROOT_CHANNEL_ID,
-            'name' => ChannelRepoParser::ROOT_CHANNEL_NAME,
-            'slug' => ChannelRepoParser::ROOT_CHANNEL_SLUG,
+            'id' => ChannelShared::ROOT_CHANNEL_ID,
+            'name' => ChannelShared::ROOT_CHANNEL_NAME,
+            'slug' => ChannelShared::ROOT_CHANNEL_SLUG,
             'description' => trim((string) ($raw['description'] ?? '')),
             'feed_enabled' => false,
-            'editor_override' => ChannelRepoParser::normalizeEditorOverride(
+            'editor_override' => ChannelShared::normalizeEditorOverride(
                 (string) ($raw['editor_override'] ?? 'inherit')
             ),
             'route_mode' => ChannelPolicy::normalizeChannelRouteMode((string) ($raw['route_mode'] ?? 'inherit')),
             'route_separator' => ChannelPolicy::normalizeChannelSeparator(
                 (string) ($raw['route_separator'] ?? 'inherit')
             ),
-            'cover_image_path' => ChannelRepoParser::normalizeNullablePath($raw['cover_image_path'] ?? null),
-            'cover_image_sm_path' => ChannelRepoParser::normalizeNullablePath($raw['cover_image_sm_path'] ?? null),
-            'cover_image_md_path' => ChannelRepoParser::normalizeNullablePath($raw['cover_image_md_path'] ?? null),
-            'cover_image_lg_path' => ChannelRepoParser::normalizeNullablePath($raw['cover_image_lg_path'] ?? null),
-            'preview_image_path' => ChannelRepoParser::normalizeNullablePath($raw['preview_image_path'] ?? null),
-            'preview_image_sm_path' => ChannelRepoParser::normalizeNullablePath($raw['preview_image_sm_path'] ?? null),
-            'preview_image_md_path' => ChannelRepoParser::normalizeNullablePath($raw['preview_image_md_path'] ?? null),
-            'preview_image_lg_path' => ChannelRepoParser::normalizeNullablePath($raw['preview_image_lg_path'] ?? null),
+            'cover_image_path' => ChannelShared::normalizeNullablePath($raw['cover_image_path'] ?? null),
+            'cover_image_sm_path' => ChannelShared::normalizeNullablePath($raw['cover_image_sm_path'] ?? null),
+            'cover_image_md_path' => ChannelShared::normalizeNullablePath($raw['cover_image_md_path'] ?? null),
+            'cover_image_lg_path' => ChannelShared::normalizeNullablePath($raw['cover_image_lg_path'] ?? null),
+            'preview_image_path' => ChannelShared::normalizeNullablePath($raw['preview_image_path'] ?? null),
+            'preview_image_sm_path' => ChannelShared::normalizeNullablePath($raw['preview_image_sm_path'] ?? null),
+            'preview_image_md_path' => ChannelShared::normalizeNullablePath($raw['preview_image_md_path'] ?? null),
+            'preview_image_lg_path' => ChannelShared::normalizeNullablePath($raw['preview_image_lg_path'] ?? null),
             'category_sets' => SetParser::normalizeSelection($raw['category_sets'] ?? [], false),
             'tag_sets' => SetParser::normalizeSelection($raw['tag_sets'] ?? [], false),
             'custom_fields' => is_array($raw['custom_fields'] ?? null) ? $raw['custom_fields'] : [],
@@ -567,8 +567,8 @@ class ChannelRead
         if ($raw === [] || $this->rootRecordNeedsRewrite($raw)) {
             ChannelWrite::writeRecordById(
                 $this->channelDirectory,
-                ChannelRepoParser::ROOT_CHANNEL_ID,
-                ChannelRepoParser::ROOT_CHANNEL_SLUG,
+                ChannelShared::ROOT_CHANNEL_ID,
+                ChannelShared::ROOT_CHANNEL_SLUG,
                 $record
             );
         }
@@ -582,15 +582,15 @@ class ChannelRead
      */
     private function rootRecordNeedsRewrite(array $raw): bool
     {
-        if (self::normalizeChannelId($raw['id'] ?? null) !== ChannelRepoParser::ROOT_CHANNEL_ID) {
+        if (self::normalizeChannelId($raw['id'] ?? null) !== ChannelShared::ROOT_CHANNEL_ID) {
             return true;
         }
 
-        if (!ChannelRepoParser::isRootChannelSlug((string) ($raw['slug'] ?? ''))) {
+        if (!ChannelShared::isRootChannelSlug((string) ($raw['slug'] ?? ''))) {
             return true;
         }
 
-        return trim((string) ($raw['name'] ?? '')) !== ChannelRepoParser::ROOT_CHANNEL_NAME;
+        return trim((string) ($raw['name'] ?? '')) !== ChannelShared::ROOT_CHANNEL_NAME;
     }
 
     /**
@@ -682,7 +682,7 @@ class ChannelRead
      */
     private function candidatePathsForId(int $id): array
     {
-        $normalizedId = max(ChannelRepoParser::ROOT_CHANNEL_ID, $id);
+        $normalizedId = max(ChannelShared::ROOT_CHANNEL_ID, $id);
         $paths = [];
 
         foreach (glob($this->channelDirectory . '/' . $normalizedId . '_*.php') ?: [] as $path) {
@@ -712,7 +712,7 @@ class ChannelRead
     private function findPathBySlug(string $slug): ?string
     {
         $normalizedSlug = strtolower(trim($slug));
-        if (!ChannelRepoParser::isValidSlug($normalizedSlug)) {
+        if (!ChannelShared::isValidSlug($normalizedSlug)) {
             return null;
         }
 
@@ -750,13 +750,13 @@ class ChannelRead
         }
 
         $filenameId = self::filenameId($path);
-        if ($filenameId >= ChannelRepoParser::ROOT_CHANNEL_ID) {
+        if ($filenameId >= ChannelShared::ROOT_CHANNEL_ID) {
             return $filenameId;
         }
 
         $fallbackSlug = $this->slugFromFilename($path);
-        if ($fallbackSlug !== '' && ChannelRepoParser::isRootChannelSlug($fallbackSlug)) {
-            return ChannelRepoParser::ROOT_CHANNEL_ID;
+        if ($fallbackSlug !== '' && ChannelShared::isRootChannelSlug($fallbackSlug)) {
+            return ChannelShared::ROOT_CHANNEL_ID;
         }
 
         return null;
@@ -772,24 +772,24 @@ class ChannelRead
      */
     private function recordSlugFromRaw(array $raw, int $id, string $fallback): string
     {
-        if ($id === ChannelRepoParser::ROOT_CHANNEL_ID) {
-            return ChannelRepoParser::ROOT_CHANNEL_SLUG;
+        if ($id === ChannelShared::ROOT_CHANNEL_ID) {
+            return ChannelShared::ROOT_CHANNEL_SLUG;
         }
 
         $slug = strtolower(trim((string) ($raw['slug'] ?? '')));
-        if (ChannelRepoParser::isValidSlug($slug)) {
+        if (ChannelShared::isValidSlug($slug)) {
             return $slug;
         }
 
         if (preg_match('/^\d+_([a-z0-9-]+)$/', $fallback, $matches) === 1) {
             $slug = strtolower(trim((string) ($matches[1] ?? '')));
-            if (ChannelRepoParser::isValidSlug($slug)) {
+            if (ChannelShared::isValidSlug($slug)) {
                 return $slug;
             }
         }
 
         $slug = $this->slugFromFilename($fallback);
-        if ($slug !== '' && ChannelRepoParser::isValidSlug($slug) && !preg_match('/^\d+$/', $slug)) {
+        if ($slug !== '' && ChannelShared::isValidSlug($slug) && !preg_match('/^\d+$/', $slug)) {
             return $slug;
         }
 
@@ -797,7 +797,7 @@ class ChannelRead
         $nameSlug = preg_replace('/[^a-z0-9]+/', '-', $nameSlug) ?? '';
         $nameSlug = trim($nameSlug, '-');
         $nameSlug = preg_replace('/-+/', '-', $nameSlug) ?? '';
-        if ($nameSlug !== '' && ChannelRepoParser::isValidSlug($nameSlug)) {
+        if ($nameSlug !== '' && ChannelShared::isValidSlug($nameSlug)) {
             return $nameSlug;
         }
 
@@ -814,12 +814,12 @@ class ChannelRead
      */
     private function canonicalizeRecord(int $id, string $slug, array $raw): array
     {
-        $normalizedId = max(ChannelRepoParser::ROOT_CHANNEL_ID, $id);
+        $normalizedId = max(ChannelShared::ROOT_CHANNEL_ID, $id);
         $normalizedSlug = $this->recordSlugFromRaw($raw, $normalizedId, $slug);
         $name = trim((string) ($raw['name'] ?? ''));
-        if ($normalizedId === ChannelRepoParser::ROOT_CHANNEL_ID) {
-            $name = ChannelRepoParser::ROOT_CHANNEL_NAME;
-            $normalizedSlug = ChannelRepoParser::ROOT_CHANNEL_SLUG;
+        if ($normalizedId === ChannelShared::ROOT_CHANNEL_ID) {
+            $name = ChannelShared::ROOT_CHANNEL_NAME;
+            $normalizedSlug = ChannelShared::ROOT_CHANNEL_SLUG;
         } elseif ($name === '') {
             $name = ucwords(str_replace('-', ' ', $normalizedSlug));
         }
@@ -834,24 +834,24 @@ class ChannelRead
             'name' => $name,
             'slug' => $normalizedSlug,
             'description' => trim((string) ($raw['description'] ?? '')),
-            'feed_enabled' => ChannelRepoParser::normalizeFeedEnabled($raw['feed_enabled'] ?? false),
+            'feed_enabled' => ChannelShared::normalizeFeedEnabled($raw['feed_enabled'] ?? false),
             'category_sets' => SetParser::normalizeSelection($raw['category_sets'] ?? [], false),
             'tag_sets' => SetParser::normalizeSelection($raw['tag_sets'] ?? [], false),
-            'editor_override' => ChannelRepoParser::normalizeEditorOverride(
+            'editor_override' => ChannelShared::normalizeEditorOverride(
                 (string) ($raw['editor_override'] ?? 'inherit')
             ),
             'route_mode' => ChannelPolicy::normalizeChannelRouteMode((string) ($raw['route_mode'] ?? 'inherit')),
             'route_separator' => ChannelPolicy::normalizeChannelSeparator(
                 (string) ($raw['route_separator'] ?? 'inherit')
             ),
-            'cover_image_path' => ChannelRepoParser::normalizeNullablePath($raw['cover_image_path'] ?? null),
-            'cover_image_sm_path' => ChannelRepoParser::normalizeNullablePath($raw['cover_image_sm_path'] ?? null),
-            'cover_image_md_path' => ChannelRepoParser::normalizeNullablePath($raw['cover_image_md_path'] ?? null),
-            'cover_image_lg_path' => ChannelRepoParser::normalizeNullablePath($raw['cover_image_lg_path'] ?? null),
-            'preview_image_path' => ChannelRepoParser::normalizeNullablePath($raw['preview_image_path'] ?? null),
-            'preview_image_sm_path' => ChannelRepoParser::normalizeNullablePath($raw['preview_image_sm_path'] ?? null),
-            'preview_image_md_path' => ChannelRepoParser::normalizeNullablePath($raw['preview_image_md_path'] ?? null),
-            'preview_image_lg_path' => ChannelRepoParser::normalizeNullablePath($raw['preview_image_lg_path'] ?? null),
+            'cover_image_path' => ChannelShared::normalizeNullablePath($raw['cover_image_path'] ?? null),
+            'cover_image_sm_path' => ChannelShared::normalizeNullablePath($raw['cover_image_sm_path'] ?? null),
+            'cover_image_md_path' => ChannelShared::normalizeNullablePath($raw['cover_image_md_path'] ?? null),
+            'cover_image_lg_path' => ChannelShared::normalizeNullablePath($raw['cover_image_lg_path'] ?? null),
+            'preview_image_path' => ChannelShared::normalizeNullablePath($raw['preview_image_path'] ?? null),
+            'preview_image_sm_path' => ChannelShared::normalizeNullablePath($raw['preview_image_sm_path'] ?? null),
+            'preview_image_md_path' => ChannelShared::normalizeNullablePath($raw['preview_image_md_path'] ?? null),
+            'preview_image_lg_path' => ChannelShared::normalizeNullablePath($raw['preview_image_lg_path'] ?? null),
             'custom_fields' => is_array($raw['custom_fields'] ?? null) ? $raw['custom_fields'] : [],
             'overrides' => is_array($raw['overrides'] ?? null) ? $raw['overrides'] : [],
             'created_at' => $createdAt,
@@ -957,7 +957,7 @@ class ChannelRead
     public static function findPathBySlugInDirectory(string $channelDirectory, string $slug): ?string
     {
         $normalizedSlug = strtolower(trim($slug));
-        if (!ChannelRepoParser::isValidSlug($normalizedSlug)) {
+        if (!ChannelShared::isValidSlug($normalizedSlug)) {
             return null;
         }
 
@@ -992,7 +992,7 @@ class ChannelRead
     public static function candidatePathsForIdInDirectory(string $channelDirectory, int $id): array
     {
         $normalizedDirectory = rtrim($channelDirectory, '/');
-        $normalizedId = max(ChannelRepoParser::ROOT_CHANNEL_ID, $id);
+        $normalizedId = max(ChannelShared::ROOT_CHANNEL_ID, $id);
         $paths = [];
 
         foreach (glob($normalizedDirectory . '/' . $normalizedId . '_*.php') ?: [] as $path) {
@@ -1028,13 +1028,13 @@ class ChannelRead
         }
 
         $filenameId = self::filenameIdStatic($path);
-        if ($filenameId >= ChannelRepoParser::ROOT_CHANNEL_ID) {
+        if ($filenameId >= ChannelShared::ROOT_CHANNEL_ID) {
             return $filenameId;
         }
 
         $fallbackSlug = self::slugFromFilenameStatic($path);
-        if ($fallbackSlug !== '' && ChannelRepoParser::isRootChannelSlug($fallbackSlug)) {
-            return ChannelRepoParser::ROOT_CHANNEL_ID;
+        if ($fallbackSlug !== '' && ChannelShared::isRootChannelSlug($fallbackSlug)) {
+            return ChannelShared::ROOT_CHANNEL_ID;
         }
 
         return null;
@@ -1050,24 +1050,24 @@ class ChannelRead
      */
     public static function recordSlugFromRawStatic(array $raw, int $id, string $fallback): string
     {
-        if ($id === ChannelRepoParser::ROOT_CHANNEL_ID) {
-            return ChannelRepoParser::ROOT_CHANNEL_SLUG;
+        if ($id === ChannelShared::ROOT_CHANNEL_ID) {
+            return ChannelShared::ROOT_CHANNEL_SLUG;
         }
 
         $slug = strtolower(trim((string) ($raw['slug'] ?? '')));
-        if (ChannelRepoParser::isValidSlug($slug)) {
+        if (ChannelShared::isValidSlug($slug)) {
             return $slug;
         }
 
         if (preg_match('/^\d+_([a-z0-9-]+)$/', $fallback, $matches) === 1) {
             $slug = strtolower(trim((string) ($matches[1] ?? '')));
-            if (ChannelRepoParser::isValidSlug($slug)) {
+            if (ChannelShared::isValidSlug($slug)) {
                 return $slug;
             }
         }
 
         $slug = self::slugFromFilenameStatic($fallback);
-        if ($slug !== '' && ChannelRepoParser::isValidSlug($slug) && !preg_match('/^\d+$/', $slug)) {
+        if ($slug !== '' && ChannelShared::isValidSlug($slug) && !preg_match('/^\d+$/', $slug)) {
             return $slug;
         }
 
@@ -1075,7 +1075,7 @@ class ChannelRead
         $nameSlug = preg_replace('/[^a-z0-9]+/', '-', $nameSlug) ?? '';
         $nameSlug = trim($nameSlug, '-');
         $nameSlug = preg_replace('/-+/', '-', $nameSlug) ?? '';
-        if ($nameSlug !== '' && ChannelRepoParser::isValidSlug($nameSlug)) {
+        if ($nameSlug !== '' && ChannelShared::isValidSlug($nameSlug)) {
             return $nameSlug;
         }
 
@@ -1092,12 +1092,12 @@ class ChannelRead
      */
     public static function canonicalizeRecordStatic(int $id, string $slug, array $raw): array
     {
-        $normalizedId = max(ChannelRepoParser::ROOT_CHANNEL_ID, $id);
+        $normalizedId = max(ChannelShared::ROOT_CHANNEL_ID, $id);
         $normalizedSlug = self::recordSlugFromRawStatic($raw, $normalizedId, $slug);
         $name = trim((string) ($raw['name'] ?? ''));
-        if ($normalizedId === ChannelRepoParser::ROOT_CHANNEL_ID) {
-            $name = ChannelRepoParser::ROOT_CHANNEL_NAME;
-            $normalizedSlug = ChannelRepoParser::ROOT_CHANNEL_SLUG;
+        if ($normalizedId === ChannelShared::ROOT_CHANNEL_ID) {
+            $name = ChannelShared::ROOT_CHANNEL_NAME;
+            $normalizedSlug = ChannelShared::ROOT_CHANNEL_SLUG;
         } elseif ($name === '') {
             $name = ucwords(str_replace('-', ' ', $normalizedSlug));
         }
@@ -1112,24 +1112,24 @@ class ChannelRead
             'name' => $name,
             'slug' => $normalizedSlug,
             'description' => trim((string) ($raw['description'] ?? '')),
-            'feed_enabled' => ChannelRepoParser::normalizeFeedEnabled($raw['feed_enabled'] ?? false),
+            'feed_enabled' => ChannelShared::normalizeFeedEnabled($raw['feed_enabled'] ?? false),
             'category_sets' => SetParser::normalizeSelection($raw['category_sets'] ?? [], false),
             'tag_sets' => SetParser::normalizeSelection($raw['tag_sets'] ?? [], false),
-            'editor_override' => ChannelRepoParser::normalizeEditorOverride(
+            'editor_override' => ChannelShared::normalizeEditorOverride(
                 (string) ($raw['editor_override'] ?? 'inherit')
             ),
             'route_mode' => ChannelPolicy::normalizeChannelRouteMode((string) ($raw['route_mode'] ?? 'inherit')),
             'route_separator' => ChannelPolicy::normalizeChannelSeparator(
                 (string) ($raw['route_separator'] ?? 'inherit')
             ),
-            'cover_image_path' => ChannelRepoParser::normalizeNullablePath($raw['cover_image_path'] ?? null),
-            'cover_image_sm_path' => ChannelRepoParser::normalizeNullablePath($raw['cover_image_sm_path'] ?? null),
-            'cover_image_md_path' => ChannelRepoParser::normalizeNullablePath($raw['cover_image_md_path'] ?? null),
-            'cover_image_lg_path' => ChannelRepoParser::normalizeNullablePath($raw['cover_image_lg_path'] ?? null),
-            'preview_image_path' => ChannelRepoParser::normalizeNullablePath($raw['preview_image_path'] ?? null),
-            'preview_image_sm_path' => ChannelRepoParser::normalizeNullablePath($raw['preview_image_sm_path'] ?? null),
-            'preview_image_md_path' => ChannelRepoParser::normalizeNullablePath($raw['preview_image_md_path'] ?? null),
-            'preview_image_lg_path' => ChannelRepoParser::normalizeNullablePath($raw['preview_image_lg_path'] ?? null),
+            'cover_image_path' => ChannelShared::normalizeNullablePath($raw['cover_image_path'] ?? null),
+            'cover_image_sm_path' => ChannelShared::normalizeNullablePath($raw['cover_image_sm_path'] ?? null),
+            'cover_image_md_path' => ChannelShared::normalizeNullablePath($raw['cover_image_md_path'] ?? null),
+            'cover_image_lg_path' => ChannelShared::normalizeNullablePath($raw['cover_image_lg_path'] ?? null),
+            'preview_image_path' => ChannelShared::normalizeNullablePath($raw['preview_image_path'] ?? null),
+            'preview_image_sm_path' => ChannelShared::normalizeNullablePath($raw['preview_image_sm_path'] ?? null),
+            'preview_image_md_path' => ChannelShared::normalizeNullablePath($raw['preview_image_md_path'] ?? null),
+            'preview_image_lg_path' => ChannelShared::normalizeNullablePath($raw['preview_image_lg_path'] ?? null),
             'custom_fields' => is_array($raw['custom_fields'] ?? null) ? $raw['custom_fields'] : [],
             'overrides' => is_array($raw['overrides'] ?? null) ? $raw['overrides'] : [],
             'created_at' => $createdAt,
@@ -1190,7 +1190,7 @@ class ChannelRead
     /**
      * Builds a map of channel id → channel record from a flat list of channel rows.
      *
-     * Shared static so PageRead, RedirectRead, and TaxonomyParser can build the same map
+     * Shared static so PageRead, RedirectRead, and Taxonomy can build the same map
      * without re-implementing the loop.
      *
      * @param array<int, array<string, mixed>> $channelRecords Flat list of channel record arrays.
