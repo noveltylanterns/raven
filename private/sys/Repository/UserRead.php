@@ -11,8 +11,8 @@ declare(strict_types=1);
 namespace Raven\Core\Repository;
 
 use PDO;
-use Raven\Lib\Auth\UserAuthCodec;
 use Raven\Lib\Database\SqlTable;
+use Raven\Lib\Parser\UserContactParser;
 
 /**
  * SELECT and lookup methods for users, group memberships, and public profiles.
@@ -26,7 +26,6 @@ class UserRead
     private PDO $rvnDb;
     private string $driver;
     private string $prefix;
-    private UserAuthCodec $authPayloadCodec;
 
     /**
      * @param PDO    $authDb Auth-database connection (users/passwords).
@@ -42,7 +41,6 @@ class UserRead
         $this->rvnDb = $rvnDb;
         $this->driver = $driver;
         $this->prefix = preg_replace('/[^a-zA-Z0-9_]/', '', $prefix) ?? '';
-        $this->authPayloadCodec = new UserAuthCodec();
     }
 
     /**
@@ -672,7 +670,7 @@ class UserRead
             'cover_image' => isset($row['cover_image']) && $row['cover_image'] !== ''
                 ? (string) $row['cover_image']
                 : null,
-            'contact' => $this->decodeContactProfiles($row['contact'] ?? null),
+            'contact' => UserContactParser::decodeContactProfiles($row['contact'] ?? null),
             'group_ids' => $groupIds,
             'primary_group_id' => $primaryGroupId,
             'secondary_group_ids' => $secondaryGroupIds,
@@ -710,7 +708,7 @@ class UserRead
             'avatar' => isset($row['avatar']) && $row['avatar'] !== ''
                 ? (string) $row['avatar']
                 : null,
-            'contact' => $this->decodeContactProfiles($row['contact'] ?? null),
+            'contact' => UserContactParser::decodeContactProfiles($row['contact'] ?? null),
         ];
     }
 
@@ -749,7 +747,7 @@ class UserRead
             'avatar' => isset($row['avatar']) && $row['avatar'] !== ''
                 ? (string) $row['avatar']
                 : null,
-            'contact' => $this->decodeContactProfiles($row['contact'] ?? null),
+            'contact' => UserContactParser::decodeContactProfiles($row['contact'] ?? null),
         ];
     }
 
@@ -789,7 +787,7 @@ class UserRead
             'avatar' => isset($row['avatar']) && $row['avatar'] !== ''
                 ? (string) $row['avatar']
                 : null,
-            'contact' => $this->decodeContactProfiles($row['contact'] ?? null),
+            'contact' => UserContactParser::decodeContactProfiles($row['contact'] ?? null),
         ];
     }
 
@@ -1038,17 +1036,6 @@ class UserRead
         }
 
         return $result;
-    }
-
-    /**
-     * Decodes stored contact-profile JSON into normalized rows.
-     *
-     * @param mixed $raw Raw contact JSON value from the database.
-     * @return array<int, array{type: string, value: string}> Decoded contact profile entries.
-     */
-    private function decodeContactProfiles(mixed $raw): array
-    {
-        return $this->authPayloadCodec->decodeContactProfiles($raw);
     }
 
     /**

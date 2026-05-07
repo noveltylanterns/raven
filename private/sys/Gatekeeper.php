@@ -21,8 +21,10 @@ use Raven\Lib\Auth\Public\PermissionMask as PublicPermissionMask;
 use Raven\Lib\Auth\Public\Service as PublicAuthService;
 use Raven\Lib\Auth\ThrottleReturn;
 use Raven\Lib\Auth\ThrottleUser;
-use Raven\Lib\Auth\UserAuthCodec;
 use Raven\Lib\Database\SqlTable;
+use Raven\Lib\Format\Json;
+use Raven\Lib\Parser\UserContactParser;
+use Raven\Lib\Security\TotpCipher;
 use Raven\Lib\Scribe\AuthProfileScribe;
 use Raven\Lib\Security\PhraseValidate;
 use Raven\Lib\Security\TotpVerify;
@@ -50,7 +52,7 @@ final class Gatekeeper
     /** Delight Auth instance. */
     private mixed $auth;
     private ThrottleReturn $throttleReturn;
-    private UserAuthCodec $authPayloadCodec;
+    private TotpCipher $totpCipher;
     private PanelAuthService $panelAuthService;
     private PublicAuthService $publicAuthService;
     private LoginEmail $loginEmail;
@@ -99,7 +101,7 @@ final class Gatekeeper
         $this->prefix = preg_replace('/[^a-zA-Z0-9_]/', '', $prefix) ?? '';
         $throttleUser = new ThrottleUser($rvnDb, $driver, $this->prefix);
         $this->throttleReturn = new ThrottleReturn($throttleUser);
-        $this->authPayloadCodec = new UserAuthCodec();
+        $this->totpCipher = new TotpCipher();
         $panelPermissionMaskService = new PanelPermissionMask();
         $publicPermissionMaskService = new PublicPermissionMask($rvnDb, $this->prefix);
         $groupMembership = new Membership($rvnDb, $driver, $prefix);
@@ -526,7 +528,7 @@ final class Gatekeeper
         }
 
         $normalized = Login2fa::normalizeStored($methods);
-        $encoded = $this->authPayloadCodec->encodeTwoFactorMethods($normalized);
+        $encoded = $this->encodeTwoFactorMethods($normalized);
         $this->authProfileScribe->updateTwoFactorMethods($userId, $encoded);
 
         unset($this->userPreferencesCache[$userId]);
@@ -856,8 +858,8 @@ final class Gatekeeper
             'cover_image' => isset($row['cover_image']) && $row['cover_image'] !== ''
                 ? (string) $row['cover_image']
                 : null,
-            'contact' => $this->authPayloadCodec->decodeContactProfiles($row['contact'] ?? null),
-            'two_factor' => $this->authPayloadCodec->decodeTwoFactorMethods($row['two_factor'] ?? null),
+            'contact' => UserContactParser::decodeContactProfiles($row['contact'] ?? null),
+            'two_factor' => $this->decodeTwoFactorMethods($row['two_factor'] ?? null),
         ];
     }
 
@@ -900,7 +902,7 @@ final class Gatekeeper
      */
     private function normalizePreferenceUpdatePayload(array $payload): array
     {
-        $contactProfiles = $this->authPayloadCodec->normalizeContactProfiles((array) ($payload['contact_profiles'] ?? []));
+        $contactProfiles = UserContactParser::normalizeContactProfiles((array) ($payload['contact_profiles'] ?? []));
         $twoFactorMethods = Login2fa::normalizeStored((array) ($payload['two_factor_methods'] ?? []));
 
         return [
@@ -913,15 +915,55 @@ final class Gatekeeper
             'timezone' => trim((string) ($payload['timezone'] ?? '')),
             'password' => $payload['password'] ?? null,
             'contact_profiles' => $contactProfiles,
-            'contact_profiles_encoded' => $this->authPayloadCodec->encodeContactProfiles($contactProfiles),
+            'contact_profiles_encoded' => UserContactParser::encodeContactProfiles($contactProfiles),
             'two_factor_methods' => $twoFactorMethods,
-            'two_factor_methods_encoded' => $this->authPayloadCodec->encodeTwoFactorMethods($twoFactorMethods),
+            'two_factor_methods_encoded' => $this->encodeTwoFactorMethods($twoFactorMethods),
             'set_avatar' => (bool) ($payload['set_avatar'] ?? false),
             'avatar_path' => $payload['avatar_path'] ?? null,
             'cover_image' => is_string($payload['cover_image'] ?? null)
                 ? trim((string) $payload['cover_image'])
                 : null,
         ];
+    }
+
+    /**
+     * Decodes a raw JSON two-factor-methods column value into normalized method rows.
+     *
+     * Decrypts TOTP secrets via the cipher before passing through Login2fa normalization.
+     * Returns an empty array on any decode or normalization error.
+     *
+     * @param mixed $raw Raw column value from the database.
+     * @return array<int, array<string, mixed>>
+     */
+    private function decodeTwoFactorMethods(mixed $raw): array
+    {
+        if (!is_string($raw) || trim($raw) === '') {
+            return [];
+        }
+
+        $decoded = Json::decode($raw, 64);
+        if (!is_array($decoded)) {
+            return [];
+        }
+
+        return Login2fa::normalizeStored($this->totpCipher->decryptMethodSecrets($decoded));
+    }
+
+    /**
+     * Encodes normalized two-factor method rows to a JSON string for persistence.
+     *
+     * Encrypts TOTP secrets via the cipher before encoding. Returns null when empty.
+     *
+     * @param array<int, array<string, mixed>> $methods Normalized 2FA method rows.
+     * @return string|null JSON string, or null when methods is empty.
+     */
+    private function encodeTwoFactorMethods(array $methods): ?string
+    {
+        if ($methods === []) {
+            return null;
+        }
+
+        return Json::encode($this->totpCipher->encryptMethodSecrets($methods), JSON_UNESCAPED_SLASHES);
     }
 
     /**

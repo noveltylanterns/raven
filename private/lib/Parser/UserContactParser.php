@@ -2,42 +2,27 @@
 
 /**
  * RAVEN CMS
- * ~/private/lib/Auth/UserAuthCodec.php
- * Encode/decode helpers for auth-adjacent JSON column payloads.
+ * ~/private/lib/Parser/UserContactParser.php
+ * Encode, decode, and normalize helpers for the user contact-profiles JSON column.
  * Docs: https://raven.lanterns.io
  */
 
 declare(strict_types=1);
 
-namespace Raven\Lib\Auth;
+namespace Raven\Lib\Parser;
 
-use Raven\Lib\Auth\Login2fa;
 use Raven\Lib\Format\Json;
-use Raven\Lib\Security\TotpCipher;
 
 /**
- * Shared codec for auth-adjacent JSON payload persistence.
+ * Static helpers for the user contact-profiles JSON column.
  *
- * Handles contact-profile and 2FA-method column serialization, including TOTP secret
- * encryption on writes and decryption on reads. Contact-profile normalization is
- * handled internally; callers no longer inject a separate normalizer.
+ * Handles round-trip JSON serialization and normalization of the contact_profiles
+ * column, which stores an ordered list of typed contact/social links (e.g. email,
+ * GitHub, Mastodon) as {type, value} pairs.
  */
-final class UserAuthCodec
+final class UserContactParser
 {
-    private const MAX_CONTACT_PROFILES = 20;
-
-    private TotpCipher $totpSecretCipher;
-
-    /**
-     * Prepares the codec with an optional TOTP cipher for secret encryption at rest.
-     *
-     * @param TotpCipher|null $totpSecretCipher Cipher for encrypting TOTP secrets; defaults to a new instance.
-     * @return void
-     */
-    public function __construct(?TotpCipher $totpSecretCipher = null)
-    {
-        $this->totpSecretCipher = $totpSecretCipher ?? new TotpCipher();
-    }
+    private const MAX_PROFILES = 20;
 
     /**
      * Decodes a raw JSON contact-profiles column value into a typed array.
@@ -47,7 +32,7 @@ final class UserAuthCodec
      * @param mixed $raw Raw column value from the database.
      * @return array<int, array{type: string, value: string}>
      */
-    public function decodeContactProfiles(mixed $raw): array
+    public static function decodeContactProfiles(mixed $raw): array
     {
         if (!is_string($raw) || trim($raw) === '') {
             return [];
@@ -58,7 +43,7 @@ final class UserAuthCodec
             return [];
         }
 
-        return $this->normalizeContactProfiles($decoded);
+        return self::normalizeContactProfiles($decoded);
     }
 
     /**
@@ -69,7 +54,7 @@ final class UserAuthCodec
      * @param array<int, array{type: string, value: string}> $profiles Normalized profiles array.
      * @return string|null JSON string, or null when profiles is empty.
      */
-    public function encodeContactProfiles(array $profiles): ?string
+    public static function encodeContactProfiles(array $profiles): ?string
     {
         if ($profiles === []) {
             return null;
@@ -87,7 +72,7 @@ final class UserAuthCodec
      * @param array<int, mixed> $profiles Raw profile entries from form input or DB decode.
      * @return array<int, array{type: string, value: string}>
      */
-    public function normalizeContactProfiles(array $profiles): array
+    public static function normalizeContactProfiles(array $profiles): array
     {
         $normalized = [];
 
@@ -127,7 +112,7 @@ final class UserAuthCodec
                 'value' => $value,
             ];
 
-            if (count($normalized) >= self::MAX_CONTACT_PROFILES) {
+            if (count($normalized) >= self::MAX_PROFILES) {
                 break;
             }
         }
@@ -150,45 +135,4 @@ final class UserAuthCodec
 
         return $result;
     }
-
-    /**
-     * Decodes a raw JSON 2FA-methods column value into a typed array.
-     *
-     * Decrypts TOTP secrets and normalizes method structure on decode.
-     * Returns an empty array on any decode or normalization error.
-     *
-     * @param mixed $raw Raw column value from the database.
-     * @return array<int, array<string, mixed>>
-     */
-    public function decodeTwoFactorMethods(mixed $raw): array
-    {
-        if (!is_string($raw) || trim($raw) === '') {
-            return [];
-        }
-
-        $decoded = Json::decode($raw, 64);
-        if (!is_array($decoded)) {
-            return [];
-        }
-
-        return Login2fa::normalizeStored($this->totpSecretCipher->decryptMethodSecrets($decoded));
-    }
-
-    /**
-     * Encodes a normalized 2FA-methods array to a JSON string for persistence.
-     *
-     * Encrypts TOTP secrets before encoding. Returns null when the array is empty.
-     *
-     * @param array<int, array<string, mixed>> $methods Normalized 2FA method rows.
-     * @return string|null JSON string, or null when methods is empty.
-     */
-    public function encodeTwoFactorMethods(array $methods): ?string
-    {
-        if ($methods === []) {
-            return null;
-        }
-
-        return Json::encode($this->totpSecretCipher->encryptMethodSecrets($methods), JSON_UNESCAPED_SLASHES);
-    }
-
 }

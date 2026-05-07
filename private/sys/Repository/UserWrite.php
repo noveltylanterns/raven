@@ -11,8 +11,8 @@ declare(strict_types=1);
 namespace Raven\Core\Repository;
 
 use PDO;
-use Raven\Lib\Auth\UserAuthCodec;
 use Raven\Lib\Database\SqlTable;
+use Raven\Lib\Parser\UserContactParser;
 use Raven\Lib\Scribe\UserScribe;
 
 /**
@@ -28,7 +28,6 @@ final class UserWrite
     private PDO $rvnDb;
     private string $driver;
     private string $prefix;
-    private UserAuthCodec $authPayloadCodec;
     private UserScribe $userScribe;
 
     /**
@@ -44,7 +43,6 @@ final class UserWrite
         $this->rvnDb = $rvnDb;
         $this->driver = $driver;
         $this->prefix = preg_replace('/[^a-zA-Z0-9_]/', '', $prefix) ?? '';
-        $this->authPayloadCodec = new UserAuthCodec();
         $this->userScribe = new UserScribe();
     }
 
@@ -83,8 +81,8 @@ final class UserWrite
         $password = isset($data['password']) && is_string($data['password']) ? $data['password'] : null;
         $primaryGroupId = isset($data['primary_group_id']) ? (int) $data['primary_group_id'] : 0;
         $groupIds = $this->normalizeGroupIds(is_array($data['group_ids'] ?? null) ? $data['group_ids'] : []);
-        $contactProfiles = $this->normalizeContactProfiles((array) ($data['contact_profiles'] ?? []));
-        $contactProfilesEncoded = $this->encodeContactProfiles($contactProfiles);
+        $contactProfiles = UserContactParser::normalizeContactProfiles((array) ($data['contact_profiles'] ?? []));
+        $contactProfilesEncoded = UserContactParser::encodeContactProfiles($contactProfiles);
         $setAvatar = (bool) ($data['set_avatar'] ?? false);
         $avatarPath = isset($data['avatar_path']) && is_string($data['avatar_path']) ? $data['avatar_path'] : null;
         $coverImage = isset($data['cover_image']) && is_string($data['cover_image']) ? trim($data['cover_image']) : '';
@@ -212,28 +210,6 @@ final class UserWrite
         }
 
         return array_values($normalized);
-    }
-
-    /**
-     * Encodes normalized contact rows for database storage.
-     *
-     * @param array<int, array{type: string, value: string}> $profiles Normalized contact profile entries.
-     * @return string|null JSON-encoded contact profiles, or null when empty.
-     */
-    private function encodeContactProfiles(array $profiles): ?string
-    {
-        return $this->authPayloadCodec->encodeContactProfiles($profiles);
-    }
-
-    /**
-     * Normalizes contact rows into deterministic `{type, value}` entries.
-     *
-     * @param array<int, mixed> $profiles Raw contact profile array from caller input.
-     * @return array<int, array{type: string, value: string}> Normalized contact profile entries.
-     */
-    private function normalizeContactProfiles(array $profiles): array
-    {
-        return $this->authPayloadCodec->normalizeContactProfiles($profiles);
     }
 
     /**
