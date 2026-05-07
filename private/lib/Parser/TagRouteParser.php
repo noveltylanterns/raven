@@ -23,17 +23,6 @@ use Raven\Lib\Security\InputSanitizer;
 final class TagRouteParser
 {
     /**
-     * Returns whether the tag feature is enabled in site config.
-     *
-     * @param Config $config Runtime site configuration.
-     * @return bool          True when tag routes should be registered.
-     */
-    public static function tagEnabled(Config $config): bool
-    {
-        return ConfigParser::bool($config->get('tag.enabled', false), false);
-    }
-
-    /**
      * Returns the normalized tag route prefix, or an empty string when tags are disabled.
      *
      * @param Config         $config Runtime site configuration.
@@ -42,7 +31,7 @@ final class TagRouteParser
      */
     public static function tagRoutePrefix(Config $config, InputSanitizer $input): string
     {
-        if (!self::tagEnabled($config)) {
+        if (!ConfigParser::bool($config->get('tag.enabled', false), false)) {
             return '';
         }
 

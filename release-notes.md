@@ -34,6 +34,12 @@
 - **CategoryRepoParser + TagRepoParser elimination** — both classes were dead outside `TaxonomyRepoParser`; inlined their two simple routing-option queries directly into `TaxonomyRepoParser` (which already held the DB primitives) and deleted both parser files.
 - **Dead Scribe class removal** — deleted `lib/Scribe/InviteScribe.php` (no callers). Restored `TaxonomyScribe` after discovering `CategoryScribe` and `TagScribe` extend it.
 - **Validation** — `php -l` clean on all remaining `lib/Parser/` and `lib/Scribe/` files; `php debug/smoke/cli.php` passed.
+- **SetRepoParser elimination** — `SetRepoParser` was a pure pass-through façade over `SetParser` with no added behavior; removed it and updated `SetRead` and `SetWrite` to import and call `SetParser` directly.
+- **RedirectParser instance-side removal** — controllers imported `RedirectParser` only for the static `isAllowedHttpOrRootPath()` method; all instance methods (`listAll`, `listPage`, `findById`, `findBySlug`, `findActiveByPath`) and the constructor were dead since callers use `RedirectRead` directly. Gutted to the static method only.
+- **PageRepoParser block-parser wrappers removed** — three methods (`normalizeStoredBlocks`, `decodeStoredBlocks`, `encodeStoredBlocks`) only forwarded to `PageBlockParser`; removed them and updated `PageRead` and `PageWrite` to call `PageBlockParser` directly.
+- **TagRouteParser::tagEnabled removed** — zero external callers; inlined the `ConfigParser::bool()` check directly into `tagRoutePrefix()`.
+- **ConfigScribe::set restored** — incorrectly identified as dead; `persistValue()` calls it internally. Updated docblock to clarify it is not intended as a direct external API.
+- **Validation** — `php -l` clean on all touched Parser, Scribe, and Repository files; `php debug/smoke/cli.php` passed.
 
 ### May 6, 2026 — lib/Scribe refactor cleanup
 

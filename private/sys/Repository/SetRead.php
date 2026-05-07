@@ -10,7 +10,7 @@ declare(strict_types=1);
 
 namespace Raven\Core\Repository;
 
-use Raven\Lib\Parser\SetRepoParser;
+use Raven\Lib\Parser\SetParser;
 use Raven\Lib\Scribe\SetScribe;
 
 /**
@@ -22,7 +22,7 @@ use Raven\Lib\Scribe\SetScribe;
 class SetRead
 {
     private string $taxonomyType;
-    private SetRepoParser $setRepoParser;
+    private SetParser $setParser;
     private SetScribe $fileScribe;
     /** @var array<int, array<string, mixed>>|null */
     private ?array $cache = null;
@@ -35,7 +35,7 @@ class SetRead
     public function __construct(string $taxonomyType, string $setDirectory)
     {
         $this->taxonomyType = strtolower(trim($taxonomyType));
-        $this->setRepoParser = new SetRepoParser($setDirectory, $this->taxonomyType);
+        $this->setParser = new SetParser($setDirectory, $this->taxonomyType);
         $this->fileScribe = new SetScribe($setDirectory, $this->taxonomyType);
     }
 
@@ -55,15 +55,15 @@ class SetRead
         $this->fileScribe->ensureRootRecord($this->rootRecord());
 
         $rows = [];
-        foreach ($this->setRepoParser->listSetFilePaths() as $path) {
-            $loaded = $this->setRepoParser->loadRecordFromPath($path);
+        foreach ($this->setParser->listSetFilePaths() as $path) {
+            $loaded = $this->setParser->loadRecordFromPath($path);
             if (!is_array($loaded)) {
                 continue;
             }
 
             $setId = (int) ($loaded['id'] ?? -1);
             $raw = is_array($loaded['raw'] ?? null) ? $loaded['raw'] : [];
-            if ($setId < SetRepoParser::DEFAULT_SET_ID || $raw === []) {
+            if ($setId < SetParser::DEFAULT_SET_ID || $raw === []) {
                 continue;
             }
 
@@ -73,7 +73,7 @@ class SetRead
         usort($rows, static function (array $left, array $right): int {
             $leftId = (int) ($left['id'] ?? 0);
             $rightId = (int) ($right['id'] ?? 0);
-            if ($leftId === SetRepoParser::DEFAULT_SET_ID || $rightId === SetRepoParser::DEFAULT_SET_ID) {
+            if ($leftId === SetParser::DEFAULT_SET_ID || $rightId === SetParser::DEFAULT_SET_ID) {
                 return $leftId <=> $rightId;
             }
 
@@ -102,7 +102,7 @@ class SetRead
                 'id' => (int) ($row['id'] ?? 0),
                 'name' => (string) ($row['name'] ?? ''),
                 'slug' => (string) ($row['slug'] ?? ''),
-                'is_root' => (int) ($row['id'] ?? -1) === SetRepoParser::DEFAULT_SET_ID,
+                'is_root' => (int) ($row['id'] ?? -1) === SetParser::DEFAULT_SET_ID,
             ];
         }
 
@@ -159,20 +159,20 @@ class SetRead
     private function canonicalizeRecord(int $id, array $raw): array
     {
         $name = trim((string) ($raw['name'] ?? ''));
-        $slug = SetRepoParser::normalizeSlug((string) ($raw['slug'] ?? ''));
+        $slug = SetParser::normalizeSlug((string) ($raw['slug'] ?? ''));
         $description = trim((string) ($raw['description'] ?? ''));
         $createdAt = trim((string) ($raw['created_at'] ?? ''));
 
-        if ($id === SetRepoParser::DEFAULT_SET_ID) {
-            $name = SetRepoParser::defaultSetName($this->taxonomyType);
-            $slug = SetRepoParser::DEFAULT_SET_SLUG;
-            $description = SetRepoParser::defaultSetDescription($this->taxonomyType);
+        if ($id === SetParser::DEFAULT_SET_ID) {
+            $name = SetParser::defaultSetName($this->taxonomyType);
+            $slug = SetParser::DEFAULT_SET_SLUG;
+            $description = SetParser::defaultSetDescription($this->taxonomyType);
         } else {
             if ($name === '') {
                 $name = ucwords(str_replace('-', ' ', $slug !== '' ? $slug : ('set-' . $id)));
             }
             if ($slug === '') {
-                $slug = SetRepoParser::normalizeSlug($name);
+                $slug = SetParser::normalizeSlug($name);
             }
             if ($slug === '') {
                 $slug = 'set-' . $id;
@@ -188,7 +188,7 @@ class SetRead
             'name' => $name,
             'slug' => $slug,
             'description' => $description,
-            'is_stock' => $id === SetRepoParser::DEFAULT_SET_ID,
+            'is_stock' => $id === SetParser::DEFAULT_SET_ID,
             'created_at' => $createdAt,
         ];
     }
@@ -201,10 +201,10 @@ class SetRead
     private function rootRecord(): array
     {
         return [
-            'id' => SetRepoParser::DEFAULT_SET_ID,
-            'name' => SetRepoParser::defaultSetName($this->taxonomyType),
-            'slug' => SetRepoParser::DEFAULT_SET_SLUG,
-            'description' => SetRepoParser::defaultSetDescription($this->taxonomyType),
+            'id' => SetParser::DEFAULT_SET_ID,
+            'name' => SetParser::defaultSetName($this->taxonomyType),
+            'slug' => SetParser::DEFAULT_SET_SLUG,
+            'description' => SetParser::defaultSetDescription($this->taxonomyType),
             'is_stock' => true,
             'created_at' => gmdate('Y-m-d H:i:s'),
         ];

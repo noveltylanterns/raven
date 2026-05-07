@@ -12,6 +12,7 @@ namespace Raven\Core\Repository;
 
 use PDO;
 use Raven\Lib\Parser\ChannelRepoParser;
+use Raven\Lib\Parser\PageBlockParser;
 use Raven\Lib\Parser\PageRepoParser;
 use Raven\Lib\Database\SqlTable;
 
@@ -1278,7 +1279,7 @@ class PageRead
      */
     private function decodeContentBlocks(string $raw): array
     {
-        return PageRepoParser::decodeStoredBlocks($raw);
+        return (new PageBlockParser())->decodeStoredBlocks($raw);
     }
 
     /**

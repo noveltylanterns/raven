@@ -14,6 +14,7 @@ use PDO;
 use RuntimeException;
 use Raven\Lib\Parser\ChannelRepoParser;
 use Raven\Core\Debug\UniquenessProfiler;
+use Raven\Lib\Parser\PageBlockParser;
 use Raven\Lib\Parser\PageRepoParser;
 use Raven\Lib\Scribe\PageScribe;
 use Raven\Lib\Database\SqlTable;
@@ -206,7 +207,7 @@ final class PageWrite
      */
     private function normalizeContentBlocks(mixed $raw): array
     {
-        return PageRepoParser::normalizeStoredBlocks($raw);
+        return (new PageBlockParser())->normalizeStoredBlocks($raw);
     }
 
     /**
@@ -217,7 +218,7 @@ final class PageWrite
      */
     private function encodeContentBlocks(array $blocks): string
     {
-        return PageRepoParser::encodeStoredBlocks($blocks);
+        return (new PageBlockParser())->encodeStoredBlocks($blocks);
     }
 
     /**

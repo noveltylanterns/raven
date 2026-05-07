@@ -27,6 +27,10 @@ final class ConfigScribe
     /**
      * Writes one dot-delimited config value into an array tree.
      *
+     * Called internally by persistValue. The public surface is here rather than
+     * inlined so callers that mutate config in memory before a deferred persist
+     * can use the same normalization path.
+     *
      * @param array<string, mixed> $config Config tree being mutated.
      * @param string $key Dot-delimited config key path.
      * @param mixed $value Value to store at the resolved path.

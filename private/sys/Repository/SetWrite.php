@@ -10,7 +10,7 @@ declare(strict_types=1);
 
 namespace Raven\Core\Repository;
 
-use Raven\Lib\Parser\SetRepoParser;
+use Raven\Lib\Parser\SetParser;
 use Raven\Lib\Scribe\SetScribe;
 use RuntimeException;
 
@@ -25,7 +25,7 @@ final class SetWrite
 {
     private SetRead $read;
     private string $taxonomyType;
-    private SetRepoParser $setRepoParser;
+    private SetParser $setParser;
     private SetScribe $fileScribe;
 
     /**
@@ -38,7 +38,7 @@ final class SetWrite
     {
         $this->read = $read;
         $this->taxonomyType = strtolower(trim($taxonomyType));
-        $this->setRepoParser = new SetRepoParser($setDirectory, $this->taxonomyType);
+        $this->setParser = new SetParser($setDirectory, $this->taxonomyType);
         $this->fileScribe = new SetScribe($setDirectory, $this->taxonomyType);
     }
 
@@ -55,19 +55,19 @@ final class SetWrite
      */
     public function save(array $data): int
     {
-        $providedId = SetRepoParser::normalizeSetId($data['id'] ?? null);
-        $setId = $providedId ?? $this->setRepoParser->nextAvailableId();
+        $providedId = SetParser::normalizeSetId($data['id'] ?? null);
+        $setId = $providedId ?? $this->setParser->nextAvailableId();
         $name = trim((string) ($data['name'] ?? ''));
         $description = trim((string) ($data['description'] ?? ''));
-        $slug = SetRepoParser::normalizeSlug((string) ($data['slug'] ?? ''));
+        $slug = SetParser::normalizeSlug((string) ($data['slug'] ?? ''));
 
-        if ($setId === SetRepoParser::DEFAULT_SET_ID) {
-            $name = SetRepoParser::defaultSetName($this->taxonomyType);
-            $slug = SetRepoParser::DEFAULT_SET_SLUG;
-            $description = SetRepoParser::defaultSetDescription($this->taxonomyType);
+        if ($setId === SetParser::DEFAULT_SET_ID) {
+            $name = SetParser::defaultSetName($this->taxonomyType);
+            $slug = SetParser::DEFAULT_SET_SLUG;
+            $description = SetParser::defaultSetDescription($this->taxonomyType);
         }
 
-        if ($name === '' || !SetRepoParser::isValidSlug($slug)) {
+        if ($name === '' || !SetParser::isValidSlug($slug)) {
             throw new RuntimeException('Set name and valid slug are required.');
         }
 
@@ -93,7 +93,7 @@ final class SetWrite
             'name' => $name,
             'slug' => $slug,
             'description' => $description,
-            'is_stock' => $setId === SetRepoParser::DEFAULT_SET_ID,
+            'is_stock' => $setId === SetParser::DEFAULT_SET_ID,
             'created_at' => $createdAt,
         ];
 
@@ -111,7 +111,7 @@ final class SetWrite
      */
     public function deleteById(int $id): void
     {
-        if ($id === SetRepoParser::DEFAULT_SET_ID) {
+        if ($id === SetParser::DEFAULT_SET_ID) {
             throw new RuntimeException('The stock default set cannot be deleted.');
         }
 
