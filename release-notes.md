@@ -40,6 +40,8 @@
 - **TagRouteParser::tagEnabled removed** — zero external callers; inlined the `ConfigParser::bool()` check directly into `tagRoutePrefix()`.
 - **ConfigScribe::set restored** — incorrectly identified as dead; `persistValue()` calls it internally. Updated docblock to clarify it is not intended as a direct external API.
 - **Validation** — `php -l` clean on all touched Parser, Scribe, and Repository files; `php debug/smoke/cli.php` passed.
+- **Third-pass thin-wrapper removal** — removed three more `ChannelRepoParser` pass-throughs: `normalizeRouteMode` (forwarded to `ChannelRouteParser::normalizeChannelRouteMode`), `normalizeRouteSeparator` (forwarded to `ChannelRouteParser::normalizeChannelSeparator`), `normalizeTaxonomySetSelection` (forwarded to `SetParser::normalizeSelection`). Callers in `ChannelRead`, `ChannelWrite`, and `ChannelScribe` now import and call `ChannelRouteParser`/`SetParser` directly. Removed dead-caller `CategoryRouteParser::categoryEnabled()` (no external callers; inlined check into `categoryRoutePrefix()`, matching the `TagRouteParser::tagEnabled` cleanup from the prior pass).
+- **Validation** — `php -l` clean; `php debug/smoke/cli.php` passed.
 
 ### May 6, 2026 — lib/Scribe refactor cleanup
 
