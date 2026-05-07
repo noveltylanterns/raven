@@ -40,7 +40,7 @@ use Raven\Lib\View\Panel\EditorBlocks;
 use Raven\Lib\View\Panel\EditorMCE;
 use Raven\Lib\View\Panel\EditorMDE;
 use Raven\Lib\View\Panel\EditorTabs;
-use Raven\Lib\View\Panel\EditorBlocksPage;
+use Raven\Lib\View\Panel\EditorPage;
 use Raven\Lib\View\Panel\EditorMedia;
 
 /**
@@ -81,7 +81,7 @@ final class PageEditController
     /** @var Closure(string): array<string, mixed> */
     private Closure $extensionServices;
     private ?PageBlockParser $pageBlockParser = null;
-    private ?EditorBlocksPage $pageBlocks = null;
+    private ?EditorPage $pageBlocks = null;
     private ?Upload $upload = null;
     private ?EditorMedia $editorMedia = null;
     private ?EditorAuthor $pageAuthorOptionBuilder = null;
@@ -864,12 +864,12 @@ final class PageEditController
     /**
      * Returns the panel page-block helper on first use.
      *
-     * @return EditorBlocksPage Panel page-block helper for editor payload normalization.
+     * @return EditorPage Panel page-block helper for editor payload normalization.
      */
-    private function pageBlocks(): EditorBlocksPage
+    private function pageBlocks(): EditorPage
     {
-        if (!$this->pageBlocks instanceof EditorBlocksPage) {
-            $this->pageBlocks = new EditorBlocksPage($this->input, $this->pageBlockParser());
+        if (!$this->pageBlocks instanceof EditorPage) {
+            $this->pageBlocks = new EditorPage($this->input, $this->pageBlockParser());
         }
 
         return $this->pageBlocks;
