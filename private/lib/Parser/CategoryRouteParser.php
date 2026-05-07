@@ -30,7 +30,7 @@ final class CategoryRouteParser
      * @param InputSanitizer $input  Input normalizer used to validate the prefix slug.
      * @return string                Route prefix slug (e.g. 'cat'), or '' when categories are disabled.
      */
-    public static function categoryRoutePrefix(Config $config, InputSanitizer $input): string
+    public static function routePrefix(Config $config, InputSanitizer $input): string
     {
         if (!ConfigRead::bool($config->get('category.enabled', false), false)) {
             return '';

@@ -2,6 +2,14 @@
 
 *The machine is supposed to be logging patches & mods to this file. Sometimes it does, sometimes it doesn't. It might be useful for historical architectural context to your Agent at one point.*
 
+### May 7, 2026 — lib/Parser naming sweep and PHPDoc closeout
+
+- **CategoryRouteParser::categoryRoutePrefix → ::routePrefix** — method name was redundant given the class name. Updated all callers: `CategoryEditController`, `RoutingController` (internal wrapper kept its distinct name), `CategoryController`, `FeedController`, `PublicPolicy`.
+- **TagRouteParser::tagRoutePrefix → ::routePrefix** — same pattern. Updated all callers: `TagEditController`, `RoutingController`, `TagController`, `FeedController`, `PublicPolicy`.
+- **UserContactParser method renames** — `decodeContactProfiles` → `decode`, `encodeContactProfiles` → `encode`, `normalizeContactProfiles` → `normalize`. Updated all callers: `UserRead` (×4), `UserWrite`, `Gatekeeper`, `lib/View/Preferences`.
+- **PHPDoc sweep** — confirmed all public/protected methods across `lib/Parser/` have complete docblocks; no gaps found.
+- **Validation** — `php -l` clean on all touched files; `php debug/smoke/cli.php` passed.
+
 ### May 7, 2026 — lib/Parser + lib/Scheduler repo-parser boundary cleanup
 
 - **ChannelRepoParser boundary tightened** — removed 4 read-only methods (`normalizeChannelId`, `channelsByIdMap`, `applyBasicChannelContext`, `applyPageChannelContext`) and `resolveChannelIdBySlug` from `ChannelRepoParser`. The three context-hydration statics now live as `public static` methods on `ChannelRead`; `normalizeChannelId` is inlined as a `private static` on `ChannelRead`. Updated all callers: `PageRead`, `RedirectRead` (also dropped its stale `ChannelRepoParser` import), and the internal `TaxonomyParser` calls.

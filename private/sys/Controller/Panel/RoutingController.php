@@ -488,7 +488,7 @@ final class RoutingController
      */
     private function categoryRoutePrefix(): string
     {
-        return CategoryRouteParser::categoryRoutePrefix($this->config, $this->input);
+        return CategoryRouteParser::routePrefix($this->config, $this->input);
     }
 
     /**
@@ -496,7 +496,7 @@ final class RoutingController
      */
     private function tagRoutePrefix(): string
     {
-        return TagRouteParser::tagRoutePrefix($this->config, $this->input);
+        return TagRouteParser::routePrefix($this->config, $this->input);
     }
 
     /**

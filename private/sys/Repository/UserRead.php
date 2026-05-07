@@ -670,7 +670,7 @@ class UserRead
             'cover_image' => isset($row['cover_image']) && $row['cover_image'] !== ''
                 ? (string) $row['cover_image']
                 : null,
-            'contact' => UserContactParser::decodeContactProfiles($row['contact'] ?? null),
+            'contact' => UserContactParser::decode($row['contact'] ?? null),
             'group_ids' => $groupIds,
             'primary_group_id' => $primaryGroupId,
             'secondary_group_ids' => $secondaryGroupIds,
@@ -708,7 +708,7 @@ class UserRead
             'avatar' => isset($row['avatar']) && $row['avatar'] !== ''
                 ? (string) $row['avatar']
                 : null,
-            'contact' => UserContactParser::decodeContactProfiles($row['contact'] ?? null),
+            'contact' => UserContactParser::decode($row['contact'] ?? null),
         ];
     }
 
@@ -747,7 +747,7 @@ class UserRead
             'avatar' => isset($row['avatar']) && $row['avatar'] !== ''
                 ? (string) $row['avatar']
                 : null,
-            'contact' => UserContactParser::decodeContactProfiles($row['contact'] ?? null),
+            'contact' => UserContactParser::decode($row['contact'] ?? null),
         ];
     }
 
@@ -787,7 +787,7 @@ class UserRead
             'avatar' => isset($row['avatar']) && $row['avatar'] !== ''
                 ? (string) $row['avatar']
                 : null,
-            'contact' => UserContactParser::decodeContactProfiles($row['contact'] ?? null),
+            'contact' => UserContactParser::decode($row['contact'] ?? null),
         ];
     }
 

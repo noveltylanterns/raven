@@ -27,15 +27,6 @@ Lingering issues & reorganization tasks. Make a plan to deal with them all in on
 - [ ] Do a sweep of all classes in Runtime/ making sure PHPdoc blocks are present+accurate for ALL headings, classes & functions.
 - [ ] Update release-notes.md, clear completed section out of todo.md, and commit.
 
-## Parser Library — Remaining Cleanup
-Deferred from the May 7 parser cleanup pass. Handle manually or in a follow-up session.
-- [ ] Naming sweep — audit callers and rename if safe:
-    - [ ] CategoryRouteParser::categoryRoutePrefix → ::routePrefix (or ::prefix)
-    - [ ] TagRouteParser::tagRoutePrefix → ::routePrefix (or ::prefix)
-    - [ ] UserContactParser: decodeContactProfiles/encodeContactProfiles/normalizeContactProfiles → decode/encode/normalize
-- [ ] Full PHPDoc sweep: confirm no public/protected methods across lib/Parser/ are missing docblocks
-- [ ] Update release-notes.md, clear this section from todo.md, commit.
-
 ## Core & Library Refactor Cleanup
 Lingering issues & reorganization tasks. Make a plan to deal with them all in one clean sweep. Append it as a detailed checklist to this section, and check off each item as you go, in case we lose session or we have to bounce between agents:
 - [ ] Do a full sweep across every class in sys/ & lib/ to clear out legacy bloat:

@@ -46,8 +46,8 @@ final class PublicPolicy
         $feedRouteParser = new FeedParser($config, $input);
 
         $panelPath = (string) $config->get('panel.path', 'panel');
-        $categoryPrefix = CategoryRouteParser::categoryRoutePrefix($config, $input);
-        $tagPrefix = TagRouteParser::tagRoutePrefix($config, $input);
+        $categoryPrefix = CategoryRouteParser::routePrefix($config, $input);
+        $tagPrefix = TagRouteParser::routePrefix($config, $input);
         $profilePrefix = $groupRouteParser->profileRoutePrefix();
         $groupPrefix = $groupRouteParser->groupRoutePrefix();
         $feedsEnabled = $feedRouteParser->feedEnabled();

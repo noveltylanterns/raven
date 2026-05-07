@@ -80,7 +80,7 @@ final class CategoryController
      */
     public function category(string $categorySlug, int $pageNumber = 1): void
     {
-        $categoryPrefix = CategoryRouteParser::categoryRoutePrefix($this->context->config(), $this->context->input());
+        $categoryPrefix = CategoryRouteParser::routePrefix($this->context->config(), $this->context->input());
         if ($categoryPrefix === '') {
             $this->context->notFound();
             return;

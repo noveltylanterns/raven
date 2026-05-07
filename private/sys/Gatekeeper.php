@@ -726,7 +726,7 @@ final class Gatekeeper
             'cover_image' => isset($row['cover_image']) && $row['cover_image'] !== ''
                 ? (string) $row['cover_image']
                 : null,
-            'contact' => UserContactParser::decodeContactProfiles($row['contact'] ?? null),
+            'contact' => UserContactParser::decode($row['contact'] ?? null),
             'two_factor' => $this->decodeTwoFactorMethods($row['two_factor'] ?? null),
         ];
     }

@@ -270,7 +270,7 @@ final class Preferences
      */
     private static function normalizePreferenceUpdatePayload(array $payload): array
     {
-        $contactProfiles = UserContactParser::normalizeContactProfiles((array) ($payload['contact_profiles'] ?? []));
+        $contactProfiles = UserContactParser::normalize((array) ($payload['contact_profiles'] ?? []));
         $twoFactorMethods = Login2fa::normalizeStored((array) ($payload['two_factor_methods'] ?? []));
 
         return [
@@ -283,7 +283,7 @@ final class Preferences
             'timezone' => trim((string) ($payload['timezone'] ?? '')),
             'password' => $payload['password'] ?? null,
             'contact_profiles' => $contactProfiles,
-            'contact_profiles_encoded' => UserContactParser::encodeContactProfiles($contactProfiles),
+            'contact_profiles_encoded' => UserContactParser::encode($contactProfiles),
             'two_factor_methods' => $twoFactorMethods,
             'two_factor_methods_encoded' => self::encodeTwoFactorMethods($twoFactorMethods),
             'set_avatar' => (bool) ($payload['set_avatar'] ?? false),

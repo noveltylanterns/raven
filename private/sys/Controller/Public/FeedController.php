@@ -251,7 +251,7 @@ final class FeedController
         $pages = [];
 
         if ($taxonomyType === 'category') {
-            $categoryPrefix = CategoryRouteParser::categoryRoutePrefix($this->context->config(), $this->context->input());
+            $categoryPrefix = CategoryRouteParser::routePrefix($this->context->config(), $this->context->input());
             if ($categoryPrefix === '') {
                 $this->context->notFound();
                 return;
@@ -268,7 +268,7 @@ final class FeedController
             $scopeLabel = $this->taxonomyLabel($category, $normalizedSlug);
             $routeSuffix = [$categoryPrefix, $normalizedSlug];
         } elseif ($taxonomyType === 'tag') {
-            $tagPrefix = TagRouteParser::tagRoutePrefix($this->context->config(), $this->context->input());
+            $tagPrefix = TagRouteParser::routePrefix($this->context->config(), $this->context->input());
             if ($tagPrefix === '') {
                 $this->context->notFound();
                 return;

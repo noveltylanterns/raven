@@ -80,7 +80,7 @@ final class TagController
      */
     public function tag(string $tagSlug, int $pageNumber = 1): void
     {
-        $tagPrefix = TagRouteParser::tagRoutePrefix($this->context->config(), $this->context->input());
+        $tagPrefix = TagRouteParser::routePrefix($this->context->config(), $this->context->input());
         if ($tagPrefix === '') {
             $this->context->notFound();
             return;

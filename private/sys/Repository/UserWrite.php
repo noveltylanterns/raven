@@ -77,8 +77,8 @@ final class UserWrite
         $password = isset($data['password']) && is_string($data['password']) ? $data['password'] : null;
         $primaryGroupId = isset($data['primary_group_id']) ? (int) $data['primary_group_id'] : 0;
         $groupIds = $this->normalizeGroupIds(is_array($data['group_ids'] ?? null) ? $data['group_ids'] : []);
-        $contactProfiles = UserContactParser::normalizeContactProfiles((array) ($data['contact_profiles'] ?? []));
-        $contactProfilesEncoded = UserContactParser::encodeContactProfiles($contactProfiles);
+        $contactProfiles = UserContactParser::normalize((array) ($data['contact_profiles'] ?? []));
+        $contactProfilesEncoded = UserContactParser::encode($contactProfiles);
         $setAvatar = (bool) ($data['set_avatar'] ?? false);
         $avatarPath = isset($data['avatar_path']) && is_string($data['avatar_path']) ? $data['avatar_path'] : null;
         $coverImage = isset($data['cover_image']) && is_string($data['cover_image']) ? trim($data['cover_image']) : '';

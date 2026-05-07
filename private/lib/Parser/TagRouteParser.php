@@ -30,7 +30,7 @@ final class TagRouteParser
      * @param InputSanitizer $input  Input normalizer used to validate the prefix slug.
      * @return string                Route prefix slug (e.g. 'tag'), or '' when tags are disabled.
      */
-    public static function tagRoutePrefix(Config $config, InputSanitizer $input): string
+    public static function routePrefix(Config $config, InputSanitizer $input): string
     {
         if (!ConfigRead::bool($config->get('tag.enabled', false), false)) {
             return '';

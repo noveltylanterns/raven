@@ -32,7 +32,7 @@ final class UserContactParser
      * @param mixed $raw Raw column value from the database.
      * @return array<int, array{type: string, value: string}>
      */
-    public static function decodeContactProfiles(mixed $raw): array
+    public static function decode(mixed $raw): array
     {
         if (!is_string($raw) || trim($raw) === '') {
             return [];
@@ -43,7 +43,7 @@ final class UserContactParser
             return [];
         }
 
-        return self::normalizeContactProfiles($decoded);
+        return self::normalize($decoded);
     }
 
     /**
@@ -54,7 +54,7 @@ final class UserContactParser
      * @param array<int, array{type: string, value: string}> $profiles Normalized profiles array.
      * @return string|null JSON string, or null when profiles is empty.
      */
-    public static function encodeContactProfiles(array $profiles): ?string
+    public static function encode(array $profiles): ?string
     {
         if ($profiles === []) {
             return null;
@@ -72,7 +72,7 @@ final class UserContactParser
      * @param array<int, mixed> $profiles Raw profile entries from form input or DB decode.
      * @return array<int, array{type: string, value: string}>
      */
-    public static function normalizeContactProfiles(array $profiles): array
+    public static function normalize(array $profiles): array
     {
         $normalized = [];
 

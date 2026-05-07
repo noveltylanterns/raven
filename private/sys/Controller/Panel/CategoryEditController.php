@@ -128,7 +128,7 @@ final class CategoryEditController
         $this->context->renderPanel('panel/category/edit', [
             'category' => $category,
             'setOptions' => $this->categorySetRepo()->listOptions(),
-            'categoryRoutePrefix' => CategoryRouteParser::categoryRoutePrefix($this->context->config(), $this->input),
+            'categoryRoutePrefix' => CategoryRouteParser::routePrefix($this->context->config(), $this->input),
             'imageAllowedExtensions' => $this->taxonomyImageService->allowedImageExtensionsLabel(),
             'imageMaxFilesizeKb' => $this->taxonomyImageService->maxImageFilesizeKb(),
             'imageVariantSpecs' => $this->taxonomyImageService->imageVariantSpecs(),
