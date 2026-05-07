@@ -21,10 +21,10 @@ use Raven\Lib\Extension\Public\FormRuntime as ExtensionFormRuntime;
 use Raven\Lib\Extension\Public\FormInstance as ExtensionFormInstance;
 use Raven\Lib\Extension\Public\Shortcodes as ExtensionShortcodes;
 use Raven\Lib\Extension\Public\Content as ExtensionContent;
-use Raven\Lib\Parser\FeedParser;
+use Raven\Core\Router\FeedPolicy;
 use Raven\Lib\Parser\RedirectParser;
-use Raven\Lib\Parser\ChannelRouteParser;
-use Raven\Lib\Parser\PageRouteParser;
+use Raven\Core\Router\ChannelPolicy;
+use Raven\Core\Router\PagePolicy;
 use Raven\Lib\Parser\PageBlockParser;
 use Raven\Lib\Parser\UserProfileParser;
 use Raven\Lib\Transport\Request;
@@ -66,7 +66,7 @@ final class PageController
     private ?ExtensionFormInstance $formInstance = null;
     private ?UserProfileParser $profileParser = null;
     private Request $request;
-    private FeedParser $feedParser;
+    private FeedPolicy $feedParser;
     private ClientProfiler $clientProfiler;
     private PublicCaptchaFlow $publicCaptchaFlow;
 
@@ -103,7 +103,7 @@ final class PageController
         $this->extensionContent = $extensionContent;
         $this->extensionServicesProvider = Closure::fromCallable($extensionServicesProvider);
         $this->request = new Request();
-        $this->feedParser = new FeedParser($context->config(), $context->input());
+        $this->feedParser = new FeedPolicy($context->config(), $context->input());
         $this->clientProfiler = new ClientProfiler();
         $this->publicCaptchaFlow = new PublicCaptchaFlow(
             $context->config(),
@@ -161,13 +161,13 @@ final class PageController
                 return;
             }
 
-            $channelRouteMode = ChannelRouteParser::effectiveChannelRouteMode($this->context->config(), (string) ($channel['route_mode'] ?? 'inherit'));
-            $channelWordSeparator = ChannelRouteParser::resolveSeparator(
+            $channelRouteMode = ChannelPolicy::effectiveChannelRouteMode($this->context->config(), (string) ($channel['route_mode'] ?? 'inherit'));
+            $channelWordSeparator = ChannelPolicy::resolveSeparator(
                 (string) ($channel['route_separator'] ?? 'inherit'),
                 (string) $this->context->config()->get('content.separator', '-')
             );
 
-            $lookupTarget = PageRouteParser::resolveLookupTarget($this->context->input(), 
+            $lookupTarget = PagePolicy::resolveLookupTarget($this->context->input(), 
                 $requestedSlug,
                 $channelRouteMode,
                 $channelWordSeparator
@@ -185,8 +185,8 @@ final class PageController
                 $lookupSlug = (string) ($lookupTarget['slug'] ?? '');
             }
         } else {
-            $channelRouteMode = ChannelRouteParser::globalPageRouteMode($this->context->config());
-            $lookupTarget = PageRouteParser::resolveLookupTarget($this->context->input(), 
+            $channelRouteMode = ChannelPolicy::globalPageRouteMode($this->context->config());
+            $lookupTarget = PagePolicy::resolveLookupTarget($this->context->input(), 
                 $requestedSlug,
                 $channelRouteMode,
                 (string) $this->context->config()->get('content.separator', '-')
@@ -222,7 +222,7 @@ final class PageController
             return;
         }
 
-        $canonicalSegment = PageRouteParser::buildRouteSegment($this->context->input(), 
+        $canonicalSegment = PagePolicy::buildRouteSegment($this->context->input(), 
             (string) ($page['slug'] ?? ''),
             (int) ($page['id'] ?? 0),
             (string) ($page['created'] ?? ''),

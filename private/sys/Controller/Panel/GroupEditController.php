@@ -17,7 +17,7 @@ use Raven\Core\Repository\GroupWrite;
 use Raven\Lib\Auth\Panel\PermissionBase as PanelAccess;
 use Raven\Lib\View\Panel\EditorPermissions;
 use Raven\Lib\Media\PreviewConfig;
-use Raven\Lib\Parser\GroupRouteParser;
+use Raven\Core\Router\GroupPolicy;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\View\Panel\EditorMeta;
 use Raven\Lib\Transport\Redirect;
@@ -37,7 +37,7 @@ final class GroupEditController
     private InputSanitizer $input;
     private GroupWrite $groupWrite;
     private GroupRead $groupRead;
-    private GroupRouteParser $groupRouteParser;
+    private GroupPolicy $groupRouteParser;
     private EditorTabs $editorTabs;
     private EditorWrapper $editor;
     private PreviewConfig $taxonomyImageService;
@@ -51,7 +51,7 @@ final class GroupEditController
      * @param InputSanitizer $input Shared request input sanitizer.
      * @param GroupWrite $groupWrite Group repository write side for group saves and deletes.
      * @param GroupRead $groupRead Group repository read side for repo-backed group reads.
-     * @param GroupRouteParser $groupRouteParser Group route parser for routing-policy reads.
+     * @param GroupPolicy $groupRouteParser Group route parser for routing-policy reads.
      * @param EditorTabs $editorTabs Panel editor tab normalization and tab-preserving URL builder.
      * @param EditorWrapper $editor Shared panel editor utility methods.
      * @param PreviewConfig $taxonomyImageService Read-side taxonomy image config and path helper.
@@ -66,7 +66,7 @@ final class GroupEditController
         InputSanitizer $input,
         GroupWrite $groupWrite,
         GroupRead $groupRead,
-        GroupRouteParser $groupRouteParser,
+        GroupPolicy $groupRouteParser,
         EditorTabs $editorTabs,
         EditorWrapper $editor,
         PreviewConfig $taxonomyImageService,

@@ -12,7 +12,7 @@ declare(strict_types=1);
 namespace Raven\Core\Controller\Panel;
 
 use Raven\Core\Repository\GroupRead;
-use Raven\Lib\Parser\GroupRouteParser;
+use Raven\Core\Router\GroupPolicy;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\View\Pagination;
 
@@ -27,20 +27,20 @@ final class GroupListController
     private SharedController $context;
     private InputSanitizer $input;
     private GroupRead $groupRead;
-    private GroupRouteParser $groupRouteParser;
+    private GroupPolicy $groupRouteParser;
 
     /**
      * @param SharedController $context Shared panel request context.
      * @param InputSanitizer $input Shared request input sanitizer.
      * @param GroupRead $groupRead Group repository read side for paginated group listings.
-     * @param GroupRouteParser $groupRouteParser Group route parser for routing-enabled flag in list view.
+     * @param GroupPolicy $groupRouteParser Group route parser for routing-enabled flag in list view.
      * @return void
      */
     public function __construct(
         SharedController $context,
         InputSanitizer $input,
         GroupRead $groupRead,
-        GroupRouteParser $groupRouteParser
+        GroupPolicy $groupRouteParser
     ) {
         $this->context = $context;
         $this->input = $input;

@@ -12,10 +12,10 @@ declare(strict_types=1);
 namespace Raven\Core\Router\Public;
 
 use Raven\Core\Config;
-use Raven\Lib\Parser\CategoryRouteParser;
-use Raven\Lib\Parser\FeedParser;
-use Raven\Lib\Parser\GroupRouteParser;
-use Raven\Lib\Parser\TagRouteParser;
+use Raven\Core\Router\CategoryPolicy;
+use Raven\Core\Router\FeedPolicy;
+use Raven\Core\Router\GroupPolicy;
+use Raven\Core\Router\TagPolicy;
 use Raven\Lib\Security\InputSanitizer;
 
 /**
@@ -42,12 +42,12 @@ final class PublicPolicy
      */
     public static function build(Config $config, InputSanitizer $input): array
     {
-        $groupRouteParser = new GroupRouteParser($config, $input);
-        $feedRouteParser = new FeedParser($config, $input);
+        $groupRouteParser = new GroupPolicy($config, $input);
+        $feedRouteParser = new FeedPolicy($config, $input);
 
         $panelPath = (string) $config->get('panel.path', 'panel');
-        $categoryPrefix = CategoryRouteParser::routePrefix($config, $input);
-        $tagPrefix = TagRouteParser::routePrefix($config, $input);
+        $categoryPrefix = CategoryPolicy::routePrefix($config, $input);
+        $tagPrefix = TagPolicy::routePrefix($config, $input);
         $profilePrefix = $groupRouteParser->profileRoutePrefix();
         $groupPrefix = $groupRouteParser->groupRoutePrefix();
         $feedsEnabled = $feedRouteParser->feedEnabled();

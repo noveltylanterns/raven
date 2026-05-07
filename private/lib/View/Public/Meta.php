@@ -12,7 +12,7 @@ declare(strict_types=1);
 namespace Raven\Lib\View\Public;
 
 use Raven\Core\Config;
-use Raven\Lib\Parser\FeedParser;
+use Raven\Core\Router\FeedPolicy;
 use Raven\Lib\Transport\Request;
 use Raven\Lib\Parser\UserProfileParser;
 
@@ -24,20 +24,20 @@ final class Meta
     private Request $requestContextResolver;
     private ThemeCatalog $themeCatalogService;
     private UserProfileParser $profileContactService;
-    private FeedParser $feedParser;
+    private FeedPolicy $feedParser;
 
     /**
      * @param Request $requestContextResolver Shared request-context helper.
      * @param ThemeCatalog $themeCatalogService Public-theme catalog helper.
      * @param UserProfileParser $profileContactService Profile-contact helper for author social metadata.
-     * @param FeedParser $feedParser Feed-route policy helper for root feed URLs.
+     * @param FeedPolicy $feedParser Feed-route policy helper for root feed URLs.
      * @return void
      */
     public function __construct(
         Request $requestContextResolver,
         ThemeCatalog $themeCatalogService,
         UserProfileParser $profileContactService,
-        FeedParser $feedParser
+        FeedPolicy $feedParser
     ) {
         $this->requestContextResolver = $requestContextResolver;
         $this->themeCatalogService = $themeCatalogService;

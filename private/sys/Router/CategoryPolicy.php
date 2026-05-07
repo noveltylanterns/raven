@@ -2,14 +2,14 @@
 
 /**
  * RAVEN CMS
- * ~/private/lib/Parser/CategoryRouteParser.php
+ * ~/private/sys/Router/CategoryPolicy.php
  * Category routing configuration helpers.
  * Docs: https://raven.lanterns.io
  */
 
 declare(strict_types=1);
 
-namespace Raven\Lib\Parser;
+namespace Raven\Core\Router;
 
 use Raven\Core\Config;
 use Raven\Core\Repository\ConfigRead;
@@ -22,7 +22,7 @@ use Raven\Lib\Security\InputSanitizer;
  * Reads the category.enabled and category.prefix config keys so callers that only
  * need category routing policy do not have to construct a CategoryDataParser instance.
  */
-final class CategoryRouteParser
+final class CategoryPolicy
 {
     /**
      * Returns the normalized category route prefix, or an empty string when categories are disabled.

@@ -19,7 +19,7 @@ use Raven\Core\Repository\TagRead;
 use Raven\Core\Repository\TagWrite;
 use Raven\Lib\Media\PreviewConfig;
 use Raven\Lib\Parser\SetParser;
-use Raven\Lib\Parser\TagRouteParser;
+use Raven\Core\Router\TagPolicy;
 use Raven\Lib\View\Panel\EditorMeta;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\Transport\Redirect;
@@ -128,7 +128,7 @@ final class TagEditController
         $this->context->renderPanel('panel/tag/edit', [
             'tag' => $tag,
             'setOptions' => $this->tagSetRepo()->listOptions(),
-            'tagRoutePrefix' => TagRouteParser::routePrefix($this->context->config(), $this->input),
+            'tagRoutePrefix' => TagPolicy::routePrefix($this->context->config(), $this->input),
             'imageAllowedExtensions' => $this->taxonomyImageService->allowedImageExtensionsLabel(),
             'imageMaxFilesizeKb' => $this->taxonomyImageService->maxImageFilesizeKb(),
             'imageVariantSpecs' => $this->taxonomyImageService->imageVariantSpecs(),

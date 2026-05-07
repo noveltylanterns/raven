@@ -2,14 +2,14 @@
 
 /**
  * RAVEN CMS
- * ~/private/lib/Parser/PageRouteParser.php
+ * ~/private/sys/Router/PagePolicy.php
  * Static page URL segment resolution and route-segment building helpers.
  * Docs: https://raven.lanterns.io
  */
 
 declare(strict_types=1);
 
-namespace Raven\Lib\Parser;
+namespace Raven\Core\Router;
 
 use Raven\Lib\Security\InputSanitizer;
 
@@ -18,9 +18,9 @@ use Raven\Lib\Security\InputSanitizer;
  *
  * All methods are stateless; callers pass the sanitizer and route-policy values
  * directly so this class can be used without constructing a PageDataParser instance.
- * Route-mode and separator policy is delegated to ChannelRouteParser.
+ * Route-mode and separator policy is delegated to ChannelPolicy.
  */
-final class PageRouteParser
+final class PagePolicy
 {
     /**
      * Normalizes a URL path segment for a slug-based page lookup.
@@ -45,7 +45,7 @@ final class PageRouteParser
         }
 
         // When the separator is underscore, convert underscores to hyphens before sanitizing.
-        $resolvedSeparator = ChannelRouteParser::resolveSeparator($wordSeparator, '-');
+        $resolvedSeparator = ChannelPolicy::resolveSeparator($wordSeparator, '-');
         if ($resolvedSeparator === '_') {
             $segment = str_replace('_', '-', $segment);
         }
@@ -115,13 +115,13 @@ final class PageRouteParser
         string $routeMode,
         string $wordSeparator
     ): ?array {
-        $mode = ChannelRouteParser::normalizeRouteMode($routeMode);
+        $mode = ChannelPolicy::normalizeRouteMode($routeMode);
         $lookupValue = self::extractLookupValue($segment, $mode);
         if ($lookupValue === null || $lookupValue === '') {
             return null;
         }
 
-        if (ChannelRouteParser::usesPageId($mode)) {
+        if (ChannelPolicy::usesPageId($mode)) {
             $id = self::normalizePageIdForLookup($lookupValue);
             return $id === null ? null : ['type' => 'id', 'id' => $id];
         }
@@ -153,8 +153,8 @@ final class PageRouteParser
         string $channelWordSeparator,
         string $globalWordSeparator
     ): string {
-        $mode = ChannelRouteParser::normalizeRouteMode($routeMode);
-        if (ChannelRouteParser::usesPageId($mode)) {
+        $mode = ChannelPolicy::normalizeRouteMode($routeMode);
+        if (ChannelPolicy::usesPageId($mode)) {
             if ($pageId <= 0) {
                 return '';
             }
@@ -166,7 +166,7 @@ final class PageRouteParser
                 return '';
             }
 
-            $resolvedSeparator = ChannelRouteParser::resolveSeparator($channelWordSeparator, $globalWordSeparator);
+            $resolvedSeparator = ChannelPolicy::resolveSeparator($channelWordSeparator, $globalWordSeparator);
             $routeValue = $resolvedSeparator === '_'
                 ? str_replace('-', '_', $normalizedSlug)
                 : $normalizedSlug;
@@ -189,7 +189,7 @@ final class PageRouteParser
      */
     public static function datePrefix(string $createdAt, string $routeMode = 'date_slug'): string
     {
-        $mode = ChannelRouteParser::normalizeRouteMode($routeMode);
+        $mode = ChannelPolicy::normalizeRouteMode($routeMode);
         $format = match ($mode) {
             'date_slug', 'date_id' => 'Y-m-d',
             'month_slug', 'month_id' => 'Y-m',
@@ -231,7 +231,7 @@ final class PageRouteParser
             return null;
         }
 
-        return match (ChannelRouteParser::normalizeRouteMode($routeMode)) {
+        return match (ChannelPolicy::normalizeRouteMode($routeMode)) {
             'date_slug', 'date_id' => self::extractPrefixedValue($segment, '/^\d{4}-\d{2}-\d{2}-(.+)$/'),
             'month_slug', 'month_id' => self::extractPrefixedValue($segment, '/^\d{4}-\d{2}-(.+)$/'),
             default => $segment,

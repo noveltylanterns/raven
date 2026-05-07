@@ -2,14 +2,14 @@
 
 /**
  * RAVEN CMS
- * ~/private/lib/Parser/FeedParser.php
+ * ~/private/sys/Router/FeedPolicy.php
  * Atom and RSS feed routing configuration helpers.
  * Docs: https://raven.lanterns.io
  */
 
 declare(strict_types=1);
 
-namespace Raven\Lib\Parser;
+namespace Raven\Core\Router;
 
 use Raven\Core\Config;
 use Raven\Core\Repository\ConfigRead;
@@ -22,7 +22,7 @@ use Raven\Lib\Security\InputSanitizer;
  * Reads feed.* config keys. There is no FeedDataParser because feed content
  * is assembled from channel and page records rather than a dedicated feed table.
  */
-final class FeedParser
+final class FeedPolicy
 {
     private Config $config;
     private InputSanitizer $input;
@@ -124,5 +124,4 @@ final class FeedParser
         $items = (int) $this->config->get('feed.items', 10);
         return max(1, $items);
     }
-
 }

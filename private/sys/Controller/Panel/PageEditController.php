@@ -27,7 +27,7 @@ use Raven\Lib\Extension\Panel\Content as ExtensionContent;
 use Raven\Lib\Extension\Panel\Manager as ExtensionManager;
 use Raven\Lib\Extension\StateRead;
 use Raven\Lib\Media\MediaUpload;
-use Raven\Lib\Parser\ChannelRouteParser;
+use Raven\Core\Router\ChannelPolicy;
 use Raven\Lib\Parser\PageBlockParser;
 use Raven\Lib\Parser\SetParser;
 use Raven\Lib\Parser\TaxonomyParser;
@@ -232,10 +232,10 @@ final class PageEditController
             $channelOption['editor_override'] = $this->editor->normalizeChannelEditorOverride(
                 (string) ($channelOption['editor_override'] ?? 'inherit')
             );
-            $channelOption['route_mode'] = ChannelRouteParser::normalizeChannelRouteMode(
+            $channelOption['route_mode'] = ChannelPolicy::normalizeChannelRouteMode(
                 (string) ($channelOption['route_mode'] ?? 'inherit')
             );
-            $channelOption['route_separator'] = ChannelRouteParser::normalizeChannelSeparator(
+            $channelOption['route_separator'] = ChannelPolicy::normalizeChannelSeparator(
                 (string) ($channelOption['route_separator'] ?? 'inherit')
             );
         }
@@ -297,8 +297,8 @@ final class PageEditController
             'editorDefault' => $this->editor->normalizeBodyTextEditorOption(
                 (string) $this->config->get('content.editor', 'tinymce')
             ),
-            'routeModeDefault' => ChannelRouteParser::globalPageRouteMode($this->config),
-            'routeSeparatorDefault' => ChannelRouteParser::normalizeGlobalSeparator(
+            'routeModeDefault' => ChannelPolicy::globalPageRouteMode($this->config),
+            'routeSeparatorDefault' => ChannelPolicy::normalizeGlobalSeparator(
                 (string) $this->config->get('content.separator', '-')
             ),
             'bodyBlockTypeDefinitions' => $this->pageEditorBodyBlockTypeDefinitions(),

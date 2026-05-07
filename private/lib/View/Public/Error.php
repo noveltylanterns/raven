@@ -12,7 +12,7 @@ declare(strict_types=1);
 namespace Raven\Lib\View\Public;
 
 use Raven\Core\Config;
-use Raven\Lib\Parser\FeedParser;
+use Raven\Core\Router\FeedPolicy;
 use Raven\Lib\Parser\UserProfileParser;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\Transport\Request;
@@ -57,7 +57,7 @@ final class Error
             new Request(),
             $this->themeCatalog,
             new UserProfileParser($input),
-            new FeedParser($this->config, $input)
+            new FeedPolicy($this->config, $input)
         );
     }
 

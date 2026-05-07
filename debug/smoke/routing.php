@@ -40,8 +40,8 @@ spl_autoload_register(static function (string $class) use ($root): void {
 use Raven\Core\Config;
 use Raven\Core\Repository\ChannelRead;
 use Raven\Core\Repository\PageRead;
-use Raven\Lib\Parser\ChannelRouteParser;
-use Raven\Lib\Parser\PageRouteParser;
+use Raven\Core\Router\ChannelPolicy;
+use Raven\Core\Router\PagePolicy;
 use Raven\Lib\Scribe\ConfigScribe;
 use Raven\Lib\Security\InputSanitizer;
 
@@ -250,16 +250,16 @@ PHP;
             $channel = $channels->findBySlug($channelSlug);
             $this->assert($channel !== null, 'Missing channel fixture for ' . $channelSlug . '.');
 
-            $routeMode = ChannelRouteParser::effectiveChannelRouteMode($config, (string) ($channel['route_mode'] ?? 'inherit'));
-            $wordSeparator = ChannelRouteParser::resolveChannelSeparator($config, (string) ($channel['route_separator'] ?? 'inherit'));
-            $lookupTarget = PageRouteParser::resolveLookupTarget($input, $requestedSegment, $routeMode, $wordSeparator);
+            $routeMode = ChannelPolicy::effectiveChannelRouteMode($config, (string) ($channel['route_mode'] ?? 'inherit'));
+            $wordSeparator = ChannelPolicy::resolveChannelSeparator($config, (string) ($channel['route_separator'] ?? 'inherit'));
+            $lookupTarget = PagePolicy::resolveLookupTarget($input, $requestedSegment, $routeMode, $wordSeparator);
             $this->assert(is_array($lookupTarget), 'Failed to parse channel route segment "' . $requestedSegment . '".');
             if ((string) ($lookupTarget['type'] ?? '') === 'slug') {
                 $lookupSlug = (string) ($lookupTarget['slug'] ?? '');
             }
         } else {
-            $routeMode = ChannelRouteParser::globalPageRouteMode($config);
-            $lookupTarget = PageRouteParser::resolveLookupTarget(
+            $routeMode = ChannelPolicy::globalPageRouteMode($config);
+            $lookupTarget = PagePolicy::resolveLookupTarget(
                 $input,
                 $requestedSegment,
                 $routeMode,
@@ -278,7 +278,7 @@ PHP;
         }
         $this->assert(is_array($page), 'Repository lookup failed for "' . $requestedSegment . '".');
 
-        $canonicalSegment = PageRouteParser::buildRouteSegment(
+        $canonicalSegment = PagePolicy::buildRouteSegment(
             $input,
             (string) ($page['slug'] ?? ''),
             (int) ($page['id'] ?? 0),

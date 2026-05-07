@@ -17,7 +17,7 @@ use Raven\Lib\Auth\Public\PermissionBase as PublicPermissionBase;
 use Raven\Lib\Auth\Public\PermissionMask as PublicPermissionMask;
 use Raven\Lib\Auth\Public\SessionGuard;
 use Raven\Lib\Transport\Request;
-use Raven\Lib\Parser\FeedParser;
+use Raven\Core\Router\FeedPolicy;
 use Raven\Lib\Parser\UserProfileParser;
 use Raven\Lib\Security\Csrf;
 use Raven\Lib\Security\InputSanitizer;
@@ -43,7 +43,7 @@ final class SharedController
     private SessionGuard $sessionGuard;
     private PublicPermissionMask $guestPermissionMask;
     private ?Request $request = null;
-    private ?FeedParser $feedParser = null;
+    private ?FeedPolicy $feedParser = null;
     private ?UserProfileParser $profileParser = null;
     private ThemeCatalog $themeCatalog;
     private ?Meta $metaService = null;
@@ -126,12 +126,12 @@ final class SharedController
     /**
      * Returns the cached feed route parser.
      *
-     * @return FeedParser Shared feed routing-policy parser.
+     * @return FeedPolicy Shared feed routing-policy parser.
      */
-    private function feedParser(): FeedParser
+    private function feedParser(): FeedPolicy
     {
-        if (!$this->feedParser instanceof FeedParser) {
-            $this->feedParser = new FeedParser($this->config, $this->input);
+        if (!$this->feedParser instanceof FeedPolicy) {
+            $this->feedParser = new FeedPolicy($this->config, $this->input);
         }
 
         return $this->feedParser;

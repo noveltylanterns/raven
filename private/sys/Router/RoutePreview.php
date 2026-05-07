@@ -12,8 +12,8 @@ declare(strict_types=1);
 namespace Raven\Core\Router;
 
 use Raven\Core\Config;
-use Raven\Lib\Parser\ChannelRouteParser;
-use Raven\Lib\Parser\PageRouteParser;
+use Raven\Core\Router\ChannelPolicy;
+use Raven\Core\Router\PagePolicy;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\View\Public\ThemeCatalog;
 
@@ -62,14 +62,14 @@ final class RoutePreview
         string $channelPageUrlSeparator,
         string $contentSeparator = '-'
     ): string {
-        $routeMode = ChannelRouteParser::normalizeRouteMode($channelPageRouteMode);
+        $routeMode = ChannelPolicy::normalizeRouteMode($channelPageRouteMode);
         $normalizedSlug = $this->input->slug($pageSlug);
-        if (!ChannelRouteParser::usesPageId($routeMode) && ($normalizedSlug === null || $normalizedSlug === '')) {
+        if (!ChannelPolicy::usesPageId($routeMode) && ($normalizedSlug === null || $normalizedSlug === '')) {
             return '/';
         }
 
         $normalizedChannel = $this->input->slug($channelSlug);
-        $routeSegment = PageRouteParser::buildRouteSegment(
+        $routeSegment = PagePolicy::buildRouteSegment(
             $this->input,
             (string) $normalizedSlug,
             $pageId,
@@ -78,7 +78,7 @@ final class RoutePreview
             $channelPageUrlSeparator,
             $contentSeparator
         );
-        if ($routeSegment === '' && !ChannelRouteParser::usesPageId($routeMode)) {
+        if ($routeSegment === '' && !ChannelPolicy::usesPageId($routeMode)) {
             $routeSegment = $normalizedSlug;
         }
 

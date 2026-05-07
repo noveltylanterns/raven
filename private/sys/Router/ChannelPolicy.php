@@ -2,14 +2,14 @@
 
 /**
  * RAVEN CMS
- * ~/private/lib/Parser/ChannelRouteParser.php
+ * ~/private/sys/Router/ChannelPolicy.php
  * Route-mode normalization, separator policy, and config-backed effective-mode resolution.
  * Docs: https://raven.lanterns.io
  */
 
 declare(strict_types=1);
 
-namespace Raven\Lib\Parser;
+namespace Raven\Core\Router;
 
 use Raven\Core\Config;
 
@@ -18,9 +18,9 @@ use Raven\Core\Config;
  *
  * The Config-taking methods (globalPageRouteMode, effectiveChannelRouteMode, resolveChannelSeparator) are the
  * canonical entry point for any code that needs to resolve URL policy without loading the full ChannelDataParser stack.
- * Shared by ChannelDataParser, ChannelRead, PageRouteParser, and panel/public controllers.
+ * Shared by ChannelDataParser, ChannelRead, PagePolicy, and panel/public controllers.
  */
-final class ChannelRouteParser
+final class ChannelPolicy
 {
     /**
      * Normalizes a per-channel route-mode value, preserving 'inherit' as a valid option.

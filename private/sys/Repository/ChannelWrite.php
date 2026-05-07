@@ -13,7 +13,7 @@ namespace Raven\Core\Repository;
 use PDO;
 use Raven\Lib\Database\SqlTable;
 use Raven\Lib\Parser\ChannelRepoParser;
-use Raven\Lib\Parser\ChannelRouteParser;
+use Raven\Core\Router\ChannelPolicy;
 use Raven\Lib\Parser\SetParser;
 use RuntimeException;
 
@@ -74,8 +74,8 @@ final class ChannelWrite
         $slug = strtolower(trim((string) ($data['slug'] ?? '')));
         $description = trim((string) ($data['description'] ?? ''));
         $editorOverride = ChannelRepoParser::normalizeEditorOverride((string) ($data['editor_override'] ?? 'inherit'));
-        $routeMode = ChannelRouteParser::normalizeChannelRouteMode((string) ($data['route_mode'] ?? 'inherit'));
-        $routeSeparator = ChannelRouteParser::normalizeChannelSeparator((string) ($data['route_separator'] ?? 'inherit'));
+        $routeMode = ChannelPolicy::normalizeChannelRouteMode((string) ($data['route_mode'] ?? 'inherit'));
+        $routeSeparator = ChannelPolicy::normalizeChannelSeparator((string) ($data['route_separator'] ?? 'inherit'));
 
         if ($name === '' || !ChannelRepoParser::isValidSlug($slug)) {
             throw new RuntimeException('Channel name and slug are required.');

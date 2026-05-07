@@ -13,10 +13,10 @@ namespace Raven\Core\Controller\Public;
 
 use Raven\Core\Repository\CategoryRead;
 use Raven\Core\Repository\PageRead;
-use Raven\Lib\Parser\CategoryRouteParser;
-use Raven\Lib\Parser\ChannelRouteParser;
-use Raven\Lib\Parser\FeedParser;
-use Raven\Lib\Parser\PageRouteParser;
+use Raven\Core\Router\CategoryPolicy;
+use Raven\Core\Router\ChannelPolicy;
+use Raven\Core\Router\FeedPolicy;
+use Raven\Core\Router\PagePolicy;
 use Raven\Lib\Parser\UserProfileParser;
 use Raven\Lib\Transport\Request;
 use Raven\Lib\View\Public\Meta;
@@ -33,7 +33,7 @@ final class CategoryController
     private PageRead $pageRead;
     private CategoryRead $categoryRead;
     private Request $request;
-    private FeedParser $feedParser;
+    private FeedPolicy $feedParser;
     private TemplateDecorator $templateDecorator;
     private ThemeCatalog $themeCatalog;
     private Meta $metaService;
@@ -56,7 +56,7 @@ final class CategoryController
         $this->pageRead = $pageRead;
         $this->categoryRead = $categoryRead;
         $this->request = new Request();
-        $this->feedParser = new FeedParser($context->config(), $context->input());
+        $this->feedParser = new FeedPolicy($context->config(), $context->input());
         $this->templateDecorator = new TemplateDecorator(
             $context->config(),
             $context->input(),
@@ -80,7 +80,7 @@ final class CategoryController
      */
     public function category(string $categorySlug, int $pageNumber = 1): void
     {
-        $categoryPrefix = CategoryRouteParser::routePrefix($this->context->config(), $this->context->input());
+        $categoryPrefix = CategoryPolicy::routePrefix($this->context->config(), $this->context->input());
         if ($categoryPrefix === '') {
             $this->context->notFound();
             return;
@@ -151,11 +151,11 @@ final class CategoryController
 
             $channelSlug = $this->context->input()->slug((string) ($page['channel_slug'] ?? ''));
             if ($channelSlug === null || $channelSlug === '') {
-                $rootSegment = PageRouteParser::buildRouteSegment($this->context->input(), 
+                $rootSegment = PagePolicy::buildRouteSegment($this->context->input(), 
                     $slug,
                     $pageId,
                     (string) ($page['created'] ?? ''),
-                    ChannelRouteParser::globalPageRouteMode($this->context->config()),
+                    ChannelPolicy::globalPageRouteMode($this->context->config()),
                     'inherit',
                     (string) $this->context->config()->get('content.separator', '-')
                 );
@@ -167,11 +167,11 @@ final class CategoryController
                 . rawurlencode($channelSlug)
                 . '/'
                 . rawurlencode(
-                    PageRouteParser::buildRouteSegment($this->context->input(), 
+                    PagePolicy::buildRouteSegment($this->context->input(), 
                         $slug,
                         $pageId,
                         (string) ($page['created'] ?? ''),
-                        ChannelRouteParser::effectiveChannelRouteMode($this->context->config(), (string) ($page['route_mode_effective'] ?? 'inherit')),
+                        ChannelPolicy::effectiveChannelRouteMode($this->context->config(), (string) ($page['route_mode_effective'] ?? 'inherit')),
                         (string) ($page['route_separator_effective'] ?? 'inherit'),
                         (string) $this->context->config()->get('content.separator', '-')
                     )

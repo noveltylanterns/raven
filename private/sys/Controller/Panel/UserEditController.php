@@ -25,7 +25,7 @@ use Raven\Lib\Media\AvatarValidator;
 use Raven\Lib\Media\CoverConfig;
 use Raven\Lib\Media\CoverDelete;
 use Raven\Lib\Media\CoverUpload;
-use Raven\Lib\Parser\GroupRouteParser;
+use Raven\Core\Router\GroupPolicy;
 use Raven\Lib\Parser\UserProfileParser;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\Transport\Redirect;
@@ -50,7 +50,7 @@ final class UserEditController
     private UserRead $userRead;
     private UserWrite $userWrite;
     private AuthWrite $authWrite;
-    private GroupRouteParser $groupParser;
+    private GroupPolicy $groupParser;
     private LoginIdentifier $loginIdentifier;
     private EditorTabs $editorTabs;
     private PanelTheme $panelTheme;
@@ -74,7 +74,7 @@ final class UserEditController
      * @param UserRead $userRead User repository read side for user find and author lookups.
      * @param UserWrite $userWrite User repository write side for panel user saves and deletes.
      * @param AuthWrite $authWrite Auth-user write repository for 2FA method updates.
-     * @param GroupRouteParser $groupParser Shared group/profile routing-policy parser.
+     * @param GroupPolicy $groupParser Shared group/profile routing-policy parser.
      * @param LoginIdentifier $loginIdentifier Shared login-identifier normalization helper.
      * @param EditorTabs $editorTabs Shared editor-tab normalization helper.
      * @param EditorBlocks $editorBlocks Shared repeater-block view helper for modular panel rows.
@@ -98,7 +98,7 @@ final class UserEditController
         UserRead $userRead,
         UserWrite $userWrite,
         AuthWrite $authWrite,
-        GroupRouteParser $groupParser,
+        GroupPolicy $groupParser,
         LoginIdentifier $loginIdentifier,
         EditorTabs $editorTabs,
         EditorBlocks $editorBlocks,

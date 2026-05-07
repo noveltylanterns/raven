@@ -2,6 +2,10 @@
 
 *The machine is supposed to be logging patches & mods to this file. Sometimes it does, sometimes it doesn't. It might be useful for historical architectural context to your Agent at one point.*
 
+### May 7, 2026 — Route policy classes moved to sys/Router/ as *Policy
+
+- **Six *RouteParser / FeedParser classes relocated** — `ChannelRouteParser`, `PageRouteParser`, `CategoryRouteParser`, `TagRouteParser`, `FeedParser`, and `GroupRouteParser` were config-backed routing policy helpers, not parsers. Moved to `private/sys/Router/` and renamed: `ChannelPolicy`, `PagePolicy`, `CategoryPolicy`, `TagPolicy`, `FeedPolicy`, `GroupPolicy`. Namespace changed from `Raven\Lib\Parser` to `Raven\Core\Router`. All callers updated (controllers, repositories, router classes, lib/View, panel template). Old files deleted. `docs/filetree.md` updated.
+
 ### May 7, 2026 — RoutePrefixParser relocated to Router layer
 
 - **RoutePrefixParser moved to `sys/Router/Public/PrefixResolver`** — class belongs to route registration policy, not the lib/Parser primitive layer. Renamed to `PrefixResolver`, moved to `Raven\Core\Router\Public` namespace. Updated all callers (`CategoryRouteParser`, `TagRouteParser`, `FeedParser`, `GroupRouteParser`) with new import and call site.

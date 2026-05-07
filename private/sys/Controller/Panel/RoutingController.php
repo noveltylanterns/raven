@@ -21,11 +21,11 @@ use Raven\Core\Debug\RouteProfiler;
 use Raven\Lib\Auth\LoginIdentifier;
 use Raven\Lib\Auth\Panel\PermissionBase as PanelAccess;
 use Raven\Lib\Format\Csv;
-use Raven\Lib\Parser\CategoryRouteParser;
-use Raven\Lib\Parser\ChannelRouteParser;
-use Raven\Lib\Parser\FeedParser;
-use Raven\Lib\Parser\GroupRouteParser;
-use Raven\Lib\Parser\TagRouteParser;
+use Raven\Core\Router\CategoryPolicy;
+use Raven\Core\Router\ChannelPolicy;
+use Raven\Core\Router\FeedPolicy;
+use Raven\Core\Router\GroupPolicy;
+use Raven\Core\Router\TagPolicy;
 use Raven\Lib\Parser\TaxonomyParser;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Core\Router\RoutePreview;
@@ -54,8 +54,8 @@ final class RoutingController
     private LoginIdentifier $loginIdentifier;
     private ?RouteProfiler $routeProfiler = null;
     private ?Csv $csvHandler = null;
-    private ?FeedParser $feedParser = null;
-    private ?GroupRouteParser $groupParser = null;
+    private ?FeedPolicy $feedParser = null;
+    private ?GroupPolicy $groupParser = null;
     private ThemeCatalog $themeCatalog;
     private ?RoutePreview $routePreview = null;
 
@@ -220,7 +220,7 @@ final class RoutingController
      */
     private function globalPageRouteMode(): string
     {
-        return ChannelRouteParser::globalPageRouteMode($this->config);
+        return ChannelPolicy::globalPageRouteMode($this->config);
     }
 
     /**
@@ -231,7 +231,7 @@ final class RoutingController
      */
     private function effectiveChannelRouteMode(string $channelValue): string
     {
-        return ChannelRouteParser::effectiveChannelRouteMode($this->config, $channelValue);
+        return ChannelPolicy::effectiveChannelRouteMode($this->config, $channelValue);
     }
 
     /**
@@ -488,7 +488,7 @@ final class RoutingController
      */
     private function categoryRoutePrefix(): string
     {
-        return CategoryRouteParser::routePrefix($this->config, $this->input);
+        return CategoryPolicy::routePrefix($this->config, $this->input);
     }
 
     /**
@@ -496,7 +496,7 @@ final class RoutingController
      */
     private function tagRoutePrefix(): string
     {
-        return TagRouteParser::routePrefix($this->config, $this->input);
+        return TagPolicy::routePrefix($this->config, $this->input);
     }
 
     /**
@@ -547,10 +547,10 @@ final class RoutingController
     /**
      * Returns the feed route parser on first use.
      */
-    private function feedParser(): FeedParser
+    private function feedParser(): FeedPolicy
     {
-        if (!$this->feedParser instanceof FeedParser) {
-            $this->feedParser = new FeedParser($this->config, $this->input);
+        if (!$this->feedParser instanceof FeedPolicy) {
+            $this->feedParser = new FeedPolicy($this->config, $this->input);
         }
 
         return $this->feedParser;
@@ -559,10 +559,10 @@ final class RoutingController
     /**
      * Returns the group route parser on first use.
      */
-    private function groupParser(): GroupRouteParser
+    private function groupParser(): GroupPolicy
     {
-        if (!$this->groupParser instanceof GroupRouteParser) {
-            $this->groupParser = new GroupRouteParser($this->config, $this->input);
+        if (!$this->groupParser instanceof GroupPolicy) {
+            $this->groupParser = new GroupPolicy($this->config, $this->input);
         }
 
         return $this->groupParser;

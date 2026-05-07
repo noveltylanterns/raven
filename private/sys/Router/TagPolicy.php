@@ -2,14 +2,14 @@
 
 /**
  * RAVEN CMS
- * ~/private/lib/Parser/TagRouteParser.php
+ * ~/private/sys/Router/TagPolicy.php
  * Tag routing configuration helpers.
  * Docs: https://raven.lanterns.io
  */
 
 declare(strict_types=1);
 
-namespace Raven\Lib\Parser;
+namespace Raven\Core\Router;
 
 use Raven\Core\Config;
 use Raven\Core\Repository\ConfigRead;
@@ -22,7 +22,7 @@ use Raven\Lib\Security\InputSanitizer;
  * Reads the tag.enabled and tag.prefix config keys so callers that only
  * need tag routing policy do not have to construct a TagDataParser instance.
  */
-final class TagRouteParser
+final class TagPolicy
 {
     /**
      * Returns the normalized tag route prefix, or an empty string when tags are disabled.

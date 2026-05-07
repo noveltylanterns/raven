@@ -48,8 +48,8 @@ use Raven\Lib\Media\AvatarDelete;
 use Raven\Lib\Media\AvatarUpload;
 use Raven\Lib\Media\CoverDelete;
 use Raven\Lib\Media\CoverUpload;
-use Raven\Lib\Parser\FeedParser;
-use Raven\Lib\Parser\GroupRouteParser;
+use Raven\Core\Router\FeedPolicy;
+use Raven\Core\Router\GroupPolicy;
 use Raven\Lib\Parser\UserProfileParser;
 use Raven\Lib\View\Panel\EditorMeta;
 use Raven\Lib\Security\PasswordValidator;
@@ -330,7 +330,7 @@ final class ControllerFactory
                 $taxonomyDomain['tag_enabled'],
                 new PreviewConfig($rvn['config']),
                 new EditorMeta($rvn['config'], (string) $rvn['root']),
-                new FeedParser($rvn['config'], $rvn['input']),
+                new FeedPolicy($rvn['config'], $rvn['input']),
                 $rvn['panel_editor_tabs'](),
                 $rvn['panel_editor'](),
                 new Upload()
@@ -546,7 +546,7 @@ final class ControllerFactory
                 $userDomain['user_read'],
                 $userDomain['invite_read'],
                 new SessionFlash('_raven_flash_list'),
-                new GroupRouteParser($rvn['config'], $rvn['input']),
+                new GroupPolicy($rvn['config'], $rvn['input']),
                 new LoginIdentifier()
             );
 
@@ -573,7 +573,7 @@ final class ControllerFactory
                 $userDomain['user_read'],
                 $userDomain['user_write'],
                 $userDomain['auth_write'],
-                new GroupRouteParser($rvn['config'], $rvn['input']),
+                new GroupPolicy($rvn['config'], $rvn['input']),
                 new LoginIdentifier(),
                 $rvn['panel_editor_tabs'](),
                 $rvn['panel_editor_blocks'](),
@@ -609,7 +609,7 @@ final class ControllerFactory
                 $rvn['input'],
                 $userDomain['invite_write'],
                 new SessionFlash('_raven_flash_list'),
-                new GroupRouteParser($rvn['config'], $rvn['input'])
+                new GroupPolicy($rvn['config'], $rvn['input'])
             );
 
             return $userInviteController;
@@ -631,7 +631,7 @@ final class ControllerFactory
                 $requestContextFactory(),
                 $rvn['input'],
                 $groupDomain['group_read'],
-                new GroupRouteParser($rvn['config'], $rvn['input'])
+                new GroupPolicy($rvn['config'], $rvn['input'])
             );
 
             return $groupListController;
@@ -654,7 +654,7 @@ final class ControllerFactory
                 $rvn['input'],
                 $groupDomain['group_write'],
                 $groupDomain['group_read'],
-                new GroupRouteParser($rvn['config'], $rvn['input']),
+                new GroupPolicy($rvn['config'], $rvn['input']),
                 $rvn['panel_editor_tabs'](),
                 $rvn['panel_editor'](),
                 new PreviewConfig($rvn['config']),

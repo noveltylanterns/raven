@@ -13,7 +13,7 @@ namespace Raven\Core\Repository;
 use PDO;
 use Raven\Lib\Database\SqlTable;
 use Raven\Lib\Parser\ChannelRepoParser;
-use Raven\Lib\Parser\ChannelRouteParser;
+use Raven\Core\Router\ChannelPolicy;
 use Raven\Lib\Parser\SetParser;
 
 /**
@@ -545,8 +545,8 @@ class ChannelRead
             'editor_override' => ChannelRepoParser::normalizeEditorOverride(
                 (string) ($raw['editor_override'] ?? 'inherit')
             ),
-            'route_mode' => ChannelRouteParser::normalizeChannelRouteMode((string) ($raw['route_mode'] ?? 'inherit')),
-            'route_separator' => ChannelRouteParser::normalizeChannelSeparator(
+            'route_mode' => ChannelPolicy::normalizeChannelRouteMode((string) ($raw['route_mode'] ?? 'inherit')),
+            'route_separator' => ChannelPolicy::normalizeChannelSeparator(
                 (string) ($raw['route_separator'] ?? 'inherit')
             ),
             'cover_image_path' => ChannelRepoParser::normalizeNullablePath($raw['cover_image_path'] ?? null),
@@ -840,8 +840,8 @@ class ChannelRead
             'editor_override' => ChannelRepoParser::normalizeEditorOverride(
                 (string) ($raw['editor_override'] ?? 'inherit')
             ),
-            'route_mode' => ChannelRouteParser::normalizeChannelRouteMode((string) ($raw['route_mode'] ?? 'inherit')),
-            'route_separator' => ChannelRouteParser::normalizeChannelSeparator(
+            'route_mode' => ChannelPolicy::normalizeChannelRouteMode((string) ($raw['route_mode'] ?? 'inherit')),
+            'route_separator' => ChannelPolicy::normalizeChannelSeparator(
                 (string) ($raw['route_separator'] ?? 'inherit')
             ),
             'cover_image_path' => ChannelRepoParser::normalizeNullablePath($raw['cover_image_path'] ?? null),
@@ -1118,8 +1118,8 @@ class ChannelRead
             'editor_override' => ChannelRepoParser::normalizeEditorOverride(
                 (string) ($raw['editor_override'] ?? 'inherit')
             ),
-            'route_mode' => ChannelRouteParser::normalizeChannelRouteMode((string) ($raw['route_mode'] ?? 'inherit')),
-            'route_separator' => ChannelRouteParser::normalizeChannelSeparator(
+            'route_mode' => ChannelPolicy::normalizeChannelRouteMode((string) ($raw['route_mode'] ?? 'inherit')),
+            'route_separator' => ChannelPolicy::normalizeChannelSeparator(
                 (string) ($raw['route_separator'] ?? 'inherit')
             ),
             'cover_image_path' => ChannelRepoParser::normalizeNullablePath($raw['cover_image_path'] ?? null),

@@ -16,8 +16,8 @@ use Raven\Core\Repository\ChannelRead;
 use Raven\Core\Repository\ChannelWrite;
 use Raven\Core\Repository\SetRead;
 use Raven\Lib\Media\PreviewConfig;
-use Raven\Lib\Parser\ChannelRouteParser;
-use Raven\Lib\Parser\FeedParser;
+use Raven\Core\Router\ChannelPolicy;
+use Raven\Core\Router\FeedPolicy;
 use Raven\Lib\Parser\SetParser;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\View\Panel\EditorMeta;
@@ -48,7 +48,7 @@ final class ChannelEditController
     private bool $tagEnabled;
     private PreviewConfig $taxonomyImageService;
     private EditorMeta $editorMeta;
-    private FeedParser $feedParser;
+    private FeedPolicy $feedParser;
     private EditorTabs $editorTabs;
     private EditorWrapper $editor;
     private Upload $upload;
@@ -64,7 +64,7 @@ final class ChannelEditController
      * @param bool $tagEnabled Whether tag features are enabled in runtime config.
      * @param PreviewConfig $taxonomyImageService Read-side taxonomy image config and path helper.
      * @param EditorMeta $editorMeta Write-side meta-image upload and cleanup helper.
-     * @param FeedParser $feedParser Feed route parser for RSS/Atom route settings.
+     * @param FeedPolicy $feedParser Feed route parser for RSS/Atom route settings.
      * @param EditorTabs $editorTabs Panel editor tab normalization and tab-preserving URL builder.
      * @param EditorWrapper $editor Shared panel editor normalizers.
      * @param Upload $upload Normalizer for $_FILES upload groups.
@@ -81,7 +81,7 @@ final class ChannelEditController
         bool $tagEnabled,
         PreviewConfig $taxonomyImageService,
         EditorMeta $editorMeta,
-        FeedParser $feedParser,
+        FeedPolicy $feedParser,
         EditorTabs $editorTabs,
         EditorWrapper $editor,
         Upload $upload
@@ -133,10 +133,10 @@ final class ChannelEditController
             $channel['editor_override'] = $this->editor->normalizeChannelEditorOverride(
                 (string) ($channel['editor_override'] ?? 'inherit')
             );
-            $channel['route_mode'] = ChannelRouteParser::normalizeChannelRouteMode(
+            $channel['route_mode'] = ChannelPolicy::normalizeChannelRouteMode(
                 (string) ($channel['route_mode'] ?? 'inherit')
             );
-            $channel['route_separator'] = ChannelRouteParser::normalizeChannelSeparator(
+            $channel['route_separator'] = ChannelPolicy::normalizeChannelSeparator(
                 (string) ($channel['route_separator'] ?? 'inherit')
             );
         }
@@ -196,10 +196,10 @@ final class ChannelEditController
         $editorOverride = $this->editor->normalizeChannelEditorOverride(
             (string) ($post['editor_override'] ?? 'inherit')
         );
-        $routeMode = ChannelRouteParser::normalizeChannelRouteMode(
+        $routeMode = ChannelPolicy::normalizeChannelRouteMode(
             (string) ($post['route_mode'] ?? 'inherit')
         );
-        $routeSeparator = ChannelRouteParser::normalizeChannelSeparator(
+        $routeSeparator = ChannelPolicy::normalizeChannelSeparator(
             (string) ($post['route_separator'] ?? 'inherit')
         );
         $feedsEnabled = $this->feedParser->feedEnabled();

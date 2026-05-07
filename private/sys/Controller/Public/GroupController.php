@@ -12,7 +12,7 @@ declare(strict_types=1);
 namespace Raven\Core\Controller\Public;
 
 use Raven\Core\Repository\GroupRead;
-use Raven\Lib\Parser\GroupRouteParser;
+use Raven\Core\Router\GroupPolicy;
 use Raven\Lib\View\Public\TemplateDecorator;
 
 /**
@@ -22,7 +22,7 @@ final class GroupController
 {
     private SharedController $context;
     private GroupRead $groupRead;
-    private GroupRouteParser $groupRouteParser;
+    private GroupPolicy $groupRouteParser;
     private TemplateDecorator $templateDecorator;
 
     /**
@@ -36,7 +36,7 @@ final class GroupController
     ) {
         $this->context = $context;
         $this->groupRead = $groupRead;
-        $this->groupRouteParser = new GroupRouteParser($context->config(), $context->input());
+        $this->groupRouteParser = new GroupPolicy($context->config(), $context->input());
         $this->templateDecorator = new TemplateDecorator(
             $context->config(),
             $context->input(),

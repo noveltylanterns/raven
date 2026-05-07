@@ -18,7 +18,7 @@ use Raven\Core\Repository\InviteRead;
 use Raven\Core\Repository\UserRead;
 use Raven\Lib\Auth\LoginIdentifier;
 use Raven\Lib\Auth\SessionFlash;
-use Raven\Lib\Parser\GroupRouteParser;
+use Raven\Core\Router\GroupPolicy;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\Transport\Redirect;
 use Raven\Lib\View\Pagination;
@@ -40,7 +40,7 @@ final class UserListController
     private Closure $inviteReadResolver;
     private ?InviteRead $inviteRead = null;
     private SessionFlash $flashList;
-    private GroupRouteParser $groupParser;
+    private GroupPolicy $groupParser;
     private LoginIdentifier $loginIdentifier;
 
     /**
@@ -51,7 +51,7 @@ final class UserListController
      * @param UserRead $userRead User repository read side for user list and invite creator map.
      * @param callable(): InviteRead $inviteReadResolver Lazy invite read resolver for token listings.
      * @param SessionFlash $flashList List-style flash store for pulling generated token batches.
-     * @param GroupRouteParser $groupParser Shared group/profile routing-policy parser.
+     * @param GroupPolicy $groupParser Shared group/profile routing-policy parser.
      * @param LoginIdentifier $loginIdentifier Shared login-identifier normalization helper.
      * @return void
      */
@@ -63,7 +63,7 @@ final class UserListController
         UserRead $userRead,
         callable $inviteReadResolver,
         SessionFlash $flashList,
-        GroupRouteParser $groupParser,
+        GroupPolicy $groupParser,
         LoginIdentifier $loginIdentifier
     ) {
         $this->context = $context;

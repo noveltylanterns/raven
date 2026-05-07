@@ -15,7 +15,7 @@ use Closure;
 use Raven\Core\Config;
 use Raven\Core\Repository\ChannelRead;
 use Raven\Core\Repository\SetRead;
-use Raven\Lib\Parser\ChannelRouteParser;
+use Raven\Core\Router\ChannelPolicy;
 use Raven\Core\Repository\ConfigRead;
 use Raven\Lib\Parser\UserProfileParser;
 use Raven\Lib\Security\InputSanitizer;
@@ -313,7 +313,7 @@ final class ConfigController
                     $rawValue,
                     $nextConfig,
                     fn (string $value): string => $this->editor->normalizeBodyTextEditorOption($value),
-                    fn (string $value): string => ChannelRouteParser::normalizeGlobalSeparator($value),
+                    fn (string $value): string => ChannelPolicy::normalizeGlobalSeparator($value),
                     fn (string $theme, bool $allowDefault): ?string => $this->panelTheme->normalizeChoice($theme, $allowDefault),
                     $publicThemeOptions,
                     $channelRoutingOptions,
@@ -1349,7 +1349,7 @@ final class ConfigController
 
         $content['editor'] = $this->editor->normalizeBodyTextEditorOption((string) ($content['editor'] ?? 'tinymce'));
         $content['mode'] = $this->normalizeGlobalPageRouteMode((string) ($content['mode'] ?? 'slug'));
-        $content['separator'] = ChannelRouteParser::normalizeGlobalSeparator((string) ($content['separator'] ?? '-'));
+        $content['separator'] = ChannelPolicy::normalizeGlobalSeparator((string) ($content['separator'] ?? '-'));
 
         $feed = $config['feed'] ?? null;
         if (!is_array($feed)) {

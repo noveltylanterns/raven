@@ -15,11 +15,11 @@ use Raven\Core\Repository\CategoryRead;
 use Raven\Core\Repository\ChannelRead;
 use Raven\Core\Repository\PageRead;
 use Raven\Core\Repository\TagRead;
-use Raven\Lib\Parser\FeedParser;
-use Raven\Lib\Parser\CategoryRouteParser;
-use Raven\Lib\Parser\ChannelRouteParser;
-use Raven\Lib\Parser\PageRouteParser;
-use Raven\Lib\Parser\TagRouteParser;
+use Raven\Core\Router\FeedPolicy;
+use Raven\Core\Router\CategoryPolicy;
+use Raven\Core\Router\ChannelPolicy;
+use Raven\Core\Router\PagePolicy;
+use Raven\Core\Router\TagPolicy;
 
 /**
  * Handles split public feed routes.
@@ -31,7 +31,7 @@ final class FeedController
     private PageRead $pageRead;
     private CategoryRead $categoryRead;
     private TagRead $tagRead;
-    private FeedParser $feedParser;
+    private FeedPolicy $feedParser;
 
     /**
      * @param SharedController $context Shared public request context.
@@ -53,7 +53,7 @@ final class FeedController
         $this->pageRead = $pageRead;
         $this->categoryRead = $categoryRead;
         $this->tagRead = $tagRead;
-        $this->feedParser = new FeedParser($context->config(), $context->input());
+        $this->feedParser = new FeedPolicy($context->config(), $context->input());
     }
 
     /**
@@ -251,7 +251,7 @@ final class FeedController
         $pages = [];
 
         if ($taxonomyType === 'category') {
-            $categoryPrefix = CategoryRouteParser::routePrefix($this->context->config(), $this->context->input());
+            $categoryPrefix = CategoryPolicy::routePrefix($this->context->config(), $this->context->input());
             if ($categoryPrefix === '') {
                 $this->context->notFound();
                 return;
@@ -268,7 +268,7 @@ final class FeedController
             $scopeLabel = $this->taxonomyLabel($category, $normalizedSlug);
             $routeSuffix = [$categoryPrefix, $normalizedSlug];
         } elseif ($taxonomyType === 'tag') {
-            $tagPrefix = TagRouteParser::routePrefix($this->context->config(), $this->context->input());
+            $tagPrefix = TagPolicy::routePrefix($this->context->config(), $this->context->input());
             if ($tagPrefix === '') {
                 $this->context->notFound();
                 return;
@@ -520,11 +520,11 @@ final class FeedController
 
             $channelSlug = $this->context->input()->slug((string) ($page['channel_slug'] ?? ''));
             if ($channelSlug === null || $channelSlug === '') {
-                $rootSegment = PageRouteParser::buildRouteSegment($this->context->input(), 
+                $rootSegment = PagePolicy::buildRouteSegment($this->context->input(), 
                     $slug,
                     $pageId,
                     (string) ($page['created'] ?? ''),
-                    ChannelRouteParser::globalPageRouteMode($this->context->config()),
+                    ChannelPolicy::globalPageRouteMode($this->context->config()),
                     'inherit',
                     (string) $this->context->config()->get('content.separator', '-')
                 );
@@ -536,11 +536,11 @@ final class FeedController
                 . rawurlencode($channelSlug)
                 . '/'
                 . rawurlencode(
-                    PageRouteParser::buildRouteSegment($this->context->input(), 
+                    PagePolicy::buildRouteSegment($this->context->input(), 
                         $slug,
                         $pageId,
                         (string) ($page['created'] ?? ''),
-                        ChannelRouteParser::effectiveChannelRouteMode($this->context->config(), (string) ($page['route_mode_effective'] ?? 'inherit')),
+                        ChannelPolicy::effectiveChannelRouteMode($this->context->config(), (string) ($page['route_mode_effective'] ?? 'inherit')),
                         (string) ($page['route_separator_effective'] ?? 'inherit'),
                         (string) $this->context->config()->get('content.separator', '-')
                     )

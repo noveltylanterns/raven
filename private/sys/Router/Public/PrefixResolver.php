@@ -17,8 +17,8 @@ use Raven\Lib\Security\InputSanitizer;
  * Shared route-prefix normalization helper.
  *
  * Normalizes configured route-prefix slugs with fallback behavior.
- * Used by public route-parser classes (CategoryRouteParser, TagRouteParser,
- * FeedParser, GroupRouteParser) to apply consistent prefix validation policy.
+ * Used by public route-parser classes (CategoryPolicy, TagPolicy,
+ * FeedPolicy, GroupPolicy) to apply consistent prefix validation policy.
  */
 final class PrefixResolver
 {

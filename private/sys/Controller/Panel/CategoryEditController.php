@@ -18,7 +18,7 @@ use Raven\Core\Repository\ChannelRead;
 use Raven\Core\Repository\SetRead;
 use Raven\Core\Repository\SetWrite;
 use Raven\Lib\Media\PreviewConfig;
-use Raven\Lib\Parser\CategoryRouteParser;
+use Raven\Core\Router\CategoryPolicy;
 use Raven\Lib\Parser\SetParser;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\View\Panel\EditorMeta;
@@ -128,7 +128,7 @@ final class CategoryEditController
         $this->context->renderPanel('panel/category/edit', [
             'category' => $category,
             'setOptions' => $this->categorySetRepo()->listOptions(),
-            'categoryRoutePrefix' => CategoryRouteParser::routePrefix($this->context->config(), $this->input),
+            'categoryRoutePrefix' => CategoryPolicy::routePrefix($this->context->config(), $this->input),
             'imageAllowedExtensions' => $this->taxonomyImageService->allowedImageExtensionsLabel(),
             'imageMaxFilesizeKb' => $this->taxonomyImageService->maxImageFilesizeKb(),
             'imageVariantSpecs' => $this->taxonomyImageService->imageVariantSpecs(),

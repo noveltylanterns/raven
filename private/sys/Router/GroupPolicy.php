@@ -2,14 +2,14 @@
 
 /**
  * RAVEN CMS
- * ~/private/lib/Parser/GroupRouteParser.php
+ * ~/private/sys/Router/GroupPolicy.php
  * User profile and group routing configuration helpers.
  * Docs: https://raven.lanterns.io
  */
 
 declare(strict_types=1);
 
-namespace Raven\Lib\Parser;
+namespace Raven\Core\Router;
 
 use Raven\Core\Config;
 use Raven\Core\Router\Public\PrefixResolver;
@@ -21,7 +21,7 @@ use Raven\Lib\Security\InputSanitizer;
  * Reads user.* and group.* config keys so callers that only need routing policy
  * do not have to construct a GroupDataParser instance.
  */
-final class GroupRouteParser
+final class GroupPolicy
 {
     private Config $config;
     private InputSanitizer $input;
