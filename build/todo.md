@@ -1,4 +1,4 @@
-# Raven CMS Running To-Do Checklist
+\# Raven CMS Running To-Do Checklist
 
 This document tracks current/future bugs, patches, modifications & feature additions for the Raven CMS platform.
 This is the default Build Mode backlog file. If the user asks about goals, unpatched bugs, roadmap goals or what to build next, check this file before searching elsewhere in the repo.
@@ -13,8 +13,6 @@ This is the default Build Mode backlog file. If the user asks about goals, unpat
 
 # Misc Bugs & Tweaks
 **Do not delete this heading!**
-- [x] Many of our lib/Parser/ functions are just thin wrappers for existing Repository functions. We were originally going to keep these, but since PSR maps make it just as easy to use Repos as libraries, lets ditch all Parser functions that have existing Repository functions. if this leaves an empty Parser class, delete that class. Lets reduce this folder down to things that can't already be done with Repos.
-- [x] Repeat the above, but for lib/Scribe/ classes.
 
 
 
