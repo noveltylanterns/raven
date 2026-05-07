@@ -54,4 +54,6 @@ Items below are the remaining classified legacy/compatibility lanes after the cu
 
 - **SchemaBootstrap::renameLegacyMediaTables()** — migration shim that renames `{prefix}page_images` → `{prefix}media` and `{prefix}page_image_variants` → `{prefix}media_variants` on first bootstrap after the namespace rename. Safe to remove once all active installs have been through a bootstrap with the new table names. Check before pruning. Audited on 2026-05-06; intentionally retained as the sole remaining Schema compatibility path.
 
+- **EditorMedia::hydrate() + stripEditorMediaColumns()** — both methods had zero callers as of 2026-05-07 and have been commented out in `lib/View/Panel/EditorMedia.php`. Delete the commented block once confirmed nothing depends on them at runtime (e.g. extension or theme code calling them dynamically).
+
 ---

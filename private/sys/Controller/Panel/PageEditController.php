@@ -41,7 +41,7 @@ use Raven\Lib\View\Panel\EditorMCE;
 use Raven\Lib\View\Panel\EditorMDE;
 use Raven\Lib\View\Panel\EditorTabs;
 use Raven\Lib\View\Panel\EditorBlocksPage;
-use Raven\Lib\View\Panel\PanelPost;
+use Raven\Lib\View\Panel\EditorMedia;
 
 /**
  * Handles page create/edit, save, gallery upload/delete, and page delete routes.
@@ -83,7 +83,7 @@ final class PageEditController
     private ?PageBlockParser $pageBlockParser = null;
     private ?EditorBlocksPage $pageBlocks = null;
     private ?Upload $upload = null;
-    private ?PanelPost $panelPostNormalizer = null;
+    private ?EditorMedia $editorMedia = null;
     private ?EditorAuthor $pageAuthorOptionBuilder = null;
     private ?LoginIdentifier $loginIdentifier = null;
     private UserRead $userRepo;
@@ -369,7 +369,7 @@ final class PageEditController
         /** @var mixed $galleryImagesRaw */
         $galleryImagesRaw = $post['gallery_images'] ?? [];
 
-        $galleryImageUpdates = $this->panelPostNormalizer()->normalizeGalleryImageUpdates($galleryImagesRaw);
+        $galleryImageUpdates = $this->editorMedia()->normalizeGalleryImageUpdates($galleryImagesRaw);
 
         if ($this->categoryEnabled && is_array($categoryIdsRaw)) {
             foreach ($categoryIdsRaw as $rawCategoryId) {
@@ -575,7 +575,7 @@ final class PageEditController
 
         $pageId = $this->input->int($post['id'] ?? null, 1);
         $imageId = $this->input->int($post['gallery_delete_image_id'] ?? null, 1);
-        $selectedImageIds = $this->panelPostNormalizer()->selectedIdsFromPost($post, 'gallery_delete_image_ids');
+        $selectedImageIds = $this->editorMedia()->selectedIdsFromPost($post, 'gallery_delete_image_ids');
 
         if ($pageId === null) {
             $this->context->flash('error', 'Invalid image delete request.');
@@ -688,7 +688,7 @@ final class PageEditController
         }
 
         // Bulk-delete mode is used by the list-level "Delete" buttons.
-        $selectedIds = $this->panelPostNormalizer()->selectedIdsFromPost($post);
+        $selectedIds = $this->editorMedia()->selectedIdsFromPost($post);
         if ($selectedIds === []) {
             $this->context->flash('error', 'No pages selected.');
             Redirect::redirect($this->context->panelUrl('/page'));
@@ -890,17 +890,17 @@ final class PageEditController
     }
 
     /**
-     * Returns the panel POST normalizer on first use.
+     * Returns the gallery media helper on first use.
      *
-     * @return PanelPost Normalizer for complex panel form POST payloads.
+     * @return EditorMedia Gallery POST and hydration helper for the page editor.
      */
-    private function panelPostNormalizer(): PanelPost
+    private function editorMedia(): EditorMedia
     {
-        if (!$this->panelPostNormalizer instanceof PanelPost) {
-            $this->panelPostNormalizer = new PanelPost($this->input);
+        if (!$this->editorMedia instanceof EditorMedia) {
+            $this->editorMedia = new EditorMedia($this->input);
         }
 
-        return $this->panelPostNormalizer;
+        return $this->editorMedia;
     }
 
     /**
