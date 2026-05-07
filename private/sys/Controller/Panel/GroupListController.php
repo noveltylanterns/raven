@@ -14,6 +14,7 @@ namespace Raven\Core\Controller\Panel;
 use Raven\Core\Repository\GroupRead;
 use Raven\Lib\Parser\GroupRouteParser;
 use Raven\Lib\Security\InputSanitizer;
+use Raven\Lib\View\Pagination;
 
 /**
  * Handles the group list route for the panel.
@@ -64,7 +65,7 @@ final class GroupListController
         $pageResult = $this->groupRead->listPage($perPage, ($requestedPage - 1) * $perPage);
         $totalItems = (int) ($pageResult['total'] ?? 0);
         $groupRows = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
-        $pagination = $this->context->panelPaginationState($totalItems, $requestedPage, $perPage);
+        $pagination = Pagination::state($totalItems, $requestedPage, $perPage);
         if ($totalItems > 0 && $pagination['current'] !== $requestedPage) {
             $pageResult = $this->groupRead->listPage($perPage, $pagination['offset']);
             $groupRows = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
@@ -72,9 +73,9 @@ final class GroupListController
 
         $this->context->renderPanel('panel/group/list', [
             'groups' => $groupRows,
-            'pagination' => $this->context->panelPaginationViewData('/group', $pagination),
+            'pagination' => Pagination::panelViewData($this->context->panelUrl('/group'), $pagination),
             'groupRoutingEnabledSystemWide' => $this->groupRouteParser->groupRoutesEnabledForRoutingTable(),
-            'csrfField' => $this->context->csrfField(),
+            'csrfField' => $this->context->csrf()->field(),
             'flashSuccess' => $this->context->pullFlash('success'),
             'flashError' => $this->context->pullFlash('error'),
             'section' => 'group',

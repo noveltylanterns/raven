@@ -54,6 +54,8 @@ final class PageEditController
     private SharedController $context;
     private Config $config;
     private InputSanitizer $input;
+    private bool $categoryEnabled;
+    private bool $tagEnabled;
     private PageRead $pageRead;
     private PageWrite $pageWrite;
     private MediaRead $mediaRead;
@@ -77,13 +79,13 @@ final class PageEditController
     private Closure $taxonomyLookupRepoResolver;
     private ?TaxonomyRepoParser $taxonomyLookupRepo = null;
     /** @var Closure(string): array<string, mixed> */
-    private Closure $extensionServicesFor;
+    private Closure $extensionServices;
     private ?PageBlockParser $pageBlockParser = null;
     private ?EditorBlocksPage $pageBlocks = null;
-    private ?Upload $uploadFileSetNormalizer = null;
+    private ?Upload $upload = null;
     private ?PanelPost $panelPostNormalizer = null;
     private ?EditorAuthor $pageAuthorOptionBuilder = null;
-    private ?LoginIdentifier $identifierResolver = null;
+    private ?LoginIdentifier $loginIdentifier = null;
     private UserRead $userRepo;
     private ChannelRead $channelRead;
     private EditorTabs $editorTabs;
@@ -101,6 +103,8 @@ final class PageEditController
      * @param SharedController $context Shared panel request context for auth, CSRF, flash, and rendering.
      * @param Config $config Runtime configuration reader for media and content settings.
      * @param InputSanitizer $input Shared input sanitizer for panel request values.
+     * @param bool $categoryEnabled Whether category taxonomy assignments are enabled in runtime config.
+     * @param bool $tagEnabled Whether tag taxonomy assignments are enabled in runtime config.
      * @param PageRead $pageRead Page repository read side for edit-form reads.
      * @param PageWrite $pageWrite Page repository write side for page saves and deletes.
      * @param MediaRead $mediaRead Media repository read side for gallery renders and page-existence checks.
@@ -121,13 +125,15 @@ final class PageEditController
      * @param StateRead $extensionStateStore Shared extension state store for enabled-extension reads.
      * @param ExtensionManager $extensionManager Shared extension catalog for manifest validation reads.
      * @param ExtensionContent $extensionContent Shared editor catalog for extension body blocks and shortcode menus.
-     * @param callable $extensionServicesFor Extension services resolver used to load per-extension shortcode and body-block contributions.
+     * @param callable $extensionServices Extension services resolver used to load per-extension shortcode and body-block contributions.
      * @return void
      */
     public function __construct(
         SharedController $context,
         Config $config,
         InputSanitizer $input,
+        bool $categoryEnabled,
+        bool $tagEnabled,
         PageRead $pageRead,
         PageWrite $pageWrite,
         MediaRead $mediaRead,
@@ -148,11 +154,13 @@ final class PageEditController
         StateRead $extensionStateStore,
         ExtensionManager $extensionManager,
         ExtensionContent $extensionContent,
-        callable $extensionServicesFor
+        callable $extensionServices
     ) {
         $this->context = $context;
         $this->config = $config;
         $this->input = $input;
+        $this->categoryEnabled = $categoryEnabled;
+        $this->tagEnabled = $tagEnabled;
         $this->pageRead = $pageRead;
         $this->pageWrite = $pageWrite;
         $this->mediaRead = $mediaRead;
@@ -173,7 +181,7 @@ final class PageEditController
         $this->extensionStateStore = $extensionStateStore;
         $this->extensionManager = $extensionManager;
         $this->extensionContent = $extensionContent;
-        $this->extensionServicesFor = Closure::fromCallable($extensionServicesFor);
+        $this->extensionServices = Closure::fromCallable($extensionServices);
     }
 
     /**
@@ -211,9 +219,7 @@ final class PageEditController
         $activeTab = $this->editorTabs->normalizeEditorTab($_GET['tab'] ?? null, ['content', 'meta', 'media'], 'content');
 
         // Load channel/category/tag options and page assignments in one query.
-        $categoryEnabled = $this->context->categoryEnabled();
-        $tagEnabled = $this->context->tagEnabled();
-        $taxonomyOptionSets = $this->pageEditorTaxonomyOptionSets($id ?? 0, $categoryEnabled, $tagEnabled);
+        $taxonomyOptionSets = $this->pageEditorTaxonomyOptionSets($id ?? 0, $this->categoryEnabled, $this->tagEnabled);
         $channelOptions = is_array($taxonomyOptionSets['channel_options'] ?? null) ? $taxonomyOptionSets['channel_options'] : [];
         foreach ($channelOptions as &$channelOption) {
             if (!is_array($channelOption)) {
@@ -268,7 +274,7 @@ final class PageEditController
             'authorOptions' => $this->pageAuthorOptionBuilder()->build(
                 $this->userRepo->listAll(),
                 $this->input,
-                fn (string $value): ?string => $this->identifierResolver()->normalizeUsernameOrEmail($this->input, $value)
+                fn (string $value): ?string => $this->loginIdentifier()->normalizeUsernameOrEmail($this->input, $value)
             ),
             'channelOptions' => $channelOptions,
             'defaultCategorySetSelection' => $this->allowedTaxonomySetIdsForChannel(null, 'category'),
@@ -277,8 +283,8 @@ final class PageEditController
             'tagOptionsAll' => $tagOptionsAll,
             'categoryOptionsSelected' => $categoryOptionsSelected,
             'tagOptionsSelected' => $tagOptionsSelected,
-            'categoryEnabled' => $categoryEnabled,
-            'tagEnabled' => $tagEnabled,
+            'categoryEnabled' => $this->categoryEnabled,
+            'tagEnabled' => $this->tagEnabled,
             'galleryImages' => $galleryImages,
             'tinyMceGalleryItems' => $this->editorMce->galleryItems($galleryImages),
             'mceScriptUrl' => $this->editorMce->scriptUrl(),
@@ -299,7 +305,7 @@ final class PageEditController
             'shortcodeInsertItems' => $this->pageEditorInsertableShortcodes(),
             'editorBlocks' => $this->editorBlocks,
             'activeTab' => $activeTab,
-            'csrfField' => $this->context->csrfField(),
+            'csrfField' => $this->context->csrf()->field(),
             'flashSuccess' => $this->context->pullFlash('success'),
             'error' => $this->context->pullFlash('error'),
             'section' => 'page',
@@ -365,10 +371,7 @@ final class PageEditController
 
         $galleryImageUpdates = $this->panelPostNormalizer()->normalizeGalleryImageUpdates($galleryImagesRaw);
 
-        $categoryEnabled = $this->context->categoryEnabled();
-        $tagEnabled = $this->context->tagEnabled();
-
-        if ($categoryEnabled && is_array($categoryIdsRaw)) {
+        if ($this->categoryEnabled && is_array($categoryIdsRaw)) {
             foreach ($categoryIdsRaw as $rawCategoryId) {
                 $parsed = $this->input->int($rawCategoryId, 1);
                 if ($parsed !== null) {
@@ -377,7 +380,7 @@ final class PageEditController
             }
         }
 
-        if ($tagEnabled && is_array($tagIdsRaw)) {
+        if ($this->tagEnabled && is_array($tagIdsRaw)) {
             foreach ($tagIdsRaw as $rawTagId) {
                 $parsed = $this->input->int($rawTagId, 1);
                 if ($parsed !== null) {
@@ -387,15 +390,15 @@ final class PageEditController
         }
 
         // Only keep ids that currently exist, preventing stale/manual post values.
-        $categoryIds = $categoryEnabled ? $this->categoryRepo()->existingIds($categoryIds) : [];
-        $tagIds = $tagEnabled ? $this->tagRepo()->existingIds($tagIds) : [];
+        $categoryIds = $this->categoryEnabled ? $this->categoryRepo()->existingIds($categoryIds) : [];
+        $tagIds = $this->tagEnabled ? $this->tagRepo()->existingIds($tagIds) : [];
         $channelRecord = $channelSlug !== null && $channelSlug !== ''
             ? $this->channelRead->findBySlug($channelSlug)
             : null;
         $allowedCategorySets = $this->allowedTaxonomySetIdsForChannel($channelRecord, 'category');
         $allowedTagSets = $this->allowedTaxonomySetIdsForChannel($channelRecord, 'tag');
 
-        if ($categoryEnabled && !$this->selectionAllowsAllSets($allowedCategorySets)) {
+        if ($this->categoryEnabled && !$this->selectionAllowsAllSets($allowedCategorySets)) {
             $categorySetIdsById = $this->categoryRepo()->setIdsByIds($categoryIds);
             foreach ($categorySetIdsById as $setId) {
                 if (!in_array($setId, $allowedCategorySets, true)) {
@@ -405,7 +408,7 @@ final class PageEditController
             }
         }
 
-        if ($tagEnabled && !$this->selectionAllowsAllSets($allowedTagSets)) {
+        if ($this->tagEnabled && !$this->selectionAllowsAllSets($allowedTagSets)) {
             $tagSetIdsById = $this->tagRepo()->setIdsByIds($tagIds);
             foreach ($tagSetIdsById as $setId) {
                 if (!in_array($setId, $allowedTagSets, true)) {
@@ -485,7 +488,7 @@ final class PageEditController
 
         /** @var mixed $rawUploads */
         $rawUploads = $files['gallery_upload_image'] ?? null;
-        $uploads = $this->uploadFileSetNormalizer()->normalize($rawUploads);
+        $uploads = $this->upload()->normalize($rawUploads);
 
         if ($uploads === []) {
             $this->context->flash('error', 'Please select one or more images to upload.');
@@ -877,13 +880,13 @@ final class PageEditController
      *
      * @return Upload Normalizer for $_FILES upload group arrays.
      */
-    private function uploadFileSetNormalizer(): Upload
+    private function upload(): Upload
     {
-        if (!$this->uploadFileSetNormalizer instanceof Upload) {
-            $this->uploadFileSetNormalizer = new Upload();
+        if (!$this->upload instanceof Upload) {
+            $this->upload = new Upload();
         }
 
-        return $this->uploadFileSetNormalizer;
+        return $this->upload;
     }
 
     /**
@@ -919,13 +922,13 @@ final class PageEditController
      *
      * @return LoginIdentifier Resolver for username/email normalization in author options.
      */
-    private function identifierResolver(): LoginIdentifier
+    private function loginIdentifier(): LoginIdentifier
     {
-        if (!$this->identifierResolver instanceof LoginIdentifier) {
-            $this->identifierResolver = new LoginIdentifier();
+        if (!$this->loginIdentifier instanceof LoginIdentifier) {
+            $this->loginIdentifier = new LoginIdentifier();
         }
 
-        return $this->identifierResolver;
+        return $this->loginIdentifier;
     }
 
     /**
@@ -1093,7 +1096,7 @@ final class PageEditController
     {
         $normalized = strtolower(trim($extensionKey));
         // Resolve the extension's service bundle via the injected services-for callable.
-        $extensionServices = ($this->extensionServicesFor)($normalized);
+        $extensionServices = ($this->extensionServices)($normalized);
         if (!is_array($extensionServices)) {
             return [];
         }

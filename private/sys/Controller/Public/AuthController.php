@@ -22,8 +22,15 @@ use Raven\Lib\Auth\LoginChallenge;
 use Raven\Lib\Auth\LoginEmail;
 use Raven\Lib\Auth\LoginIdentifier;
 use Raven\Lib\Auth\LoginUiState;
+use Raven\Lib\Auth\SessionFlash;
+use Raven\Lib\Parser\GroupRouteParser;
+use Raven\Lib\Parser\PanelParser;
 use Raven\Lib\Parser\RedirectParser;
+use Raven\Lib\Transport\Request;
 use Raven\Lib\Transport\Redirect;
+use Raven\Lib\Transport\Response;
+use Raven\Lib\Security\PublicCaptchaFlow;
+use Raven\Core\Debug\ClientProfiler;
 
 /**
  * Handles split public auth routes.
@@ -37,10 +44,15 @@ final class AuthController
     private Closure $inviteWriteResolver;
     private ?InviteRead $inviteRead = null;
     private ?InviteWrite $inviteWrite = null;
-    private LoginIdentifier $identifierResolver;
+    private SessionFlash $flashStore;
+    private LoginIdentifier $loginIdentifier;
+    private GroupRouteParser $groupRouteParser;
+    private Request $request;
+    private ClientProfiler $clientProfiler;
+    private PublicCaptchaFlow $publicCaptchaFlow;
     private ?LoginUiState $loginUiState = null;
     private ?LoginAttempt $loginAttempt = null;
-    private ?LoginChallenge $loginChallengeWorkflow = null;
+    private ?LoginChallenge $loginChallenge = null;
 
     /**
      * @param SharedController $context Shared public request context.
@@ -62,7 +74,16 @@ final class AuthController
         $this->userRepo = $userRepo;
         $this->inviteReadResolver = Closure::fromCallable($inviteReadResolver);
         $this->inviteWriteResolver = Closure::fromCallable($inviteWriteResolver);
-        $this->identifierResolver = new LoginIdentifier();
+        $this->flashStore = new SessionFlash('_raven_public_flash');
+        $this->loginIdentifier = new LoginIdentifier();
+        $this->groupRouteParser = new GroupRouteParser($context->config(), $context->input());
+        $this->request = new Request();
+        $this->clientProfiler = new ClientProfiler();
+        $this->publicCaptchaFlow = new PublicCaptchaFlow(
+            $context->config(),
+            $context->input(),
+            $this->clientProfiler
+        );
     }
 
     /**
@@ -72,25 +93,25 @@ final class AuthController
      */
     public function login(): void
     {
-        $redirectPath = $this->publicPostLoginRedirectFromRequest();
+        $redirectPath = $this->resolveRedirectPath();
         if ($this->context->auth()->isLoggedIn() && $this->context->auth()->isTwoFactorVerifiedForUser()) {
             Redirect::redirect($redirectPath);
         }
 
         if ($this->context->auth()->pendingTwoFactorUserId() !== null) {
-            $this->storePublicPostLoginRedirect($redirectPath);
+            $this->storePostLoginRedirect($redirectPath);
             Redirect::redirect($this->loginTwoFactorPathWithRedirect($redirectPath));
         }
 
-        $loginIdentifierMode = $this->identifierResolver->modeFromConfig($this->context->config());
+        $loginIdentifierMode = $this->loginIdentifier->modeFromConfig($this->context->config());
         $this->context->renderPublic('auth/login', [
             'site' => $this->context->siteData(),
-            'csrfField' => $this->context->csrfField(),
-            'flashSuccess' => $this->context->pullFlash('success'),
-            'flashError' => $this->context->pullFlash('error'),
+            'csrfField' => $this->context->csrf()->field(),
+            'flashSuccess' => $this->pullFlash('success'),
+            'flashError' => $this->pullFlash('error'),
             'loginPath' => $this->loginPathWithRedirect($redirectPath),
             'registrationPath' => '/register',
-            'registrationMode' => $this->context->groupParser()->registrationMode(),
+            'registrationMode' => $this->groupRouteParser->registrationMode(),
             'loginIdentifierMode' => $loginIdentifierMode,
             'loginIdentifierLabel' => $loginIdentifierMode === 'email' ? 'Email' : 'Username or Email',
             'postLoginRedirectPath' => $redirectPath,
@@ -105,18 +126,18 @@ final class AuthController
      */
     public function loginSubmit(array $post): void
     {
-        $requestedRedirect = $this->publicPostLoginRedirectFromValue((string) ($post['redirect_to'] ?? ''));
-        $this->storePublicPostLoginRedirect($requestedRedirect);
+        $requestedRedirect = $this->normalizeRedirectPath((string) ($post['redirect_to'] ?? ''));
+        $this->storePostLoginRedirect($requestedRedirect);
 
         if (!$this->context->csrf()->validate($post['_csrf'] ?? null)) {
-            $this->context->flash('error', 'Invalid CSRF token.');
+            $this->flash('error', 'Invalid CSRF token.');
             Redirect::redirect($this->loginPathWithRedirect($requestedRedirect));
         }
 
         $result = $this->loginAttempt()->attempt(
             $this->context->auth(),
             $post,
-            $this->loginAttemptClientIpAddress(),
+            $this->clientIpAddress(),
             $this->loginUiState()
         );
 
@@ -125,15 +146,15 @@ final class AuthController
         }
 
         if (($result['status'] ?? '') === 'verified') {
-            Redirect::redirect($this->consumePublicPostLoginRedirectOrDefault());
+            Redirect::redirect($this->consumePostLoginRedirect());
         }
 
         if (($result['status'] ?? '') === 'missing_user') {
             $this->context->auth()->logout();
-            $this->clearPublicPostLoginRedirect();
+            $this->clearPostLoginRedirect();
         }
 
-        $this->context->flash('error', (string) ($result['message'] ?? 'Login failed.'));
+        $this->flash('error', (string) ($result['message'] ?? 'Login failed.'));
         Redirect::redirect($this->loginPathWithRedirect($requestedRedirect));
     }
 
@@ -144,25 +165,25 @@ final class AuthController
      */
     public function loginTwoFactor(): void
     {
-        $redirectPath = $this->publicPostLoginRedirectFromRequest();
+        $redirectPath = $this->resolveRedirectPath();
         if ($redirectPath !== '/') {
-            $this->storePublicPostLoginRedirect($redirectPath);
+            $this->storePostLoginRedirect($redirectPath);
         }
 
-        $viewState = $this->loginChallengeWorkflow()->buildViewState($this->context->auth(), $this->loginUiState());
+        $viewState = $this->loginChallenge()->buildViewState($this->context->auth(), $this->loginUiState());
         if (!(bool) ($viewState['ok'] ?? false)) {
             $this->context->auth()->logout();
-            $this->clearPublicPostLoginRedirect();
-            $this->context->flash('error', (string) ($viewState['message'] ?? 'Your login session expired. Please log in again.'));
+            $this->clearPostLoginRedirect();
+            $this->flash('error', (string) ($viewState['message'] ?? 'Your login session expired. Please log in again.'));
             Redirect::redirect($this->loginPathWithRedirect($redirectPath));
         }
 
         $this->context->renderPublic('auth/login_2fa', [
             'site' => $this->context->siteData(),
-            'csrfField' => $this->context->csrfField(),
+            'csrfField' => $this->context->csrf()->field(),
             'csrfToken' => $this->context->csrf()->token(),
-            'success' => $this->context->pullFlash('success'),
-            'error' => $this->context->pullFlash('error'),
+            'success' => $this->pullFlash('success'),
+            'error' => $this->pullFlash('error'),
             'verifyPath' => $this->loginTwoFactorPathWithRedirect($redirectPath),
             'selectPath' => $this->loginTwoFactorSelectPathWithRedirect($redirectPath),
             'webauthnOptionsPath' => '/login/2fa/webauthn/options',
@@ -180,40 +201,40 @@ final class AuthController
      */
     public function loginTwoFactorSubmit(array $post): void
     {
-        $requestedRedirect = $this->publicPostLoginRedirectFromValue((string) ($post['redirect_to'] ?? ''));
-        $this->storePublicPostLoginRedirect($requestedRedirect);
+        $requestedRedirect = $this->normalizeRedirectPath((string) ($post['redirect_to'] ?? ''));
+        $this->storePostLoginRedirect($requestedRedirect);
 
         if (!$this->context->csrf()->validate($post['_csrf'] ?? null)) {
-            $this->context->flash('error', 'Invalid CSRF token.');
+            $this->flash('error', 'Invalid CSRF token.');
             Redirect::redirect($this->loginTwoFactorPathWithRedirect($requestedRedirect));
         }
 
-        $result = $this->loginChallengeWorkflow()->verifyCodeChallenge($this->context->auth(), $this->loginUiState(), $post);
+        $result = $this->loginChallenge()->verifyCodeChallenge($this->context->auth(), $this->loginUiState(), $post);
         if (($result['status'] ?? '') === 'expired') {
             $this->context->auth()->logout();
-            $this->clearPublicPostLoginRedirect();
-            $this->context->flash('error', (string) ($result['message'] ?? 'Your login session expired. Please log in again.'));
+            $this->clearPostLoginRedirect();
+            $this->flash('error', (string) ($result['message'] ?? 'Your login session expired. Please log in again.'));
             Redirect::redirect($this->loginPathWithRedirect($requestedRedirect));
         }
 
         if (($result['status'] ?? '') === 'email_sent') {
-            $this->context->flash('success', (string) ($result['message'] ?? 'Check your email for a verification code.'));
+            $this->flash('success', (string) ($result['message'] ?? 'Check your email for a verification code.'));
             Redirect::redirect($this->loginTwoFactorPathWithRedirect($requestedRedirect));
         }
 
         if (($result['status'] ?? '') === 'unsupported') {
             $this->context->auth()->logout();
-            $this->clearPublicPostLoginRedirect();
-            $this->context->flash('error', 'This verification method is not supported in the public login form.');
+            $this->clearPostLoginRedirect();
+            $this->flash('error', 'This verification method is not supported in the public login form.');
             Redirect::redirect($this->loginPathWithRedirect($requestedRedirect));
         }
 
         if (($result['status'] ?? '') !== 'verified') {
-            $this->context->flash('error', (string) ($result['message'] ?? 'Verification failed.'));
+            $this->flash('error', (string) ($result['message'] ?? 'Verification failed.'));
             Redirect::redirect($this->loginTwoFactorPathWithRedirect($requestedRedirect));
         }
 
-        Redirect::redirect($this->consumePublicPostLoginRedirectOrDefault());
+        Redirect::redirect($this->consumePostLoginRedirect());
     }
 
     /**
@@ -224,24 +245,24 @@ final class AuthController
      */
     public function loginTwoFactorSelect(array $post): void
     {
-        $requestedRedirect = $this->publicPostLoginRedirectFromValue((string) ($post['redirect_to'] ?? ''));
-        $this->storePublicPostLoginRedirect($requestedRedirect);
+        $requestedRedirect = $this->normalizeRedirectPath((string) ($post['redirect_to'] ?? ''));
+        $this->storePostLoginRedirect($requestedRedirect);
 
         if (!$this->context->csrf()->validate($post['_csrf'] ?? null)) {
-            $this->context->flash('error', 'Invalid CSRF token.');
+            $this->flash('error', 'Invalid CSRF token.');
             Redirect::redirect($this->loginTwoFactorPathWithRedirect($requestedRedirect));
         }
 
-        $result = $this->loginChallengeWorkflow()->selectMethod($this->context->auth(), $this->loginUiState(), $post);
+        $result = $this->loginChallenge()->selectMethod($this->context->auth(), $this->loginUiState(), $post);
         if (($result['status'] ?? '') === 'expired') {
             $this->context->auth()->logout();
-            $this->clearPublicPostLoginRedirect();
-            $this->context->flash('error', (string) ($result['message'] ?? 'Your login session expired. Please log in again.'));
+            $this->clearPostLoginRedirect();
+            $this->flash('error', (string) ($result['message'] ?? 'Your login session expired. Please log in again.'));
             Redirect::redirect($this->loginPathWithRedirect($requestedRedirect));
         }
 
         if (($result['status'] ?? '') === 'invalid_method') {
-            $this->context->flash('error', (string) ($result['message'] ?? 'Selected verification method is invalid.'));
+            $this->flash('error', (string) ($result['message'] ?? 'Selected verification method is invalid.'));
         }
 
         Redirect::redirect($this->loginTwoFactorPathWithRedirect($requestedRedirect));
@@ -256,20 +277,20 @@ final class AuthController
     public function loginTwoFactorWebauthnOptions(array $post): void
     {
         if (!$this->context->csrf()->validate($post['_csrf'] ?? null)) {
-            $this->context->jsonResponse(['ok' => false, 'message' => 'Invalid CSRF token.'], 400);
+            $this->jsonResponse(['ok' => false, 'message' => 'Invalid CSRF token.'], 400);
             return;
         }
 
-        $result = $this->loginChallengeWorkflow()->webauthnOptions($this->context->auth(), $this->loginUiState(), $_SERVER);
+        $result = $this->loginChallenge()->webauthnOptions($this->context->auth(), $this->loginUiState(), $_SERVER);
         if (!(bool) ($result['ok'] ?? false)) {
-            $this->context->jsonResponse(
+            $this->jsonResponse(
                 ['ok' => false, 'message' => (string) ($result['message'] ?? 'Failed to initialize WebAuthn challenge.')],
                 (int) ($result['http_status'] ?? 400)
             );
             return;
         }
 
-        $this->context->jsonResponse(
+        $this->jsonResponse(
             is_array($result['payload'] ?? null) ? $result['payload'] : ['ok' => true],
             (int) ($result['http_status'] ?? 200)
         );
@@ -284,25 +305,25 @@ final class AuthController
     public function loginTwoFactorWebauthnVerify(array $post): void
     {
         if (!$this->context->csrf()->validate($post['_csrf'] ?? null)) {
-            $this->context->jsonResponse(['ok' => false, 'message' => 'Invalid CSRF token.'], 400);
+            $this->jsonResponse(['ok' => false, 'message' => 'Invalid CSRF token.'], 400);
             return;
         }
 
-        $result = $this->loginChallengeWorkflow()->verifyWebauthn(
+        $result = $this->loginChallenge()->verifyWebauthn(
             $this->context->auth(),
             $this->loginUiState(),
             $post,
             $_SERVER
         );
         if (!(bool) ($result['ok'] ?? false)) {
-            $this->context->jsonResponse(
+            $this->jsonResponse(
                 ['ok' => false, 'message' => (string) ($result['message'] ?? 'Security key verification failed.')],
                 (int) ($result['http_status'] ?? 400)
             );
             return;
         }
 
-        $this->context->jsonResponse(['ok' => true, 'redirect' => $this->consumePublicPostLoginRedirectOrDefault()], 200);
+        $this->jsonResponse(['ok' => true, 'redirect' => $this->consumePostLoginRedirect()], 200);
     }
 
     /**
@@ -312,14 +333,14 @@ final class AuthController
      */
     public function register(): void
     {
-        $registrationMode = $this->context->groupParser()->registrationMode();
-        $loginIdentifierMode = $this->identifierResolver->modeFromConfig($this->context->config());
+        $registrationMode = $this->groupRouteParser->registrationMode();
+        $loginIdentifierMode = $this->loginIdentifier->modeFromConfig($this->context->config());
         $this->context->renderPublic('auth/register', [
             'site' => $this->context->siteData(),
-            'csrfField' => $this->context->csrfField(),
-            'captchaMarkup' => $this->context->publicCaptchaMarkup(),
-            'flashSuccess' => $this->context->pullFlash('success'),
-            'flashError' => $this->context->pullFlash('error'),
+            'csrfField' => $this->context->csrf()->field(),
+            'captchaMarkup' => $this->publicCaptchaFlow->markup(),
+            'flashSuccess' => $this->pullFlash('success'),
+            'flashError' => $this->pullFlash('error'),
             'registrationMode' => $registrationMode,
             'registrationClosed' => $registrationMode === 'closed',
             'registrationInvite' => $registrationMode === 'invite',
@@ -338,25 +359,25 @@ final class AuthController
     public function registerSubmit(array $post): void
     {
         if (!$this->context->csrf()->validate($post['_csrf'] ?? null)) {
-            $this->context->flash('error', 'Invalid CSRF token.');
+            $this->flash('error', 'Invalid CSRF token.');
             Redirect::redirect('/register');
         }
 
-        $registrationMode = $this->context->groupParser()->registrationMode();
+        $registrationMode = $this->groupRouteParser->registrationMode();
         if ($registrationMode === 'closed') {
-            $this->context->flash('error', 'Registration is currently closed.');
+            $this->flash('error', 'Registration is currently closed.');
             Redirect::redirect('/register');
         }
 
         if ($this->isRegistrationTemporarilyLocked()) {
-            $this->context->flash('error', 'Too many registration attempts. Please wait a few minutes and try again.');
+            $this->flash('error', 'Too many registration attempts. Please wait a few minutes and try again.');
             Redirect::redirect('/register');
         }
 
         $input = $this->context->input();
-        $loginIdentifierMode = $this->identifierResolver->modeFromConfig($this->context->config());
+        $loginIdentifierMode = $this->loginIdentifier->modeFromConfig($this->context->config());
         $rawUsername = $input->text($post['username'] ?? null, 254);
-        $normalizedUsername = $this->identifierResolver->normalizeUsernameOrEmail($input, $rawUsername);
+        $normalizedUsername = $this->loginIdentifier->normalizeUsernameOrEmail($input, $rawUsername);
         $displayName = $input->text($post['display_name'] ?? null, 160);
         $email = $input->email($post['email'] ?? null);
         $password = $input->text($post['password'] ?? null, 255);
@@ -380,7 +401,7 @@ final class AuthController
         if (!hash_equals($password, $passwordConfirm)) {
             $errors[] = 'Password confirmation does not match.';
         }
-        $captchaError = $this->context->validatePublicCaptcha();
+        $captchaError = $this->publicCaptchaFlow->validateSubmission($post, $_SERVER);
         if ($captchaError !== null) {
             $errors[] = $captchaError;
         }
@@ -405,7 +426,7 @@ final class AuthController
 
         if ($errors !== []) {
             $this->recordRegistrationFailure();
-            $this->context->flash('error', implode(' ', $errors));
+            $this->flash('error', implode(' ', $errors));
             Redirect::redirect('/register');
         }
 
@@ -440,7 +461,7 @@ final class AuthController
                     }
 
                     $this->recordRegistrationFailure();
-                    $this->context->flash('error', 'Invite token is no longer available. Please request a new token.');
+                    $this->flash('error', 'Invite token is no longer available. Please request a new token.');
                     Redirect::redirect('/register');
                 }
             }
@@ -452,12 +473,12 @@ final class AuthController
                 . ' - '
                 . $exception->getMessage()
             );
-            $this->context->flash('error', 'Unable to create account with the provided details. Please review your submission and try again.');
+            $this->flash('error', 'Unable to create account with the provided details. Please review your submission and try again.');
             Redirect::redirect('/register');
         }
 
         $this->clearRegistrationFailures();
-        $this->context->flash('success', 'Account created. You can sign in if your account has dashboard access.');
+        $this->flash('success', 'Account created. You can sign in if your account has dashboard access.');
         Redirect::redirect('/login');
     }
 
@@ -543,7 +564,7 @@ final class AuthController
             $this->loginAttempt = new LoginAttempt(
                 $this->context->config(),
                 $this->context->input(),
-                $this->identifierResolver
+                $this->loginIdentifier
             );
         }
 
@@ -558,10 +579,10 @@ final class AuthController
      *
      * @return LoginChallenge Shared login challenge workflow with email delivery wired.
      */
-    private function loginChallengeWorkflow(): LoginChallenge
+    private function loginChallenge(): LoginChallenge
     {
-        if (!$this->loginChallengeWorkflow instanceof LoginChallenge) {
-            $this->loginChallengeWorkflow = new LoginChallenge(
+        if (!$this->loginChallenge instanceof LoginChallenge) {
+            $this->loginChallenge = new LoginChallenge(
                 $this->context->config(),
                 $this->context->input(),
                 new LoginEmail(),
@@ -569,7 +590,7 @@ final class AuthController
             );
         }
 
-        return $this->loginChallengeWorkflow;
+        return $this->loginChallenge;
     }
 
     /**
@@ -577,10 +598,10 @@ final class AuthController
      *
      * @return string Normalized post-login redirect path.
      */
-    private function consumePublicPostLoginRedirectOrDefault(): string
+    private function consumePostLoginRedirect(): string
     {
         $raw = $this->loginUiState()->consumePostLoginRedirect();
-        $normalized = $this->publicPostLoginRedirectFromValue($raw);
+        $normalized = $this->normalizeRedirectPath($raw);
         return $normalized !== '' ? $normalized : '/';
     }
 
@@ -589,7 +610,7 @@ final class AuthController
      *
      * @return void
      */
-    private function clearPublicPostLoginRedirect(): void
+    private function clearPostLoginRedirect(): void
     {
         $this->loginUiState()->clearAll();
     }
@@ -600,9 +621,9 @@ final class AuthController
      * @param string $value Candidate redirect path.
      * @return void
      */
-    private function storePublicPostLoginRedirect(string $value): void
+    private function storePostLoginRedirect(string $value): void
     {
-        $normalized = $this->publicPostLoginRedirectFromValue($value);
+        $normalized = $this->normalizeRedirectPath($value);
         $this->loginUiState()->storePostLoginRedirect($normalized !== '' ? $normalized : '/');
     }
 
@@ -611,14 +632,14 @@ final class AuthController
      *
      * @return string Normalized redirect path.
      */
-    private function publicPostLoginRedirectFromRequest(): string
+    private function resolveRedirectPath(): string
     {
-        $queryValue = $this->publicPostLoginRedirectFromValue((string) ($_GET['redirect_to'] ?? ''));
+        $queryValue = $this->normalizeRedirectPath((string) ($_GET['redirect_to'] ?? ''));
         if ($queryValue !== '') {
             return $queryValue;
         }
 
-        $storedValue = $this->publicPostLoginRedirectFromValue($this->loginUiState()->postLoginRedirect());
+        $storedValue = $this->normalizeRedirectPath($this->loginUiState()->postLoginRedirect());
         if ($storedValue !== '') {
             return $storedValue;
         }
@@ -628,14 +649,14 @@ final class AuthController
             $parts = parse_url($referer);
             if (is_array($parts)) {
                 $host = strtolower(trim((string) ($parts['host'] ?? '')));
-                $currentHost = strtolower($this->context->requestContextResolver()->resolveRequestHost((string) $this->context->config()->get('site.domain', 'localhost')));
+                $currentHost = strtolower($this->request->resolveRequestHost((string) $this->context->config()->get('site.domain', 'localhost')));
                 if ($host !== '' && $host === $currentHost) {
                     $candidate = (string) ($parts['path'] ?? '/');
                     if (isset($parts['query']) && $parts['query'] !== '') {
                         $candidate .= '?' . (string) $parts['query'];
                     }
-                    $normalized = $this->publicPostLoginRedirectFromValue($candidate);
-                    if ($normalized !== '' && !$this->isPublicAuthPath($normalized)) {
+                    $normalized = $this->normalizeRedirectPath($candidate);
+                    if ($normalized !== '' && !$this->isAuthPath($normalized)) {
                         return $normalized;
                     }
                 }
@@ -651,7 +672,7 @@ final class AuthController
      * @param string $value Candidate redirect path.
      * @return string Normalized safe redirect path, or empty string.
      */
-    private function publicPostLoginRedirectFromValue(string $value): string
+    private function normalizeRedirectPath(string $value): string
     {
         $value = trim($value);
         if ($value === '') {
@@ -680,12 +701,12 @@ final class AuthController
             return '';
         }
 
-        $panelBase = trim($this->context->panelUrl(''));
+        $panelBase = $this->panelBasePath();
         if ($panelBase !== '' && str_starts_with($path, $panelBase)) {
             return '';
         }
 
-        if ($this->isPublicAuthPath($path)) {
+        if ($this->isAuthPath($path)) {
             return '';
         }
 
@@ -708,7 +729,7 @@ final class AuthController
      */
     private function loginPathWithRedirect(string $redirectPath): string
     {
-        $normalized = $this->publicPostLoginRedirectFromValue($redirectPath);
+        $normalized = $this->normalizeRedirectPath($redirectPath);
         if ($normalized === '' || $normalized === '/') {
             return '/login';
         }
@@ -724,7 +745,7 @@ final class AuthController
      */
     private function loginTwoFactorPathWithRedirect(string $redirectPath): string
     {
-        $normalized = $this->publicPostLoginRedirectFromValue($redirectPath);
+        $normalized = $this->normalizeRedirectPath($redirectPath);
         if ($normalized === '' || $normalized === '/') {
             return '/login/2fa';
         }
@@ -740,7 +761,7 @@ final class AuthController
      */
     private function loginTwoFactorSelectPathWithRedirect(string $redirectPath): string
     {
-        $normalized = $this->publicPostLoginRedirectFromValue($redirectPath);
+        $normalized = $this->normalizeRedirectPath($redirectPath);
         if ($normalized === '' || $normalized === '/') {
             return '/login/2fa/select';
         }
@@ -754,7 +775,7 @@ final class AuthController
      * @param string $path Candidate path.
      * @return bool True when the path targets the public auth helper surface.
      */
-    private function isPublicAuthPath(string $path): bool
+    private function isAuthPath(string $path): bool
     {
         $path = (string) parse_url($path, PHP_URL_PATH);
         if ($path === '') {
@@ -769,6 +790,17 @@ final class AuthController
             '/login/2fa/webauthn/verify',
             '/register',
         ], true);
+    }
+
+    /**
+     * Returns the configured panel base path with leading slash and no trailing slash.
+     *
+     * @return string Normalized panel base path.
+     */
+    private function panelBasePath(): string
+    {
+        $panelBase = '/' . trim(PanelParser::fromConfig($this->context->config()), '/');
+        return $panelBase === '/' ? '' : $panelBase;
     }
 
     /**
@@ -790,8 +822,8 @@ final class AuthController
     {
         return $this->context->auth()->isLoginTemporarilyLocked(
             $this->registrationThrottleIdentifier(),
-            $this->loginAttemptClientIpAddress(),
-            $this->loginAttemptWindowSeconds()
+            $this->clientIpAddress(),
+            $this->windowSeconds()
         );
     }
 
@@ -804,10 +836,10 @@ final class AuthController
     {
         $this->context->auth()->recordFailedLoginAttempt(
             $this->registrationThrottleIdentifier(),
-            $this->loginAttemptClientIpAddress(),
-            $this->loginAttemptMaxAttempts(),
-            $this->loginAttemptWindowSeconds(),
-            $this->loginAttemptLockSeconds()
+            $this->clientIpAddress(),
+            $this->maxAttempts(),
+            $this->windowSeconds(),
+            $this->lockSeconds()
         );
     }
 
@@ -820,8 +852,43 @@ final class AuthController
     {
         $this->context->auth()->clearFailedLoginAttempts(
             $this->registrationThrottleIdentifier(),
-            $this->loginAttemptClientIpAddress()
+            $this->clientIpAddress()
         );
+    }
+
+    /**
+     * Stores one public-auth flash message in session.
+     *
+     * @param string $key Flash message key.
+     * @param string $value Flash message text.
+     * @return void
+     */
+    private function flash(string $key, string $value): void
+    {
+        $this->flashStore->put($key, $value);
+    }
+
+    /**
+     * Pulls and clears one public-auth flash message from session.
+     *
+     * @param string $key Flash message key.
+     * @return string|null Message text when present.
+     */
+    private function pullFlash(string $key): ?string
+    {
+        return $this->flashStore->pull($key);
+    }
+
+    /**
+     * Emits one JSON response for public auth helper endpoints.
+     *
+     * @param array<string, mixed> $payload JSON payload.
+     * @param int $status HTTP status code.
+     * @return void
+     */
+    private function jsonResponse(array $payload, int $status = 200): void
+    {
+        Response::json($payload, $status, true);
     }
 
     /**
@@ -829,9 +896,9 @@ final class AuthController
      *
      * @return string Normalized client IP or `unknown` fallback.
      */
-    private function loginAttemptClientIpAddress(): string
+    private function clientIpAddress(): string
     {
-        $normalized = $this->context->clientProfiler()->normalizeClientIp((string) ($_SERVER['REMOTE_ADDR'] ?? ''));
+        $normalized = $this->clientProfiler->normalizeClientIp((string) ($_SERVER['REMOTE_ADDR'] ?? ''));
         return $normalized ?? 'unknown';
     }
 
@@ -840,7 +907,7 @@ final class AuthController
      *
      * @return int Maximum failed attempts before lockout.
      */
-    private function loginAttemptMaxAttempts(): int
+    private function maxAttempts(): int
     {
         $configured = (int) $this->context->config()->get('session.brute.max', 5);
         return max(1, $configured);
@@ -851,7 +918,7 @@ final class AuthController
      *
      * @return int Failure-window length in seconds.
      */
-    private function loginAttemptWindowSeconds(): int
+    private function windowSeconds(): int
     {
         $configured = (int) $this->context->config()->get('session.brute.window', 600);
         return max(1, $configured);
@@ -862,7 +929,7 @@ final class AuthController
      *
      * @return int Lockout duration in seconds.
      */
-    private function loginAttemptLockSeconds(): int
+    private function lockSeconds(): int
     {
         $configured = (int) $this->context->config()->get('session.brute.lock', 900);
         return max(1, $configured);

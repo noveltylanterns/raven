@@ -23,11 +23,11 @@ final class DomainFactory
      *
      * @param callable(callable): Closure $memoize Request-scoped memoization wrapper from public runtime builder.
      * @param Closure $channelReadFactory Channel read factory closure.
-     * @param Closure $categoryLookupRepository Category lookup parser factory closure.
+     * @param Closure $categoryReadFactory Category read repository factory closure.
      * @param Closure $mediaReadFactory Media read factory closure.
      * @param Closure $pageReadFactory Page read factory closure.
      * @param Closure $redirectReadFactory Redirect read factory closure.
-     * @param Closure $tagLookupRepository Tag lookup parser factory closure.
+     * @param Closure $tagReadFactory Tag read repository factory closure.
      * @param Closure $taxonomyLookupRepository Taxonomy lookup parser factory closure.
      * @param Closure $groupReadFactory Group read factory closure.
      * @param Closure $userReadFactory User read factory closure.
@@ -44,11 +44,11 @@ final class DomainFactory
     public static function build(
         callable $memoize,
         Closure $channelReadFactory,
-        Closure $categoryLookupRepository,
+        Closure $categoryReadFactory,
         Closure $mediaReadFactory,
         Closure $pageReadFactory,
         Closure $redirectReadFactory,
-        Closure $tagLookupRepository,
+        Closure $tagReadFactory,
         Closure $taxonomyLookupRepository,
         Closure $groupReadFactory,
         Closure $userReadFactory,
@@ -66,20 +66,20 @@ final class DomainFactory
          */
         $publicContentDomain = $memoize(static function () use (
             $channelReadFactory,
-            $categoryLookupRepository,
+            $categoryReadFactory,
             $mediaReadFactory,
             $pageReadFactory,
             $redirectReadFactory,
-            $tagLookupRepository,
+            $tagReadFactory,
             $taxonomyLookupRepository
         ): array {
             return [
-                'category_lookup' => $categoryLookupRepository,
+                'category_lookup' => $categoryReadFactory,
                 'channel' => $channelReadFactory(),
                 'media' => $mediaReadFactory(),
                 'page' => $pageReadFactory(),
                 'redirect_read' => $redirectReadFactory(),
-                'tag_lookup' => $tagLookupRepository,
+                'tag_lookup' => $tagReadFactory,
                 'taxonomy_lookup' => $taxonomyLookupRepository,
             ];
         });

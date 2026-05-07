@@ -32,18 +32,18 @@ final class ThemeController
     private Config $config;
     private InputSanitizer $input;
     private string $root;
-    private ThemeCatalog $themeCatalogService;
+    private ThemeCatalog $themeCatalog;
     private ?ArchivePackage $archivePackages = null;
     private ?ThemeGenerator $themeGenerator = null;
-    private ?ArchiveInstall $packageInstallWorkflowService = null;
-    private ?ArchiveDelete $directoryTreeService = null;
+    private ?ArchiveInstall $packageInstaller = null;
+    private ?ArchiveDelete $directoryTree = null;
 
     /**
      * @param SharedController $context Shared panel request context.
      * @param Config $config Runtime configuration reader.
      * @param InputSanitizer $input Shared request input sanitizer.
      * @param string $root Project root path for filesystem-backed admin workflows.
-     * @param ThemeCatalog $themeCatalogService Shared public-theme catalog for theme inventory and slug validation.
+     * @param ThemeCatalog $themeCatalog Shared public-theme catalog for theme inventory and slug validation.
      * @return void
      */
     public function __construct(
@@ -51,13 +51,13 @@ final class ThemeController
         Config $config,
         InputSanitizer $input,
         string $root,
-        ThemeCatalog $themeCatalogService
+        ThemeCatalog $themeCatalog
     ) {
         $this->context = $context;
         $this->config = $config;
         $this->input = $input;
         $this->root = rtrim($root, '/\\');
-        $this->themeCatalogService = $themeCatalogService;
+        $this->themeCatalog = $themeCatalog;
     }
 
     /**
@@ -75,13 +75,13 @@ final class ThemeController
         $archivePackages = $this->archivePackages();
 
         $this->context->renderPanel('panel/themes', [
-            'csrfField' => $this->context->csrfField(),
+            'csrfField' => $this->context->csrf()->field(),
             'flashSuccess' => $this->context->pullFlash('success'),
             'flashError' => $this->context->pullFlash('error'),
             'section' => 'themes',
-            'themes' => $this->themeCatalogService->listForPanel(),
-            'activeTheme' => $this->themeCatalogService->activeSlugFromConfig($this->config),
-            'themeOptions' => ThemeDiscovery::options($this->themeCatalogService->root()),
+            'themes' => $this->themeCatalog->listForPanel(),
+            'activeTheme' => $this->themeCatalog->activeSlugFromConfig($this->config),
+            'themeOptions' => ThemeDiscovery::options($this->themeCatalog->root()),
             'packageArchiveAcceptAttribute' => $archivePackages->accept(),
             'packageArchiveFormats' => $archivePackages->formatLabels(),
             'exportArchiveFormats' => $archivePackages->exportFormatOptions(),
@@ -107,12 +107,12 @@ final class ThemeController
         }
 
         $themeSlug = strtolower(trim((string) $this->input->text($post['theme'] ?? null, 80)));
-        if (!$this->themeCatalogService->isSafeSlug($themeSlug)) {
+        if (!$this->themeCatalog->isSafeSlug($themeSlug)) {
             $this->context->flash('error', 'Invalid theme identifier.');
             Redirect::redirect($this->context->panelUrl('/themes'));
         }
 
-        $availableThemes = $this->themeCatalogService->options();
+        $availableThemes = $this->themeCatalog->options();
         if (!isset($availableThemes[$themeSlug])) {
             $this->context->flash('error', 'Theme "' . $themeSlug . '" is not available.');
             Redirect::redirect($this->context->panelUrl('/themes'));
@@ -155,24 +155,24 @@ final class ThemeController
         }
 
         $themeSlug = strtolower(trim((string) $this->input->text($post['slug'] ?? null, 80)));
-        if (!$this->themeCatalogService->isSafeSlug($themeSlug)) {
+        if (!$this->themeCatalog->isSafeSlug($themeSlug)) {
             $this->context->flash('error', 'Theme slug must use lowercase letters, numbers, underscores, or dashes.');
             Redirect::redirect($this->context->panelUrl('/themes'));
         }
 
         $parentTheme = strtolower(trim((string) $this->input->text($post['parent_theme'] ?? null, 80)));
-        if ($parentTheme !== '' && !$this->themeCatalogService->isSafeSlug($parentTheme)) {
+        if ($parentTheme !== '' && !$this->themeCatalog->isSafeSlug($parentTheme)) {
             $this->context->flash('error', 'Parent theme slug is invalid.');
             Redirect::redirect($this->context->panelUrl('/themes'));
         }
 
         $cloneTheme = strtolower(trim((string) $this->input->text($post['clone_theme'] ?? null, 80)));
-        if ($cloneTheme !== '' && !$this->themeCatalogService->isSafeSlug($cloneTheme)) {
+        if ($cloneTheme !== '' && !$this->themeCatalog->isSafeSlug($cloneTheme)) {
             $this->context->flash('error', 'Clone-source theme slug is invalid.');
             Redirect::redirect($this->context->panelUrl('/themes'));
         }
 
-        $themesRoot = $this->themeCatalogService->root();
+        $themesRoot = $this->themeCatalog->root();
         $themeOptions = ThemeDiscovery::options($themesRoot);
         $themeManifests = ThemeDiscovery::manifests($themesRoot);
         if ($parentTheme !== '' && !isset($themeOptions[$parentTheme])) {
@@ -242,7 +242,7 @@ final class ThemeController
                 );
             }
         } catch (\RuntimeException $exception) {
-            $this->directoryTreeService()->removeTree($themePath);
+            $this->directoryTree()->removeTree($themePath);
             $this->context->flash('error', 'Failed to create theme scaffold: ' . $exception->getMessage());
             Redirect::redirect($this->context->panelUrl('/themes'));
         }
@@ -252,7 +252,7 @@ final class ThemeController
                 ConfigScribe::persistValue($this->config->path(), $this->config->all(), 'site.theme', $themeSlug);
                 $this->config = new Config($this->config->path());
             } catch (\RuntimeException $exception) {
-                $this->directoryTreeService()->removeTree($themePath);
+                $this->directoryTree()->removeTree($themePath);
                 $this->context->flash('error', 'Theme scaffold created, but activation failed: ' . $exception->getMessage());
                 Redirect::redirect($this->context->panelUrl('/themes'));
             }
@@ -302,7 +302,7 @@ final class ThemeController
             Redirect::redirect($this->context->panelUrl('/themes'));
         }
 
-        $upload = $this->packageInstallWorkflowService()->validateUpload(
+        $upload = $this->packageInstaller()->validateUpload(
             $files['theme_archive'] ?? null,
             'Theme archive',
             'Themes'
@@ -314,16 +314,16 @@ final class ThemeController
 
         $tmpPath = (string) ($upload['tmp_path'] ?? '');
         $archiveName = (string) ($upload['archive_name'] ?? 'theme-package.zip');
-        $derivedThemeSlug = $this->packageInstallWorkflowService()->themeSlug($tmpPath);
+        $derivedThemeSlug = $this->packageInstaller()->themeSlug($tmpPath);
 
-        $slugResult = $this->packageInstallWorkflowService()->resolveInstallName(
+        $slugResult = $this->packageInstaller()->resolveInstallName(
             (string) ($post['upload_slug'] ?? ''),
             $archiveName,
-            fn (string $name): ?string => $derivedThemeSlug ?? $this->themeCatalogService->slugFromArchiveFilename($name),
-            fn (string $slug): bool => $this->themeCatalogService->isSafeSlug($slug),
-            fn (string $slug): bool => $this->themeCatalogService->isStockSlug($slug),
-            fn (string $slug): ?string => $this->themeCatalogService->nextAvailableSlug($slug),
-            fn (string $slug): bool => file_exists($this->themeCatalogService->root() . '/' . $slug),
+            fn (string $name): ?string => $derivedThemeSlug ?? $this->themeCatalog->slugFromArchiveFilename($name),
+            fn (string $slug): bool => $this->themeCatalog->isSafeSlug($slug),
+            fn (string $slug): bool => $this->themeCatalog->isStockSlug($slug),
+            fn (string $slug): ?string => $this->themeCatalog->nextAvailableSlug($slug),
+            fn (string $slug): bool => file_exists($this->themeCatalog->root() . '/' . $slug),
             'Theme',
             'Theme slug must use lowercase letters, numbers, underscores, or dashes.'
         );
@@ -332,7 +332,7 @@ final class ThemeController
             if (
                 trim((string) ($post['upload_slug'] ?? '')) === ''
                 && $derivedThemeSlug === null
-                && $this->themeCatalogService->slugFromArchiveFilename($archiveName) === null
+                && $this->themeCatalog->slugFromArchiveFilename($archiveName) === null
             ) {
                 $slugError = 'Theme upload failed: theme.json must include a valid "slug" value or use Slug Override.';
             }
@@ -342,7 +342,7 @@ final class ThemeController
         }
         $themeSlug = (string) ($slugResult['name'] ?? '');
 
-        $themesRoot = $this->themeCatalogService->root();
+        $themesRoot = $this->themeCatalog->root();
         if (!is_dir($themesRoot) && !mkdir($themesRoot, 0775, true) && !is_dir($themesRoot)) {
             $this->context->flash('error', 'Failed to initialize public/theme directory.');
             Redirect::redirect($this->context->panelUrl('/themes'));
@@ -354,11 +354,11 @@ final class ThemeController
             Redirect::redirect($this->context->panelUrl('/themes'));
         }
 
-        $extractError = $this->packageInstallWorkflowService()->extractTo(
+        $extractError = $this->packageInstaller()->extractTo(
             $tmpPath,
             $targetDirectory,
             function (string $directory): void {
-                $this->directoryTreeService()->removeTree($directory);
+                $this->directoryTree()->removeTree($directory);
             },
             'theme'
         );
@@ -367,23 +367,23 @@ final class ThemeController
             Redirect::redirect($this->context->panelUrl('/themes'));
         }
 
-        $flattenError = $this->packageInstallWorkflowService()->flattenRoot($targetDirectory);
+        $flattenError = $this->packageInstaller()->flattenRoot($targetDirectory);
         if (is_string($flattenError)) {
-            $this->directoryTreeService()->removeTree($targetDirectory);
+            $this->directoryTree()->removeTree($targetDirectory);
             $this->context->flash('error', $flattenError);
             Redirect::redirect($this->context->panelUrl('/themes'));
         }
 
         $manifestPath = $targetDirectory . '/theme.json';
         if (!is_file($manifestPath)) {
-            $this->directoryTreeService()->removeTree($targetDirectory);
+            $this->directoryTree()->removeTree($targetDirectory);
             $this->context->flash('error', 'Theme upload failed: archive must include theme.json at archive root.');
             Redirect::redirect($this->context->panelUrl('/themes'));
         }
 
         $manifests = ThemeDiscovery::manifests($themesRoot);
         if (!isset($manifests[$themeSlug])) {
-            $this->directoryTreeService()->removeTree($targetDirectory);
+            $this->directoryTree()->removeTree($targetDirectory);
             $this->context->flash('error', 'Theme upload failed: theme.json is missing required/valid metadata.');
             Redirect::redirect($this->context->panelUrl('/themes'));
         }
@@ -411,12 +411,12 @@ final class ThemeController
         }
 
         $themeSlug = strtolower(trim((string) $this->input->text($query['theme'] ?? null, 80)));
-        if (!$this->themeCatalogService->isSafeSlug($themeSlug)) {
+        if (!$this->themeCatalog->isSafeSlug($themeSlug)) {
             $this->context->flash('error', 'Invalid theme identifier.');
             Redirect::redirect($this->context->panelUrl('/themes'));
         }
 
-        $themePath = $this->themeCatalogService->root() . '/' . $themeSlug;
+        $themePath = $this->themeCatalog->root() . '/' . $themeSlug;
         if (!is_dir($themePath)) {
             $this->context->flash('error', 'Theme directory was not found on disk.');
             Redirect::redirect($this->context->panelUrl('/themes'));
@@ -458,28 +458,28 @@ final class ThemeController
         }
 
         $themeSlug = strtolower(trim((string) $this->input->text($post['theme'] ?? null, 80)));
-        if (!$this->themeCatalogService->isSafeSlug($themeSlug)) {
+        if (!$this->themeCatalog->isSafeSlug($themeSlug)) {
             $this->context->flash('error', 'Invalid theme identifier.');
             Redirect::redirect($this->context->panelUrl('/themes'));
         }
 
-        if ($this->themeCatalogService->isStockSlug($themeSlug)) {
+        if ($this->themeCatalog->isStockSlug($themeSlug)) {
             $this->context->flash('error', 'Stock themes cannot be uninstalled.');
             Redirect::redirect($this->context->panelUrl('/themes'));
         }
 
-        $themePath = $this->themeCatalogService->root() . '/' . $themeSlug;
+        $themePath = $this->themeCatalog->root() . '/' . $themeSlug;
         if (!is_dir($themePath)) {
             $this->context->flash('error', 'Theme directory was not found on disk.');
             Redirect::redirect($this->context->panelUrl('/themes'));
         }
 
-        if ($this->themeCatalogService->activeSlugFromConfig($this->config) === $themeSlug) {
+        if ($this->themeCatalog->activeSlugFromConfig($this->config) === $themeSlug) {
             $this->context->flash('error', 'Active theme cannot be uninstalled. Enable another theme first.');
             Redirect::redirect($this->context->panelUrl('/themes'));
         }
 
-        $this->directoryTreeService()->removeTree($themePath);
+        $this->directoryTree()->removeTree($themePath);
         if (is_dir($themePath)) {
             $this->context->flash('error', 'Failed to uninstall theme directory from disk.');
             Redirect::redirect($this->context->panelUrl('/themes'));
@@ -516,28 +516,28 @@ final class ThemeController
     /**
      * Returns the package-install workflow service on first use.
      */
-    private function packageInstallWorkflowService(): ArchiveInstall
+    private function packageInstaller(): ArchiveInstall
     {
-        if (!$this->packageInstallWorkflowService instanceof ArchiveInstall) {
-            $this->packageInstallWorkflowService = new ArchiveInstall(
+        if (!$this->packageInstaller instanceof ArchiveInstall) {
+            $this->packageInstaller = new ArchiveInstall(
                 $this->input,
                 new Upload(),
                 $this->archivePackages()
             );
         }
 
-        return $this->packageInstallWorkflowService;
+        return $this->packageInstaller;
     }
 
     /**
      * Returns the directory-tree helper on first use.
      */
-    private function directoryTreeService(): ArchiveDelete
+    private function directoryTree(): ArchiveDelete
     {
-        if (!$this->directoryTreeService instanceof ArchiveDelete) {
-            $this->directoryTreeService = new ArchiveDelete();
+        if (!$this->directoryTree instanceof ArchiveDelete) {
+            $this->directoryTree = new ArchiveDelete();
         }
 
-        return $this->directoryTreeService;
+        return $this->directoryTree;
     }
 }

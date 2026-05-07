@@ -21,6 +21,7 @@ use Raven\Lib\Auth\SessionFlash;
 use Raven\Lib\Parser\GroupRouteParser;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\Transport\Redirect;
+use Raven\Lib\View\Pagination;
 
 /**
  * Handles user list and invite list routes for the panel.
@@ -40,7 +41,7 @@ final class UserListController
     private ?InviteRead $inviteRead = null;
     private SessionFlash $flashList;
     private GroupRouteParser $groupParser;
-    private LoginIdentifier $loginIdentifierResolver;
+    private LoginIdentifier $loginIdentifier;
 
     /**
      * @param SharedController $context Shared panel request context.
@@ -51,7 +52,7 @@ final class UserListController
      * @param callable(): InviteRead $inviteReadResolver Lazy invite read resolver for token listings.
      * @param SessionFlash $flashList List-style flash store for pulling generated token batches.
      * @param GroupRouteParser $groupParser Shared group/profile routing-policy parser.
-     * @param LoginIdentifier $loginIdentifierResolver Shared login-identifier normalization helper.
+     * @param LoginIdentifier $loginIdentifier Shared login-identifier normalization helper.
      * @return void
      */
     public function __construct(
@@ -63,7 +64,7 @@ final class UserListController
         callable $inviteReadResolver,
         SessionFlash $flashList,
         GroupRouteParser $groupParser,
-        LoginIdentifier $loginIdentifierResolver
+        LoginIdentifier $loginIdentifier
     ) {
         $this->context = $context;
         $this->config = $config;
@@ -73,7 +74,7 @@ final class UserListController
         $this->inviteReadResolver = Closure::fromCallable($inviteReadResolver);
         $this->flashList = $flashList;
         $this->groupParser = $groupParser;
-        $this->loginIdentifierResolver = $loginIdentifierResolver;
+        $this->loginIdentifier = $loginIdentifier;
     }
 
     /**
@@ -98,7 +99,7 @@ final class UserListController
         );
         $totalItems = (int) ($pageResult['total'] ?? 0);
         $userRows = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
-        $pagination = $this->context->panelPaginationState($totalItems, $requestedPage, $perPage);
+        $pagination = Pagination::state($totalItems, $requestedPage, $perPage);
         if ($totalItems > 0 && $pagination['current'] !== $requestedPage) {
             $pageResult = $this->userRead->listPage(
                 $perPage,
@@ -116,10 +117,10 @@ final class UserListController
             'users' => $userRows,
             'prefilterGroup' => $prefilterGroup,
             'groupOptions' => $groupOptions,
-            'loginIdentifierMode' => $this->panelLoginIdentifierMode(),
+            'loginIdentifierMode' => $this->identifierMode(),
             'registrationMode' => $this->registrationMode(),
-            'pagination' => $this->context->panelPaginationViewData('/user', $pagination, ['group' => $prefilterGroup]),
-            'csrfField' => $this->context->csrfField(),
+            'pagination' => Pagination::panelViewData($this->context->panelUrl('/user'), $pagination, ['group' => $prefilterGroup]),
+            'csrfField' => $this->context->csrf()->field(),
             'flashSuccess' => $this->context->pullFlash('success'),
             'flashError' => $this->context->pullFlash('error'),
             'section' => 'user',
@@ -147,7 +148,7 @@ final class UserListController
             'inviteGeneratedTokens' => $this->pullFlashList('generated_invites'),
             'inviteRegistrationMode' => $this->registrationMode(),
             'inviteNowTs' => time(),
-            'csrfField' => $this->context->csrfField(),
+            'csrfField' => $this->context->csrf()->field(),
             'flashSuccess' => $this->context->pullFlash('success'),
             'flashError' => $this->context->pullFlash('error'),
             'section' => 'user',
@@ -262,8 +263,8 @@ final class UserListController
      *
      * @return string `email` or `username`.
      */
-    private function panelLoginIdentifierMode(): string
+    private function identifierMode(): string
     {
-        return $this->loginIdentifierResolver->modeFromConfig($this->config);
+        return $this->loginIdentifier->modeFromConfig($this->config);
     }
 }

@@ -17,6 +17,7 @@ use Raven\Lib\Auth\Panel\PermissionBase as PanelAccess;
 use Raven\Lib\Format\Csv;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\Transport\Redirect;
+use Raven\Lib\View\Pagination;
 
 /**
  * Handles split panel event-log routes.
@@ -76,7 +77,7 @@ final class LogsController
         $perPage = 50;
         $requestedPage = $this->input->int($_GET['page'] ?? null, 1) ?? 1;
         $totalItems = $this->logger()->count($filters);
-        $pagination = $this->context->panelPaginationState($totalItems, $requestedPage, $perPage);
+        $pagination = Pagination::state($totalItems, $requestedPage, $perPage);
         if ($totalItems > 0 && $pagination['current'] !== $requestedPage) {
             $requestedPage = $pagination['current'];
         }
@@ -93,10 +94,10 @@ final class LogsController
         $this->context->renderPanel('panel/logs', [
             'rows' => $rows,
             'filters' => ['severity' => $severity, 'search' => $search],
-            'pagination' => $this->context->panelPaginationViewData('/logs', $pagination, $paginationQuery),
+            'pagination' => Pagination::panelViewData($this->context->panelUrl('/logs'), $pagination, $paginationQuery),
             'totalItems' => $totalItems,
             'loggingEnabled' => $this->logger()->isEnabled('error') || $this->logger()->isEnabled('warn') || $this->logger()->isEnabled('info'),
-            'csrfField' => $this->context->csrfField(),
+            'csrfField' => $this->context->csrf()->field(),
             'flashSuccess' => $this->context->pullFlash('success'),
             'flashError' => $this->context->pullFlash('error'),
             'section' => 'logs',

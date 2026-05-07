@@ -70,17 +70,13 @@ final class ControllerFactory
      * @param callable(): Gatekeeper $resolveAuth Lazy auth-service resolver.
      * @param callable(): ExtensionManager $extensionManagerFactory Extension manager factory.
      * @param callable(string): array<int, array{name: string, slug: string}> $extensionFormsProvider Extension enabled-form resolver.
-     * @param bool $categoryEnabled Whether category support is enabled for the current request.
-     * @param bool $tagEnabled Whether tag support is enabled for the current request.
      * @return void
      */
     public static function registerBase(
         array &$rvn,
         callable $resolveAuth,
         callable $extensionManagerFactory,
-        callable $extensionFormsProvider,
-        bool $categoryEnabled,
-        bool $tagEnabled
+        callable $extensionFormsProvider
     ): void {
         $authController = null;
         $panelSharedController = null;
@@ -132,7 +128,7 @@ final class ControllerFactory
         /**
          * Builds the shared request context for split panel sub-controllers.
          */
-        $rvn['panel_request_context'] = static function () use (&$panelSharedController, &$rvn, $categoryEnabled, $tagEnabled, $resolveAuth): SharedController {
+        $rvn['panel_request_context'] = static function () use (&$panelSharedController, &$rvn, $resolveAuth): SharedController {
             if ($panelSharedController instanceof SharedController) {
                 return $panelSharedController;
             }
@@ -143,8 +139,6 @@ final class ControllerFactory
                 $resolveAuth(),
                 $rvn['csrf'],
                 new SessionFlash('_raven_flash'),
-                $categoryEnabled,
-                $tagEnabled,
                 static function () use (&$rvn): void {
                     (new PublicError($rvn['config'], (string) $rvn['root']))->render404();
                 }
@@ -163,6 +157,8 @@ final class ControllerFactory
      * @param callable(): mixed $extensionStateStoreFactory Extension state store factory.
      * @param callable(): ExtensionManager $extensionManagerFactory Extension manager factory.
      * @param callable(): mixed $extensionContentFactory Extension content catalog factory.
+     * @param bool $categoryEnabled Whether category support is enabled for the current request.
+     * @param bool $tagEnabled Whether tag support is enabled for the current request.
      * @return void
      */
     public static function registerContentTaxonomyControllers(
@@ -171,7 +167,9 @@ final class ControllerFactory
         Closure $panelTaxonomyDomain,
         callable $extensionStateStoreFactory,
         callable $extensionManagerFactory,
-        callable $extensionContentFactory
+        callable $extensionContentFactory,
+        bool $categoryEnabled,
+        bool $tagEnabled
     ): void {
         $dashboardController = null;
         $pageListController = null;
@@ -206,7 +204,9 @@ final class ControllerFactory
         $rvn['panel_page_list_controller'] = static function () use (
             &$pageListController,
             &$rvn,
-            $panelContentDomain
+            $panelContentDomain,
+            $categoryEnabled,
+            $tagEnabled
         ): PageListController {
             if ($pageListController instanceof PageListController) {
                 return $pageListController;
@@ -218,6 +218,8 @@ final class ControllerFactory
             $pageListController = new PageListController(
                 $requestContextFactory(),
                 $rvn['input'],
+                $categoryEnabled,
+                $tagEnabled,
                 $contentDomain['page_read'],
                 $contentDomain['channel_read']
             );
@@ -236,7 +238,9 @@ final class ControllerFactory
             $panelTaxonomyDomain,
             $extensionStateStoreFactory,
             $extensionManagerFactory,
-            $extensionContentFactory
+            $extensionContentFactory,
+            $categoryEnabled,
+            $tagEnabled
         ): PageEditController {
             if ($pageEditController instanceof PageEditController) {
                 return $pageEditController;
@@ -250,6 +254,8 @@ final class ControllerFactory
                 $requestContextFactory(),
                 $rvn['config'],
                 $rvn['input'],
+                $categoryEnabled,
+                $tagEnabled,
                 $contentDomain['page_read'],
                 $contentDomain['page_write'],
                 $contentDomain['media_read'],

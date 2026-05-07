@@ -46,13 +46,13 @@ final class UserEditController
     private UserRead $userRead;
     private UserWrite $userWrite;
     private GroupRouteParser $groupParser;
-    private LoginIdentifier $loginIdentifierResolver;
+    private LoginIdentifier $loginIdentifier;
     private EditorTabs $editorTabs;
     private PanelTheme $panelTheme;
     private EditorBlocks $editorBlocks;
     private AvatarConfig $avatarConfig;
     private MediaConfig $mediaConfig;
-    private UserProfileParser $profileContactService;
+    private UserProfileParser $profileParser;
     private Form2fa $form2fa;
     private UserScribe $userMediaScribe;
     private CoverConfig $coverConfig;
@@ -65,12 +65,12 @@ final class UserEditController
      * @param UserRead $userRead User repository read side for user find and author lookups.
      * @param UserWrite $userWrite User repository write side for panel user saves and deletes.
      * @param GroupRouteParser $groupParser Shared group/profile routing-policy parser.
-     * @param LoginIdentifier $loginIdentifierResolver Shared login-identifier normalization helper.
+     * @param LoginIdentifier $loginIdentifier Shared login-identifier normalization helper.
      * @param EditorTabs $editorTabs Shared editor-tab normalization helper.
      * @param EditorBlocks $editorBlocks Shared repeater-block view helper for modular panel rows.
      * @param AvatarConfig $avatarConfig Shared avatar-limit and template-data helper.
      * @param MediaConfig $mediaConfig Shared non-avatar media-limit helper.
-     * @param UserProfileParser $profileContactService Shared profile-contact normalizer.
+     * @param UserProfileParser $profileParser Shared profile-contact normalizer.
      * @param Form2fa $form2fa Shared 2FA list normalizer.
      * @param UserScribe $userMediaScribe Shared user-media write helper.
      * @param CoverConfig $coverConfig Shared user cover-image URL resolver.
@@ -84,12 +84,12 @@ final class UserEditController
         UserRead $userRead,
         UserWrite $userWrite,
         GroupRouteParser $groupParser,
-        LoginIdentifier $loginIdentifierResolver,
+        LoginIdentifier $loginIdentifier,
         EditorTabs $editorTabs,
         EditorBlocks $editorBlocks,
         AvatarConfig $avatarConfig,
         MediaConfig $mediaConfig,
-        UserProfileParser $profileContactService,
+        UserProfileParser $profileParser,
         Form2fa $form2fa,
         UserScribe $userMediaScribe,
         CoverConfig $coverConfig
@@ -101,13 +101,13 @@ final class UserEditController
         $this->userRead = $userRead;
         $this->userWrite = $userWrite;
         $this->groupParser = $groupParser;
-        $this->loginIdentifierResolver = $loginIdentifierResolver;
+        $this->loginIdentifier = $loginIdentifier;
         $this->editorTabs = $editorTabs;
         $this->panelTheme = new PanelTheme();
         $this->editorBlocks = $editorBlocks;
         $this->avatarConfig = $avatarConfig;
         $this->mediaConfig = $mediaConfig;
-        $this->profileContactService = $profileContactService;
+        $this->profileParser = $profileParser;
         $this->form2fa = $form2fa;
         $this->userMediaScribe = $userMediaScribe;
         $this->coverConfig = $coverConfig;
@@ -157,12 +157,12 @@ final class UserEditController
         $this->context->renderPanel('panel/user/edit', [
             'userRow' => $user,
             'bioMaxLength' => $bioMaxLength,
-            'loginIdentifierMode' => $this->panelLoginIdentifierMode(),
+            'loginIdentifierMode' => $this->identifierMode(),
             'profileContactOptions' => $this->profileContactOptions(),
             'twoFactorTypeOptions' => $this->twoFactorTypeOptions(),
             'profileRoutePrefix' => $this->profileRoutePrefix(),
-            'profileRoutesEnabled' => $this->profileRoutesEnabledForRoutingTable(),
-            'profileRouteSegment' => is_array($user) ? ($this->publicProfileRouteSegmentForUser($user) ?? '') : '',
+            'profileRoutesEnabled' => $this->profileRoutesEnabled(),
+            'profileRouteSegment' => is_array($user) ? ($this->profileRouteSegment($user) ?? '') : '',
             'avatarTemplateData' => is_array($user) ? $this->avatarTemplateData((string) ($user['avatar'] ?? '')) : ['filename' => '', 'url' => '', 'thumb_url' => ''],
             'avatarUploadLimitsNote' => $this->avatarUploadLimitsNote(),
             'coverImageUrl' => is_array($user) ? $this->coverPublicUrl((string) ($user['cover_image'] ?? '')) : '',
@@ -174,7 +174,7 @@ final class UserEditController
             'themeOptions' => ['default', 'corp', 'ice', 'midnight'],
             'editorBlocks' => $this->editorBlocks,
             'activeTab' => $activeTab,
-            'csrfField' => $this->context->csrfField(),
+            'csrfField' => $this->context->csrf()->field(),
             'flashSuccess' => $this->context->pullFlash('success'),
             'error' => $this->context->pullFlash('error'),
             'section' => 'user',
@@ -217,10 +217,10 @@ final class UserEditController
             $activeTab,
             'security'
         );
-        $loginIdentifierMode = $this->panelLoginIdentifierMode();
+        $loginIdentifierMode = $this->identifierMode();
         $usernameSubmitted = array_key_exists('username', $post);
         $rawUsername = $this->input->text($post['username'] ?? null, 254);
-        $username = $this->normalizeUserIdentifierValue($rawUsername);
+        $username = $this->normalizeIdentifier($rawUsername);
         $displayName = $this->input->text($post['display_name'] ?? null, 160);
         $bioMaxLength = max(1, (int) $this->config->get('user.bio', 500));
         $bio = $this->input->text($post['bio'] ?? null, $bioMaxLength);
@@ -716,9 +716,9 @@ final class UserEditController
      *
      * @return string `email` or `username`.
      */
-    private function panelLoginIdentifierMode(): string
+    private function identifierMode(): string
     {
-        return $this->loginIdentifierResolver->modeFromConfig($this->config);
+        return $this->loginIdentifier->modeFromConfig($this->config);
     }
 
     /**
@@ -727,9 +727,9 @@ final class UserEditController
      * @param string $rawValue User-submitted identifier candidate.
      * @return string|null Canonical username/email value, or null when invalid.
      */
-    private function normalizeUserIdentifierValue(string $rawValue): ?string
+    private function normalizeIdentifier(string $rawValue): ?string
     {
-        return $this->loginIdentifierResolver->normalizeUsernameOrEmail($this->input, $rawValue);
+        return $this->loginIdentifier->normalizeUsernameOrEmail($this->input, $rawValue);
     }
 
     /**
@@ -747,9 +747,9 @@ final class UserEditController
      *
      * @return bool True when profile routes are enabled.
      */
-    private function profileRoutesEnabledForRoutingTable(): bool
+    private function profileRoutesEnabled(): bool
     {
-        return $this->groupParser->profileRoutesEnabledForRoutingTable();
+        return $this->groupParser->profileRoutesEnabled();
     }
 
     /**
@@ -770,7 +770,7 @@ final class UserEditController
      * @param array<string, mixed> $user User row payload.
      * @return string|null Public route segment, or null when unavailable.
      */
-    private function publicProfileRouteSegmentForUser(array $user): ?string
+    private function profileRouteSegment(array $user): ?string
     {
         $userId = (int) ($user['id'] ?? 0);
         if ($userId <= 0) {
@@ -779,7 +779,7 @@ final class UserEditController
 
         return match ($this->groupParser->profileSelector()) {
             'string' => $this->currentUserString($user),
-            'username' => $this->normalizeUserIdentifierValue((string) ($user['username'] ?? '')),
+            'username' => $this->normalizeIdentifier((string) ($user['username'] ?? '')),
             default => (string) $userId,
         };
     }
@@ -791,8 +791,8 @@ final class UserEditController
      */
     private function profileContactOptions(): array
     {
-        return $this->profileContactService->normalizeOptionsConfig(
-            $this->config->get('user.contact', $this->profileContactService->defaultOptions())
+        return $this->profileParser->normalizeOptionsConfig(
+            $this->config->get('user.contact', $this->profileParser->defaultOptions())
         );
     }
 
@@ -805,7 +805,7 @@ final class UserEditController
      */
     private function normalizeSubmittedContactProfiles(mixed $rawProfiles, array $allowedOptions): array
     {
-        return $this->profileContactService->normalizeSubmittedProfiles($rawProfiles, $allowedOptions);
+        return $this->profileParser->normalizeSubmittedProfiles($rawProfiles, $allowedOptions);
     }
 
     /**

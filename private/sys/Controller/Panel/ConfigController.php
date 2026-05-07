@@ -152,7 +152,7 @@ final class ConfigController
     private ?array $categorySetOptionsCache = null;
     /** @var array<int, array{id: int, name: string, slug: string, is_root: bool}>|null */
     private ?array $tagSetOptionsCache = null;
-    private ThemeCatalog $themeCatalogService;
+    private ThemeCatalog $themeCatalog;
 
     /**
      * @param SharedController $context Shared panel request context.
@@ -164,7 +164,7 @@ final class ConfigController
      * @param EditorTabs $editorTabs Shared panel editor-tab normalization and URL builder.
      * @param EditorWrapper $editor Shared panel editor utility methods for editor fields.
      * @param EditorBlocks $editorBlocks Shared repeater-block view helper for modular panel rows.
-     * @param ThemeCatalog $themeCatalogService Shared public-theme catalog for config theme options.
+     * @param ThemeCatalog $themeCatalog Shared public-theme catalog for config theme options.
      * @return void
      */
     public function __construct(
@@ -177,7 +177,7 @@ final class ConfigController
         EditorTabs $editorTabs,
         EditorWrapper $editor,
         EditorBlocks $editorBlocks,
-        ThemeCatalog $themeCatalogService
+        ThemeCatalog $themeCatalog
     ) {
         $this->context = $context;
         $this->config = $config;
@@ -190,7 +190,7 @@ final class ConfigController
         $this->editor = $editor;
         $this->panelTheme = new PanelTheme();
         $this->editorBlocks = $editorBlocks;
-        $this->themeCatalogService = $themeCatalogService;
+        $this->themeCatalog = $themeCatalog;
     }
 
     /**
@@ -217,7 +217,7 @@ final class ConfigController
 
         $this->context->renderPanel('panel/configuration', [
             'canManageConfiguration' => $this->context->auth()->panelService()->canManageConfiguration(),
-            'csrfField' => $this->context->csrfField(),
+            'csrfField' => $this->context->csrf()->field(),
             'flashSuccess' => $this->context->pullFlash('success'),
             'flashError' => $this->context->pullFlash('error'),
             'section' => 'configuration',
@@ -422,7 +422,7 @@ final class ConfigController
             return $this->publicThemeOptionsCache;
         }
 
-        $this->publicThemeOptionsCache = $this->themeCatalogService->options();
+        $this->publicThemeOptionsCache = $this->themeCatalog->options();
         return $this->publicThemeOptionsCache;
     }
 

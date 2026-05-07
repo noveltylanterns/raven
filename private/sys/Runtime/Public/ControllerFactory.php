@@ -18,9 +18,9 @@ use Raven\Core\Controller\Public\ChannelController as PublicChannelController;
 use Raven\Core\Controller\Public\FeedController as PublicFeedController;
 use Raven\Core\Controller\Public\GroupController as PublicGroupController;
 use Raven\Core\Controller\Public\PageController as PublicPageController;
+use Raven\Core\Controller\Public\ProfileController as PublicProfileController;
 use Raven\Core\Controller\Public\SharedController;
 use Raven\Core\Controller\Public\TagController as PublicTagController;
-use Raven\Core\Controller\Public\UserController as PublicUserController;
 use Raven\Core\Gatekeeper;
 use Raven\Lib\Auth\Public\PermissionMask as PublicPermissionMask;
 use Raven\Lib\View\Public\ThemeCatalog;
@@ -60,7 +60,7 @@ final class ControllerFactory
         $publicChannelController = null;
         $publicGroupController = null;
         $publicTagController = null;
-        $publicUserController = null;
+        $publicProfileController = null;
         $publicSharedController = null;
 
         /**
@@ -173,22 +173,22 @@ final class ControllerFactory
         };
 
         /**
-         * Builds the split public user controller on first use.
+         * Builds the split public profile controller on first use.
          */
-        $rvn['public_user_controller'] = static function () use (&$publicUserController, &$rvn, $publicAuthDomain): PublicUserController {
-            if ($publicUserController instanceof PublicUserController) {
-                return $publicUserController;
+        $rvn['public_profile_controller'] = static function () use (&$publicProfileController, &$rvn, $publicAuthDomain): PublicProfileController {
+            if ($publicProfileController instanceof PublicProfileController) {
+                return $publicProfileController;
             }
 
             /** @var callable(): SharedController $requestContextFactory */
             $requestContextFactory = $rvn['public_request_context'];
             $authDomain = $publicAuthDomain();
-            $publicUserController = new PublicUserController(
+            $publicProfileController = new PublicProfileController(
                 $requestContextFactory(),
                 $authDomain['user_read']
             );
 
-            return $publicUserController;
+            return $publicProfileController;
         };
 
         /**

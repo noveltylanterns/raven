@@ -145,8 +145,8 @@ $requirePublicFactory = static function (string $key) use ($rvn): callable {
 $publicPageController = $requirePublicFactory('public_page_controller');
 /** @var callable(): object $publicAuthController */
 $publicAuthController = $requirePublicFactory('public_auth_controller');
-/** @var callable(): object $publicUserController */
-$publicUserController = $requirePublicFactory('public_user_controller');
+/** @var callable(): object $publicProfileController */
+$publicProfileController = $requirePublicFactory('public_profile_controller');
 /** @var callable(): object $publicCategoryController */
 $publicCategoryController = $requirePublicFactory('public_category_controller');
 /** @var callable(): object $publicChannelController */
@@ -175,7 +175,7 @@ $routeDeps = new PublicPayload(
     $rvn,
     $publicAuthController,
     $publicPageController,
-    $publicUserController,
+    $publicProfileController,
     $publicCategoryController,
     $publicChannelController,
     $publicGroupController,

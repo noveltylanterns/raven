@@ -30,7 +30,7 @@ final class ProfileRouter
     {
         self::register(
             $router,
-            $deps->publicUserController,
+            $deps->publicProfileController,
             $deps->publicRequestContext,
             $deps->input,
             $deps->routeConfig
@@ -41,7 +41,7 @@ final class ProfileRouter
      * Registers the public profile route family.
      *
      * @param RouteHandler $router Mutable router receiving profile routes.
-     * @param callable(): object $publicUserController Lazy public-user controller factory.
+     * @param callable(): object $publicProfileController Lazy public-profile controller factory.
      * @param callable(): object $publicRequestContext Lazy public request-context factory.
      * @param InputSanitizer $input Shared input normalizer for route params.
      * @param array{profile_prefix: string} $routeConfig Normalized public route policy.
@@ -49,7 +49,7 @@ final class ProfileRouter
      */
     public static function register(
         RouteHandler $router,
-        callable $publicUserController,
+        callable $publicProfileController,
         callable $publicRequestContext,
         InputSanitizer $input,
         array $routeConfig
@@ -60,7 +60,7 @@ final class ProfileRouter
         }
 
         $profileRouteBase = '/' . $profilePrefix;
-        $router->add('GET', $profileRouteBase . '/{username}', static function (array $params) use ($publicUserController, $publicRequestContext, $input): void {
+        $router->add('GET', $profileRouteBase . '/{username}', static function (array $params) use ($publicProfileController, $publicRequestContext, $input): void {
             $username = $input->text(rawurldecode((string) ($params['username'] ?? '')), 254);
 
             if ($username === '') {
@@ -68,7 +68,7 @@ final class ProfileRouter
                 return;
             }
 
-            $publicUserController()->profile($username);
+            $publicProfileController()->profile($username);
         });
     }
 }

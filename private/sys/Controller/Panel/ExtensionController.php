@@ -37,12 +37,12 @@ final class ExtensionController
     private InputSanitizer $input;
     private string $root;
     /** @var Closure(string): array<string, mixed> */
-    private Closure $extensionServicesFor;
+    private Closure $extensionServices;
     private StateRead $extensionStateStore;
     private ExtensionManager $extensionManager;
     private ?ArchivePackage $archivePackages = null;
-    private ?ArchiveInstall $packageInstallWorkflowService = null;
-    private ?ArchiveDelete $directoryTreeService = null;
+    private ?ArchiveInstall $packageInstaller = null;
+    private ?ArchiveDelete $directoryTree = null;
     private ?Scaffold $extensionScaffold = null;
     private ?StorageProvisioner $extensionStorageProvisioner = null;
     private ?Bootstrap $extensionBootstrap = null;
@@ -54,7 +54,7 @@ final class ExtensionController
      * @param string $root Project root path for filesystem-backed admin workflows.
      * @param StateRead $extensionStateStore Shared extension state store for panel extension reads/writes.
      * @param ExtensionManager $extensionManager Shared extension catalog for manifest and stock-extension reads.
-     * @param callable(string): array<string, mixed> $extensionServicesFor Lazy per-extension services resolver.
+     * @param callable(string): array<string, mixed> $extensionServices Lazy per-extension services resolver.
      * @return void
      */
     public function __construct(
@@ -64,7 +64,7 @@ final class ExtensionController
         string $root,
         StateRead $extensionStateStore,
         ExtensionManager $extensionManagerService,
-        callable $extensionServicesFor
+        callable $extensionServices
     ) {
         $this->context = $context;
         $this->config = $config;
@@ -72,7 +72,7 @@ final class ExtensionController
         $this->root = rtrim($root, '/\\');
         $this->extensionStateStore = $extensionStateStore;
         $this->extensionManagerService = $extensionManagerService;
-        $this->extensionServicesFor = Closure::fromCallable($extensionServicesFor);
+        $this->extensionServices = Closure::fromCallable($extensionServices);
     }
 
     /**
@@ -99,7 +99,7 @@ final class ExtensionController
         $archivePackages = $this->archivePackages();
 
         $this->context->renderPanel('panel/extensions', [
-            'csrfField' => $this->context->csrfField(),
+            'csrfField' => $this->context->csrf()->field(),
             'flashSuccess' => $this->context->pullFlash('success'),
             'flashError' => $this->context->pullFlash('error'),
             'section' => 'extensions',
@@ -265,7 +265,7 @@ final class ExtensionController
             Redirect::redirect($this->context->panelUrl('/extensions'));
         }
 
-        $this->directoryTreeService()->removeTree($extensionPath);
+        $this->directoryTree()->removeTree($extensionPath);
         if (is_dir($extensionPath)) {
             $this->context->flash('error', 'Failed to uninstall extension directory from disk.');
             Redirect::redirect($this->context->panelUrl('/extensions'));
@@ -308,7 +308,7 @@ final class ExtensionController
             Redirect::redirect($this->context->panelUrl('/extensions'));
         }
 
-        $upload = $this->packageInstallWorkflowService()->validateUpload(
+        $upload = $this->packageInstaller()->validateUpload(
             $files['extension_archive'] ?? null,
             'Extension archive',
             'Extensions'
@@ -320,15 +320,15 @@ final class ExtensionController
 
         $tmpPath = (string) ($upload['tmp_path'] ?? '');
         $archiveName = (string) ($upload['archive_name'] ?? 'extension-package.zip');
-        $derivedExtensionSlug = $this->packageInstallWorkflowService()->extensionSlug($tmpPath);
+        $derivedExtensionSlug = $this->packageInstaller()->extensionSlug($tmpPath);
 
-        $nameResult = $this->packageInstallWorkflowService()->resolveInstallName(
+        $nameResult = $this->packageInstaller()->resolveInstallName(
             (string) ($post['upload_slug'] ?? ''),
             $archiveName,
             fn (string $name): ?string => $derivedExtensionSlug,
             fn (string $name): bool => $this->extensionManagerService->isSafeDirectoryName($name),
             fn (string $name): bool => $this->extensionManagerService->isStockExtensionDirectory($name),
-            fn (string $name): ?string => $this->nextAvailableExtensionDirectoryName($name),
+            fn (string $name): ?string => $this->nextExtensionDirectory($name),
             fn (string $name): bool => file_exists($this->extensionStateStore->basePath() . '/' . $name),
             'Extension',
             'Extension directory must use lowercase letters, numbers, underscores, or dashes.'
@@ -357,11 +357,11 @@ final class ExtensionController
             Redirect::redirect($this->context->panelUrl('/extensions'));
         }
 
-        $extractError = $this->packageInstallWorkflowService()->extractTo(
+        $extractError = $this->packageInstaller()->extractTo(
             $tmpPath,
             $targetDirectory,
             function (string $directory): void {
-                $this->directoryTreeService()->removeTree($directory);
+                $this->directoryTree()->removeTree($directory);
             },
             'extension'
         );
@@ -370,9 +370,9 @@ final class ExtensionController
             Redirect::redirect($this->context->panelUrl('/extensions'));
         }
 
-        $flattenError = $this->packageInstallWorkflowService()->flattenRoot($targetDirectory);
+        $flattenError = $this->packageInstaller()->flattenRoot($targetDirectory);
         if (is_string($flattenError)) {
-            $this->directoryTreeService()->removeTree($targetDirectory);
+            $this->directoryTree()->removeTree($targetDirectory);
             $this->context->flash('error', $flattenError);
             Redirect::redirect($this->context->panelUrl('/extensions'));
         }
@@ -382,7 +382,7 @@ final class ExtensionController
             fn (string $extensionKey): array => $this->listEnabledExtensionForms($extensionKey)
         );
         if (!($manifest['valid'] ?? false)) {
-            $this->directoryTreeService()->removeTree($targetDirectory);
+            $this->directoryTree()->removeTree($targetDirectory);
             $reason = (string) ($manifest['invalid_reason'] ?? 'Missing required extension metadata.');
             $this->context->flash('error', 'Extension upload failed: ' . $reason);
             Redirect::redirect($this->context->panelUrl('/extensions'));
@@ -402,7 +402,7 @@ final class ExtensionController
                 $this->extensionStateStore->saveState($enabledMap, $permissionMap, $permissionBitsMap);
             }
         } catch (\RuntimeException $exception) {
-            $this->directoryTreeService()->removeTree($targetDirectory);
+            $this->directoryTree()->removeTree($targetDirectory);
             $this->context->flash('error', 'Extension upload failed: ' . $exception->getMessage());
             Redirect::redirect($this->context->panelUrl('/extensions'));
         }
@@ -569,7 +569,7 @@ final class ExtensionController
                 $generateComposerFile
             );
         } catch (\Throwable $exception) {
-            $this->directoryTreeService()->removeTree($extensionPath);
+            $this->directoryTree()->removeTree($extensionPath);
             $this->context->flash('error', 'Failed to create extension scaffold: ' . $exception->getMessage());
             Redirect::redirect($this->context->panelUrl('/extensions'));
         }
@@ -588,7 +588,7 @@ final class ExtensionController
                 $this->extensionStateStore->saveState($enabledMap, $permissionMap, $permissionBitsMap);
             }
         } catch (\RuntimeException $exception) {
-            $this->directoryTreeService()->removeTree($extensionPath);
+            $this->directoryTree()->removeTree($extensionPath);
             $this->context->flash('error', 'Extension scaffold created, but state finalization failed: ' . $exception->getMessage());
             Redirect::redirect($this->context->panelUrl('/extensions'));
         }
@@ -635,7 +635,7 @@ final class ExtensionController
     /**
      * Resolves the next available extension directory name by appending copy suffixes.
      */
-    private function nextAvailableExtensionDirectoryName(string $baseName): ?string
+    private function nextExtensionDirectory(string $baseName): ?string
     {
         $normalizedBase = strtolower(trim($baseName));
         if (!$this->extensionManagerService->isSafeDirectoryName($normalizedBase)) {
@@ -679,7 +679,7 @@ final class ExtensionController
     private function listEnabledExtensionForms(string $extensionKey): array
     {
         $normalized = strtolower(trim($extensionKey));
-        $extensionServices = ($this->extensionServicesFor)($normalized);
+        $extensionServices = ($this->extensionServices)($normalized);
         if (is_array($extensionServices)) {
             $formsRepository = $extensionServices['forms'] ?? null;
             if (is_object($formsRepository) && method_exists($formsRepository, 'listAll')) {
@@ -813,28 +813,28 @@ final class ExtensionController
     /**
      * Returns the package-install workflow service on first use.
      */
-    private function packageInstallWorkflowService(): ArchiveInstall
+    private function packageInstaller(): ArchiveInstall
     {
-        if (!$this->packageInstallWorkflowService instanceof ArchiveInstall) {
-            $this->packageInstallWorkflowService = new ArchiveInstall(
+        if (!$this->packageInstaller instanceof ArchiveInstall) {
+            $this->packageInstaller = new ArchiveInstall(
                 $this->input,
                 new Upload(),
                 $this->archivePackages()
             );
         }
 
-        return $this->packageInstallWorkflowService;
+        return $this->packageInstaller;
     }
 
     /**
      * Returns the directory-tree helper on first use.
      */
-    private function directoryTreeService(): ArchiveDelete
+    private function directoryTree(): ArchiveDelete
     {
-        if (!$this->directoryTreeService instanceof ArchiveDelete) {
-            $this->directoryTreeService = new ArchiveDelete();
+        if (!$this->directoryTree instanceof ArchiveDelete) {
+            $this->directoryTree = new ArchiveDelete();
         }
 
-        return $this->directoryTreeService;
+        return $this->directoryTree;
     }
 }

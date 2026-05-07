@@ -14,6 +14,7 @@ namespace Raven\Core\Controller\Panel;
 use Raven\Core\Repository\ChannelRead;
 use Raven\Core\Repository\PageRead;
 use Raven\Lib\Security\InputSanitizer;
+use Raven\Lib\View\Pagination;
 
 /**
  * Handles the page list route for the panel.
@@ -25,12 +26,16 @@ final class PageListController
 {
     private SharedController $context;
     private InputSanitizer $input;
+    private bool $categoryEnabled;
+    private bool $tagEnabled;
     private PageRead $pageRead;
     private ChannelRead $channelRead;
 
     /**
      * @param SharedController $context Shared panel request context.
      * @param InputSanitizer $input Shared request input sanitizer.
+     * @param bool $categoryEnabled Whether category prefilter support is enabled in runtime config.
+     * @param bool $tagEnabled Whether tag prefilter support is enabled in runtime config.
      * @param PageRead $pageRead Page repository read side for paginated page list queries.
      * @param ChannelRead $channelRead Channel repository read side for channel-slug prefilter resolution.
      * @return void
@@ -38,11 +43,15 @@ final class PageListController
     public function __construct(
         SharedController $context,
         InputSanitizer $input,
+        bool $categoryEnabled,
+        bool $tagEnabled,
         PageRead $pageRead,
         ChannelRead $channelRead
     ) {
         $this->context = $context;
         $this->input = $input;
+        $this->categoryEnabled = $categoryEnabled;
+        $this->tagEnabled = $tagEnabled;
         $this->pageRead = $pageRead;
         $this->channelRead = $channelRead;
     }
@@ -62,10 +71,10 @@ final class PageListController
         $prefilterChannel = $this->input->slug($_GET['channel'] ?? null) ?? '';
         $prefilterCategoryId = $this->input->int($_GET['category'] ?? null, 1) ?? 0;
         $prefilterTagId = $this->input->int($_GET['tag'] ?? null, 1) ?? 0;
-        if (!$this->context->categoryEnabled()) {
+        if (!$this->categoryEnabled) {
             $prefilterCategoryId = 0;
         }
-        if (!$this->context->tagEnabled()) {
+        if (!$this->tagEnabled) {
             $prefilterTagId = 0;
         }
         $requestedPage = $this->input->int($_GET['page'] ?? null, 1) ?? 1;
@@ -84,7 +93,7 @@ final class PageListController
             );
         $totalItems = (int) ($pageResult['total'] ?? 0);
         $pageRows = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
-        $pagination = $this->context->panelPaginationState($totalItems, $requestedPage, $perPage);
+        $pagination = Pagination::state($totalItems, $requestedPage, $perPage);
         if (!$hasMissingChannelPrefilter && $totalItems > 0 && $pagination['current'] !== $requestedPage) {
             $pageResult = $this->pageRead->listPage(
                 $perPage,
@@ -110,8 +119,8 @@ final class PageListController
             'prefilterChannel' => strtolower($prefilterChannel),
             'prefilterCategoryId' => $prefilterCategoryId,
             'prefilterTagId' => $prefilterTagId,
-            'pagination' => $this->context->panelPaginationViewData(
-                '/page',
+            'pagination' => Pagination::panelViewData(
+                $this->context->panelUrl('/page'),
                 $pagination,
                 [
                     'channel' => $prefilterChannel,
@@ -119,7 +128,7 @@ final class PageListController
                     'tag' => $prefilterTagId > 0 ? (string) $prefilterTagId : '',
                 ]
             ),
-            'csrfField' => $this->context->csrfField(),
+            'csrfField' => $this->context->csrf()->field(),
             'flashSuccess' => $this->context->pullFlash('success'),
             'flashError' => $this->context->pullFlash('error'),
             'section' => 'page',

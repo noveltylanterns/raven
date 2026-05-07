@@ -35,7 +35,7 @@ final class GroupEditController
 {
     private SharedController $context;
     private InputSanitizer $input;
-    private GroupWrite $groupRepo;
+    private GroupWrite $groupWrite;
     private GroupRead $groupRead;
     private GroupRouteParser $groupRouteParser;
     private EditorTabs $editorTabs;
@@ -43,13 +43,13 @@ final class GroupEditController
     private PreviewConfig $taxonomyImageService;
     private MediaScribe $mediaScribe;
     private EditorPermissions $permissionDefinitionCatalog;
-    private Upload $uploadFileSetNormalizer;
-    private Closure $panelPermissionMapProvider;
+    private Upload $upload;
+    private Closure $permissionMapProvider;
 
     /**
      * @param SharedController $context Shared panel request context.
      * @param InputSanitizer $input Shared request input sanitizer.
-     * @param GroupWrite $groupRepo Group repository write side for group saves and deletes.
+     * @param GroupWrite $groupWrite Group repository write side for group saves and deletes.
      * @param GroupRead $groupRead Group repository read side for repo-backed group reads.
      * @param GroupRouteParser $groupRouteParser Group route parser for routing-policy reads.
      * @param EditorTabs $editorTabs Panel editor tab normalization and tab-preserving URL builder.
@@ -57,14 +57,14 @@ final class GroupEditController
      * @param PreviewConfig $taxonomyImageService Read-side taxonomy image config and path helper.
      * @param MediaScribe $mediaScribe Write-side meta-image upload and cleanup helper.
      * @param EditorPermissions $permissionDefinitionCatalog Shared panel permission-definition catalog.
-     * @param Upload $uploadFileSetNormalizer Shared upload payload flattener.
-     * @param callable(): array<string, array<string, mixed>> $panelPermissionMapProvider Session-scoped extension permission map provider.
+     * @param Upload $upload Shared upload payload flattener.
+     * @param callable(): array<string, array<string, mixed>> $permissionMapProvider Session-scoped extension permission map provider.
      * @return void
      */
     public function __construct(
         SharedController $context,
         InputSanitizer $input,
-        GroupWrite $groupRepo,
+        GroupWrite $groupWrite,
         GroupRead $groupRead,
         GroupRouteParser $groupRouteParser,
         EditorTabs $editorTabs,
@@ -72,12 +72,12 @@ final class GroupEditController
         PreviewConfig $taxonomyImageService,
         MediaScribe $mediaScribe,
         EditorPermissions $permissionDefinitionCatalog,
-        Upload $uploadFileSetNormalizer,
-        callable $panelPermissionMapProvider
+        Upload $upload,
+        callable $permissionMapProvider
     ) {
         $this->context = $context;
         $this->input = $input;
-        $this->groupRepo = $groupRepo;
+        $this->groupWrite = $groupWrite;
         $this->groupRead = $groupRead;
         $this->groupRouteParser = $groupRouteParser;
         $this->editorTabs = $editorTabs;
@@ -85,8 +85,8 @@ final class GroupEditController
         $this->taxonomyImageService = $taxonomyImageService;
         $this->mediaScribe = $mediaScribe;
         $this->permissionDefinitionCatalog = $permissionDefinitionCatalog;
-        $this->uploadFileSetNormalizer = $uploadFileSetNormalizer;
-        $this->panelPermissionMapProvider = Closure::fromCallable($panelPermissionMapProvider);
+        $this->upload = $upload;
+        $this->permissionMapProvider = Closure::fromCallable($permissionMapProvider);
     }
 
     /**
@@ -124,7 +124,7 @@ final class GroupEditController
             'imageMaxFilesizeKb' => $this->taxonomyImageService->maxImageFilesizeKb(),
             'imageVariantSpecs' => $this->taxonomyImageService->imageVariantSpecs(),
             'activeTab' => $activeTab,
-            'csrfField' => $this->context->csrfField(),
+            'csrfField' => $this->context->csrf()->field(),
             'flashSuccess' => $this->context->pullFlash('success'),
             'error' => $this->context->pullFlash('error'),
             'section' => 'group',
@@ -241,7 +241,7 @@ final class GroupEditController
         }
 
         try {
-            $savedId = $this->groupRepo->save([
+            $savedId = $this->groupWrite->save([
                 'id' => $id,
                 'name' => $name,
                 'slug' => $slug,
@@ -266,8 +266,8 @@ final class GroupEditController
         $nextStorage = $currentStorage;
         $newPathSets = [];
 
-        $coverUploads = $this->uploadFileSetNormalizer->normalize($files['cover_image'] ?? null);
-        $iconUploads = $this->uploadFileSetNormalizer->normalize($files['icon_image'] ?? null);
+        $coverUploads = $this->upload->normalize($files['cover_image'] ?? null);
+        $iconUploads = $this->upload->normalize($files['icon_image'] ?? null);
 
         if (count($coverUploads) > 1 || count($iconUploads) > 1) {
             $this->context->flash('error', 'Please upload only one image per slot.');
@@ -315,7 +315,7 @@ final class GroupEditController
         }
 
         try {
-            $this->groupRepo->updateImageFiles($savedId, $nextStorage);
+            $this->groupWrite->updateImageFiles($savedId, $nextStorage);
         } catch (\Throwable) {
             $this->mediaScribe->cleanupMetaImagePathSets('groups', $savedId, $newPathSets);
             $this->context->flash('error', 'Failed to save group image selections.');
@@ -351,7 +351,7 @@ final class GroupEditController
         $id = $this->input->int($post['id'] ?? null, 1);
         if ($id !== null) {
             try {
-                $this->groupRepo->deleteById($id);
+                $this->groupWrite->deleteById($id);
             } catch (\Throwable $exception) {
                 $this->context->flash('error', $exception->getMessage() ?: 'Failed to delete group.');
                 Redirect::redirect($this->context->panelUrl('/group'));
@@ -371,7 +371,7 @@ final class GroupEditController
         $failedCount = 0;
         foreach ($selectedIds as $selectedId) {
             try {
-                $this->groupRepo->deleteById($selectedId);
+                $this->groupWrite->deleteById($selectedId);
                 $deletedCount++;
             } catch (\Throwable) {
                 $failedCount++;
@@ -406,7 +406,7 @@ final class GroupEditController
     private function permissionDefinitions(): array
     {
         return $this->permissionDefinitionCatalog->definitions(
-            fn (): array => $this->currentPanelPermissionMap()
+            fn (): array => $this->permissionMap()
         );
     }
 
@@ -418,7 +418,7 @@ final class GroupEditController
     private function extensionPermissionBitsMask(): int
     {
         return $this->permissionDefinitionCatalog->extensionBitsMask(
-            fn (): array => $this->currentPanelPermissionMap()
+            fn (): array => $this->permissionMap()
         );
     }
 
@@ -427,10 +427,10 @@ final class GroupEditController
      *
      * @return array<string, array<string, mixed>> Extension permission metadata keyed by directory.
      */
-    private function currentPanelPermissionMap(): array
+    private function permissionMap(): array
     {
         /** @var callable(): array<string, array<string, mixed>> $provider */
-        $provider = $this->panelPermissionMapProvider;
+        $provider = $this->permissionMapProvider;
         $map = $provider();
         return is_array($map) ? $map : [];
     }

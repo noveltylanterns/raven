@@ -12,6 +12,7 @@ declare(strict_types=1);
 namespace Raven\Core\Runtime\Public;
 
 use Closure;
+use Raven\Core\Repository\CategoryRead;
 use Raven\Core\Repository\ChannelRead;
 use Raven\Core\Repository\GroupRead;
 use Raven\Core\Repository\InviteRead;
@@ -19,10 +20,9 @@ use Raven\Core\Repository\InviteWrite;
 use Raven\Core\Repository\MediaRead;
 use Raven\Core\Repository\PageRead;
 use Raven\Core\Repository\RedirectRead;
+use Raven\Core\Repository\TagRead;
 use Raven\Core\Repository\UserRead;
 use Raven\Core\Repository\UserWrite;
-use Raven\Lib\Parser\CategoryRepoParser;
-use Raven\Lib\Parser\TagRepoParser;
 use Raven\Lib\Parser\TaxonomyRepoParser;
 
 /**
@@ -180,10 +180,10 @@ final class RepoFactory
         });
 
         /**
-         * Builds category lookup parsing only for public category-route and taxonomy-feed reads.
+         * Builds category lookup reads only for public category-route and taxonomy-feed flows.
          */
-        $categoryLookupRepository = $memoize(static function () use ($rvn): CategoryRepoParser {
-            return new CategoryRepoParser(
+        $categoryReadFactory = $memoize(static function () use ($rvn): CategoryRead {
+            return new CategoryRead(
                 $rvn['db'],
                 (string) $rvn['driver'],
                 (string) $rvn['prefix']
@@ -191,10 +191,10 @@ final class RepoFactory
         });
 
         /**
-         * Builds tag lookup parsing only for public tag-route and taxonomy-feed reads.
+         * Builds tag lookup reads only for public tag-route and taxonomy-feed flows.
          */
-        $tagLookupRepository = $memoize(static function () use ($rvn): TagRepoParser {
-            return new TagRepoParser(
+        $tagReadFactory = $memoize(static function () use ($rvn): TagRead {
+            return new TagRead(
                 $rvn['db'],
                 (string) $rvn['driver'],
                 (string) $rvn['prefix']
@@ -212,8 +212,8 @@ final class RepoFactory
             'invite_read' => $inviteReadFactory,
             'invite_write' => $inviteWriteFactory,
             'taxonomy_lookup' => $taxonomyLookupRepository,
-            'category_lookup' => $categoryLookupRepository,
-            'tag_lookup' => $tagLookupRepository,
+            'category_lookup' => $categoryReadFactory,
+            'tag_lookup' => $tagReadFactory,
         ];
     }
 }

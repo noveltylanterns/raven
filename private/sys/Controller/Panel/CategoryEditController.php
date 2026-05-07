@@ -50,7 +50,7 @@ final class CategoryEditController
     private MediaScribe $mediaScribe;
     private ChannelRead $channelRead;
     private EditorTabs $editorTabs;
-    private Upload $uploadFileSetNormalizer;
+    private Upload $upload;
 
     /**
      * @param SharedController $context Shared panel request context.
@@ -64,7 +64,7 @@ final class CategoryEditController
      * @param MediaScribe $mediaScribe Write-side meta-image upload and cleanup helper.
      * @param ChannelRead $channelRead Channel repository for category-set channel-assignment counts on delete.
      * @param EditorTabs $editorTabs Panel editor tab normalization and tab-preserving URL builder.
-     * @param Upload $uploadFileSetNormalizer Normalizer for $_FILES upload groups.
+     * @param Upload $upload Normalizer for $_FILES upload groups.
      * @return void
      */
     public function __construct(
@@ -79,7 +79,7 @@ final class CategoryEditController
         MediaScribe $mediaScribe,
         ChannelRead $channelRead,
         EditorTabs $editorTabs,
-        Upload $uploadFileSetNormalizer
+        Upload $upload
     ) {
         $this->context = $context;
         $this->input = $input;
@@ -92,7 +92,7 @@ final class CategoryEditController
         $this->mediaScribe = $mediaScribe;
         $this->channelRead = $channelRead;
         $this->editorTabs = $editorTabs;
-        $this->uploadFileSetNormalizer = $uploadFileSetNormalizer;
+        $this->upload = $upload;
     }
 
     /**
@@ -133,7 +133,7 @@ final class CategoryEditController
             'imageMaxFilesizeKb' => $this->taxonomyImageService->maxImageFilesizeKb(),
             'imageVariantSpecs' => $this->taxonomyImageService->imageVariantSpecs(),
             'activeTab' => $activeTab,
-            'csrfField' => $this->context->csrfField(),
+            'csrfField' => $this->context->csrf()->field(),
             'flashSuccess' => $this->context->pullFlash('success'),
             'error' => $this->context->pullFlash('error'),
             'section' => 'category',
@@ -217,9 +217,9 @@ final class CategoryEditController
         $nextStorage = $currentStorage;
         $newPathSets = [];
 
-        $coverUploads = $this->uploadFileSetNormalizer->normalize($files['cover_image'] ?? null);
-        $previewUploads = $this->uploadFileSetNormalizer->normalize($files['preview_image'] ?? null);
-        $iconUploads = $this->uploadFileSetNormalizer->normalize($files['icon_image'] ?? null);
+        $coverUploads = $this->upload->normalize($files['cover_image'] ?? null);
+        $previewUploads = $this->upload->normalize($files['preview_image'] ?? null);
+        $iconUploads = $this->upload->normalize($files['icon_image'] ?? null);
 
         if (count($coverUploads) > 1 || count($previewUploads) > 1 || count($iconUploads) > 1) {
             $this->context->flash('error', 'Please upload only one image per slot.');
@@ -420,7 +420,7 @@ final class CategoryEditController
 
         $this->context->renderPanel('panel/category/set_edit', [
             'set' => $set,
-            'csrfField' => $this->context->csrfField(),
+            'csrfField' => $this->context->csrf()->field(),
             'flashSuccess' => $this->context->pullFlash('success'),
             'error' => $this->context->pullFlash('error'),
             'section' => 'category',

@@ -23,7 +23,7 @@ final class PublicPayload
     public readonly array $rvn;
     public readonly Closure $publicAuthController;
     public readonly Closure $publicPageController;
-    public readonly Closure $publicUserController;
+    public readonly Closure $publicProfileController;
     public readonly Closure $publicCategoryController;
     public readonly Closure $publicChannelController;
     public readonly Closure $publicGroupController;
@@ -38,7 +38,7 @@ final class PublicPayload
      * @param array<string, mixed> $rvn Shared Raven runtime container.
      * @param callable(): object $publicAuthController Lazy auth controller factory.
      * @param callable(): object $publicPageController Lazy page controller factory.
-     * @param callable(): object $publicUserController Lazy user controller factory.
+     * @param callable(): object $publicProfileController Lazy profile controller factory.
      * @param callable(): object $publicCategoryController Lazy category controller factory.
      * @param callable(): object $publicChannelController Lazy channel controller factory.
      * @param callable(): object $publicGroupController Lazy group controller factory.
@@ -52,7 +52,7 @@ final class PublicPayload
         array $rvn,
         callable $publicAuthController,
         callable $publicPageController,
-        callable $publicUserController,
+        callable $publicProfileController,
         callable $publicCategoryController,
         callable $publicChannelController,
         callable $publicGroupController,
@@ -65,7 +65,7 @@ final class PublicPayload
         $this->rvn = $rvn;
         $this->publicAuthController = Closure::fromCallable($publicAuthController);
         $this->publicPageController = Closure::fromCallable($publicPageController);
-        $this->publicUserController = Closure::fromCallable($publicUserController);
+        $this->publicProfileController = Closure::fromCallable($publicProfileController);
         $this->publicCategoryController = Closure::fromCallable($publicCategoryController);
         $this->publicChannelController = Closure::fromCallable($publicChannelController);
         $this->publicGroupController = Closure::fromCallable($publicGroupController);

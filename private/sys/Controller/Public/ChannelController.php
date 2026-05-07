@@ -20,11 +20,14 @@ use Raven\Lib\Extension\Public\Content as ExtensionContent;
 use Raven\Lib\Extension\Public\FormRuntime as ExtensionFormRuntime;
 use Raven\Lib\Extension\Public\FormInstance as ExtensionFormInstance;
 use Raven\Lib\Extension\Public\Shortcodes as ExtensionShortcodes;
+use Raven\Lib\Parser\FeedParser;
 use Raven\Lib\Parser\RedirectParser;
 use Raven\Lib\Parser\ChannelRouteParser;
 use Raven\Lib\Parser\PageRouteParser;
 use Raven\Lib\Parser\PageBlockParser;
 use Raven\Lib\Parser\UserProfileParser;
+use Raven\Lib\Transport\Request;
+use Raven\Lib\Security\PublicCaptchaFlow;
 use Raven\Lib\Transport\Redirect;
 use Raven\Lib\View\Public\MetaService;
 use Raven\Lib\View\Public\PageBlocks;
@@ -32,6 +35,7 @@ use Raven\Lib\View\Public\PageMarkdown;
 use Raven\Lib\View\Public\TemplateDecorator;
 use Raven\Lib\View\Public\ThemeCatalog;
 use Raven\Lib\View\Public\ThemeTemplate;
+use Raven\Core\Debug\ClientProfiler;
 
 /**
  * Handles split public single-segment channel routes.
@@ -53,8 +57,8 @@ final class ChannelController
     private array $shortcodeRuntimes = [];
     private bool $shortcodeRuntimesLoaded = false;
     /** @var array<string, array{label: string, editor: string}>|null */
-    private ?array $pageBodyBlockTypeDefinitionsCache = null;
-    private ThemeCatalog $themeCatalogService;
+    private ?array $blockTypeDefsCache = null;
+    private ThemeCatalog $themeCatalog;
     private ?ThemeTemplate $themeTemplate = null;
     private ?MetaService $metaService = null;
     private ?TemplateDecorator $templateDecorator = null;
@@ -63,7 +67,11 @@ final class ChannelController
     private ?PageBlocks $pageBlocks = null;
     private ExtensionContent $extensionContent;
     private ?ExtensionFormInstance $formInstance = null;
-    private ?UserProfileParser $profileContactService = null;
+    private ?UserProfileParser $profileParser = null;
+    private Request $request;
+    private FeedParser $feedParser;
+    private ClientProfiler $clientProfiler;
+    private PublicCaptchaFlow $publicCaptchaFlow;
 
     /**
      * @param SharedController $context Shared public request context.
@@ -71,7 +79,7 @@ final class ChannelController
      * @param PageRead $pageRead Page repository read side for channel-homepage and root-page lookups.
      * @param RedirectRead $redirectRead Redirect repository read side for public redirect fallbacks.
      * @param UserRead $userRead User repository read side for author profile lookups in page meta.
-     * @param ThemeCatalog $themeCatalogService Shared public-theme catalog for template resolution and meta reads.
+     * @param ThemeCatalog $themeCatalog Shared public-theme catalog for template resolution and meta reads.
      * @param ExtensionContent $extensionContent Shared extension editor catalog for public block definitions.
      * @param callable(?string=): array<string, mixed> $extensionServicesProvider Lazy extension-services resolver for shortcode runtimes.
      * @return void
@@ -82,7 +90,7 @@ final class ChannelController
         PageRead $pageRead,
         RedirectRead $redirectRead,
         UserRead $userRead,
-        ThemeCatalog $themeCatalogService,
+        ThemeCatalog $themeCatalog,
         ExtensionContent $extensionContent,
         callable $extensionServicesProvider
     ) {
@@ -91,9 +99,17 @@ final class ChannelController
         $this->pageRead = $pageRead;
         $this->redirectRead = $redirectRead;
         $this->userRead = $userRead;
-        $this->themeCatalogService = $themeCatalogService;
+        $this->themeCatalog = $themeCatalog;
         $this->extensionContent = $extensionContent;
         $this->extensionServicesProvider = Closure::fromCallable($extensionServicesProvider);
+        $this->request = new Request();
+        $this->feedParser = new FeedParser($context->config(), $context->input());
+        $this->clientProfiler = new ClientProfiler();
+        $this->publicCaptchaFlow = new PublicCaptchaFlow(
+            $context->config(),
+            $context->input(),
+            $this->clientProfiler
+        );
     }
 
     /**
@@ -124,14 +140,14 @@ final class ChannelController
 
             $channelTemplate = $this->themeTemplate()->resolveChannelTemplateNameForThemeChain(
                 $requestedSlug,
-                $this->publicThemesRoot(),
-                $this->currentPublicThemeSlug(),
+                $this->themesRoot(),
+                $this->activeThemeSlug(),
                 dirname(__DIR__, 4) . '/private/tpl/public'
             );
 
             $site = $this->siteDataWithPageMeta($page);
             // Channel-level cover/preview uploads override page/default meta images on channel landings.
-            $site = $this->context->siteDataWithTaxonomyMetaImage($channel, $site);
+            $site = $this->metaService()->siteDataWithTaxonomyMetaImage($channel, $site);
 
             $this->context->renderPublic($channelTemplate, [
                 'site' => $site,
@@ -189,8 +205,8 @@ final class ChannelController
         $page = $this->templateDecorator()->decoratePageForTemplate($page);
         $pageTemplate = $this->themeTemplate()->resolvePageTemplateNameForThemeChain(
             null,
-            $this->publicThemesRoot(),
-            $this->currentPublicThemeSlug(),
+            $this->themesRoot(),
+            $this->activeThemeSlug(),
             dirname(__DIR__, 4) . '/private/tpl/public'
         );
 
@@ -209,8 +225,8 @@ final class ChannelController
      */
     private function siteDataWithPageMeta(array $page): array
     {
-        $profileContactOptions = $this->profileContactService()->normalizeOptionsConfig(
-            $this->context->config()->get('user.contact', $this->profileContactService()->defaultOptions())
+        $profileContactOptions = $this->profileParser()->normalizeOptionsConfig(
+            $this->context->config()->get('user.contact', $this->profileParser()->defaultOptions())
         );
 
         return $this->metaService()->siteDataWithPageMeta(
@@ -232,9 +248,9 @@ final class ChannelController
     {
         return $this->pageBlocks()->renderPageContentBlocks(
             $page,
-            $this->pageBodyBlockTypeDefinitions(),
+            $this->blockTypeDefinitions(),
             fn (): string => $this->renderPageGalleryBlockHtml($page),
-            fn (string $html): string => $this->renderEmbeddedExtensionFormInstance($html)
+            fn (string $html): string => $this->renderFormShortcodes($html)
         );
     }
 
@@ -314,17 +330,17 @@ final class ChannelController
      *
      * @return array<string, array{label: string, editor: string}> Body-block definitions keyed by type.
      */
-    private function pageBodyBlockTypeDefinitions(): array
+    private function blockTypeDefinitions(): array
     {
-        if (is_array($this->pageBodyBlockTypeDefinitionsCache)) {
-            return $this->pageBodyBlockTypeDefinitionsCache;
+        if (is_array($this->blockTypeDefsCache)) {
+            return $this->blockTypeDefsCache;
         }
 
-        $this->pageBodyBlockTypeDefinitionsCache = $this->pageBlocks()->mergeTypeDefinitions(
+        $this->blockTypeDefsCache = $this->pageBlocks()->mergeTypeDefinitions(
             $this->extensionContent->publicBodyBlockDefinitions()
         );
 
-        return $this->pageBodyBlockTypeDefinitionsCache;
+        return $this->blockTypeDefsCache;
     }
 
     /**
@@ -357,14 +373,14 @@ final class ChannelController
      * @param string $html Raw HTML containing potential shortcode markers.
      * @return string HTML with supported shortcodes expanded.
      */
-    private function renderEmbeddedExtensionFormInstance(string $html): string
+    private function renderFormShortcodes(string $html): string
     {
         return $this->formInstance()->renderPublicShortcodes(
             $html,
             $this->shortcodeRuntimes(),
             (string) ($_SERVER['REQUEST_URI'] ?? '/'),
-            $this->context->csrfField(),
-            fn (): string => $this->context->publicCaptchaMarkup()
+            $this->context->csrf()->field(),
+            fn (): string => $this->publicCaptchaFlow->markup()
         );
     }
 
@@ -430,9 +446,9 @@ final class ChannelController
      *
      * @return string Active public theme slug.
      */
-    private function currentPublicThemeSlug(): string
+    private function activeThemeSlug(): string
     {
-        return $this->themeCatalogService->activeSlugFromConfig($this->context->config());
+        return $this->themeCatalog->activeSlugFromConfig($this->context->config());
     }
 
     /**
@@ -440,9 +456,9 @@ final class ChannelController
      *
      * @return string Absolute public theme root.
      */
-    private function publicThemesRoot(): string
+    private function themesRoot(): string
     {
-        return $this->themeCatalogService->root();
+        return $this->themeCatalog->root();
     }
 
     /**
@@ -454,10 +470,10 @@ final class ChannelController
     {
         if (!$this->metaService instanceof MetaService) {
             $this->metaService = new MetaService(
-                $this->context->requestContextResolver(),
-                $this->themeCatalogService,
-                $this->profileContactService(),
-                $this->context->feedParser()
+                $this->request,
+                $this->themeCatalog,
+                $this->profileParser(),
+                $this->feedParser
             );
         }
 
@@ -469,13 +485,13 @@ final class ChannelController
      *
      * @return UserProfileParser Shared profile-contact helper.
      */
-    private function profileContactService(): UserProfileParser
+    private function profileParser(): UserProfileParser
     {
-        if (!$this->profileContactService instanceof UserProfileParser) {
-            $this->profileContactService = new UserProfileParser($this->context->input());
+        if (!$this->profileParser instanceof UserProfileParser) {
+            $this->profileParser = new UserProfileParser($this->context->input());
         }
 
-        return $this->profileContactService;
+        return $this->profileParser;
     }
 
     /**

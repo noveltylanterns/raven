@@ -79,7 +79,7 @@ final class RedirectEditController
         $this->context->renderPanel('panel/redirect/edit', [
             'redirectRow' => $redirectRow,
             'channelOptions' => $channelOptions,
-            'csrfField' => $this->context->csrfField(),
+            'csrfField' => $this->context->csrf()->field(),
             'flashSuccess' => $this->context->pullFlash('success'),
             'error' => $this->context->pullFlash('error'),
             'section' => 'redirect',
@@ -241,8 +241,11 @@ final class RedirectEditController
      */
     private function isReservedPublicRootSlug(string $slug): bool
     {
+        // Pull panel-path directly from config here to avoid keeping a shared-controller
+        // wrapper method that only this controller consumed.
+        $panelPath = trim((string) $this->context->config()->get('panel.path', 'panel'), '/');
         $reserved = array_values(array_unique(array_filter([
-            $this->context->panelPath(),
+            $panelPath,
             'boot',
             'mce',
             'theme',

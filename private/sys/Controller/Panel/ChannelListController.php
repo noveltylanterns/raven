@@ -13,6 +13,7 @@ namespace Raven\Core\Controller\Panel;
 
 use Raven\Core\Repository\ChannelRead;
 use Raven\Lib\Security\InputSanitizer;
+use Raven\Lib\View\Pagination;
 
 /**
  * Handles the channel list route for the panel.
@@ -59,7 +60,7 @@ final class ChannelListController
         $pageResult = $this->channelRead->listPage($perPage, ($requestedPage - 1) * $perPage);
         $totalItems = (int) ($pageResult['total'] ?? 0);
         $channelRows = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
-        $pagination = $this->context->panelPaginationState($totalItems, $requestedPage, $perPage);
+        $pagination = Pagination::state($totalItems, $requestedPage, $perPage);
         if ($totalItems > 0 && $pagination['current'] !== $requestedPage) {
             $pageResult = $this->channelRead->listPage($perPage, $pagination['offset']);
             $channelRows = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
@@ -67,8 +68,8 @@ final class ChannelListController
 
         $this->context->renderPanel('panel/channel/list', [
             'channelRows' => $channelRows,
-            'pagination' => $this->context->panelPaginationViewData('/channel', $pagination),
-            'csrfField' => $this->context->csrfField(),
+            'pagination' => Pagination::panelViewData($this->context->panelUrl('/channel'), $pagination),
+            'csrfField' => $this->context->csrf()->field(),
             'flashSuccess' => $this->context->pullFlash('success'),
             'flashError' => $this->context->pullFlash('error'),
             'section' => 'channel',

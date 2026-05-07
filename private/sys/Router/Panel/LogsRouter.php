@@ -2,7 +2,7 @@
 
 /**
  * RAVEN CMS
- * ~/private/sys/Router/Panel/LogRouter.php
+ * ~/private/sys/Router/Panel/LogsRouter.php
  * Panel logs-route registration.
  * Docs: https://raven.lanterns.io
  */
@@ -16,7 +16,7 @@ use Raven\Core\Router\RouteHandler;
 /**
  * Registers event-log routes for the panel runtime.
  */
-final class LogRouter
+final class LogsRouter
 {
     /**
      * Registers log routes from one shared dependency payload.

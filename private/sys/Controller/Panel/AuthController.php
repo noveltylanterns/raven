@@ -42,11 +42,11 @@ final class AuthController
     private InputSanitizer $input;
     private Csrf $csrf;
     private SessionFlash $flash;
-    private LoginIdentifier $identifierResolver;
+    private LoginIdentifier $loginIdentifier;
     private PanelTheme $panelTheme;
     private ?LoginUiState $loginUiState = null;
     private ?LoginAttempt $loginAttempt = null;
-    private ?LoginChallenge $loginChallengeWorkflow = null;
+    private ?LoginChallenge $loginChallenge = null;
 
     /**
      * Wires up the panel auth controller with its shared runtime dependencies.
@@ -70,12 +70,14 @@ final class AuthController
         $this->input = $input;
         $this->csrf = $csrf;
         $this->flash = new SessionFlash('_raven_flash');
-        $this->identifierResolver = new LoginIdentifier();
+        $this->loginIdentifier = new LoginIdentifier();
         $this->panelTheme = new PanelTheme();
     }
 
     /**
-     * Shows login form.
+     * Shows the panel login form.
+     *
+     * @return void
      */
     public function showLogin(): void
     {
@@ -90,15 +92,15 @@ final class AuthController
             Redirect::redirect($this->panelUrl('/'));
         }
 
-        $loginIdentifierMode = $this->loginIdentifierMode();
+        $identifierMode = $this->identifierMode();
         Footer::reset();
 
         $this->view->render('panel/auth/login', [
             'site' => $this->siteData(),
             'csrfField' => $this->csrf->field(),
             'error' => $this->pullFlash('error'),
-            'loginIdentifierMode' => $loginIdentifierMode,
-            'loginIdentifierLabel' => $loginIdentifierMode === 'email' ? 'Email' : 'Username or Email',
+            'identifierMode' => $identifierMode,
+            'loginIdentifierLabel' => $identifierMode === 'email' ? 'Email' : 'Username or Email',
             // Login screen must not expose authenticated panel navigation.
             'showSidebar' => false,
             'section' => 'login',
@@ -107,7 +109,10 @@ final class AuthController
     }
 
     /**
-     * Processes login form submission.
+     * Processes panel login form submission.
+     *
+     * @param array<string, mixed> $post Submitted login payload.
+     * @return void
      */
     public function login(array $post): void
     {
@@ -122,7 +127,7 @@ final class AuthController
         $result = $this->loginAttempt()->attempt(
             $this->auth,
             $post,
-            $this->loginAttemptClientIpAddress(),
+            $this->clientIpAddress(),
             $this->loginUiState(),
             static function (Gatekeeper $auth, int $userId): array {
                 return [
@@ -145,7 +150,9 @@ final class AuthController
     }
 
     /**
-     * Shows interactive 2FA challenge form.
+     * Shows the panel interactive 2FA challenge form.
+     *
+     * @return void
      */
     public function showLoginTwoFactor(): void
     {
@@ -155,7 +162,7 @@ final class AuthController
             Redirect::redirect($this->panelUrl('/login'));
         }
 
-        $viewState = $this->loginChallengeWorkflow()->buildViewState($this->auth, $this->loginUiState());
+        $viewState = $this->loginChallenge()->buildViewState($this->auth, $this->loginUiState());
         if (!(bool) ($viewState['ok'] ?? false)) {
             $this->logoutPanelSession();
             Redirect::redirect($this->panelUrl('/login'));
@@ -178,7 +185,10 @@ final class AuthController
     }
 
     /**
-     * Verifies interactive 2FA challenge.
+     * Verifies the panel interactive 2FA challenge.
+     *
+     * @param array<string, mixed> $post Submitted 2FA payload.
+     * @return void
      */
     public function loginTwoFactor(array $post): void
     {
@@ -187,7 +197,7 @@ final class AuthController
             Redirect::redirect($this->panelUrl('/login/2fa'));
         }
 
-        $result = $this->loginChallengeWorkflow()->verifyCodeChallenge($this->auth, $this->loginUiState(), $post);
+        $result = $this->loginChallenge()->verifyCodeChallenge($this->auth, $this->loginUiState(), $post);
         if (($result['status'] ?? '') === 'expired') {
             $this->logoutPanelSession();
             $this->flash('error', (string) ($result['message'] ?? 'Your login session expired. Please log in again.'));
@@ -208,7 +218,10 @@ final class AuthController
     }
 
     /**
-     * Selects one pending 2FA method from login challenge list.
+     * Selects one pending panel 2FA method from the login challenge list.
+     *
+     * @param array<string, mixed> $post Submitted method-selection payload.
+     * @return void
      */
     public function loginTwoFactorSelect(array $post): void
     {
@@ -217,7 +230,7 @@ final class AuthController
             Redirect::redirect($this->panelUrl('/login/2fa'));
         }
 
-        $result = $this->loginChallengeWorkflow()->selectMethod($this->auth, $this->loginUiState(), $post);
+        $result = $this->loginChallenge()->selectMethod($this->auth, $this->loginUiState(), $post);
         if (($result['status'] ?? '') === 'expired') {
             $this->logoutPanelSession();
             $this->flash('error', (string) ($result['message'] ?? 'Your login session expired. Please log in again.'));
@@ -232,7 +245,10 @@ final class AuthController
     }
 
     /**
-     * Returns WebAuthn login assertion options for pending 2FA challenge.
+     * Returns WebAuthn assertion options for the pending panel 2FA challenge.
+     *
+     * @param array<string, mixed> $post Submitted WebAuthn options payload.
+     * @return void
      */
     public function loginTwoFactorWebauthnOptions(array $post): void
     {
@@ -241,7 +257,7 @@ final class AuthController
             return;
         }
 
-        $result = $this->loginChallengeWorkflow()->webauthnOptions($this->auth, $this->loginUiState(), $_SERVER);
+        $result = $this->loginChallenge()->webauthnOptions($this->auth, $this->loginUiState(), $_SERVER);
         if (!(bool) ($result['ok'] ?? false)) {
             $this->jsonResponse(
                 ['ok' => false, 'message' => (string) ($result['message'] ?? 'Failed to initialize WebAuthn challenge.')],
@@ -257,7 +273,10 @@ final class AuthController
     }
 
     /**
-     * Verifies WebAuthn assertion response for pending login challenge.
+     * Verifies the WebAuthn assertion response for the pending panel login challenge.
+     *
+     * @param array<string, mixed> $post Submitted WebAuthn assertion payload.
+     * @return void
      */
     public function loginTwoFactorWebauthnVerify(array $post): void
     {
@@ -266,7 +285,7 @@ final class AuthController
             return;
         }
 
-        $result = $this->loginChallengeWorkflow()->verifyWebauthn(
+        $result = $this->loginChallenge()->verifyWebauthn(
             $this->auth,
             $this->loginUiState(),
             $post,
@@ -284,7 +303,10 @@ final class AuthController
     }
 
     /**
-     * Logs user out from panel session.
+     * Logs the current user out from the panel session.
+     *
+     * @param array<string, mixed> $post Submitted logout payload (CSRF token required).
+     * @return void
      */
     public function logout(array $post): void
     {
@@ -427,9 +449,9 @@ final class AuthController
     /**
      * Resolves panel login identifier mode from config.
      */
-    private function loginIdentifierMode(): string
+    private function identifierMode(): string
     {
-        return $this->identifierResolver->modeFromConfig($this->config);
+        return $this->loginIdentifier->modeFromConfig($this->config);
     }
 
     /**
@@ -457,7 +479,7 @@ final class AuthController
             $this->loginAttempt = new LoginAttempt(
                 $this->config,
                 $this->input,
-                $this->identifierResolver
+                $this->loginIdentifier
             );
         }
 
@@ -469,7 +491,7 @@ final class AuthController
      *
      * @return string Normalized client IP or `unknown` fallback.
      */
-    private function loginAttemptClientIpAddress(): string
+    private function clientIpAddress(): string
     {
         $normalized = (new ClientProfiler())->normalizeClientIp((string) ($_SERVER['REMOTE_ADDR'] ?? ''));
         return $normalized ?? 'unknown';
@@ -483,10 +505,10 @@ final class AuthController
      *
      * @return LoginChallenge Shared login challenge workflow with email delivery wired.
      */
-    private function loginChallengeWorkflow(): LoginChallenge
+    private function loginChallenge(): LoginChallenge
     {
-        if (!$this->loginChallengeWorkflow instanceof LoginChallenge) {
-            $this->loginChallengeWorkflow = new LoginChallenge(
+        if (!$this->loginChallenge instanceof LoginChallenge) {
+            $this->loginChallenge = new LoginChallenge(
                 $this->config,
                 $this->input,
                 new LoginEmail(),
@@ -494,7 +516,7 @@ final class AuthController
             );
         }
 
-        return $this->loginChallengeWorkflow;
+        return $this->loginChallenge;
     }
 
     /**

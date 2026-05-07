@@ -2,8 +2,8 @@
 
 /**
  * RAVEN CMS
- * ~/private/sys/Controller/Public/UserController.php
- * Split public user controller for public profile routes.
+ * ~/private/sys/Controller/Public/ProfileController.php
+ * Split public profile controller for public profile routes.
  * Docs: https://raven.lanterns.io
  */
 
@@ -13,33 +13,36 @@ namespace Raven\Core\Controller\Public;
 
 use Raven\Core\Repository\UserRead;
 use Raven\Lib\Auth\LoginIdentifier;
+use Raven\Lib\Parser\GroupRouteParser;
 use Raven\Lib\Parser\UserProfileParser;
 use Raven\Lib\View\Public\TemplateDecorator;
 
 /**
- * Handles split public user-profile routes.
+ * Handles split public profile routes.
  */
-final class UserController
+final class ProfileController
 {
     private SharedController $context;
     private UserRead $userRead;
-    private LoginIdentifier $loginIdentifierResolver;
-    private UserProfileParser $profileContactService;
+    private LoginIdentifier $loginIdentifier;
+    private GroupRouteParser $groupRouteParser;
+    private UserProfileParser $profileParser;
     private TemplateDecorator $templateDecorator;
 
     /**
      * @param SharedController $context Shared public request context.
-     * @param UserRead $userRepo User repository read side for public profile routes.
+     * @param UserRead $userRead User repository read side for public profile routes.
      * @return void
      */
     public function __construct(
         SharedController $context,
-        UserRead $userRepo
+        UserRead $userRead
     ) {
         $this->context = $context;
-        $this->userRead = $userRepo;
-        $this->loginIdentifierResolver = new LoginIdentifier();
-        $this->profileContactService = new UserProfileParser($context->input());
+        $this->userRead = $userRead;
+        $this->loginIdentifier = new LoginIdentifier();
+        $this->groupRouteParser = new GroupRouteParser($context->config(), $context->input());
+        $this->profileParser = new UserProfileParser($context->input());
         $this->templateDecorator = new TemplateDecorator(
             $context->config(),
             $context->input(),
@@ -55,9 +58,9 @@ final class UserController
      */
     public function profile(string $username): void
     {
-        $profileMode = $this->context->groupParser()->profileMode();
+        $profileMode = $this->groupRouteParser->profileMode();
         $isLoggedIn = $this->context->auth()->isLoggedIn();
-        if ($this->context->groupParser()->profileRoutePrefix() === '') {
+        if ($this->groupRouteParser->profileRoutePrefix() === '') {
             $this->context->notFound();
             return;
         }
@@ -72,13 +75,13 @@ final class UserController
             return;
         }
 
-        $profile = $this->findPublicProfileByRouteSegment(rawurldecode($username));
+        $profile = $this->findProfileBySegment(rawurldecode($username));
         if ($profile === null) {
             $this->context->notFound();
             return;
         }
 
-        $profile = $this->decoratePublicProfileContacts($profile);
+        $profile = $this->decorateProfileContacts($profile);
         $profile = $this->templateDecorator->decorateProfileForTemplate($profile);
 
         $template = match ($profileMode) {
@@ -123,13 +126,13 @@ final class UserController
      * @param array<string, mixed> $profile Public profile payload.
      * @return array<string, mixed> Decorated public profile payload.
      */
-    private function decoratePublicProfileContacts(array $profile): array
+    private function decorateProfileContacts(array $profile): array
     {
-        $profileContactOptions = $this->profileContactService->normalizeOptionsConfig(
-            $this->context->config()->get('user.contact', $this->profileContactService->defaultOptions())
+        $profileContactOptions = $this->profileParser->normalizeOptionsConfig(
+            $this->context->config()->get('user.contact', $this->profileParser->defaultOptions())
         );
 
-        return $this->profileContactService->decorateProfileContacts($profile, $profileContactOptions);
+        return $this->profileParser->decorateProfileContacts($profile, $profileContactOptions);
     }
 
     /**
@@ -138,9 +141,9 @@ final class UserController
      * @param string $routeSegment Raw public profile route segment.
      * @return array<string, mixed>|null Profile payload when found.
      */
-    private function findPublicProfileByRouteSegment(string $routeSegment): ?array
+    private function findProfileBySegment(string $routeSegment): ?array
     {
-        $selector = $this->context->groupParser()->profileSelector();
+        $selector = $this->groupRouteParser->profileSelector();
         if ($selector === 'id') {
             $userId = $this->context->input()->int($routeSegment, 1);
             if ($userId === null) {
@@ -159,7 +162,7 @@ final class UserController
             return $this->userRead->findProfileSummaryByString($normalizedString);
         }
 
-        $normalizedUsername = $this->loginIdentifierResolver->normalizeUsernameOrEmail($this->context->input(), $routeSegment);
+        $normalizedUsername = $this->loginIdentifier->normalizeUsernameOrEmail($this->context->input(), $routeSegment);
         if ($normalizedUsername === null) {
             return null;
         }

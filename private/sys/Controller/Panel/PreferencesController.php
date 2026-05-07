@@ -43,13 +43,13 @@ final class PreferencesController
     private SharedController $context;
     private Config $config;
     private InputSanitizer $input;
-    private LoginIdentifier $loginIdentifierResolver;
+    private LoginIdentifier $loginIdentifier;
     private EditorTabs $editorTabs;
     private PanelTheme $panelTheme;
     private EditorBlocks $editorBlocks;
     private AvatarConfig $avatarConfig;
     private MediaConfig $mediaConfig;
-    private UserProfileParser $profileContactService;
+    private UserProfileParser $profileParser;
     private Form2fa $form2fa;
     private UserScribe $userMediaScribe;
     private CoverConfig $coverConfig;
@@ -59,12 +59,12 @@ final class PreferencesController
      * @param SharedController $context Shared panel request context.
      * @param Config $config Runtime configuration reader.
      * @param InputSanitizer $input Shared request input sanitizer.
-     * @param LoginIdentifier $loginIdentifierResolver Shared login-identifier normalization helper.
+     * @param LoginIdentifier $loginIdentifier Shared login-identifier normalization helper.
      * @param EditorTabs $editorTabs Shared editor-tab normalization helper.
      * @param EditorBlocks $editorBlocks Shared repeater-block view helper for modular panel rows.
      * @param AvatarConfig $avatarConfig Shared avatar-limit and template-data helper.
      * @param MediaConfig $mediaConfig Shared non-avatar media-limit helper.
-     * @param UserProfileParser $profileContactService Shared profile-contact normalizer.
+     * @param UserProfileParser $profileParser Shared profile-contact normalizer.
      * @param Form2fa $form2fa Shared 2FA helper set.
      * @param UserScribe $userMediaScribe Shared user-media write helper.
      * @param CoverConfig $coverConfig Shared user cover-image URL resolver.
@@ -75,12 +75,12 @@ final class PreferencesController
         SharedController $context,
         Config $config,
         InputSanitizer $input,
-        LoginIdentifier $loginIdentifierResolver,
+        LoginIdentifier $loginIdentifier,
         EditorTabs $editorTabs,
         EditorBlocks $editorBlocks,
         AvatarConfig $avatarConfig,
         MediaConfig $mediaConfig,
-        UserProfileParser $profileContactService,
+        UserProfileParser $profileParser,
         Form2fa $form2fa,
         UserScribe $userMediaScribe,
         CoverConfig $coverConfig,
@@ -89,13 +89,13 @@ final class PreferencesController
         $this->context = $context;
         $this->config = $config;
         $this->input = $input;
-        $this->loginIdentifierResolver = $loginIdentifierResolver;
+        $this->loginIdentifier = $loginIdentifier;
         $this->editorTabs = $editorTabs;
         $this->panelTheme = new PanelTheme();
         $this->editorBlocks = $editorBlocks;
         $this->avatarConfig = $avatarConfig;
         $this->mediaConfig = $mediaConfig;
-        $this->profileContactService = $profileContactService;
+        $this->profileParser = $profileParser;
         $this->form2fa = $form2fa;
         $this->userMediaScribe = $userMediaScribe;
         $this->coverConfig = $coverConfig;
@@ -134,7 +134,7 @@ final class PreferencesController
         $this->context->renderPanel('panel/preferences', [
             'preferences' => $preferences,
             'bioMaxLength' => $bioMaxLength,
-            'loginIdentifierMode' => $this->panelLoginIdentifierMode(),
+            'loginIdentifierMode' => $this->identifierMode(),
             'profileContactOptions' => $this->profileContactOptions(),
             'twoFactorTypeOptions' => $this->twoFactorTypeOptions(),
             'themeOptions' => ['default', 'corp', 'ice', 'midnight'],
@@ -144,7 +144,7 @@ final class PreferencesController
             'editorBlocks' => $this->editorBlocks,
             'activeTab' => $activeTab,
             'section' => 'preferences',
-            'csrfField' => $this->context->csrfField(),
+            'csrfField' => $this->context->csrf()->field(),
             'flashSuccess' => $this->context->pullFlash('success'),
             'flashError' => $this->context->pullFlash('error'),
         ]);
@@ -185,10 +185,10 @@ final class PreferencesController
             Redirect::redirect($preferencesUrl);
         }
 
-        $loginIdentifierMode = $this->panelLoginIdentifierMode();
+        $loginIdentifierMode = $this->identifierMode();
         $usernameSubmitted = array_key_exists('username', $post);
         $rawUsername = $this->input->text($post['username'] ?? null, 254);
-        $username = $this->normalizeUserIdentifierValue($rawUsername);
+        $username = $this->normalizeIdentifier($rawUsername);
         $displayName = $this->input->text($post['display_name'] ?? null, 160);
         $bioMaxLength = max(1, (int) $this->config->get('user.bio', 500));
         $bio = $this->input->text($post['bio'] ?? null, $bioMaxLength);
@@ -620,9 +620,9 @@ final class PreferencesController
      *
      * @return string `email` or `username`.
      */
-    private function panelLoginIdentifierMode(): string
+    private function identifierMode(): string
     {
-        return $this->loginIdentifierResolver->modeFromConfig($this->config);
+        return $this->loginIdentifier->modeFromConfig($this->config);
     }
 
     /**
@@ -631,9 +631,9 @@ final class PreferencesController
      * @param string $rawValue User-submitted identifier candidate.
      * @return string|null Canonical username/email value, or null when invalid.
      */
-    private function normalizeUserIdentifierValue(string $rawValue): ?string
+    private function normalizeIdentifier(string $rawValue): ?string
     {
-        return $this->loginIdentifierResolver->normalizeUsernameOrEmail($this->input, $rawValue);
+        return $this->loginIdentifier->normalizeUsernameOrEmail($this->input, $rawValue);
     }
 
     /**
@@ -643,8 +643,8 @@ final class PreferencesController
      */
     private function profileContactOptions(): array
     {
-        return $this->profileContactService->normalizeOptionsConfig(
-            $this->config->get('user.contact', $this->profileContactService->defaultOptions())
+        return $this->profileParser->normalizeOptionsConfig(
+            $this->config->get('user.contact', $this->profileParser->defaultOptions())
         );
     }
 
@@ -657,7 +657,7 @@ final class PreferencesController
      */
     private function normalizeSubmittedContactProfiles(mixed $rawProfiles, array $allowedOptions): array
     {
-        return $this->profileContactService->normalizeSubmittedProfiles($rawProfiles, $allowedOptions);
+        return $this->profileParser->normalizeSubmittedProfiles($rawProfiles, $allowedOptions);
     }
 
     /**

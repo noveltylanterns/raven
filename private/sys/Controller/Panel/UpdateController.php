@@ -35,9 +35,9 @@ final class UpdateController
     private array $stockPublicThemeSlugs;
     /** @var array<int, string> */
     private array $stockExtensionDirectories;
-    private ?Git $gitArchiveHandler = null;
-    private ?Upstream $updateSourceResolver = null;
-    private ?ArchiveUpdate $updateWorkflowService = null;
+    private ?Git $git = null;
+    private ?Upstream $upstream = null;
+    private ?ArchiveUpdate $archiveUpdate = null;
 
     /**
      * @param SharedController $context Shared panel request context.
@@ -76,8 +76,8 @@ final class UpdateController
             return;
         }
 
-        $source = $this->updateSourceResolver()->fromConfig($this->config->all());
-        $result = $this->updateWorkflowService()->compare($source);
+        $source = $this->upstream()->fromConfig($this->config->all());
+        $result = $this->archiveUpdate()->compare($source);
         $this->renderUpdatePage($source, $result, null, null, false);
     }
 
@@ -94,9 +94,9 @@ final class UpdateController
             return;
         }
 
-        $source = $this->updateSourceResolver()->fromPost(
+        $source = $this->upstream()->fromPost(
             $post,
-            $this->updateSourceResolver()->fromConfig($this->config->all())
+            $this->upstream()->fromConfig($this->config->all())
         );
         $allowOverwrite = ((string) ($post['allow_overwrite'] ?? '')) === '1';
         $error = null;
@@ -104,15 +104,15 @@ final class UpdateController
 
         if (!$this->context->csrf()->validate($post['_csrf'] ?? null)) {
             $error = 'Invalid CSRF token.';
-            $result = $this->updateWorkflowService()->compare($source);
+            $result = $this->archiveUpdate()->compare($source);
             $this->renderUpdatePage($source, $result, $success, $error, $allowOverwrite);
             return;
         }
 
-        $sourceErrors = $this->updateSourceResolver()->validationErrors($source);
+        $sourceErrors = $this->upstream()->validationErrors($source);
         if ($sourceErrors !== []) {
             $error = implode(' ', $sourceErrors);
-            $result = $this->updateWorkflowService()->compare($source);
+            $result = $this->archiveUpdate()->compare($source);
             $this->renderUpdatePage($source, $result, $success, $error, $allowOverwrite);
             return;
         }
@@ -131,7 +131,7 @@ final class UpdateController
             $this->config = new Config($this->config->path());
         } catch (\RuntimeException $exception) {
             $error = 'Failed to save updater source settings: ' . $exception->getMessage();
-            $result = $this->updateWorkflowService()->compare($source);
+            $result = $this->archiveUpdate()->compare($source);
             $this->renderUpdatePage($source, $result, $success, $error, $allowOverwrite);
             return;
         }
@@ -142,9 +142,9 @@ final class UpdateController
         }
 
         $result = match ($action) {
-            'dry_run' => $this->updateWorkflowService()->dryRun($source, $allowOverwrite),
-            'update_now' => $this->updateWorkflowService()->update($source, $allowOverwrite),
-            default => $this->updateWorkflowService()->compare($source),
+            'dry_run' => $this->archiveUpdate()->dryRun($source, $allowOverwrite),
+            'update_now' => $this->archiveUpdate()->update($source, $allowOverwrite),
+            default => $this->archiveUpdate()->compare($source),
         };
 
         if ((bool) ($result['ok'] ?? false)) {
@@ -179,13 +179,13 @@ final class UpdateController
     /**
      * Returns the canonical Git handler on first use.
      */
-    private function gitArchiveHandler(): Git
+    private function git(): Git
     {
-        if (!$this->gitArchiveHandler instanceof Git) {
-            $this->gitArchiveHandler = new Git();
+        if (!$this->git instanceof Git) {
+            $this->git = new Git();
         }
 
-        return $this->gitArchiveHandler;
+        return $this->git;
     }
 
     /**
@@ -193,13 +193,13 @@ final class UpdateController
      *
      * @return Upstream Lazily initialized update source resolver.
      */
-    private function updateSourceResolver(): Upstream
+    private function upstream(): Upstream
     {
-        if (!$this->updateSourceResolver instanceof Upstream) {
-            $this->updateSourceResolver = new Upstream($this->input);
+        if (!$this->upstream instanceof Upstream) {
+            $this->upstream = new Upstream($this->input);
         }
 
-        return $this->updateSourceResolver;
+        return $this->upstream;
     }
 
     /**
@@ -207,18 +207,18 @@ final class UpdateController
      *
      * @return ArchiveUpdate Lazily initialized update workflow service.
      */
-    private function updateWorkflowService(): ArchiveUpdate
+    private function archiveUpdate(): ArchiveUpdate
     {
-        if (!$this->updateWorkflowService instanceof ArchiveUpdate) {
-            $this->updateWorkflowService = new ArchiveUpdate(
+        if (!$this->archiveUpdate instanceof ArchiveUpdate) {
+            $this->archiveUpdate = new ArchiveUpdate(
                 $this->root,
-                $this->gitArchiveHandler(),
+                $this->git(),
                 $this->stockPublicThemeSlugs(),
                 $this->stockExtensionDirectories()
             );
         }
 
-        return $this->updateWorkflowService;
+        return $this->archiveUpdate;
     }
 
     /**
@@ -240,7 +240,7 @@ final class UpdateController
     ): void {
         $this->context->renderPanel('panel/update', [
             'canManageConfiguration' => $this->context->auth()->panelService()->canManageConfiguration(),
-            'csrfField' => $this->context->csrfField(),
+            'csrfField' => $this->context->csrf()->field(),
             'flashSuccess' => $flashSuccess,
             'flashError' => $flashError,
             'section' => 'update',

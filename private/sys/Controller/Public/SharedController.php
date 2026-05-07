@@ -12,19 +12,13 @@ declare(strict_types=1);
 namespace Raven\Core\Controller\Public;
 
 use Raven\Core\Config;
-use Raven\Core\Debug\ClientProfiler;
 use Raven\Core\Gatekeeper;
 use Raven\Lib\Auth\Public\PermissionBase as PublicPermissionBase;
 use Raven\Lib\Auth\Public\PermissionMask as PublicPermissionMask;
 use Raven\Lib\Auth\Public\SessionGuard;
-use Raven\Lib\Transport\Response;
 use Raven\Lib\Transport\Request;
-use Raven\Lib\Auth\SessionFlash;
 use Raven\Lib\Parser\FeedParser;
-use Raven\Lib\Parser\GroupRouteParser;
-use Raven\Lib\Parser\PanelParser;
 use Raven\Lib\Parser\UserProfileParser;
-use Raven\Lib\Security\Captcha;
 use Raven\Lib\Security\Csrf;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\View\Public\Error as PublicError;
@@ -45,18 +39,13 @@ final class SharedController
     private ?Gatekeeper $auth = null;
     private InputSanitizer $input;
     private Csrf $csrf;
-    private SessionFlash $flash;
     private ThemeBrace $themeBrace;
     private SessionGuard $sessionGuard;
-    private bool $captchaScriptIncluded = false;
     private PublicPermissionMask $guestPermissionMask;
-    private ?Request $requestContextResolver = null;
-    private ?ClientProfiler $clientProfiler = null;
+    private ?Request $request = null;
     private ?FeedParser $feedParser = null;
-    private ?GroupRouteParser $groupParser = null;
-    private ?UserProfileParser $profileContactService = null;
-    private ?Captcha $captchaService = null;
-    private ThemeCatalog $themeCatalogService;
+    private ?UserProfileParser $profileParser = null;
+    private ThemeCatalog $themeCatalog;
     private ?MetaService $metaService = null;
     private ?TemplateDecorator $templateDecorator = null;
     private ?ThemeTemplate $themeTemplate = null;
@@ -66,7 +55,7 @@ final class SharedController
      * @param callable(): Gatekeeper $authResolver Lazy auth/session resolver for public requests.
      * @param InputSanitizer $input Shared request input sanitizer.
      * @param Csrf $csrf CSRF helper for public forms and auth flows.
-     * @param ThemeCatalog $themeCatalogService Shared public-theme catalog for wrapper/meta/template reads.
+     * @param ThemeCatalog $themeCatalog Shared public-theme catalog for wrapper/meta/template reads.
      * @param PublicPermissionMask $guestPermissionMask Guest permission-mask service for public-mode availability checks.
      * @return void
      */
@@ -75,16 +64,15 @@ final class SharedController
         callable $authResolver,
         InputSanitizer $input,
         Csrf $csrf,
-        ThemeCatalog $themeCatalogService,
+        ThemeCatalog $themeCatalog,
         PublicPermissionMask $guestPermissionMask
     ) {
         $this->config = $config;
         $this->authResolver = $authResolver;
         $this->input = $input;
         $this->csrf = $csrf;
-        $this->themeCatalogService = $themeCatalogService;
+        $this->themeCatalog = $themeCatalog;
         $this->guestPermissionMask = $guestPermissionMask;
-        $this->flash = new SessionFlash('_raven_public_flash');
         $this->themeBrace = new ThemeBrace(dirname(__DIR__, 4) . '/.tmp/template_tag_cache');
         $this->sessionGuard = new SessionGuard();
     }
@@ -136,44 +124,11 @@ final class SharedController
     }
 
     /**
-     * Returns one CSRF hidden-input field string for public templates.
-     *
-     * @return string HTML hidden input field.
-     */
-    public function csrfField(): string
-    {
-        return $this->csrf->field();
-    }
-
-    /**
-     * Stores one public flash message in session.
-     *
-     * @param string $key Flash message key.
-     * @param string $value Flash message text.
-     * @return void
-     */
-    public function flash(string $key, string $value): void
-    {
-        $this->flash->put($key, $value);
-    }
-
-    /**
-     * Pulls and clears one public flash message from session.
-     *
-     * @param string $key Flash message key.
-     * @return string|null Message text when present.
-     */
-    public function pullFlash(string $key): ?string
-    {
-        return $this->flash->pull($key);
-    }
-
-    /**
      * Returns the cached feed route parser.
      *
      * @return FeedParser Shared feed routing-policy parser.
      */
-    public function feedParser(): FeedParser
+    private function feedParser(): FeedParser
     {
         if (!$this->feedParser instanceof FeedParser) {
             $this->feedParser = new FeedParser($this->config, $this->input);
@@ -183,56 +138,17 @@ final class SharedController
     }
 
     /**
-     * Returns the cached group/profile route parser.
-     *
-     * @return GroupRouteParser Shared group/profile routing-policy parser.
-     */
-    public function groupParser(): GroupRouteParser
-    {
-        if (!$this->groupParser instanceof GroupRouteParser) {
-            $this->groupParser = new GroupRouteParser($this->config, $this->input);
-        }
-
-        return $this->groupParser;
-    }
-
-    /**
      * Returns normalized request-context helper cached for the current request.
      *
      * @return Request Shared request-context helper.
      */
-    public function requestContextResolver(): Request
+    private function request(): Request
     {
-        if (!$this->requestContextResolver instanceof Request) {
-            $this->requestContextResolver = new Request();
+        if (!$this->request instanceof Request) {
+            $this->request = new Request();
         }
 
-        return $this->requestContextResolver;
-    }
-
-    /**
-     * Returns normalized client-network helper cached for the current request.
-     *
-     * @return ClientProfiler Shared client-network normalizer/resolver.
-     */
-    public function clientProfiler(): ClientProfiler
-    {
-        if (!$this->clientProfiler instanceof ClientProfiler) {
-            $this->clientProfiler = new ClientProfiler();
-        }
-
-        return $this->clientProfiler;
-    }
-
-    /**
-     * Builds one panel URL using the configured panel-path prefix.
-     *
-     * @param string $suffix Path suffix beginning with `/`.
-     * @return string Absolute panel-relative URL.
-     */
-    public function panelUrl(string $suffix = ''): string
-    {
-        return PanelParser::fromConfig($this->config, $suffix);
+        return $this->request;
     }
 
     /**
@@ -243,21 +159,6 @@ final class SharedController
     public function siteData(): array
     {
         return $this->metaService()->siteData($this->config);
-    }
-
-    /**
-     * Returns site data with taxonomy-level OG/Twitter image overrides when available.
-     *
-     * @param array<string, mixed> $taxonomy Taxonomy payload with optional image metadata.
-     * @param array<string, mixed>|null $baseSiteData Optional prebuilt site data payload.
-     * @return array<string, mixed> Site metadata payload with taxonomy image overrides.
-     */
-    public function siteDataWithTaxonomyMetaImage(array $taxonomy, ?array $baseSiteData = null): array
-    {
-        return $this->metaService()->siteDataWithTaxonomyMetaImage(
-            $taxonomy,
-            $baseSiteData ?? $this->siteData()
-        );
     }
 
     /**
@@ -340,8 +241,8 @@ final class SharedController
             $data,
             $layout,
             fn (string $file, array $payload): string => $this->themeBrace->renderFile($file, $payload),
-            $this->publicThemesRoot(),
-            $this->currentPublicThemeSlug(),
+            $this->themesRoot(),
+            $this->activeThemeSlug(),
             dirname(__DIR__, 4) . '/private/tpl/public'
         );
 
@@ -366,8 +267,8 @@ final class SharedController
         $data = $this->decorateTemplateData($data);
         $themeTemplate = $this->themeTemplate();
         $roots = $themeTemplate->lookupRoots(
-            $this->publicThemesRoot(),
-            $this->currentPublicThemeSlug(),
+            $this->themesRoot(),
+            $this->activeThemeSlug(),
             dirname(__DIR__, 4) . '/private/tpl/public'
         );
 
@@ -386,41 +287,6 @@ final class SharedController
         );
 
         echo $output;
-    }
-
-    /**
-     * Returns one public captcha validation error for the current request.
-     *
-     * @return string|null One user-facing error, or null when captcha passes.
-     */
-    public function validatePublicCaptcha(): ?string
-    {
-        $remoteIp = $this->clientProfiler()->normalizeClientIp((string) ($_SERVER['REMOTE_ADDR'] ?? ''));
-        return $this->captchaService()->validateSubmission($_POST, $remoteIp);
-    }
-
-    /**
-     * Returns public captcha widget markup and tracks script injection state.
-     *
-     * @return string Captcha widget markup.
-     */
-    public function publicCaptchaMarkup(): string
-    {
-        $markup = $this->captchaService()->markup($this->captchaScriptIncluded);
-        $this->captchaScriptIncluded = (bool) ($markup['script_included'] ?? $this->captchaScriptIncluded);
-        return (string) ($markup['markup'] ?? '');
-    }
-
-    /**
-     * Emits one JSON response with the shared no-cache defaults.
-     *
-     * @param array<string, mixed> $payload JSON payload.
-     * @param int $status HTTP status code.
-     * @return void
-     */
-    public function jsonResponse(array $payload, int $status = 200): void
-    {
-        Response::json($payload, $status, true);
     }
 
     /**
@@ -452,27 +318,13 @@ final class SharedController
     }
 
     /**
-     * Returns the cached captcha service.
-     *
-     * @return Captcha Shared captcha helper.
-     */
-    private function captchaService(): Captcha
-    {
-        if (!$this->captchaService instanceof Captcha) {
-            $this->captchaService = new Captcha($this->config, $this->input);
-        }
-
-        return $this->captchaService;
-    }
-
-    /**
      * Returns the active public theme slug.
      *
      * @return string Active public theme slug.
      */
-    private function currentPublicThemeSlug(): string
+    private function activeThemeSlug(): string
     {
-        return $this->themeCatalogService->activeSlugFromConfig($this->config);
+        return $this->themeCatalog->activeSlugFromConfig($this->config);
     }
 
     /**
@@ -480,9 +332,9 @@ final class SharedController
      *
      * @return string Absolute public theme root.
      */
-    private function publicThemesRoot(): string
+    private function themesRoot(): string
     {
-        return $this->themeCatalogService->root();
+        return $this->themeCatalog->root();
     }
 
     /**
@@ -490,13 +342,13 @@ final class SharedController
      *
      * @return UserProfileParser Shared profile-contact helper.
      */
-    private function profileContactService(): UserProfileParser
+    private function profileParser(): UserProfileParser
     {
-        if (!$this->profileContactService instanceof UserProfileParser) {
-            $this->profileContactService = new UserProfileParser($this->input);
+        if (!$this->profileParser instanceof UserProfileParser) {
+            $this->profileParser = new UserProfileParser($this->input);
         }
 
-        return $this->profileContactService;
+        return $this->profileParser;
     }
 
     /**
@@ -508,9 +360,9 @@ final class SharedController
     {
         if (!$this->metaService instanceof MetaService) {
             $this->metaService = new MetaService(
-                $this->requestContextResolver(),
-                $this->themeCatalogService,
-                $this->profileContactService(),
+                $this->request(),
+                $this->themeCatalog,
+                $this->profileParser(),
                 $this->feedParser()
             );
         }

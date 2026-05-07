@@ -125,8 +125,8 @@ final class RuntimeBuilder
         $inviteReadFactory = $repoFactories['invite_read'];
         $inviteWriteFactory = $repoFactories['invite_write'];
         $taxonomyLookupRepository = $repoFactories['taxonomy_lookup'];
-        $categoryLookupRepository = $repoFactories['category_lookup'];
-        $tagLookupRepository = $repoFactories['tag_lookup'];
+        $categoryReadFactory = $repoFactories['category_lookup'];
+        $tagReadFactory = $repoFactories['tag_lookup'];
 
         /**
          * Boots extension providers only when public runtime code needs extension services.
@@ -190,11 +190,11 @@ final class RuntimeBuilder
         $domainFactories = DomainFactory::build(
             $memoize,
             $channelReadFactory,
-            $categoryLookupRepository,
+            $categoryReadFactory,
             $mediaReadFactory,
             $pageReadFactory,
             $redirectReadFactory,
-            $tagLookupRepository,
+            $tagReadFactory,
             $taxonomyLookupRepository,
             $groupReadFactory,
             $userReadFactory,

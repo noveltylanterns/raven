@@ -51,13 +51,13 @@ final class RoutingController
     /** @var Closure(): TaxonomyRepoParser */
     private Closure $taxonomyLookupRepoResolver;
     private ?TaxonomyRepoParser $taxonomyLookupRepo = null;
-    private LoginIdentifier $identifierResolver;
+    private LoginIdentifier $loginIdentifier;
     private ?RouteProfiler $routeProfiler = null;
     private ?Csv $csvHandler = null;
     private ?FeedParser $feedParser = null;
     private ?GroupRouteParser $groupParser = null;
-    private ThemeCatalog $themeCatalogService;
-    private ?RoutePreview $panelRoutingPreviewService = null;
+    private ThemeCatalog $themeCatalog;
+    private ?RoutePreview $routePreview = null;
 
     /**
      * @param SharedController $context Shared panel request context.
@@ -69,7 +69,7 @@ final class RoutingController
      * @param RedirectRead $redirectRepo Redirect repository read side for routing inventory rows.
      * @param UserRead $userRepo User repository read side for routing inventory rows.
      * @param callable(): TaxonomyRepoParser $taxonomyLookupRepoResolver Lazy taxonomy lookup parser resolver.
-     * @param ThemeCatalog $themeCatalogService Shared public-theme catalog for route preview rendering.
+     * @param ThemeCatalog $themeCatalog Shared public-theme catalog for route preview rendering.
      * @return void
      */
     public function __construct(
@@ -82,7 +82,7 @@ final class RoutingController
         RedirectRead $redirectRepo,
         UserRead $userRepo,
         callable $taxonomyLookupRepoResolver,
-        ThemeCatalog $themeCatalogService
+        ThemeCatalog $themeCatalog
     ) {
         $this->context = $context;
         $this->config = $config;
@@ -93,8 +93,8 @@ final class RoutingController
         $this->redirectRepo = $redirectRepo;
         $this->userRepo = $userRepo;
         $this->taxonomyLookupRepoResolver = Closure::fromCallable($taxonomyLookupRepoResolver);
-        $this->identifierResolver = new LoginIdentifier();
-        $this->themeCatalogService = $themeCatalogService;
+        $this->loginIdentifier = new LoginIdentifier();
+        $this->themeCatalog = $themeCatalog;
     }
 
     /**
@@ -109,7 +109,7 @@ final class RoutingController
             return;
         }
 
-        $routeRows = $this->routingRowsForPanel();
+        $routeRows = $this->routingRows();
         $summary = [
             'total' => count($routeRows),
             'page' => count(array_filter($routeRows, static fn (array $row): bool => (string) ($row['type_key'] ?? '') === 'page')),
@@ -120,7 +120,7 @@ final class RoutingController
         $initialSearch = $this->input->text(is_string($_GET['search'] ?? null) ? $_GET['search'] : null, 200);
 
         $this->context->renderPanel('panel/routing', [
-            'csrfField' => $this->context->csrfField(),
+            'csrfField' => $this->context->csrf()->field(),
             'flashSuccess' => $this->context->pullFlash('success'),
             'flashError' => $this->context->pullFlash('error'),
             'section' => 'routing',
@@ -143,7 +143,7 @@ final class RoutingController
             return;
         }
 
-        $rows = $this->routingRowsForPanel();
+        $rows = $this->routingRows();
         $filename = 'routing-inventory-' . gmdate('Ymd-His') . '.csv';
         $this->csvHandler()->streamToOutput(
             $filename,
@@ -242,9 +242,9 @@ final class RoutingController
      * @param string $rawValue Raw identifier value.
      * @return string|null Normalized identifier or null when invalid.
      */
-    private function normalizeUserIdentifierValue(string $rawValue): ?string
+    private function normalizeIdentifier(string $rawValue): ?string
     {
-        return $this->identifierResolver->normalizeUsernameOrEmail($this->input, $rawValue);
+        return $this->loginIdentifier->normalizeUsernameOrEmail($this->input, $rawValue);
     }
 
     /**
@@ -253,7 +253,7 @@ final class RoutingController
      * @param array<string, mixed> $user User row used for routing inventory.
      * @return string|null Public route segment or null when unavailable.
      */
-    private function publicProfileRouteSegmentForUser(array $user): ?string
+    private function profileRouteSegment(array $user): ?string
     {
         $userId = (int) ($user['id'] ?? 0);
         if ($userId <= 0) {
@@ -262,7 +262,7 @@ final class RoutingController
 
         return match ($this->groupParser()->profileSelector()) {
             'string' => $this->currentUserString($user),
-            'username' => $this->normalizeUserIdentifierValue((string) ($user['username'] ?? '')),
+            'username' => $this->normalizeIdentifier((string) ($user['username'] ?? '')),
             default => (string) $userId,
         };
     }
@@ -295,7 +295,7 @@ final class RoutingController
      *   is_conflict: bool
      * }>
      */
-    private function routingRowsForPanel(): array
+    private function routingRows(): array
     {
         $categoryPrefix = $this->categoryRoutePrefix();
         $tagPrefix = $this->tagRoutePrefix();
@@ -355,7 +355,7 @@ final class RoutingController
             ),
             'channel_landing_map_builder' => fn (array $pagesForRouting): array => $this->channelLandingMapFromPagesForRouting($pagesForRouting),
             'build_edit_url' => fn (string $typeKey, array $meta): string => $this->routingEditUrl($typeKey, $meta),
-            'build_user_route_segment' => fn (array $user): ?string => $this->publicProfileRouteSegmentForUser($user),
+            'build_user_route_segment' => fn (array $user): ?string => $this->profileRouteSegment($user),
             'slugify_group_name' => fn (string $name): string => $this->slugifyGroupName($name),
         ]);
     }
@@ -433,7 +433,7 @@ final class RoutingController
         string $routeModeEffective,
         string $routeSeparatorEffective
     ): string {
-        return $this->panelRoutingPreviewService()->routingPublicPathForPage(
+        return $this->routePreview()->routingPublicPathForPage(
             $pageSlug,
             $pageId,
             $channelSlug,
@@ -454,7 +454,7 @@ final class RoutingController
      */
     private function channelLandingMapFromPagesForRouting(array $pagesForRouting): array
     {
-        return $this->panelRoutingPreviewService()->channelLandingMapFromPages($pagesForRouting);
+        return $this->routePreview()->channelLandingMapFromPages($pagesForRouting);
     }
 
     /**
@@ -462,7 +462,7 @@ final class RoutingController
      */
     private function channelIndexTemplateExistsForRouting(): bool
     {
-        return $this->panelRoutingPreviewService()->channelIndexTemplateExists($this->config);
+        return $this->routePreview()->channelIndexTemplateExists($this->config);
     }
 
     /**
@@ -472,7 +472,7 @@ final class RoutingController
      */
     private function reservedPublicPrefixes(): array
     {
-        return $this->panelRoutingPreviewService()->reservedPublicPrefixes(
+        return $this->routePreview()->reservedPublicPrefixes(
             (string) $this->config->get('panel.path', 'panel'),
             [
                 $this->categoryRoutePrefix(),
@@ -595,16 +595,16 @@ final class RoutingController
     /**
      * Returns the panel routing-preview service on first use.
      */
-    private function panelRoutingPreviewService(): RoutePreview
+    private function routePreview(): RoutePreview
     {
-        if (!$this->panelRoutingPreviewService instanceof RoutePreview) {
-            $this->panelRoutingPreviewService = new RoutePreview(
+        if (!$this->routePreview instanceof RoutePreview) {
+            $this->routePreview = new RoutePreview(
                 $this->root,
                 $this->input,
-                $this->themeCatalogService
+                $this->themeCatalog
             );
         }
 
-        return $this->panelRoutingPreviewService;
+        return $this->routePreview;
     }
 }

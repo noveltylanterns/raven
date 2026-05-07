@@ -25,7 +25,7 @@ final class RuntimeContract
         'initialize_public_runtime',
         'public_page_controller',
         'public_auth_controller',
-        'public_user_controller',
+        'public_profile_controller',
         'public_category_controller',
         'public_channel_controller',
         'public_group_controller',

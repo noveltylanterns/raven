@@ -16,6 +16,7 @@ use Raven\Core\Repository\CategoryRead;
 use Raven\Core\Repository\ChannelRead;
 use Raven\Core\Repository\SetRead;
 use Raven\Lib\Security\InputSanitizer;
+use Raven\Lib\View\Pagination;
 
 /**
  * Handles category and category-set list routes for the panel.
@@ -92,7 +93,7 @@ final class CategoryListController
         $pageResult = $this->categoryRead()->listPage($perPage, ($requestedPage - 1) * $perPage, $selectedSetId);
         $totalItems = (int) ($pageResult['total'] ?? 0);
         $categoryRows = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
-        $pagination = $this->context->panelPaginationState($totalItems, $requestedPage, $perPage);
+        $pagination = Pagination::state($totalItems, $requestedPage, $perPage);
         if ($totalItems > 0 && $pagination['current'] !== $requestedPage) {
             $pageResult = $this->categoryRead()->listPage($perPage, $pagination['offset'], $selectedSetId);
             $categoryRows = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
@@ -113,10 +114,10 @@ final class CategoryListController
             'categoryRows' => $categoryRows,
             'setOptions' => $setOptions,
             'selectedSetId' => $selectedSetId,
-            'pagination' => $this->context->panelPaginationViewData('/category', $pagination, [
+            'pagination' => Pagination::panelViewData($this->context->panelUrl('/category'), $pagination, [
                 'set' => $selectedSetId !== null ? (string) $selectedSetId : '',
             ]),
-            'csrfField' => $this->context->csrfField(),
+            'csrfField' => $this->context->csrf()->field(),
             'flashSuccess' => $this->context->pullFlash('success'),
             'flashError' => $this->context->pullFlash('error'),
             'section' => 'category',
@@ -152,7 +153,7 @@ final class CategoryListController
 
         $this->context->renderPanel('panel/category/set_list', [
             'setRows' => $setRows,
-            'csrfField' => $this->context->csrfField(),
+            'csrfField' => $this->context->csrf()->field(),
             'flashSuccess' => $this->context->pullFlash('success'),
             'flashError' => $this->context->pullFlash('error'),
             'section' => 'category',

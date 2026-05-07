@@ -12,9 +12,14 @@ declare(strict_types=1);
 namespace Raven\Core\Controller\Public;
 
 use Raven\Core\Repository\PageRead;
+use Raven\Core\Repository\TagRead;
 use Raven\Lib\Parser\ChannelRouteParser;
+use Raven\Lib\Parser\FeedParser;
 use Raven\Lib\Parser\PageRouteParser;
-use Raven\Lib\Parser\TagRepoParser;
+use Raven\Lib\Parser\TagRouteParser;
+use Raven\Lib\Parser\UserProfileParser;
+use Raven\Lib\Transport\Request;
+use Raven\Lib\View\Public\MetaService;
 use Raven\Lib\View\Public\TemplateDecorator;
 use Raven\Lib\View\Public\ThemeCatalog;
 use Raven\Lib\View\Public\ThemeTemplate;
@@ -26,33 +31,44 @@ final class TagController
 {
     private SharedController $context;
     private PageRead $pageRead;
-    private TagRepoParser $tagLookupRepo;
+    private TagRead $tagRead;
+    private Request $request;
+    private FeedParser $feedParser;
     private TemplateDecorator $templateDecorator;
-    private ThemeCatalog $themeCatalogService;
+    private ThemeCatalog $themeCatalog;
+    private MetaService $metaService;
     private ?ThemeTemplate $themeTemplate = null;
 
     /**
      * @param SharedController $context Shared public request context.
-     * @param PageRead $pageRepo Page repository read side for public tag page lists.
-     * @param TagRepoParser $tagLookupRepo Tag lookup parser for tag resolution.
-     * @param ThemeCatalog $themeCatalogService Shared public-theme catalog for template resolution.
+     * @param PageRead $pageRead Page repository read side for public tag page lists.
+     * @param TagRead $tagRead Tag repository read side for tag resolution.
+     * @param ThemeCatalog $themeCatalog Shared public-theme catalog for template resolution.
      * @return void
      */
     public function __construct(
         SharedController $context,
-        PageRead $pageRepo,
-        TagRepoParser $tagLookupRepo,
-        ThemeCatalog $themeCatalogService
+        PageRead $pageRead,
+        TagRead $tagRead,
+        ThemeCatalog $themeCatalog
     ) {
         $this->context = $context;
-        $this->pageRead = $pageRepo;
-        $this->tagLookupRepo = $tagLookupRepo;
+        $this->pageRead = $pageRead;
+        $this->tagRead = $tagRead;
+        $this->request = new Request();
+        $this->feedParser = new FeedParser($context->config(), $context->input());
         $this->templateDecorator = new TemplateDecorator(
             $context->config(),
             $context->input(),
             dirname(__DIR__, 4)
         );
-        $this->themeCatalogService = $themeCatalogService;
+        $this->themeCatalog = $themeCatalog;
+        $this->metaService = new MetaService(
+            $this->request,
+            $this->themeCatalog,
+            new UserProfileParser($context->input()),
+            $this->feedParser
+        );
     }
 
     /**
@@ -64,13 +80,13 @@ final class TagController
      */
     public function tag(string $tagSlug, int $pageNumber = 1): void
     {
-        $tagPrefix = $this->context->tagParser()->tagRoutePrefix();
+        $tagPrefix = TagRouteParser::tagRoutePrefix($this->context->config(), $this->context->input());
         if ($tagPrefix === '') {
             $this->context->notFound();
             return;
         }
 
-        $tag = $this->tagLookupRepo->findBySlug($tagSlug);
+        $tag = $this->tagRead->findBySlug($tagSlug);
         if ($tag === null) {
             $this->context->notFound();
             return;
@@ -89,7 +105,7 @@ final class TagController
         }
 
         $pages = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
-        $pages = $this->decoratePageListPublicPaths($pages);
+        $pages = $this->buildPageUrls($pages);
         $pages = $this->templateDecorator->decoratePageListForTemplate($pages);
         $pagination = $this->templateDecorator->decoratePaginationForTemplate([
             'current' => $pageNumber,
@@ -99,13 +115,14 @@ final class TagController
         ]);
         $tagTemplate = $this->themeTemplate()->resolveTagTemplateNameForThemeChain(
             $tagSlug,
-            $this->publicThemesRoot(),
-            $this->currentPublicThemeSlug(),
+            $this->themesRoot(),
+            $this->activeThemeSlug(),
             dirname(__DIR__, 4) . '/private/tpl/public'
         );
 
         $this->context->renderPublic($tagTemplate, [
-            'site' => $this->context->siteDataWithTaxonomyMetaImage($tag),
+            // Tag-level cover/preview uploads override default site meta image when present.
+            'site' => $this->metaService->siteDataWithTaxonomyMetaImage($tag, $this->context->siteData()),
             'tag' => $tag,
             'pages' => $pages,
             'pagination' => $pagination,
@@ -118,7 +135,7 @@ final class TagController
      * @param array<int, array<string, mixed>> $pages Public page rows.
      * @return array<int, array<string, mixed>> Public page rows with `url` fields.
      */
-    private function decoratePageListPublicPaths(array $pages): array
+    private function buildPageUrls(array $pages): array
     {
         foreach ($pages as $index => $page) {
             if (!is_array($page)) {
@@ -169,9 +186,9 @@ final class TagController
      *
      * @return string Active public theme slug.
      */
-    private function currentPublicThemeSlug(): string
+    private function activeThemeSlug(): string
     {
-        return $this->themeCatalogService->activeSlugFromConfig($this->context->config());
+        return $this->themeCatalog->activeSlugFromConfig($this->context->config());
     }
 
     /**
@@ -179,9 +196,9 @@ final class TagController
      *
      * @return string Absolute public theme root.
      */
-    private function publicThemesRoot(): string
+    private function themesRoot(): string
     {
-        return $this->themeCatalogService->root();
+        return $this->themeCatalog->root();
     }
 
     /**

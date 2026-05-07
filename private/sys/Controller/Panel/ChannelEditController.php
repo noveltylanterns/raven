@@ -51,7 +51,7 @@ final class ChannelEditController
     private FeedParser $feedParser;
     private EditorTabs $editorTabs;
     private EditorWrapper $editor;
-    private Upload $uploadFileSetNormalizer;
+    private Upload $upload;
 
     /**
      * @param SharedController $context Shared panel request context.
@@ -67,7 +67,7 @@ final class ChannelEditController
      * @param FeedParser $feedParser Feed route parser for RSS/Atom route settings.
      * @param EditorTabs $editorTabs Panel editor tab normalization and tab-preserving URL builder.
      * @param EditorWrapper $editor Shared panel editor normalizers.
-     * @param Upload $uploadFileSetNormalizer Normalizer for $_FILES upload groups.
+     * @param Upload $upload Normalizer for $_FILES upload groups.
      * @return void
      */
     public function __construct(
@@ -84,7 +84,7 @@ final class ChannelEditController
         FeedParser $feedParser,
         EditorTabs $editorTabs,
         EditorWrapper $editor,
-        Upload $uploadFileSetNormalizer
+        Upload $upload
     ) {
         $this->context = $context;
         $this->input = $input;
@@ -99,7 +99,7 @@ final class ChannelEditController
         $this->feedParser = $feedParser;
         $this->editorTabs = $editorTabs;
         $this->editor = $editor;
-        $this->uploadFileSetNormalizer = $uploadFileSetNormalizer;
+        $this->upload = $upload;
     }
 
     /**
@@ -156,7 +156,7 @@ final class ChannelEditController
             'imageMaxFilesizeKb' => $this->taxonomyImageService->maxImageFilesizeKb(),
             'imageVariantSpecs' => $this->taxonomyImageService->imageVariantSpecs(),
             'activeTab' => $activeTab,
-            'csrfField' => $this->context->csrfField(),
+            'csrfField' => $this->context->csrf()->field(),
             'flashSuccess' => $this->context->pullFlash('success'),
             'error' => $this->context->pullFlash('error'),
             'section' => 'channel',
@@ -268,8 +268,8 @@ final class ChannelEditController
         $nextStorage = $currentStorage;
         $newPathSets = [];
 
-        $coverUploads = $this->uploadFileSetNormalizer->normalize($files['cover_image'] ?? null);
-        $previewUploads = $this->uploadFileSetNormalizer->normalize($files['preview_image'] ?? null);
+        $coverUploads = $this->upload->normalize($files['cover_image'] ?? null);
+        $previewUploads = $this->upload->normalize($files['preview_image'] ?? null);
 
         if (count($coverUploads) > 1 || count($previewUploads) > 1) {
             $this->context->flash('error', 'Please upload only one cover image and one preview image.');

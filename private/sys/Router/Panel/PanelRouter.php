@@ -48,7 +48,7 @@ final class PanelRouter
         RedirectRouter::registerWithDeps($this->router, $deps);
         UserRouter::registerWithDeps($this->router, $deps);
         GroupRouter::registerWithDeps($this->router, $deps);
-        LogRouter::registerWithDeps($this->router, $deps);
+        LogsRouter::registerWithDeps($this->router, $deps);
         RoutingRouter::registerWithDeps($this->router, $deps);
         UpdateRouter::registerWithDeps($this->router, $deps);
         PreferencesRouter::registerWithDeps($this->router, $deps);

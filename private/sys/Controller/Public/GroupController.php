@@ -12,6 +12,7 @@ declare(strict_types=1);
 namespace Raven\Core\Controller\Public;
 
 use Raven\Core\Repository\GroupRead;
+use Raven\Lib\Parser\GroupRouteParser;
 use Raven\Lib\View\Public\TemplateDecorator;
 
 /**
@@ -21,6 +22,7 @@ final class GroupController
 {
     private SharedController $context;
     private GroupRead $groupRead;
+    private GroupRouteParser $groupRouteParser;
     private TemplateDecorator $templateDecorator;
 
     /**
@@ -34,6 +36,7 @@ final class GroupController
     ) {
         $this->context = $context;
         $this->groupRead = $groupRead;
+        $this->groupRouteParser = new GroupRouteParser($context->config(), $context->input());
         $this->templateDecorator = new TemplateDecorator(
             $context->config(),
             $context->input(),
@@ -49,9 +52,9 @@ final class GroupController
      */
     public function group(string $groupSlug): void
     {
-        $groupMode = $this->context->groupParser()->groupMode();
+        $groupMode = $this->groupRouteParser->groupMode();
         $isLoggedIn = $this->context->auth()->isLoggedIn();
-        if ($this->context->groupParser()->groupRoutePrefix() === '') {
+        if ($this->groupRouteParser->groupRoutePrefix() === '') {
             $this->context->notFound();
             return;
         }

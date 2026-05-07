@@ -13,6 +13,7 @@ namespace Raven\Core\Controller\Panel;
 
 use Raven\Core\Repository\RedirectRead;
 use Raven\Lib\Security\InputSanitizer;
+use Raven\Lib\View\Pagination;
 
 /**
  * Handles the redirect list route for the panel.
@@ -59,7 +60,7 @@ final class RedirectListController
         $pageResult = $this->redirectRead->listPage($perPage, ($requestedPage - 1) * $perPage);
         $totalItems = (int) ($pageResult['total'] ?? 0);
         $redirectRows = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
-        $pagination = $this->context->panelPaginationState($totalItems, $requestedPage, $perPage);
+        $pagination = Pagination::state($totalItems, $requestedPage, $perPage);
         if ($totalItems > 0 && $pagination['current'] !== $requestedPage) {
             $pageResult = $this->redirectRead->listPage($perPage, $pagination['offset']);
             $redirectRows = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
@@ -67,8 +68,8 @@ final class RedirectListController
 
         $this->context->renderPanel('panel/redirect/list', [
             'redirectRows' => $redirectRows,
-            'pagination' => $this->context->panelPaginationViewData('/redirect', $pagination),
-            'csrfField' => $this->context->csrfField(),
+            'pagination' => Pagination::panelViewData($this->context->panelUrl('/redirect'), $pagination),
+            'csrfField' => $this->context->csrf()->field(),
             'flashSuccess' => $this->context->pullFlash('success'),
             'flashError' => $this->context->pullFlash('error'),
             'section' => 'redirect',

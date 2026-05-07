@@ -11,13 +11,14 @@ declare(strict_types=1);
 
 namespace Raven\Core\Controller\Public;
 
+use Raven\Core\Repository\CategoryRead;
 use Raven\Core\Repository\ChannelRead;
 use Raven\Core\Repository\PageRead;
-use Raven\Lib\Parser\CategoryRepoParser;
+use Raven\Core\Repository\TagRead;
+use Raven\Lib\Parser\FeedParser;
 use Raven\Lib\Parser\CategoryRouteParser;
 use Raven\Lib\Parser\ChannelRouteParser;
 use Raven\Lib\Parser\PageRouteParser;
-use Raven\Lib\Parser\TagRepoParser;
 use Raven\Lib\Parser\TagRouteParser;
 
 /**
@@ -28,29 +29,31 @@ final class FeedController
     private SharedController $context;
     private ChannelRead $channelRead;
     private PageRead $pageRead;
-    private CategoryRepoParser $categoryLookupRepo;
-    private TagRepoParser $tagLookupRepo;
+    private CategoryRead $categoryRead;
+    private TagRead $tagRead;
+    private FeedParser $feedParser;
 
     /**
      * @param SharedController $context Shared public request context.
      * @param ChannelRead $channelRead Channel repository read side for feed/channel label lookups.
      * @param PageRead $pageRead Page repository read side for feed and taxonomy listing rows.
-     * @param CategoryRepoParser $categoryLookupRepo Category lookup parser for category feed resolution.
-     * @param TagRepoParser $tagLookupRepo Tag lookup parser for tag feed resolution.
+     * @param CategoryRead $categoryRead Category repository read side for category feed resolution.
+     * @param TagRead $tagRead Tag repository read side for tag feed resolution.
      * @return void
      */
     public function __construct(
         SharedController $context,
         ChannelRead $channelRead,
         PageRead $pageRead,
-        CategoryRepoParser $categoryLookupRepo,
-        TagRepoParser $tagLookupRepo
+        CategoryRead $categoryRead,
+        TagRead $tagRead
     ) {
         $this->context = $context;
         $this->channelRead = $channelRead;
         $this->pageRead = $pageRead;
-        $this->categoryLookupRepo = $categoryLookupRepo;
-        $this->tagLookupRepo = $tagLookupRepo;
+        $this->categoryRead = $categoryRead;
+        $this->tagRead = $tagRead;
+        $this->feedParser = new FeedParser($context->config(), $context->input());
     }
 
     /**
@@ -128,13 +131,12 @@ final class FeedController
      */
     private function renderFeed(string $format, ?string $channelSlug = null): void
     {
-        $feedParser = $this->context->feedParser();
-        if (!$feedParser->feedEnabled()) {
+        if (!$this->feedParser->feedEnabled()) {
             $this->context->notFound();
             return;
         }
 
-        $routeSegment = $format === 'atom' ? $feedParser->atomFeedRoute() : $feedParser->rssFeedRoute();
+        $routeSegment = $format === 'atom' ? $this->feedParser->atomFeedRoute() : $this->feedParser->rssFeedRoute();
         if ($routeSegment === '') {
             $this->context->notFound();
             return;
@@ -142,7 +144,7 @@ final class FeedController
 
         $site = $this->context->siteData();
         $feedChannelSlug = '';
-        $configuredFeedChannels = $feedParser->feedChannels();
+        $configuredFeedChannels = $this->feedParser->feedChannels();
         $scopeLabel = '';
         $scopeType = 'global';
         $scopeSlug = '';
@@ -162,13 +164,13 @@ final class FeedController
             }
 
             $feedChannelSlug = $normalizedChannelSlug;
-            $scopeLabel = $this->feedChannelLabel($feedChannelSlug);
+            $scopeLabel = $this->channelLabel($feedChannelSlug);
             $scopeType = 'channel';
             $scopeSlug = $feedChannelSlug;
-            $pages = $this->pageRead->listRecentPublished($feedParser->feedItems(), $feedChannelSlug);
+            $pages = $this->pageRead->listRecentPublished($this->feedParser->feedItems(), $feedChannelSlug);
         } else {
             if (in_array('all', $configuredFeedChannels, true)) {
-                $pages = $this->pageRead->listRecentPublished($feedParser->feedItems(), null);
+                $pages = $this->pageRead->listRecentPublished($this->feedParser->feedItems(), null);
             } else {
                 $selectedFeedChannels = array_values(array_filter(
                     $configuredFeedChannels,
@@ -176,7 +178,7 @@ final class FeedController
                 ));
                 if (count($selectedFeedChannels) === 1) {
                     $feedChannelSlug = $selectedFeedChannels[0];
-                    $scopeLabel = $this->feedChannelLabel($feedChannelSlug);
+                    $scopeLabel = $this->channelLabel($feedChannelSlug);
                     $scopeType = 'channel';
                     $scopeSlug = $feedChannelSlug;
                 } elseif ($selectedFeedChannels !== []) {
@@ -185,7 +187,7 @@ final class FeedController
                 }
 
                 $pages = $this->pageRead->listRecentPublishedForChannels(
-                    $feedParser->feedItems(),
+                    $this->feedParser->feedItems(),
                     $selectedFeedChannels
                 );
             }
@@ -197,7 +199,7 @@ final class FeedController
 
         $feedPayload = $this->buildFeedPayload(
             $format,
-            $this->buildFeedRoutePath(
+            $this->feedRoutePath(
                 $routeSegment,
                 $channelSlug !== null && $feedChannelSlug !== '' ? [$feedChannelSlug] : []
             ),
@@ -226,13 +228,12 @@ final class FeedController
      */
     private function renderTaxonomyFeed(string $format, string $taxonomyType, string $taxonomySlug): void
     {
-        $feedParser = $this->context->feedParser();
-        if (!$feedParser->feedEnabled()) {
+        if (!$this->feedParser->feedEnabled()) {
             $this->context->notFound();
             return;
         }
 
-        $routeSegment = $format === 'atom' ? $feedParser->atomFeedRoute() : $feedParser->rssFeedRoute();
+        $routeSegment = $format === 'atom' ? $this->feedParser->atomFeedRoute() : $this->feedParser->rssFeedRoute();
         if ($routeSegment === '') {
             $this->context->notFound();
             return;
@@ -256,15 +257,15 @@ final class FeedController
                 return;
             }
 
-            $category = $this->categoryLookupRepo->findBySlug($normalizedSlug);
+            $category = $this->categoryRead->findBySlug($normalizedSlug);
             if (!is_array($category)) {
                 $this->context->notFound();
                 return;
             }
 
-            $pageResult = $this->pageRead->listPageByCategorySlug($normalizedSlug, $feedParser->feedItems(), 0);
+            $pageResult = $this->pageRead->listPageByCategorySlug($normalizedSlug, $this->feedParser->feedItems(), 0);
             $pages = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
-            $scopeLabel = $this->taxonomyFeedLabel($category, $normalizedSlug);
+            $scopeLabel = $this->taxonomyLabel($category, $normalizedSlug);
             $routeSuffix = [$categoryPrefix, $normalizedSlug];
         } elseif ($taxonomyType === 'tag') {
             $tagPrefix = TagRouteParser::tagRoutePrefix($this->context->config(), $this->context->input());
@@ -273,15 +274,15 @@ final class FeedController
                 return;
             }
 
-            $tag = $this->tagLookupRepo->findBySlug($normalizedSlug);
+            $tag = $this->tagRead->findBySlug($normalizedSlug);
             if (!is_array($tag)) {
                 $this->context->notFound();
                 return;
             }
 
-            $pageResult = $this->pageRead->listPageByTagSlug($normalizedSlug, $feedParser->feedItems(), 0);
+            $pageResult = $this->pageRead->listPageByTagSlug($normalizedSlug, $this->feedParser->feedItems(), 0);
             $pages = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
-            $scopeLabel = $this->taxonomyFeedLabel($tag, $normalizedSlug);
+            $scopeLabel = $this->taxonomyLabel($tag, $normalizedSlug);
             $routeSuffix = [$tagPrefix, $normalizedSlug];
         } else {
             $this->context->notFound();
@@ -290,7 +291,7 @@ final class FeedController
 
         $feedPayload = $this->buildFeedPayload(
             $format,
-            $this->buildFeedRoutePath($routeSegment, $routeSuffix),
+            $this->feedRoutePath($routeSegment, $routeSuffix),
             $scopeLabel,
             $site,
             $pages,
@@ -345,7 +346,7 @@ final class FeedController
             $description = 'Latest pages from ' . $scopeLabel . ' on ' . $siteName . '.';
         }
 
-        $items = $this->decorateFeedPages($pages, $site);
+        $items = $this->buildFeedItems($pages, $site);
         $updatedTimestamp = time();
         if ($items !== []) {
             $updatedTimestamp = (int) ($items[0]['timestamp'] ?? $updatedTimestamp);
@@ -375,9 +376,9 @@ final class FeedController
      * @param array<string, string> $site Public site metadata payload.
      * @return array<int, array<string, mixed>> Feed template rows.
      */
-    private function decorateFeedPages(array $pages, array $site): array
+    private function buildFeedItems(array $pages, array $site): array
     {
-        $pages = $this->decoratePageListPublicPaths($pages);
+        $pages = $this->buildPageUrls($pages);
         $siteUrl = rtrim((string) ($site['url'] ?? ''), '/');
         $result = [];
 
@@ -428,7 +429,7 @@ final class FeedController
      * @param string $channelSlug Normalized channel slug.
      * @return string Human-readable channel label.
      */
-    private function feedChannelLabel(string $channelSlug): string
+    private function channelLabel(string $channelSlug): string
     {
         $normalized = strtolower(trim($channelSlug));
         if ($normalized === '') {
@@ -466,7 +467,7 @@ final class FeedController
      * @param string $fallbackSlug Fallback slug when no taxonomy name is present.
      * @return string Human-readable taxonomy feed label.
      */
-    private function taxonomyFeedLabel(array $taxonomy, string $fallbackSlug): string
+    private function taxonomyLabel(array $taxonomy, string $fallbackSlug): string
     {
         $name = trim((string) ($taxonomy['name'] ?? ''));
         return $name !== '' ? $name : $fallbackSlug;
@@ -479,7 +480,7 @@ final class FeedController
      * @param array<int, string> $extraSegments Extra route suffix segments.
      * @return string Relative feed route path.
      */
-    private function buildFeedRoutePath(string $routeSegment, array $extraSegments = []): string
+    private function feedRoutePath(string $routeSegment, array $extraSegments = []): string
     {
         $segments = [trim($routeSegment, '/')];
         foreach ($extraSegments as $extraSegment) {
@@ -503,7 +504,7 @@ final class FeedController
      * @param array<int, array<string, mixed>> $pages Public page rows.
      * @return array<int, array<string, mixed>> Public page rows with `url` fields.
      */
-    private function decoratePageListPublicPaths(array $pages): array
+    private function buildPageUrls(array $pages): array
     {
         foreach ($pages as $index => $page) {
             if (!is_array($page)) {

@@ -387,9 +387,7 @@ final class RuntimeBuilder
             $rvn,
             $resolveAuth,
             $extensionManagerFactory,
-            $extensionFormsProvider,
-            $categoryEnabled,
-            $tagEnabled
+            $extensionFormsProvider
         );
 
         ControllerFactory::registerContentTaxonomyControllers(
@@ -398,7 +396,9 @@ final class RuntimeBuilder
             $panelTaxonomyDomain,
             $extensionStateStoreFactory,
             $extensionManagerFactory,
-            $extensionContentFactory
+            $extensionContentFactory,
+            $categoryEnabled,
+            $tagEnabled
         );
 
         ControllerFactory::registerUserAdminControllers(

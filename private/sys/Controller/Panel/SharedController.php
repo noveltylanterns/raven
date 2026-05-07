@@ -18,7 +18,7 @@ use Raven\Lib\Auth\Panel\PermissionBase as PanelAccess;
 use Raven\Lib\Auth\Panel\SessionGuard;
 use Raven\Lib\Auth\SessionFlash;
 use Raven\Lib\Extension\Resolver;
-use Raven\Lib\View\Pagination;
+use Raven\Lib\Parser\ConfigParser;
 use Raven\Lib\Parser\PanelParser;
 use Raven\Lib\Security\Csrf;
 use Raven\Lib\View\Panel\Footer;
@@ -35,8 +35,6 @@ final class SharedController
     private Csrf $csrf;
     private SessionFlash $flash;
     private SessionGuard $sessionGuard;
-    private bool $categoryEnabled;
-    private bool $tagEnabled;
     private PanelTheme $panelTheme;
     /** @var array<string, bool> */
     private array $routePermissionDecisionCache = [];
@@ -49,8 +47,6 @@ final class SharedController
      * @param Gatekeeper $auth Auth/session service for panel requests.
      * @param Csrf $csrf CSRF helper for panel forms and actions.
      * @param SessionFlash $flash Shared panel flash-message store.
-     * @param bool $categoryEnabled Whether category routes are enabled in runtime config.
-     * @param bool $tagEnabled Whether tag routes are enabled in runtime config.
      * @param callable(): void $publicNotFoundRenderer Callback that renders the public 404 fallback for guest panel access.
      * @return void
      */
@@ -60,8 +56,6 @@ final class SharedController
         Gatekeeper $auth,
         Csrf $csrf,
         SessionFlash $flash,
-        bool $categoryEnabled,
-        bool $tagEnabled,
         callable $publicNotFoundRenderer
     ) {
         $this->view = $view;
@@ -70,14 +64,14 @@ final class SharedController
         $this->csrf = $csrf;
         $this->flash = $flash;
         $this->sessionGuard = new SessionGuard();
-        $this->categoryEnabled = $categoryEnabled;
-        $this->tagEnabled = $tagEnabled;
         $this->panelTheme = new PanelTheme();
         $this->publicNotFoundRenderer = $publicNotFoundRenderer;
     }
 
     /**
      * Returns the shared auth service.
+     *
+     * @return Gatekeeper Public auth/session service.
      */
     public function auth(): Gatekeeper
     {
@@ -86,6 +80,8 @@ final class SharedController
 
     /**
      * Returns the shared CSRF helper.
+     *
+     * @return Csrf Shared CSRF helper.
      */
     public function csrf(): Csrf
     {
@@ -94,34 +90,12 @@ final class SharedController
 
     /**
      * Returns the shared runtime configuration reader.
+     *
+     * @return Config Runtime configuration reader.
      */
     public function config(): Config
     {
         return $this->config;
-    }
-
-    /**
-     * Returns one CSRF form field string for panel templates.
-     */
-    public function csrfField(): string
-    {
-        return $this->csrf->field();
-    }
-
-    /**
-     * Returns whether category routes are enabled in runtime config.
-     */
-    public function categoryEnabled(): bool
-    {
-        return $this->categoryEnabled;
-    }
-
-    /**
-     * Returns whether tag routes are enabled in runtime config.
-     */
-    public function tagEnabled(): bool
-    {
-        return $this->tagEnabled;
     }
 
     /**
@@ -138,16 +112,6 @@ final class SharedController
             $this->panelUrl('/login/2fa'),
             $this->publicNotFoundRenderer
         );
-    }
-
-    /**
-     * Returns normalized panel identity from session cache.
-     *
-     * @return array{display_name: string, username: string, email: string}
-     */
-    public function panelIdentityFromSession(): array
-    {
-        return $this->sessionGuard->panelIdentityFromSession($_SESSION['rvn-panel-identity'] ?? null);
     }
 
     /**
@@ -226,7 +190,7 @@ final class SharedController
         http_response_code(404);
         $this->renderPanel('panel/status/404', [
             'section' => null,
-            'csrfField' => $this->csrfField(),
+            'csrfField' => $this->csrf->field(),
         ]);
     }
 
@@ -235,12 +199,12 @@ final class SharedController
      *
      * @return void
      */
-    public function renderPanelDenied(): void
+    private function renderPanelDenied(): void
     {
         http_response_code(403);
         $this->renderPanel('panel/status/denied', [
             'section' => null,
-            'csrfField' => $this->csrfField(),
+            'csrfField' => $this->csrf->field(),
         ]);
     }
 
@@ -253,40 +217,6 @@ final class SharedController
     public function panelUrl(string $suffix): string
     {
         return PanelParser::fromConfig($this->config, $suffix);
-    }
-
-    /**
-     * Returns the configured raw panel path without leading/trailing slashes.
-     */
-    public function panelPath(): string
-    {
-        return trim((string) $this->config->get('panel.path', 'panel'), '/');
-    }
-
-    /**
-     * Normalizes one list pagination state from total items and requested page.
-     *
-     * @param int $totalItems Total matching items.
-     * @param int $requestedPage Requested 1-based page number.
-     * @param int $perPage Items per page.
-     * @return array{current: int, per_page: int, total_items: int, total_pages: int, offset: int}
-     */
-    public function panelPaginationState(int $totalItems, int $requestedPage, int $perPage): array
-    {
-        return Pagination::state($totalItems, $requestedPage, $perPage);
-    }
-
-    /**
-     * Builds panel-list pagination payload for view templates.
-     *
-     * @param string $path Panel path suffix for page links.
-     * @param array{current: int, per_page: int, total_items: int, total_pages: int, offset: int} $pagination Pagination state.
-     * @param array<string, scalar|null> $query Additional query-string values.
-     * @return array{current: int, per_page: int, total_items: int, total_pages: int, base_path: string, query: array<string, string>}
-     */
-    public function panelPaginationViewData(string $path, array $pagination, array $query = []): array
-    {
-        return Pagination::panelViewData($this->panelUrl($path), $pagination, $query);
     }
 
     /**
@@ -700,7 +630,7 @@ final class SharedController
      *
      * @return array<string, mixed>
      */
-    public function siteData(): array
+    private function siteData(): array
     {
         return [
             'name' => (string) $this->config->get('site.name', 'Raven CMS'),
@@ -708,8 +638,8 @@ final class SharedController
             'panel_brand_name' => (string) $this->config->get('panel.brand_name', ''),
             'panel_brand_logo' => (string) $this->config->get('panel.brand_logo', ''),
             'domain' => (string) $this->config->get('site.domain', 'localhost'),
-            'category_enabled' => $this->categoryEnabled,
-            'tag_enabled' => $this->tagEnabled,
+            'category_enabled' => ConfigParser::bool($this->config->get('category.enabled', true), true),
+            'tag_enabled' => ConfigParser::bool($this->config->get('tag.enabled', true), true),
         ];
     }
 
@@ -718,7 +648,7 @@ final class SharedController
      *
      * @return string Normalized panel theme slug.
      */
-    public function currentUserTheme(): string
+    private function currentUserTheme(): string
     {
         $defaultTheme = $this->defaultPanelTheme();
         $userId = $this->auth->userId();
