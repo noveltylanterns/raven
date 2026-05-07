@@ -12,6 +12,7 @@ declare(strict_types=1);
 namespace Raven\Lib\Parser;
 
 use Raven\Core\Config;
+use Raven\Core\Router\Public\PrefixResolver;
 use Raven\Lib\Security\InputSanitizer;
 
 /**
@@ -45,7 +46,7 @@ final class GroupRouteParser
      */
     public function profileRoutePrefix(): string
     {
-        return RoutePrefixParser::normalize($this->input, (string) $this->config->get('user.prefix', 'user'), 'user', true);
+        return PrefixResolver::normalize($this->input, (string) $this->config->get('user.prefix', 'user'), 'user', true);
     }
 
     /**
@@ -102,7 +103,7 @@ final class GroupRouteParser
      */
     public function groupRoutePrefix(): string
     {
-        return RoutePrefixParser::normalize($this->input, (string) $this->config->get('group.prefix', 'group'), 'group', true);
+        return PrefixResolver::normalize($this->input, (string) $this->config->get('group.prefix', 'group'), 'group', true);
     }
 
     /**

@@ -13,6 +13,7 @@ namespace Raven\Lib\Parser;
 
 use Raven\Core\Config;
 use Raven\Core\Repository\ConfigRead;
+use Raven\Core\Router\Public\PrefixResolver;
 use Raven\Lib\Security\InputSanitizer;
 
 /**
@@ -36,6 +37,6 @@ final class CategoryRouteParser
             return '';
         }
 
-        return RoutePrefixParser::normalize($input, (string) $config->get('category.prefix', 'cat'), 'cat', true);
+        return PrefixResolver::normalize($input, (string) $config->get('category.prefix', 'cat'), 'cat', true);
     }
 }

@@ -13,6 +13,7 @@ namespace Raven\Lib\Parser;
 
 use Raven\Core\Config;
 use Raven\Core\Repository\ConfigRead;
+use Raven\Core\Router\Public\PrefixResolver;
 use Raven\Lib\Security\InputSanitizer;
 
 /**
@@ -60,7 +61,7 @@ final class FeedParser
             return '';
         }
 
-        return RoutePrefixParser::normalize($this->input, (string) $this->config->get('feed.rss', 'rss'), 'rss', true);
+        return PrefixResolver::normalize($this->input, (string) $this->config->get('feed.rss', 'rss'), 'rss', true);
     }
 
     /**
@@ -74,7 +75,7 @@ final class FeedParser
             return '';
         }
 
-        return RoutePrefixParser::normalize($this->input, (string) $this->config->get('feed.atom', 'atom'), 'atom', true);
+        return PrefixResolver::normalize($this->input, (string) $this->config->get('feed.atom', 'atom'), 'atom', true);
     }
 
     /**

@@ -2,6 +2,10 @@
 
 *The machine is supposed to be logging patches & mods to this file. Sometimes it does, sometimes it doesn't. It might be useful for historical architectural context to your Agent at one point.*
 
+### May 7, 2026 — RoutePrefixParser relocated to Router layer
+
+- **RoutePrefixParser moved to `sys/Router/Public/PrefixResolver`** — class belongs to route registration policy, not the lib/Parser primitive layer. Renamed to `PrefixResolver`, moved to `Raven\Core\Router\Public` namespace. Updated all callers (`CategoryRouteParser`, `TagRouteParser`, `FeedParser`, `GroupRouteParser`) with new import and call site.
+
 ### May 7, 2026 — lib/Parser naming sweep and PHPDoc closeout
 
 - **CategoryRouteParser::categoryRoutePrefix → ::routePrefix** — method name was redundant given the class name. Updated all callers: `CategoryEditController`, `RoutingController` (internal wrapper kept its distinct name), `CategoryController`, `FeedController`, `PublicPolicy`.

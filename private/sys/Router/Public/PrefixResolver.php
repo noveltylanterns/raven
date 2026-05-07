@@ -2,23 +2,25 @@
 
 /**
  * RAVEN CMS
- * ~/private/lib/Parser/RoutePrefixParser.php
- * Shared route-prefix normalization helpers.
+ * ~/private/sys/Router/Public/PrefixResolver.php
+ * Shared route-prefix normalization helper for public route registration.
  * Docs: https://raven.lanterns.io
  */
 
 declare(strict_types=1);
 
-namespace Raven\Lib\Parser;
+namespace Raven\Core\Router\Public;
 
 use Raven\Lib\Security\InputSanitizer;
 
 /**
  * Shared route-prefix normalization helper.
  *
- * Keeps generic route-prefix slug policy separate from panel-path helpers.
+ * Normalizes configured route-prefix slugs with fallback behavior.
+ * Used by public route-parser classes (CategoryRouteParser, TagRouteParser,
+ * FeedParser, GroupRouteParser) to apply consistent prefix validation policy.
  */
-final class RoutePrefixParser
+final class PrefixResolver
 {
     /**
      * Normalizes a configured route prefix with fallback behavior.
@@ -44,4 +46,3 @@ final class RoutePrefixParser
         return $slug;
     }
 }
-
