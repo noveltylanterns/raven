@@ -13,6 +13,8 @@ namespace Raven\Core\Repository;
 use PDO;
 use Raven\Lib\Database\SqlTable;
 use Raven\Lib\Parser\ChannelRepoParser;
+use Raven\Lib\Parser\ChannelRouteParser;
+use Raven\Lib\Parser\SetParser;
 use Raven\Lib\Scribe\ChannelScribe;
 use RuntimeException;
 
@@ -74,8 +76,8 @@ final class ChannelWrite
         $slug = strtolower(trim((string) ($data['slug'] ?? '')));
         $description = trim((string) ($data['description'] ?? ''));
         $editorOverride = ChannelRepoParser::normalizeEditorOverride((string) ($data['editor_override'] ?? 'inherit'));
-        $routeMode = ChannelRepoParser::normalizeRouteMode((string) ($data['route_mode'] ?? 'inherit'));
-        $routeSeparator = ChannelRepoParser::normalizeRouteSeparator((string) ($data['route_separator'] ?? 'inherit'));
+        $routeMode = ChannelRouteParser::normalizeChannelRouteMode((string) ($data['route_mode'] ?? 'inherit'));
+        $routeSeparator = ChannelRouteParser::normalizeChannelSeparator((string) ($data['route_separator'] ?? 'inherit'));
 
         if ($name === '' || !ChannelRepoParser::isValidSlug($slug)) {
             throw new RuntimeException('Channel name and slug are required.');
@@ -103,11 +105,11 @@ final class ChannelWrite
             ? ChannelRepoParser::normalizeFeedEnabled($data['feed_enabled'])
             : ChannelRepoParser::normalizeFeedEnabled($currentRaw['feed_enabled'] ?? false);
         $categorySets = array_key_exists('category_sets', $data)
-            ? ChannelRepoParser::normalizeTaxonomySetSelection($data['category_sets'], false)
-            : ChannelRepoParser::normalizeTaxonomySetSelection($currentRaw['category_sets'] ?? [], false);
+            ? SetParser::normalizeSelection($data['category_sets'], false)
+            : SetParser::normalizeSelection($currentRaw['category_sets'] ?? [], false);
         $tagSets = array_key_exists('tag_sets', $data)
-            ? ChannelRepoParser::normalizeTaxonomySetSelection($data['tag_sets'], false)
-            : ChannelRepoParser::normalizeTaxonomySetSelection($currentRaw['tag_sets'] ?? [], false);
+            ? SetParser::normalizeSelection($data['tag_sets'], false)
+            : SetParser::normalizeSelection($currentRaw['tag_sets'] ?? [], false);
         $createdAt = trim((string) ($currentRaw['created_at'] ?? ''));
         if ($createdAt === '') {
             $createdAt = gmdate('Y-m-d H:i:s');
@@ -179,11 +181,11 @@ final class ChannelWrite
             'feed_enabled' => ChannelRepoParser::normalizeFeedEnabled(
                 $currentRaw['feed_enabled'] ?? ($record['feed_enabled'] ?? false)
             ),
-            'category_sets' => ChannelRepoParser::normalizeTaxonomySetSelection(
+            'category_sets' => SetParser::normalizeSelection(
                 $currentRaw['category_sets'] ?? ($record['category_sets'] ?? []),
                 false
             ),
-            'tag_sets' => ChannelRepoParser::normalizeTaxonomySetSelection(
+            'tag_sets' => SetParser::normalizeSelection(
                 $currentRaw['tag_sets'] ?? ($record['tag_sets'] ?? []),
                 false
             ),

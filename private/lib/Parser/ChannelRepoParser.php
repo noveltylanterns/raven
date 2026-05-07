@@ -89,28 +89,6 @@ class ChannelRepoParser
     }
 
     /**
-     * Normalizes a raw route-mode value through the routing policy.
-     *
-     * @param string $value Raw route-mode string.
-     * @return string       Validated route mode string.
-     */
-    public static function normalizeRouteMode(string $value): string
-    {
-        return ChannelRouteParser::normalizeChannelRouteMode($value);
-    }
-
-    /**
-     * Normalizes a raw route-separator value through the routing policy.
-     *
-     * @param string $value Raw separator string.
-     * @return string       Validated separator string.
-     */
-    public static function normalizeRouteSeparator(string $value): string
-    {
-        return ChannelRouteParser::normalizeChannelSeparator($value);
-    }
-
-    /**
      * Normalizes a nullable path scalar to a trimmed string or null.
      *
      * @param mixed $value Raw value; must be scalar or null.
@@ -173,20 +151,6 @@ class ChannelRepoParser
 
         $id = (int) $normalized;
         return $id >= self::ROOT_CHANNEL_ID ? $id : null;
-    }
-
-    /**
-     * Normalizes a taxonomy-set selection value for storage on a channel record.
-     *
-     * Delegates to SetParser::normalizeSelection for consistent cross-entity normalization.
-     *
-     * @param mixed $value      Raw selection value.
-     * @param bool  $defaultAll When true and the selection is empty, returns the all-sets sentinel.
-     * @return array<int, int|string> Sorted set-id array.
-     */
-    public static function normalizeTaxonomySetSelection(mixed $value, bool $defaultAll = true): array
-    {
-        return SetParser::normalizeSelection($value, $defaultAll);
     }
 
     // -------------------------------------------------------------------------

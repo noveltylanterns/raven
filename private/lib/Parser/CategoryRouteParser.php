@@ -23,17 +23,6 @@ use Raven\Lib\Security\InputSanitizer;
 final class CategoryRouteParser
 {
     /**
-     * Returns whether the category feature is enabled in site config.
-     *
-     * @param Config $config Runtime site configuration.
-     * @return bool          True when category routes should be registered.
-     */
-    public static function categoryEnabled(Config $config): bool
-    {
-        return ConfigParser::bool($config->get('category.enabled', false), false);
-    }
-
-    /**
      * Returns the normalized category route prefix, or an empty string when categories are disabled.
      *
      * @param Config         $config Runtime site configuration.
@@ -42,7 +31,7 @@ final class CategoryRouteParser
      */
     public static function categoryRoutePrefix(Config $config, InputSanitizer $input): string
     {
-        if (!self::categoryEnabled($config)) {
+        if (!ConfigParser::bool($config->get('category.enabled', false), false)) {
             return '';
         }
 

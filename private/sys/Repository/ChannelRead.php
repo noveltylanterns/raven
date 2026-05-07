@@ -13,6 +13,8 @@ namespace Raven\Core\Repository;
 use PDO;
 use Raven\Lib\Database\SqlTable;
 use Raven\Lib\Parser\ChannelRepoParser;
+use Raven\Lib\Parser\ChannelRouteParser;
+use Raven\Lib\Parser\SetParser;
 use Raven\Lib\Scribe\ChannelScribe;
 
 /**
@@ -253,8 +255,8 @@ class ChannelRead
                 'id' => (int) ($channel['id'] ?? 0),
                 'name' => (string) ($channel['name'] ?? ''),
                 'slug' => (string) ($channel['slug'] ?? ''),
-                'category_sets' => ChannelRepoParser::normalizeTaxonomySetSelection($channel['category_sets'] ?? [], false),
-                'tag_sets' => ChannelRepoParser::normalizeTaxonomySetSelection($channel['tag_sets'] ?? [], false),
+                'category_sets' => SetParser::normalizeSelection($channel['category_sets'] ?? [], false),
+                'tag_sets' => SetParser::normalizeSelection($channel['tag_sets'] ?? [], false),
                 'editor_override' => (string) ($channel['editor_override'] ?? 'inherit'),
                 'route_mode' => (string) ($channel['route_mode'] ?? 'inherit'),
                 'route_separator' => (string) ($channel['route_separator'] ?? 'inherit'),
@@ -287,8 +289,8 @@ class ChannelRead
                 'name' => (string) ($channel['name'] ?? ''),
                 'slug' => (string) ($channel['slug'] ?? ''),
                 'feed_enabled' => (bool) ($channel['feed_enabled'] ?? false),
-                'category_sets' => ChannelRepoParser::normalizeTaxonomySetSelection($channel['category_sets'] ?? [], false),
-                'tag_sets' => ChannelRepoParser::normalizeTaxonomySetSelection($channel['tag_sets'] ?? [], false),
+                'category_sets' => SetParser::normalizeSelection($channel['category_sets'] ?? [], false),
+                'tag_sets' => SetParser::normalizeSelection($channel['tag_sets'] ?? [], false),
                 'editor_override' => (string) ($channel['editor_override'] ?? 'inherit'),
                 'route_mode' => (string) ($channel['route_mode'] ?? 'inherit'),
                 'route_separator' => (string) ($channel['route_separator'] ?? 'inherit'),
@@ -425,7 +427,7 @@ class ChannelRead
         $counts = [];
 
         foreach ($this->listRecords() as $record) {
-            $selection = ChannelRepoParser::normalizeTaxonomySetSelection($record[$field] ?? [], false);
+            $selection = SetParser::normalizeSelection($record[$field] ?? [], false);
             foreach ($selection as $setId) {
                 $counts[$setId] = (int) ($counts[$setId] ?? 0) + 1;
             }
@@ -542,8 +544,8 @@ class ChannelRead
             'editor_override' => ChannelRepoParser::normalizeEditorOverride(
                 (string) ($raw['editor_override'] ?? 'inherit')
             ),
-            'route_mode' => ChannelRepoParser::normalizeRouteMode((string) ($raw['route_mode'] ?? 'inherit')),
-            'route_separator' => ChannelRepoParser::normalizeRouteSeparator(
+            'route_mode' => ChannelRouteParser::normalizeChannelRouteMode((string) ($raw['route_mode'] ?? 'inherit')),
+            'route_separator' => ChannelRouteParser::normalizeChannelSeparator(
                 (string) ($raw['route_separator'] ?? 'inherit')
             ),
             'cover_image_path' => ChannelRepoParser::normalizeNullablePath($raw['cover_image_path'] ?? null),
@@ -554,8 +556,8 @@ class ChannelRead
             'preview_image_sm_path' => ChannelRepoParser::normalizeNullablePath($raw['preview_image_sm_path'] ?? null),
             'preview_image_md_path' => ChannelRepoParser::normalizeNullablePath($raw['preview_image_md_path'] ?? null),
             'preview_image_lg_path' => ChannelRepoParser::normalizeNullablePath($raw['preview_image_lg_path'] ?? null),
-            'category_sets' => ChannelRepoParser::normalizeTaxonomySetSelection($raw['category_sets'] ?? [], false),
-            'tag_sets' => ChannelRepoParser::normalizeTaxonomySetSelection($raw['tag_sets'] ?? [], false),
+            'category_sets' => SetParser::normalizeSelection($raw['category_sets'] ?? [], false),
+            'tag_sets' => SetParser::normalizeSelection($raw['tag_sets'] ?? [], false),
             'custom_fields' => is_array($raw['custom_fields'] ?? null) ? $raw['custom_fields'] : [],
             'overrides' => is_array($raw['overrides'] ?? null) ? $raw['overrides'] : [],
             'created_at' => $createdAt,
@@ -831,13 +833,13 @@ class ChannelRead
             'slug' => $normalizedSlug,
             'description' => trim((string) ($raw['description'] ?? '')),
             'feed_enabled' => ChannelRepoParser::normalizeFeedEnabled($raw['feed_enabled'] ?? false),
-            'category_sets' => ChannelRepoParser::normalizeTaxonomySetSelection($raw['category_sets'] ?? [], false),
-            'tag_sets' => ChannelRepoParser::normalizeTaxonomySetSelection($raw['tag_sets'] ?? [], false),
+            'category_sets' => SetParser::normalizeSelection($raw['category_sets'] ?? [], false),
+            'tag_sets' => SetParser::normalizeSelection($raw['tag_sets'] ?? [], false),
             'editor_override' => ChannelRepoParser::normalizeEditorOverride(
                 (string) ($raw['editor_override'] ?? 'inherit')
             ),
-            'route_mode' => ChannelRepoParser::normalizeRouteMode((string) ($raw['route_mode'] ?? 'inherit')),
-            'route_separator' => ChannelRepoParser::normalizeRouteSeparator(
+            'route_mode' => ChannelRouteParser::normalizeChannelRouteMode((string) ($raw['route_mode'] ?? 'inherit')),
+            'route_separator' => ChannelRouteParser::normalizeChannelSeparator(
                 (string) ($raw['route_separator'] ?? 'inherit')
             ),
             'cover_image_path' => ChannelRepoParser::normalizeNullablePath($raw['cover_image_path'] ?? null),

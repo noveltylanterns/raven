@@ -12,6 +12,8 @@ declare(strict_types=1);
 namespace Raven\Lib\Scribe;
 
 use Raven\Lib\Parser\ChannelRepoParser;
+use Raven\Lib\Parser\ChannelRouteParser;
+use Raven\Lib\Parser\SetParser;
 use RuntimeException;
 
 /**
@@ -412,13 +414,13 @@ final class ChannelScribe
             'slug' => $normalizedSlug,
             'description' => trim((string) ($raw['description'] ?? '')),
             'feed_enabled' => ChannelRepoParser::normalizeFeedEnabled($raw['feed_enabled'] ?? false),
-            'category_sets' => ChannelRepoParser::normalizeTaxonomySetSelection($raw['category_sets'] ?? [], false),
-            'tag_sets' => ChannelRepoParser::normalizeTaxonomySetSelection($raw['tag_sets'] ?? [], false),
+            'category_sets' => SetParser::normalizeSelection($raw['category_sets'] ?? [], false),
+            'tag_sets' => SetParser::normalizeSelection($raw['tag_sets'] ?? [], false),
             'editor_override' => ChannelRepoParser::normalizeEditorOverride(
                 (string) ($raw['editor_override'] ?? 'inherit')
             ),
-            'route_mode' => ChannelRepoParser::normalizeRouteMode((string) ($raw['route_mode'] ?? 'inherit')),
-            'route_separator' => ChannelRepoParser::normalizeRouteSeparator(
+            'route_mode' => ChannelRouteParser::normalizeChannelRouteMode((string) ($raw['route_mode'] ?? 'inherit')),
+            'route_separator' => ChannelRouteParser::normalizeChannelSeparator(
                 (string) ($raw['route_separator'] ?? 'inherit')
             ),
             'cover_image_path' => ChannelRepoParser::normalizeNullablePath($raw['cover_image_path'] ?? null),
