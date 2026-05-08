@@ -19,8 +19,7 @@ use Raven\Lib\Security\InputSanitizer;
 /**
  * Config-backed routing policy helpers for the Atom and RSS feed feature.
  *
- * Reads feed.* config keys. There is no FeedDataParser because feed content
- * is assembled from channel and page records rather than a dedicated feed table.
+ * Reads feed routing config keys used by public/panel route registrars.
  */
 final class FeedPolicy
 {
@@ -76,52 +75,5 @@ final class FeedPolicy
         }
 
         return PrefixResolver::normalize($this->input, (string) $this->config->get('feed.atom', 'atom'), 'atom', true);
-    }
-
-    /**
-     * Returns the normalized list of channel slugs whose pages appear in the feed.
-     *
-     * A single-element ['all'] means all channels are included.
-     *
-     * @return array<int, string> Normalized channel slug list; ['all'] for all channels.
-     */
-    public function feedChannels(): array
-    {
-        $rawChannels = $this->config->get('feed.channels', null);
-        if (!is_array($rawChannels)) {
-            $rawChannels = ['all'];
-        }
-
-        $normalizedChannels = [];
-        foreach ($rawChannels as $rawChannel) {
-            $channel = strtolower(trim((string) $rawChannel));
-            if ($channel === '') {
-                continue;
-            }
-
-            if ($channel === 'all') {
-                return ['all'];
-            }
-
-            $normalized = $channel === 'root' ? 'root' : $this->input->slug($channel);
-            if ($normalized === null || $normalized === '') {
-                continue;
-            }
-
-            $normalizedChannels[$normalized] = $normalized;
-        }
-
-        return array_values($normalizedChannels);
-    }
-
-    /**
-     * Returns the maximum number of items to include in a feed.
-     *
-     * @return int Item limit, minimum 1.
-     */
-    public function feedItems(): int
-    {
-        $items = (int) $this->config->get('feed.items', 10);
-        return max(1, $items);
     }
 }

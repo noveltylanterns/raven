@@ -15,6 +15,7 @@ use Raven\Core\Repository\CategoryRead;
 use Raven\Core\Repository\ChannelRead;
 use Raven\Core\Repository\PageRead;
 use Raven\Core\Repository\TagRead;
+use Raven\Lib\Parser\FeedParser;
 use Raven\Core\Router\FeedPolicy;
 use Raven\Core\Router\CategoryPolicy;
 use Raven\Core\Router\ChannelPolicy;
@@ -31,7 +32,8 @@ final class FeedController
     private PageRead $pageRead;
     private CategoryRead $categoryRead;
     private TagRead $tagRead;
-    private FeedPolicy $feedParser;
+    private FeedPolicy $feedPolicy;
+    private FeedParser $feedParser;
 
     /**
      * @param SharedController $context Shared public request context.
@@ -53,7 +55,8 @@ final class FeedController
         $this->pageRead = $pageRead;
         $this->categoryRead = $categoryRead;
         $this->tagRead = $tagRead;
-        $this->feedParser = new FeedPolicy($context->config(), $context->input());
+        $this->feedPolicy = new FeedPolicy($context->config(), $context->input());
+        $this->feedParser = new FeedParser($context->config(), $context->input());
     }
 
     /**
@@ -131,12 +134,12 @@ final class FeedController
      */
     private function renderFeed(string $format, ?string $channelSlug = null): void
     {
-        if (!$this->feedParser->feedEnabled()) {
+        if (!$this->feedPolicy->feedEnabled()) {
             $this->context->notFound();
             return;
         }
 
-        $routeSegment = $format === 'atom' ? $this->feedParser->atomFeedRoute() : $this->feedParser->rssFeedRoute();
+        $routeSegment = $format === 'atom' ? $this->feedPolicy->atomFeedRoute() : $this->feedPolicy->rssFeedRoute();
         if ($routeSegment === '') {
             $this->context->notFound();
             return;
@@ -228,12 +231,12 @@ final class FeedController
      */
     private function renderTaxonomyFeed(string $format, string $taxonomyType, string $taxonomySlug): void
     {
-        if (!$this->feedParser->feedEnabled()) {
+        if (!$this->feedPolicy->feedEnabled()) {
             $this->context->notFound();
             return;
         }
 
-        $routeSegment = $format === 'atom' ? $this->feedParser->atomFeedRoute() : $this->feedParser->rssFeedRoute();
+        $routeSegment = $format === 'atom' ? $this->feedPolicy->atomFeedRoute() : $this->feedPolicy->rssFeedRoute();
         if ($routeSegment === '') {
             $this->context->notFound();
             return;
