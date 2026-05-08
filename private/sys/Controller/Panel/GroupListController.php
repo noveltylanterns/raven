@@ -74,7 +74,7 @@ final class GroupListController
         $this->context->renderPanel('panel/group/list', [
             'groups' => $groupRows,
             'pagination' => Pagination::panelViewData($this->context->panelUrl('/group'), $pagination),
-            'groupRoutingEnabledSystemWide' => $this->groupRouteParser->groupRoutesEnabledForRoutingTable(),
+            'groupRoutingEnabledSystemWide' => $this->groupRouteParser->groupRouteEnabled(),
             'csrfField' => $this->context->csrf()->field(),
             'flashSuccess' => $this->context->pullFlash('success'),
             'flashError' => $this->context->pullFlash('error'),

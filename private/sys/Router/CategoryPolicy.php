@@ -25,18 +25,25 @@ use Raven\Lib\Security\InputSanitizer;
 final class CategoryPolicy
 {
     /**
-     * Returns the normalized category route prefix, or an empty string when categories are disabled.
+     * Returns whether public category routes are enabled system-wide.
+     *
+     * @param Config         $config Runtime site configuration.
+     * @return bool                  True when category routes are enabled.
+     */
+    public static function categoryRouteEnabled(Config $config): bool
+    {
+        return ConfigRead::bool($config->get('category.enabled', false), false);
+    }
+
+    /**
+     * Returns the normalized category route prefix.
      *
      * @param Config         $config Runtime site configuration.
      * @param InputSanitizer $input  Input normalizer used to validate the prefix slug.
-     * @return string                Route prefix slug (e.g. 'cat'), or '' when categories are disabled.
+     * @return string                Route prefix slug (e.g. 'cat').
      */
-    public static function routePrefix(Config $config, InputSanitizer $input): string
+    public static function categoryRoutePrefix(Config $config, InputSanitizer $input): string
     {
-        if (!ConfigRead::bool($config->get('category.enabled', false), false)) {
-            return '';
-        }
-
         return PrefixResolver::normalize($input, (string) $config->get('category.prefix', 'cat'), 'cat', true);
     }
 }

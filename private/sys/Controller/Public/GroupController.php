@@ -54,12 +54,13 @@ final class GroupController
     {
         $groupMode = $this->groupRouteParser->groupMode();
         $isLoggedIn = $this->context->auth()->isLoggedIn();
-        if ($this->groupRouteParser->groupRoutePrefix() === '') {
-            $this->context->notFound();
-            return;
-        }
+        // Use the canonical route-enable primitive so prefix + mode gates stay centralized in GroupPolicy.
+        if (!$this->groupRouteParser->groupRouteEnabled()) {
+            if ($this->groupRouteParser->groupRoutePrefix() === '') {
+                $this->context->notFound();
+                return;
+            }
 
-        if ($groupMode === 'disabled') {
             $this->renderGroupUnavailable('not_found', 'disabled');
             return;
         }

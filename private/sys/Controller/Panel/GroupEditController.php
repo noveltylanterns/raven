@@ -117,7 +117,7 @@ final class GroupEditController
         $this->context->renderPanel('panel/group/edit', [
             'group' => $group,
             'groupRoutePrefix' => $this->groupRouteParser->groupRoutePrefix(),
-            'groupRoutingEnabledSystemWide' => $this->groupRouteParser->groupRoutesEnabledForRoutingTable(),
+            'groupRoutingEnabledSystemWide' => $this->groupRouteParser->groupRouteEnabled(),
             'permissionDefinitions' => $this->permissionDefinitions(),
             'canEditConfigurationBit' => $this->context->auth()->panelService()->isAdmin(),
             'imageAllowedExtensions' => $this->taxonomyImageService->allowedImageExtensionsLabel(),
@@ -174,7 +174,7 @@ final class GroupEditController
             }
         }
 
-        $groupRoutingEnabledSystemWide = $this->groupRouteParser->groupRoutesEnabledForRoutingTable();
+        $groupRoutingEnabledSystemWide = $this->groupRouteParser->groupRouteEnabled();
         $routeEnabled = $groupRoutingEnabledSystemWide
             && isset($post['route_enabled'])
             && (string) $post['route_enabled'] === '1';

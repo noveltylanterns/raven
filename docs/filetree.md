@@ -159,11 +159,11 @@ This file is the fast system map for Raven CMS. Use it to quickly understand the
   - `RouteValidator.php` — shared route-param validation helpers (`slugOrNotFound`, `intOrNotFound`, `slugAllowedOrNotFound`) used by public/panel routers to keep validation/404 behavior consistent.
   - `ChannelPolicy.php` — channel/page routing policy statics: `globalPageRouteMode`, `effectiveChannelRouteMode`, `resolveChannelSeparator`, `normalizeGlobalSeparator`, `normalizeRouteMode`, `normalizeChannelSeparator`, `resolveSeparator`, `usesPageId`. Called by controllers, repositories, `PagePolicy`, and `RoutePreview`.
   - `PagePolicy.php` — static URL-building policy: `normalizeSlugForLookup`, `parseDateSlugSegment`, `normalizePageIdForLookup`, `resolveLookupTarget`, `buildRouteSegment`, `datePrefix`. Delegates route-mode and separator decisions to `ChannelPolicy`.
-  - `CategoryPolicy.php` — static `routePrefix()` routing policy for the category feature; reads `category.enabled` and `category.prefix` config keys.
-  - `TagPolicy.php` — static `routePrefix()` routing policy for the tag feature; reads `tag.enabled` and `tag.prefix` config keys.
-  - `FeedPolicy.php` — feed routing policy (config-backed instance class): `feedEnabled`, `rssFeedRoute`, `atomFeedRoute`.
-  - `UserPolicy.php` — user profile routing policy (config-backed instance class): `profileRoutePrefix`, `profileSelector`, `profileMode`, `profileRoutesEnabledForRoutingTable`.
-  - `GroupPolicy.php` — group routing policy (config-backed instance class): `groupRoutePrefix`, `groupMode`, `groupRoutesEnabledForRoutingTable`.
+  - `CategoryPolicy.php` — static category routing policy: `categoryRouteEnabled()`, `categoryRoutePrefix()`; reads `category.enabled` and `category.prefix` config keys.
+  - `TagPolicy.php` — static tag routing policy: `tagRouteEnabled()`, `tagRoutePrefix()`; reads `tag.enabled` and `tag.prefix` config keys.
+  - `FeedPolicy.php` — feed routing policy (config-backed instance class): `feedEnabled`, `rssRoute`, `atomRoute`.
+  - `UserPolicy.php` — user profile routing policy (config-backed instance class): `profileRoutePrefix`, `profileSelector`, `profileMode`, `profileRouteEnabled`.
+  - `GroupPolicy.php` — group routing policy (config-backed instance class): `groupRoutePrefix`, `groupMode`, `groupRouteEnabled`.
   - `Router/Public/` — `PublicRouter` (scope-owned public orchestration over an isolated internal `RouteHandler` instance), controller-aligned public routers, shared deps payload `PublicRouteDeps`, shared route policy `PublicRoutePolicy`, and shared slug-prefix primitive `PrefixRouter` used by `CategoryRouter` and `TagRouter`. Extension-provided public route loading is delegated to `lib/Extension/Public/PublicRouteRegistrar`.
   - `Router/Panel/` — `PanelRouter` (scope-owned panel orchestration over an isolated internal `RouteHandler` instance), controller-aligned panel routers including `SetRouter`, `ThemeRouter`, `ExtensionRouter`, and the split family routers for auth/dashboard/page/channel/category/tag/redirect/user/group/preferences/logs/routing/update/config.
   - `sys/Debug/RouteProfiler.php` now owns generic routing inventory composition. Panel-specific routing-screen shaping and edit-link policy live in `Controller/Panel/RoutingController.php`.

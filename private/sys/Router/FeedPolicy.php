@@ -54,7 +54,7 @@ final class FeedPolicy
      *
      * @return string Route prefix slug (e.g. 'rss'), or '' when disabled.
      */
-    public function rssFeedRoute(): string
+    public function rssRoute(): string
     {
         if (!$this->feedEnabled()) {
             return '';
@@ -68,7 +68,7 @@ final class FeedPolicy
      *
      * @return string Route prefix slug (e.g. 'atom'), or '' when disabled.
      */
-    public function atomFeedRoute(): string
+    public function atomRoute(): string
     {
         if (!$this->feedEnabled()) {
             return '';

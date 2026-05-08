@@ -65,11 +65,11 @@ final class GroupPolicy
     }
 
     /**
-     * Returns whether group routes should appear in the routing table.
+     * Returns whether public group routes are enabled system-wide.
      *
      * @return bool True when groups have a prefix and are not fully disabled.
      */
-    public function groupRoutesEnabledForRoutingTable(): bool
+    public function groupRouteEnabled(): bool
     {
         return $this->groupRoutePrefix() !== '' && in_array($this->groupMode(), ['public_full', 'public_limited', 'private'], true);
     }

@@ -80,11 +80,11 @@ final class CategoryController
      */
     public function category(string $categorySlug, int $pageNumber = 1): void
     {
-        $categoryPrefix = CategoryPolicy::routePrefix($this->context->config(), $this->context->input());
-        if ($categoryPrefix === '') {
+        if (!CategoryPolicy::categoryRouteEnabled($this->context->config())) {
             $this->context->notFound();
             return;
         }
+        $categoryPrefix = CategoryPolicy::categoryRoutePrefix($this->context->config(), $this->context->input());
 
         $category = $this->categoryRead->findBySlug($categorySlug);
         if ($category === null) {

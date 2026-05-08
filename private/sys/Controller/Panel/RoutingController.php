@@ -302,9 +302,9 @@ final class RoutingController
         $categoryPrefix = $this->categoryRoutePrefix();
         $tagPrefix = $this->tagRoutePrefix();
         $profilePrefix = $this->profileRoutePrefix();
-        $profileRoutesEnabled = $this->profileRoutesEnabledForRoutingTable();
+        $profileRoutesEnabled = $this->profileRouteEnabled();
         $groupPrefix = $this->groupRoutePrefix();
-        $groupRoutesEnabled = $this->groupRoutesEnabledForRoutingTable();
+        $groupRoutesEnabled = $this->groupRouteEnabled();
 
         $groupRoutingEnabled = $groupRoutesEnabled && $groupPrefix !== '';
         $userRoutingEnabled = $profileRoutesEnabled && $profilePrefix !== '';
@@ -317,8 +317,8 @@ final class RoutingController
             'reserved_prefixes' => $this->reservedPublicPrefixes(),
             'channel_index_template_exists' => $this->channelIndexTemplateExistsForRouting(),
             'feed_enabled' => $this->feedParser()->feedEnabled(),
-            'rss_feed_route' => $this->feedParser()->rssFeedRoute(),
-            'atom_feed_route' => $this->feedParser()->atomFeedRoute(),
+            'rss_feed_route' => $this->feedParser()->rssRoute(),
+            'atom_feed_route' => $this->feedParser()->atomRoute(),
             'category_prefix' => $categoryPrefix,
             'tag_prefix' => $tagPrefix,
             'profile_prefix' => $profilePrefix,
@@ -490,7 +490,11 @@ final class RoutingController
      */
     private function categoryRoutePrefix(): string
     {
-        return CategoryPolicy::routePrefix($this->config, $this->input);
+        if (!CategoryPolicy::categoryRouteEnabled($this->config)) {
+            return '';
+        }
+
+        return CategoryPolicy::categoryRoutePrefix($this->config, $this->input);
     }
 
     /**
@@ -498,7 +502,11 @@ final class RoutingController
      */
     private function tagRoutePrefix(): string
     {
-        return TagPolicy::routePrefix($this->config, $this->input);
+        if (!TagPolicy::tagRouteEnabled($this->config)) {
+            return '';
+        }
+
+        return TagPolicy::tagRoutePrefix($this->config, $this->input);
     }
 
     /**
@@ -512,9 +520,9 @@ final class RoutingController
     /**
      * Returns true when public profile URLs are enabled for routing inventory.
      */
-    private function profileRoutesEnabledForRoutingTable(): bool
+    private function profileRouteEnabled(): bool
     {
-        return $this->userPolicy()->profileRoutesEnabledForRoutingTable();
+        return $this->userPolicy()->profileRouteEnabled();
     }
 
     /**
@@ -528,9 +536,9 @@ final class RoutingController
     /**
      * Returns true when public group URLs are enabled for routing inventory.
      */
-    private function groupRoutesEnabledForRoutingTable(): bool
+    private function groupRouteEnabled(): bool
     {
-        return $this->groupPolicy()->groupRoutesEnabledForRoutingTable();
+        return $this->groupPolicy()->groupRouteEnabled();
     }
 
     /**

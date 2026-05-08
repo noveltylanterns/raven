@@ -25,18 +25,25 @@ use Raven\Lib\Security\InputSanitizer;
 final class TagPolicy
 {
     /**
-     * Returns the normalized tag route prefix, or an empty string when tags are disabled.
+     * Returns whether public tag routes are enabled system-wide.
+     *
+     * @param Config         $config Runtime site configuration.
+     * @return bool                  True when tag routes are enabled.
+     */
+    public static function tagRouteEnabled(Config $config): bool
+    {
+        return ConfigRead::bool($config->get('tag.enabled', false), false);
+    }
+
+    /**
+     * Returns the normalized tag route prefix.
      *
      * @param Config         $config Runtime site configuration.
      * @param InputSanitizer $input  Input normalizer used to validate the prefix slug.
-     * @return string                Route prefix slug (e.g. 'tag'), or '' when tags are disabled.
+     * @return string                Route prefix slug (e.g. 'tag').
      */
-    public static function routePrefix(Config $config, InputSanitizer $input): string
+    public static function tagRoutePrefix(Config $config, InputSanitizer $input): string
     {
-        if (!ConfigRead::bool($config->get('tag.enabled', false), false)) {
-            return '';
-        }
-
         return PrefixResolver::normalize($input, (string) $config->get('tag.prefix', 'tag'), 'tag', true);
     }
 }

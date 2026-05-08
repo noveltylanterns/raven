@@ -48,13 +48,17 @@ final class PublicPolicy
         $feedRouteParser = new FeedPolicy($config, $input);
 
         $panelPath = (string) $config->get('panel.path', 'panel');
-        $categoryPrefix = CategoryPolicy::routePrefix($config, $input);
-        $tagPrefix = TagPolicy::routePrefix($config, $input);
+        $categoryPrefix = CategoryPolicy::categoryRouteEnabled($config)
+            ? CategoryPolicy::categoryRoutePrefix($config, $input)
+            : '';
+        $tagPrefix = TagPolicy::tagRouteEnabled($config)
+            ? TagPolicy::tagRoutePrefix($config, $input)
+            : '';
         $profilePrefix = $userRouteParser->profileRoutePrefix();
         $groupPrefix = $groupRouteParser->groupRoutePrefix();
         $feedsEnabled = $feedRouteParser->feedEnabled();
-        $rssFeedRoute = $feedRouteParser->rssFeedRoute();
-        $atomFeedRoute = $feedRouteParser->atomFeedRoute();
+        $rssFeedRoute = $feedRouteParser->rssRoute();
+        $atomFeedRoute = $feedRouteParser->atomRoute();
 
         // Keep the two feed route slugs distinct even when config is edited to collide.
         if ($rssFeedRoute !== '' && $atomFeedRoute !== '' && $rssFeedRoute === $atomFeedRoute) {

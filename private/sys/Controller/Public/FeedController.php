@@ -139,7 +139,7 @@ final class FeedController
             return;
         }
 
-        $routeSegment = $format === 'atom' ? $this->feedPolicy->atomFeedRoute() : $this->feedPolicy->rssFeedRoute();
+        $routeSegment = $format === 'atom' ? $this->feedPolicy->atomRoute() : $this->feedPolicy->rssRoute();
         if ($routeSegment === '') {
             $this->context->notFound();
             return;
@@ -236,7 +236,7 @@ final class FeedController
             return;
         }
 
-        $routeSegment = $format === 'atom' ? $this->feedPolicy->atomFeedRoute() : $this->feedPolicy->rssFeedRoute();
+        $routeSegment = $format === 'atom' ? $this->feedPolicy->atomRoute() : $this->feedPolicy->rssRoute();
         if ($routeSegment === '') {
             $this->context->notFound();
             return;
@@ -254,12 +254,12 @@ final class FeedController
         $pages = [];
 
         if ($taxonomyType === 'category') {
-            $categoryPrefix = CategoryPolicy::routePrefix($this->context->config(), $this->context->input());
-            if ($categoryPrefix === '') {
+            if (!CategoryPolicy::categoryRouteEnabled($this->context->config())) {
                 $this->context->notFound();
                 return;
             }
 
+            $categoryPrefix = CategoryPolicy::categoryRoutePrefix($this->context->config(), $this->context->input());
             $category = $this->categoryRead->findBySlug($normalizedSlug);
             if (!is_array($category)) {
                 $this->context->notFound();
@@ -271,12 +271,12 @@ final class FeedController
             $scopeLabel = $this->taxonomyLabel($category, $normalizedSlug);
             $routeSuffix = [$categoryPrefix, $normalizedSlug];
         } elseif ($taxonomyType === 'tag') {
-            $tagPrefix = TagPolicy::routePrefix($this->context->config(), $this->context->input());
-            if ($tagPrefix === '') {
+            if (!TagPolicy::tagRouteEnabled($this->context->config())) {
                 $this->context->notFound();
                 return;
             }
 
+            $tagPrefix = TagPolicy::tagRoutePrefix($this->context->config(), $this->context->input());
             $tag = $this->tagRead->findBySlug($normalizedSlug);
             if (!is_array($tag)) {
                 $this->context->notFound();

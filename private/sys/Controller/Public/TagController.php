@@ -80,11 +80,11 @@ final class TagController
      */
     public function tag(string $tagSlug, int $pageNumber = 1): void
     {
-        $tagPrefix = TagPolicy::routePrefix($this->context->config(), $this->context->input());
-        if ($tagPrefix === '') {
+        if (!TagPolicy::tagRouteEnabled($this->context->config())) {
             $this->context->notFound();
             return;
         }
+        $tagPrefix = TagPolicy::tagRoutePrefix($this->context->config(), $this->context->input());
 
         $tag = $this->tagRead->findBySlug($tagSlug);
         if ($tag === null) {

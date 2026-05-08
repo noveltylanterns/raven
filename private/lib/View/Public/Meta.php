@@ -266,12 +266,12 @@ final class Meta
             return $site;
         }
 
-        $rssRoute = $this->feedParser->rssFeedRoute();
+        $rssRoute = $this->feedParser->rssRoute();
         if ($rssRoute !== '') {
             $site['feed_rss_url'] = $siteUrl . '/' . ltrim($rssRoute, '/');
         }
 
-        $atomRoute = $this->feedParser->atomFeedRoute();
+        $atomRoute = $this->feedParser->atomRoute();
         if ($atomRoute !== '') {
             $site['feed_atom_url'] = $siteUrl . '/' . ltrim($atomRoute, '/');
         }

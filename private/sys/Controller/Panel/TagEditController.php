@@ -128,7 +128,7 @@ final class TagEditController
         $this->context->renderPanel('panel/tag/edit', [
             'tag' => $tag,
             'setOptions' => $this->tagSetRepo()->listOptions(),
-            'tagRoutePrefix' => TagPolicy::routePrefix($this->context->config(), $this->input),
+            'tagRoutePrefix' => TagPolicy::tagRoutePrefix($this->context->config(), $this->input),
             'imageAllowedExtensions' => $this->taxonomyImageService->allowedImageExtensionsLabel(),
             'imageMaxFilesizeKb' => $this->taxonomyImageService->maxImageFilesizeKb(),
             'imageVariantSpecs' => $this->taxonomyImageService->imageVariantSpecs(),

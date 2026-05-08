@@ -87,11 +87,11 @@ final class UserPolicy
     }
 
     /**
-     * Returns whether profile routes should appear in the routing table.
+     * Returns whether public profile routes are enabled system-wide.
      *
      * @return bool True when profiles have a prefix and are not fully disabled.
      */
-    public function profileRoutesEnabledForRoutingTable(): bool
+    public function profileRouteEnabled(): bool
     {
         return $this->profileRoutePrefix() !== '' && in_array($this->profileMode(), ['public_full', 'public_limited', 'private'], true);
     }
