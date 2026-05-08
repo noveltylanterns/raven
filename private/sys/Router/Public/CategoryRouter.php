@@ -32,6 +32,7 @@ final class CategoryRouter
     {
         PrefixRouter::register(
             $router,
+            'category_route_enabled',
             'category_prefix',
             $deps->routeConfig,
             fn(string $slug) => $deps->publicCategoryController()->category($slug, 1),

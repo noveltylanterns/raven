@@ -62,12 +62,7 @@ final class ProfileController
         $isLoggedIn = $this->context->auth()->isLoggedIn();
         // Use the canonical route-enable primitive so prefix + mode gates stay centralized in UserPolicy.
         if (!$this->groupRouteParser->profileRouteEnabled()) {
-            if ($this->groupRouteParser->profileRoutePrefix() === '') {
-                $this->context->notFound();
-                return;
-            }
-
-            $this->renderProfileUnavailable('not_found', 'disabled');
+            $this->context->notFound();
             return;
         }
 

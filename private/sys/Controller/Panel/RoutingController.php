@@ -201,8 +201,8 @@ final class RoutingController
      */
     private function routingInventoryTaxonomyOptionSets(string $categoryPrefix, string $tagPrefix): array
     {
-        $includeCategories = trim($categoryPrefix) !== '';
-        $includeTags = trim($tagPrefix) !== '';
+        $includeCategories = $this->categoryRouteEnabled();
+        $includeTags = $this->tagRouteEnabled();
         if (!$includeCategories && !$includeTags) {
             return [
                 'channel_options' => $this->channelRepo->listRoutingOptions(),
@@ -306,8 +306,8 @@ final class RoutingController
         $groupPrefix = $this->groupRoutePrefix();
         $groupRoutesEnabled = $this->groupRouteEnabled();
 
-        $groupRoutingEnabled = $groupRoutesEnabled && $groupPrefix !== '';
-        $userRoutingEnabled = $profileRoutesEnabled && $profilePrefix !== '';
+        $groupRoutingEnabled = $groupRoutesEnabled;
+        $userRoutingEnabled = $profileRoutesEnabled;
         $routingAuthData = $this->userRepo->listRoutingData($groupRoutingEnabled, $userRoutingEnabled);
         $routingGroups = is_array($routingAuthData['group_rows'] ?? null) ? $routingAuthData['group_rows'] : [];
         $routingUsers = is_array($routingAuthData['user_rows'] ?? null) ? $routingAuthData['user_rows'] : [];
@@ -490,7 +490,7 @@ final class RoutingController
      */
     private function categoryRoutePrefix(): string
     {
-        if (!CategoryPolicy::categoryRouteEnabled($this->config)) {
+        if (!$this->categoryRouteEnabled()) {
             return '';
         }
 
@@ -498,11 +498,19 @@ final class RoutingController
     }
 
     /**
+     * Returns true when public category routes are enabled system-wide.
+     */
+    private function categoryRouteEnabled(): bool
+    {
+        return CategoryPolicy::categoryRouteEnabled($this->config);
+    }
+
+    /**
      * Returns the configured public tag route prefix.
      */
     private function tagRoutePrefix(): string
     {
-        if (!TagPolicy::tagRouteEnabled($this->config)) {
+        if (!$this->tagRouteEnabled()) {
             return '';
         }
 
@@ -510,10 +518,22 @@ final class RoutingController
     }
 
     /**
+     * Returns true when public tag routes are enabled system-wide.
+     */
+    private function tagRouteEnabled(): bool
+    {
+        return TagPolicy::tagRouteEnabled($this->config);
+    }
+
+    /**
      * Returns the configured public profile route prefix.
      */
     private function profileRoutePrefix(): string
     {
+        if (!$this->profileRouteEnabled()) {
+            return '';
+        }
+
         return $this->userPolicy()->profileRoutePrefix();
     }
 
@@ -530,6 +550,10 @@ final class RoutingController
      */
     private function groupRoutePrefix(): string
     {
+        if (!$this->groupRouteEnabled()) {
+            return '';
+        }
+
         return $this->groupPolicy()->groupRoutePrefix();
     }
 

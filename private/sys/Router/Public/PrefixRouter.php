@@ -32,9 +32,11 @@ final class PrefixRouter
      * Reads the URL prefix from $routeConfig[$configKey] and registers two routes:
      * /{prefix}/{slug} (page defaults to 1) and /{prefix}/{slug}/{page}. Both
      * validate the slug; the paged route additionally validates page as a positive
-     * integer. Registration is skipped entirely when the prefix is empty or unset.
+     * integer. Registration is skipped entirely when the route is disabled or when
+     * the prefix is empty or unset.
      *
      * @param RouteHandler $router Mutable router receiving the prefix routes.
+     * @param string $enabledKey routeConfig key that indicates route enablement (e.g. 'category_route_enabled').
      * @param string $configKey routeConfig key that holds the URL prefix (e.g. 'category_prefix').
      * @param array<string, mixed> $routeConfig Normalized public route policy map.
      * @param Closure $onSlug Handler for /{prefix}/{slug} — receives (string $slug).
@@ -45,6 +47,7 @@ final class PrefixRouter
      */
     public static function register(
         RouteHandler $router,
+        string $enabledKey,
         string $configKey,
         array $routeConfig,
         Closure $onSlug,
@@ -52,6 +55,10 @@ final class PrefixRouter
         callable $publicRequestContext,
         InputSanitizer $input
     ): void {
+        if (empty($routeConfig[$enabledKey])) {
+            return;
+        }
+
         $prefix = (string) ($routeConfig[$configKey] ?? '');
         if ($prefix === '') {
             return;

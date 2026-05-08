@@ -32,8 +32,12 @@ final class PublicPolicy
      * @return array{
      *   category_prefix: string,
      *   tag_prefix: string,
+     *   category_route_enabled: bool,
+     *   tag_route_enabled: bool,
      *   profile_prefix: string,
      *   group_prefix: string,
+     *   profile_route_enabled: bool,
+     *   group_route_enabled: bool,
      *   feeds_enabled: bool,
      *   rss_feed_route: string,
      *   atom_feed_route: string,
@@ -48,14 +52,19 @@ final class PublicPolicy
         $feedRouteParser = new FeedPolicy($config, $input);
 
         $panelPath = (string) $config->get('panel.path', 'panel');
-        $categoryPrefix = CategoryPolicy::categoryRouteEnabled($config)
+        $categoryRouteEnabled = CategoryPolicy::categoryRouteEnabled($config);
+        $tagRouteEnabled = TagPolicy::tagRouteEnabled($config);
+        $profileRouteEnabled = $userRouteParser->profileRouteEnabled();
+        $groupRouteEnabled = $groupRouteParser->groupRouteEnabled();
+
+        $categoryPrefix = $categoryRouteEnabled
             ? CategoryPolicy::categoryRoutePrefix($config, $input)
             : '';
-        $tagPrefix = TagPolicy::tagRouteEnabled($config)
+        $tagPrefix = $tagRouteEnabled
             ? TagPolicy::tagRoutePrefix($config, $input)
             : '';
-        $profilePrefix = $userRouteParser->profileRoutePrefix();
-        $groupPrefix = $groupRouteParser->groupRoutePrefix();
+        $profilePrefix = $profileRouteEnabled ? $userRouteParser->profileRoutePrefix() : '';
+        $groupPrefix = $groupRouteEnabled ? $groupRouteParser->groupRoutePrefix() : '';
         $feedsEnabled = $feedRouteParser->feedEnabled();
         $rssFeedRoute = $feedRouteParser->rssRoute();
         $atomFeedRoute = $feedRouteParser->atomRoute();
@@ -104,8 +113,12 @@ final class PublicPolicy
         return [
             'category_prefix' => $categoryPrefix,
             'tag_prefix' => $tagPrefix,
+            'category_route_enabled' => $categoryRouteEnabled,
+            'tag_route_enabled' => $tagRouteEnabled,
             'profile_prefix' => $profilePrefix,
             'group_prefix' => $groupPrefix,
+            'profile_route_enabled' => $profileRouteEnabled,
+            'group_route_enabled' => $groupRouteEnabled,
             'feeds_enabled' => $feedsEnabled,
             'rss_feed_route' => $rssFeedRoute,
             'atom_feed_route' => $atomFeedRoute,

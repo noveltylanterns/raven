@@ -31,9 +31,10 @@ final class GroupRouter
         $publicGroupController = $deps->publicGroupController;
         $publicRequestContext = $deps->publicRequestContext;
         $input = $deps->input;
+        $groupRouteEnabled = !empty($deps->routeConfig['group_route_enabled']);
         $groupPrefix = (string) ($deps->routeConfig['group_prefix'] ?? '');
 
-        if ($groupPrefix === '') {
+        if (!$groupRouteEnabled || $groupPrefix === '') {
             return;
         }
 

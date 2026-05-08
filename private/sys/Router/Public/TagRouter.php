@@ -32,6 +32,7 @@ final class TagRouter
     {
         PrefixRouter::register(
             $router,
+            'tag_route_enabled',
             'tag_prefix',
             $deps->routeConfig,
             fn(string $slug) => $deps->publicTagController()->tag($slug, 1),

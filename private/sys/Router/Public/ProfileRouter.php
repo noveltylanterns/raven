@@ -30,9 +30,10 @@ final class ProfileRouter
         $publicProfileController = $deps->publicProfileController;
         $publicRequestContext = $deps->publicRequestContext;
         $input = $deps->input;
+        $profileRouteEnabled = !empty($deps->routeConfig['profile_route_enabled']);
         $profilePrefix = (string) ($deps->routeConfig['profile_prefix'] ?? '');
 
-        if ($profilePrefix === '') {
+        if (!$profileRouteEnabled || $profilePrefix === '') {
             return;
         }
 
