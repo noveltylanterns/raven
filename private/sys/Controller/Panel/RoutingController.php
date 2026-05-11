@@ -13,24 +13,24 @@ namespace Raven\Core\Controller\Panel;
 
 use Closure;
 use Raven\Core\Config;
+use Raven\Core\Debug\RouteProfiler;
 use Raven\Core\Repository\ChannelRead;
 use Raven\Core\Repository\PageRead;
 use Raven\Core\Repository\RedirectRead;
 use Raven\Core\Repository\UserRead;
-use Raven\Core\Debug\RouteProfiler;
-use Raven\Lib\Auth\LoginIdentifier;
-use Raven\Lib\Auth\Panel\PermissionBase as PanelAccess;
-use Raven\Lib\Format\Csv;
 use Raven\Core\Router\CategoryPolicy;
 use Raven\Core\Router\ChannelPolicy;
 use Raven\Core\Router\FeedPolicy;
 use Raven\Core\Router\GroupPolicy;
+use Raven\Core\Router\RoutePreview;
 use Raven\Core\Router\TagPolicy;
 use Raven\Core\Router\UserPolicy;
-use Raven\Lib\View\Taxonomy;
+use Raven\Lib\Auth\LoginIdentifier;
+use Raven\Lib\Auth\Panel\PermissionBase as PanelAccess;
+use Raven\Lib\Format\Csv;
 use Raven\Lib\Security\InputSanitizer;
-use Raven\Core\Router\RoutePreview;
 use Raven\Lib\View\Public\ThemeCatalog;
+use Raven\Lib\View\Taxonomy;
 
 /**
  * Handles the split panel routing diagnostics routes.

@@ -22,26 +22,26 @@ use Raven\Core\Repository\PageWrite;
 use Raven\Core\Repository\SetRead;
 use Raven\Core\Repository\TagRead;
 use Raven\Core\Repository\UserRead;
+use Raven\Core\Router\ChannelPolicy;
 use Raven\Lib\Auth\LoginIdentifier;
 use Raven\Lib\Extension\Panel\Content as ExtensionContent;
 use Raven\Lib\Extension\Panel\Manager as ExtensionManager;
 use Raven\Lib\Extension\StateRead;
 use Raven\Lib\Media\MediaUpload;
-use Raven\Core\Router\ChannelPolicy;
 use Raven\Lib\Parser\PageBlockParser;
 use Raven\Lib\Parser\SetParser;
-use Raven\Lib\View\Taxonomy;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\Transport\Redirect;
 use Raven\Lib\Transport\Upload;
-use Raven\Lib\View\Panel\EditorWrapper;
 use Raven\Lib\View\Panel\EditorAuthor;
 use Raven\Lib\View\Panel\EditorBlocks;
 use Raven\Lib\View\Panel\EditorMCE;
 use Raven\Lib\View\Panel\EditorMDE;
-use Raven\Lib\View\Panel\EditorTabs;
-use Raven\Lib\View\Panel\EditorPage;
 use Raven\Lib\View\Panel\EditorMedia;
+use Raven\Lib\View\Panel\EditorPage;
+use Raven\Lib\View\Panel\EditorTabs;
+use Raven\Lib\View\Panel\EditorWrapper;
+use Raven\Lib\View\Taxonomy;
 
 /**
  * Handles page create/edit, save, gallery upload/delete, and page delete routes.

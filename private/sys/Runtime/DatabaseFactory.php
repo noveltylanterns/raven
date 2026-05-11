@@ -12,12 +12,12 @@ declare(strict_types=1);
 namespace Raven\Core\Runtime;
 
 use PDO;
+use Raven\Core\Debug\QueryProfiler;
 use Raven\Core\Debug\QueryProfilerPdo;
 use Raven\Core\Debug\RequestProfilerAdapter;
 use Raven\Lib\Database\DbDriver;
 use Raven\Lib\Database\MysqlConfig;
 use Raven\Lib\Database\PgsqlConfig;
-use Raven\Core\Debug\QueryProfiler;
 use Raven\Lib\Database\SqliteBootstrap;
 use Raven\Lib\Database\SqliteConfig;
 

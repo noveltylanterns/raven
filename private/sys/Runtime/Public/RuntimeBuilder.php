@@ -13,14 +13,14 @@ namespace Raven\Core\Runtime\Public;
 
 use Closure;
 use PDO;
+use Raven\Core\Gatekeeper;
+use Raven\Core\Renderer;
+use Raven\Core\Repository\ConfigRead;
 use Raven\Core\Runtime\Public\ControllerFactory;
 use Raven\Core\Runtime\Public\DomainFactory;
 use Raven\Core\Runtime\Public\RepoFactory;
 use Raven\Core\Runtime\Public\RuntimeInitializer;
-use Raven\Core\Renderer;
-use Raven\Core\Gatekeeper;
 use Raven\Lib\Extension\Public\Content as ExtensionContent;
-use Raven\Core\Repository\ConfigRead;
 use Raven\Lib\View\Public\ThemeCatalog;
 use RuntimeException;
 

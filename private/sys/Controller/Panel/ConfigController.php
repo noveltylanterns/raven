@@ -14,19 +14,19 @@ namespace Raven\Core\Controller\Panel;
 use Closure;
 use Raven\Core\Config;
 use Raven\Core\Repository\ChannelRead;
+use Raven\Core\Repository\ConfigRead;
+use Raven\Core\Repository\ConfigWrite;
 use Raven\Core\Repository\SetRead;
 use Raven\Core\Router\ChannelPolicy;
-use Raven\Core\Repository\ConfigRead;
 use Raven\Lib\Parser\UserProfileParser;
 use Raven\Lib\Security\InputSanitizer;
-use Raven\Core\Repository\ConfigWrite;
-use Raven\Lib\View\Panel\EditorWrapper;
+use Raven\Lib\Transport\Redirect;
 use Raven\Lib\View\Panel\EditorBlocks;
 use Raven\Lib\View\Panel\EditorTabs;
+use Raven\Lib\View\Panel\EditorWrapper;
 use Raven\Lib\View\Panel\Theme as PanelTheme;
-use Raven\Lib\View\Public\ThemeCatalog;
 
-use Raven\Lib\Transport\Redirect;
+use Raven\Lib\View\Public\ThemeCatalog;
 
 /**
  * Handles the panel configuration editor routes.

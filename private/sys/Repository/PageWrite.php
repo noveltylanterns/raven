@@ -11,14 +11,14 @@ declare(strict_types=1);
 namespace Raven\Core\Repository;
 
 use PDO;
-use RuntimeException;
-use Raven\Lib\Parser\ChannelParser;
-use Raven\Core\Repository\ChannelShared;
 use Raven\Core\Debug\UniquenessProfiler;
-use Raven\Lib\Parser\PageBlockParser;
+use Raven\Core\Repository\ChannelShared;
 use Raven\Core\Repository\PageShared;
 use Raven\Lib\Database\SqlInsert;
 use Raven\Lib\Database\SqlTable;
+use Raven\Lib\Parser\ChannelParser;
+use Raven\Lib\Parser\PageBlockParser;
+use RuntimeException;
 
 /**
  * INSERT, UPDATE, and DELETE methods for page records.

@@ -11,10 +11,10 @@ declare(strict_types=1);
 
 namespace Raven\Core\Router\Panel;
 
-use Raven\Lib\Extension\Panel\Routes as PanelRoutes;
+use Raven\Core\Router\RouteHandler;
 use Raven\Core\Router\RouteRequest;
 use Raven\Core\Router\RouteResponse;
-use Raven\Core\Router\RouteHandler;
+use Raven\Lib\Extension\Panel\Routes as PanelRoutes;
 
 /**
  * Owns panel-route registration order and dispatch lifecycle.

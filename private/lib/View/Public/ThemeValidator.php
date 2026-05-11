@@ -17,6 +17,17 @@ namespace Raven\Lib\View\Public;
 final class ThemeValidator
 {
     /**
+     * Returns whether the given value satisfies Raven's public-theme slug contract.
+     *
+     * @param string $slug Candidate public-theme slug.
+     * @return bool True when the slug is safe for manifest/runtime use.
+     */
+    public function isValidSlug(string $slug): bool
+    {
+        return preg_match('/^[a-z0-9][a-z0-9_-]{0,63}$/', $slug) === 1;
+    }
+
+    /**
      * Validates and normalizes one decoded `theme.json` payload.
      *
      * @param string $themeSlug Filesystem theme slug that owns the manifest.
@@ -41,17 +52,6 @@ final class ThemeValidator
             'is_child_theme' => $isChildTheme && $parentTheme !== '',
             'parent_theme' => $parentTheme,
         ];
-    }
-
-    /**
-     * Returns whether the given value satisfies Raven's public-theme slug contract.
-     *
-     * @param string $slug Candidate public-theme slug.
-     * @return bool True when the slug is safe for manifest/runtime use.
-     */
-    public function isValidSlug(string $slug): bool
-    {
-        return preg_match('/^[a-z0-9][a-z0-9_-]{0,63}$/', $slug) === 1;
     }
 
     private function toBool(mixed $value): bool

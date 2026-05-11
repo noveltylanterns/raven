@@ -15,8 +15,8 @@ use Raven\Core\Repository\ChannelRead;
 use Raven\Core\Repository\RedirectRead;
 use Raven\Core\Repository\RedirectWrite;
 use Raven\Lib\Parser\RedirectParser;
-use Raven\Lib\Transport\Redirect;
 use Raven\Lib\Security\InputSanitizer;
+use Raven\Lib\Transport\Redirect;
 
 /**
  * Handles redirect create/edit/save/delete routes for the panel.

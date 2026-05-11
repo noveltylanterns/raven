@@ -24,20 +24,20 @@ use Raven\Lib\Media\AvatarValidator;
 use Raven\Lib\Media\CoverConfig;
 use Raven\Lib\Media\CoverDelete;
 use Raven\Lib\Media\CoverUpload;
+use Raven\Lib\Media\MediaConfig;
+use Raven\Lib\Parser\UserProfileParser;
+use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\Security\PasswordValidator;
-use Raven\Lib\View\Preferences as PreferencesView;
-use Raven\Lib\View\Qr;
+use Raven\Lib\Security\WebAuthn;
+use Raven\Lib\Transport\Redirect;
+use Raven\Lib\Transport\Response;
 use Raven\Lib\View\Form2fa;
 use Raven\Lib\View\Panel\EditorBlocks;
 use Raven\Lib\View\Panel\EditorTabs;
 use Raven\Lib\View\Panel\Theme as PanelTheme;
-use Raven\Lib\Media\MediaConfig;
-use Raven\Lib\Parser\UserProfileParser;
-use Raven\Lib\Security\InputSanitizer;
-use Raven\Lib\Security\WebAuthn;
-use Raven\Lib\Transport\Response;
+use Raven\Lib\View\Preferences as PreferencesView;
 
-use Raven\Lib\Transport\Redirect;
+use Raven\Lib\View\Qr;
 
 /**
  * Handles the current user's panel preferences routes.

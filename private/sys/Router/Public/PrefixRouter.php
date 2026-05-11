@@ -12,8 +12,8 @@ declare(strict_types=1);
 namespace Raven\Core\Router\Public;
 
 use Closure;
-use Raven\Core\Router\RouteValidator;
 use Raven\Core\Router\RouteHandler;
+use Raven\Core\Router\RouteValidator;
 use Raven\Lib\Security\InputSanitizer;
 
 /**

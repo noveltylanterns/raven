@@ -16,6 +16,7 @@ use Raven\Core\Repository\AuthWrite;
 use Raven\Core\Repository\GroupRead;
 use Raven\Core\Repository\UserRead;
 use Raven\Core\Repository\UserWrite;
+use Raven\Core\Router\UserPolicy;
 use Raven\Lib\Auth\LoginIdentifier;
 use Raven\Lib\Auth\Panel\PermissionBase as PanelAccess;
 use Raven\Lib\Media\AvatarConfig;
@@ -25,7 +26,7 @@ use Raven\Lib\Media\AvatarValidator;
 use Raven\Lib\Media\CoverConfig;
 use Raven\Lib\Media\CoverDelete;
 use Raven\Lib\Media\CoverUpload;
-use Raven\Core\Router\UserPolicy;
+use Raven\Lib\Media\MediaConfig;
 use Raven\Lib\Parser\UserProfileParser;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\Transport\Redirect;
@@ -33,7 +34,6 @@ use Raven\Lib\View\Form2fa;
 use Raven\Lib\View\Panel\EditorBlocks;
 use Raven\Lib\View\Panel\EditorTabs;
 use Raven\Lib\View\Panel\Theme as PanelTheme;
-use Raven\Lib\Media\MediaConfig;
 
 /**
  * Handles panel user create/edit/save/delete routes.

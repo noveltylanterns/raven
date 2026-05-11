@@ -13,19 +13,19 @@ namespace Raven\Core\Controller\Public;
 
 use Raven\Core\Config;
 use Raven\Core\Gatekeeper;
+use Raven\Core\Router\FeedPolicy;
 use Raven\Lib\Auth\Public\PermissionBase as PublicPermissionBase;
 use Raven\Lib\Auth\Public\PermissionMask as PublicPermissionMask;
 use Raven\Lib\Auth\Public\SessionGuard;
-use Raven\Lib\Transport\Request;
-use Raven\Core\Router\FeedPolicy;
 use Raven\Lib\Parser\UserProfileParser;
 use Raven\Lib\Security\Csrf;
 use Raven\Lib\Security\InputSanitizer;
+use Raven\Lib\Transport\Request;
 use Raven\Lib\View\Public\Error as PublicError;
 use Raven\Lib\View\Public\Meta;
 use Raven\Lib\View\Public\TemplateDecorator;
-use Raven\Lib\View\Public\ThemeCatalog;
 use Raven\Lib\View\Public\ThemeBrace;
+use Raven\Lib\View\Public\ThemeCatalog;
 use Raven\Lib\View\Public\ThemeTemplate;
 
 /**

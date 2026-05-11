@@ -23,19 +23,6 @@ namespace Raven\Lib\View\Panel;
 final class EditorMCE
 {
     /**
-     * Returns the local TinyMCE script URL.
-     *
-     * TinyMCE is served from the Nginx /mce/ mapping, which points to the
-     * local Composer install path. No CDN is used.
-     *
-     * @return string Absolute root-relative URL to the TinyMCE bundle.
-     */
-    public function scriptUrl(): string
-    {
-        return '/mce/tinymce.min.js';
-    }
-
-    /**
      * Builds the compact gallery-item payload consumed by the TinyMCE custom gallery button.
      *
      * Filters out images that are not in `ready` status or that have been explicitly
@@ -82,5 +69,18 @@ final class EditorMCE
         }
 
         return $items;
+    }
+
+    /**
+     * Returns the local TinyMCE script URL.
+     *
+     * TinyMCE is served from the Nginx /mce/ mapping, which points to the
+     * local Composer install path. No CDN is used.
+     *
+     * @return string Absolute root-relative URL to the TinyMCE bundle.
+     */
+    public function scriptUrl(): string
+    {
+        return '/mce/tinymce.min.js';
     }
 }

@@ -12,10 +12,10 @@ declare(strict_types=1);
 namespace Raven\Core\Controller\Panel;
 
 use Raven\Core\Config;
+use Raven\Core\Repository\ConfigWrite;
 use Raven\Lib\Archive\Update as ArchiveUpdate;
 use Raven\Lib\Archive\Upstream;
 use Raven\Lib\Format\Git;
-use Raven\Core\Repository\ConfigWrite;
 use Raven\Lib\Security\InputSanitizer;
 
 /**

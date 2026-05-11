@@ -17,13 +17,13 @@ use Raven\Core\Repository\CategoryWrite;
 use Raven\Core\Repository\ChannelRead;
 use Raven\Core\Repository\SetRead;
 use Raven\Core\Repository\SetWrite;
-use Raven\Lib\Media\PreviewConfig;
 use Raven\Core\Router\CategoryPolicy;
+use Raven\Lib\Media\PreviewConfig;
 use Raven\Lib\Parser\SetParser;
 use Raven\Lib\Security\InputSanitizer;
-use Raven\Lib\View\Panel\EditorMeta;
 use Raven\Lib\Transport\Redirect;
 use Raven\Lib\Transport\Upload;
+use Raven\Lib\View\Panel\EditorMeta;
 use Raven\Lib\View\Panel\EditorTabs;
 
 /**

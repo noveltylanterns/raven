@@ -12,13 +12,13 @@ declare(strict_types=1);
 namespace Raven\Core\Controller\Panel;
 
 use Raven\Core\Config;
+use Raven\Core\Repository\ConfigWrite;
 use Raven\Lib\Archive\Folder as ArchiveDelete;
 use Raven\Lib\Archive\Install as ArchiveInstall;
 use Raven\Lib\Archive\Package as ArchivePackage;
-use Raven\Core\Repository\ConfigWrite;
 use Raven\Lib\Security\InputSanitizer;
-use Raven\Lib\Transport\Upload;
 use Raven\Lib\Transport\Redirect;
+use Raven\Lib\Transport\Upload;
 use Raven\Lib\View\Public\ThemeCatalog;
 use Raven\Lib\View\Public\ThemeDiscovery;
 use Raven\Lib\View\Public\ThemeGenerator;

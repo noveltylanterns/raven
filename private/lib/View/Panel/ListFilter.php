@@ -17,35 +17,6 @@ namespace Raven\Lib\View\Panel;
 final class ListFilter
 {
     /**
-     * Appends one integer equality clause when the filter id is present.
-     *
-     * @param array<int, string> $where Mutable WHERE-clause fragment list.
-     * @param array<string, int|string> $params Mutable prepared-statement parameter map.
-     * @param string $column SQL column/expression that should equal the filter id.
-     * @param int|null $value Normalized integer filter id from controller/parser input.
-     * @param string $placeholderPrefix Prefix used to namespace generated placeholders.
-     * @param string $filterKey Stable key name appended to the placeholder.
-     * @return void
-     */
-    public function appendIntEquals(
-        array &$where,
-        array &$params,
-        string $column,
-        ?int $value,
-        string $placeholderPrefix,
-        string $filterKey
-    ): void {
-        $normalizedValue = $this->normalizePositiveId($value);
-        if ($normalizedValue === null) {
-            return;
-        }
-
-        $placeholder = $this->placeholder($placeholderPrefix, $filterKey);
-        $where[] = $column . ' = ' . $placeholder;
-        $params[$placeholder] = $normalizedValue;
-    }
-
-    /**
      * Appends one many-to-many EXISTS clause when the filter id is present.
      *
      * `EXISTS` keeps the caller's outer rowset stable, which avoids duplicate rows
@@ -87,6 +58,35 @@ final class ListFilter
                 WHERE ' . $matchColumn . ' = ' . $matchExpression . '
                   AND ' . $filterColumn . ' = ' . $placeholder . '
             )';
+        $params[$placeholder] = $normalizedValue;
+    }
+
+    /**
+     * Appends one integer equality clause when the filter id is present.
+     *
+     * @param array<int, string> $where Mutable WHERE-clause fragment list.
+     * @param array<string, int|string> $params Mutable prepared-statement parameter map.
+     * @param string $column SQL column/expression that should equal the filter id.
+     * @param int|null $value Normalized integer filter id from controller/parser input.
+     * @param string $placeholderPrefix Prefix used to namespace generated placeholders.
+     * @param string $filterKey Stable key name appended to the placeholder.
+     * @return void
+     */
+    public function appendIntEquals(
+        array &$where,
+        array &$params,
+        string $column,
+        ?int $value,
+        string $placeholderPrefix,
+        string $filterKey
+    ): void {
+        $normalizedValue = $this->normalizePositiveId($value);
+        if ($normalizedValue === null) {
+            return;
+        }
+
+        $placeholder = $this->placeholder($placeholderPrefix, $filterKey);
+        $where[] = $column . ' = ' . $placeholder;
         $params[$placeholder] = $normalizedValue;
     }
 

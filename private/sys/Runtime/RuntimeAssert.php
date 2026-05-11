@@ -19,6 +19,22 @@ use RuntimeException;
 final class RuntimeAssert
 {
     /**
+     * Asserts every key in one list exists as a callable factory.
+     *
+     * @param array<string, mixed> $runtime Scope runtime payload array.
+     * @param array<int, string> $requiredKeys Ordered list of required runtime factory keys.
+     * @param string $scope Scope label used in exception messages.
+     * @return void
+     * @throws RuntimeException When any required key is missing or not callable.
+     */
+    public static function assertRequiredCallables(array $runtime, array $requiredKeys, string $scope): void
+    {
+        foreach ($requiredKeys as $key) {
+            self::requireCallable($runtime, $key, $scope);
+        }
+    }
+
+    /**
      * Asserts one runtime key exists and resolves to a callable factory.
      *
      * @param array<string, mixed> $runtime Scope runtime payload array.
@@ -37,21 +53,5 @@ final class RuntimeAssert
         }
 
         return $value;
-    }
-
-    /**
-     * Asserts every key in one list exists as a callable factory.
-     *
-     * @param array<string, mixed> $runtime Scope runtime payload array.
-     * @param array<int, string> $requiredKeys Ordered list of required runtime factory keys.
-     * @param string $scope Scope label used in exception messages.
-     * @return void
-     * @throws RuntimeException When any required key is missing or not callable.
-     */
-    public static function assertRequiredCallables(array $runtime, array $requiredKeys, string $scope): void
-    {
-        foreach ($requiredKeys as $key) {
-            self::requireCallable($runtime, $key, $scope);
-        }
     }
 }

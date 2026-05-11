@@ -11,9 +11,9 @@ declare(strict_types=1);
 namespace Raven\Core\Repository;
 
 use PDO;
-use Raven\Lib\Database\SqlTable;
 use Raven\Core\Repository\ChannelShared;
 use Raven\Core\Router\ChannelPolicy;
+use Raven\Lib\Database\SqlTable;
 use Raven\Lib\Parser\SetParser;
 
 /**

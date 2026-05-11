@@ -13,23 +13,23 @@ namespace Raven\Core\Controller\Panel;
 
 use Raven\Core\Config;
 use Raven\Core\Debug\ClientProfiler;
+use Raven\Core\Gatekeeper;
 use Raven\Core\Postmaster;
 use Raven\Core\Renderer;
-use Raven\Core\Gatekeeper;
 use Raven\Lib\Auth\LoginAttempt;
 use Raven\Lib\Auth\LoginChallenge;
 use Raven\Lib\Auth\LoginEmail;
 use Raven\Lib\Auth\LoginIdentifier;
 use Raven\Lib\Auth\LoginUiState;
-use Raven\Lib\Transport\Response;
 use Raven\Lib\Auth\SessionFlash;
 use Raven\Lib\Parser\PanelParser;
 use Raven\Lib\Security\Csrf;
 use Raven\Lib\Security\InputSanitizer;
-use Raven\Lib\View\Panel\Footer;
-use Raven\Lib\View\Panel\Theme as PanelTheme;
-
 use Raven\Lib\Transport\Redirect;
+use Raven\Lib\Transport\Response;
+use Raven\Lib\View\Panel\Footer;
+
+use Raven\Lib\View\Panel\Theme as PanelTheme;
 
 /**
  * Handles dashboard authentication and logout actions.

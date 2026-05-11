@@ -11,9 +11,9 @@ declare(strict_types=1);
 
 namespace Raven\Core\Router\Public;
 
+use Raven\Core\Router\RouteHandler;
 use Raven\Core\Router\RouteRequest;
 use Raven\Core\Router\RouteResponse;
-use Raven\Core\Router\RouteHandler;
 use Raven\Lib\Extension\Public\Routes as PublicRoutes;
 
 /**

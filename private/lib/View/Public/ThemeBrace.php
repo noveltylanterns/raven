@@ -11,9 +11,9 @@ declare(strict_types=1);
 
 namespace Raven\Lib\View\Public;
 
-use RuntimeException;
-
 use function Raven\Lib\Security\e;
+
+use RuntimeException;
 
 /**
  * Compiles EE-style public-theme brace tags into PHP once, then renders from cache.

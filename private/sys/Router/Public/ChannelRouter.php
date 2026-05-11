@@ -11,8 +11,8 @@ declare(strict_types=1);
 
 namespace Raven\Core\Router\Public;
 
-use Raven\Core\Router\RouteValidator;
 use Raven\Core\Router\RouteHandler;
+use Raven\Core\Router\RouteValidator;
 
 /**
  * Registers single-segment public channel routes.

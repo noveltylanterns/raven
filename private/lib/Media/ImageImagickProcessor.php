@@ -19,20 +19,6 @@ use Imagick;
 final class ImageImagickProcessor
 {
     /**
-     * Reads one uploaded image and normalizes it to the first frame.
-     *
-     * @param string $tmpPath Absolute temporary upload path.
-     * @return Imagick Loaded ImageMagick instance at frame index 0.
-     */
-    public function readFirstFrame(string $tmpPath): Imagick
-    {
-        $image = new Imagick();
-        $image->readImage($tmpPath);
-        $image->setIteratorIndex(0);
-        return $image;
-    }
-
-    /**
      * Applies EXIF orientation, optional metadata stripping, and output format.
      *
      * @param Imagick $image Loaded source image instance.
@@ -58,5 +44,19 @@ final class ImageImagickProcessor
             // Keep JPEG quality high while still reducing payload size.
             $image->setImageCompressionQuality(85);
         }
+    }
+
+    /**
+     * Reads one uploaded image and normalizes it to the first frame.
+     *
+     * @param string $tmpPath Absolute temporary upload path.
+     * @return Imagick Loaded ImageMagick instance at frame index 0.
+     */
+    public function readFirstFrame(string $tmpPath): Imagick
+    {
+        $image = new Imagick();
+        $image->readImage($tmpPath);
+        $image->setIteratorIndex(0);
+        return $image;
     }
 }

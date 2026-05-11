@@ -15,12 +15,12 @@ use Raven\Core\Repository\CategoryRead;
 use Raven\Core\Repository\ChannelRead;
 use Raven\Core\Repository\PageRead;
 use Raven\Core\Repository\TagRead;
-use Raven\Lib\Parser\FeedParser;
-use Raven\Core\Router\FeedPolicy;
 use Raven\Core\Router\CategoryPolicy;
 use Raven\Core\Router\ChannelPolicy;
+use Raven\Core\Router\FeedPolicy;
 use Raven\Core\Router\PagePolicy;
 use Raven\Core\Router\TagPolicy;
+use Raven\Lib\Parser\FeedParser;
 
 /**
  * Handles split public feed routes.

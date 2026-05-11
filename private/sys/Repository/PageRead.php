@@ -12,9 +12,9 @@ namespace Raven\Core\Repository;
 
 use PDO;
 use Raven\Core\Repository\ChannelShared;
-use Raven\Lib\Parser\PageBlockParser;
 use Raven\Core\Repository\PageShared;
 use Raven\Lib\Database\SqlTable;
+use Raven\Lib\Parser\PageBlockParser;
 
 /**
  * SELECT and lookup methods for pages, public listings, and taxonomy filters.

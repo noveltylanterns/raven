@@ -13,8 +13,8 @@ namespace Raven\Lib\View\Public;
 
 use Raven\Core\Config;
 use Raven\Lib\Media\AvatarConfig;
-use Raven\Lib\View\Pagination;
 use Raven\Lib\Security\InputSanitizer;
+use Raven\Lib\View\Pagination;
 
 /**
  * Shared template-facing payload decoration helpers for public views.

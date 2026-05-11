@@ -12,8 +12,8 @@ declare(strict_types=1);
 namespace Raven\Core\Controller\Public;
 
 use Raven\Core\Repository\UserRead;
-use Raven\Lib\Auth\LoginIdentifier;
 use Raven\Core\Router\UserPolicy;
+use Raven\Lib\Auth\LoginIdentifier;
 use Raven\Lib\Parser\UserProfileParser;
 use Raven\Lib\View\Public\TemplateDecorator;
 

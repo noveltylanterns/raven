@@ -18,14 +18,14 @@ use Raven\Lib\Archive\Folder as ArchiveDelete;
 use Raven\Lib\Archive\Install as ArchiveInstall;
 use Raven\Lib\Archive\Package as ArchivePackage;
 use Raven\Lib\Extension\Bootstrap;
-use Raven\Lib\Extension\StorageCleaner;
-use Raven\Lib\Extension\StorageProvisioner;
-use Raven\Lib\Extension\StateRead;
 use Raven\Lib\Extension\Panel\Manager as ExtensionManager;
 use Raven\Lib\Extension\Scaffold;
+use Raven\Lib\Extension\StateRead;
+use Raven\Lib\Extension\StorageCleaner;
+use Raven\Lib\Extension\StorageProvisioner;
 use Raven\Lib\Security\InputSanitizer;
-use Raven\Lib\Transport\Upload;
 use Raven\Lib\Transport\Redirect;
+use Raven\Lib\Transport\Upload;
 
 /**
  * Handles panel extension-manager routes.

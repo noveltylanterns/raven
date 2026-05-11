@@ -14,16 +14,16 @@ namespace Raven\Core\Controller\Panel;
 use Closure;
 use Raven\Core\Repository\GroupRead;
 use Raven\Core\Repository\GroupWrite;
-use Raven\Lib\Auth\Panel\PermissionBase as PanelAccess;
-use Raven\Lib\View\Panel\EditorPermissions;
-use Raven\Lib\Media\PreviewConfig;
 use Raven\Core\Router\GroupPolicy;
+use Raven\Lib\Auth\Panel\PermissionBase as PanelAccess;
+use Raven\Lib\Media\PreviewConfig;
 use Raven\Lib\Security\InputSanitizer;
-use Raven\Lib\View\Panel\EditorMeta;
 use Raven\Lib\Transport\Redirect;
 use Raven\Lib\Transport\Upload;
-use Raven\Lib\View\Panel\EditorWrapper;
+use Raven\Lib\View\Panel\EditorMeta;
+use Raven\Lib\View\Panel\EditorPermissions;
 use Raven\Lib\View\Panel\EditorTabs;
+use Raven\Lib\View\Panel\EditorWrapper;
 
 /**
  * Handles group create/edit/save/delete routes for the panel.

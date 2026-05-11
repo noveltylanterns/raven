@@ -12,13 +12,13 @@ declare(strict_types=1);
 namespace Raven\Core\Controller\Panel;
 
 use Raven\Core\Config;
-use Raven\Core\Renderer;
 use Raven\Core\Gatekeeper;
+use Raven\Core\Renderer;
+use Raven\Core\Repository\ConfigRead;
 use Raven\Lib\Auth\Panel\PermissionBase as PanelAccess;
 use Raven\Lib\Auth\Panel\SessionGuard;
 use Raven\Lib\Auth\SessionFlash;
 use Raven\Lib\Extension\Resolver;
-use Raven\Core\Repository\ConfigRead;
 use Raven\Lib\Parser\PanelParser;
 use Raven\Lib\Security\Csrf;
 use Raven\Lib\View\Panel\Footer;

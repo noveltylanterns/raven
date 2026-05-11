@@ -12,11 +12,12 @@ declare(strict_types=1);
 namespace Raven\Core\Controller\Public;
 
 use Closure;
+use Raven\Core\Debug\ClientProfiler;
+use Raven\Core\Postmaster;
 use Raven\Core\Repository\GroupRead;
 use Raven\Core\Repository\InviteRead;
 use Raven\Core\Repository\InviteWrite;
 use Raven\Core\Repository\UserWrite;
-use Raven\Core\Postmaster;
 use Raven\Lib\Auth\LoginAttempt;
 use Raven\Lib\Auth\LoginChallenge;
 use Raven\Lib\Auth\LoginEmail;
@@ -25,11 +26,10 @@ use Raven\Lib\Auth\LoginUiState;
 use Raven\Lib\Auth\SessionFlash;
 use Raven\Lib\Parser\PanelParser;
 use Raven\Lib\Parser\RedirectParser;
-use Raven\Lib\Transport\Request;
-use Raven\Lib\Transport\Redirect;
-use Raven\Lib\Transport\Response;
 use Raven\Lib\Security\PublicCaptchaFlow;
-use Raven\Core\Debug\ClientProfiler;
+use Raven\Lib\Transport\Redirect;
+use Raven\Lib\Transport\Request;
+use Raven\Lib\Transport\Response;
 
 /**
  * Handles split public auth routes.

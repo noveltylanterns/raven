@@ -12,8 +12,8 @@ namespace Raven\Core\Repository;
 
 use PDO;
 use PDOException;
-use RuntimeException;
 use Raven\Lib\Database\SqlTable;
+use RuntimeException;
 
 /**
  * INSERT, UPDATE, and DELETE methods for invite-token records.

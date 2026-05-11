@@ -20,6 +20,16 @@ use RuntimeException;
 final class SqliteBootstrap
 {
     /**
+     * Applies mandatory SQLite PRAGMAs to a freshly opened connection.
+     *
+     * @param PDO $pdo SQLite PDO connection to initialize.
+     */
+    public function bootstrap(PDO $pdo): void
+    {
+        $pdo->exec('PRAGMA foreign_keys = ON');
+    }
+
+    /**
      * Creates the parent directory of an SQLite database file when it does not exist.
      *
      * @param string $path Absolute path to the SQLite database file (not the directory itself).
@@ -35,15 +45,5 @@ final class SqliteBootstrap
         if (!@mkdir($directory, 0775, true) && !is_dir($directory)) {
             throw new RuntimeException('Failed to create SQLite data directory: ' . $directory);
         }
-    }
-
-    /**
-     * Applies mandatory SQLite PRAGMAs to a freshly opened connection.
-     *
-     * @param PDO $pdo SQLite PDO connection to initialize.
-     */
-    public function bootstrap(PDO $pdo): void
-    {
-        $pdo->exec('PRAGMA foreign_keys = ON');
     }
 }

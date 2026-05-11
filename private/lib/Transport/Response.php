@@ -17,6 +17,16 @@ namespace Raven\Lib\Transport;
 final class Response
 {
     /**
+     * Applies the shared no-store cache headers Raven uses for sensitive responses.
+     *
+     * @return void
+     */
+    public static function applyNoStoreHeaders(): void
+    {
+        header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+    }
+
+    /**
      * Emits a JSON response payload with optional no-store cache headers.
      *
      * @param array<string, mixed> $payload
@@ -38,15 +48,5 @@ final class Response
         } catch (\Throwable) {
             echo '{}';
         }
-    }
-
-    /**
-     * Applies the shared no-store cache headers Raven uses for sensitive responses.
-     *
-     * @return void
-     */
-    public static function applyNoStoreHeaders(): void
-    {
-        header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
     }
 }

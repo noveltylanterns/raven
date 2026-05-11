@@ -13,8 +13,8 @@ namespace Raven\Lib\View\Public;
 
 use Raven\Core\Config;
 use Raven\Core\Router\FeedPolicy;
-use Raven\Lib\Transport\Request;
 use Raven\Lib\Parser\UserProfileParser;
+use Raven\Lib\Transport\Request;
 
 /**
  * Shared site/public meta payload builder and social-image URL resolver.

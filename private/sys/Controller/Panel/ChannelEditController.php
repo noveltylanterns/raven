@@ -15,16 +15,16 @@ use Closure;
 use Raven\Core\Repository\ChannelRead;
 use Raven\Core\Repository\ChannelWrite;
 use Raven\Core\Repository\SetRead;
-use Raven\Lib\Media\PreviewConfig;
 use Raven\Core\Router\ChannelPolicy;
 use Raven\Core\Router\FeedPolicy;
+use Raven\Lib\Media\PreviewConfig;
 use Raven\Lib\Parser\SetParser;
 use Raven\Lib\Security\InputSanitizer;
-use Raven\Lib\View\Panel\EditorMeta;
 use Raven\Lib\Transport\Redirect;
 use Raven\Lib\Transport\Upload;
-use Raven\Lib\View\Panel\EditorWrapper;
+use Raven\Lib\View\Panel\EditorMeta;
 use Raven\Lib\View\Panel\EditorTabs;
+use Raven\Lib\View\Panel\EditorWrapper;
 
 /**
  * Handles channel create/edit/save/delete routes for the panel.

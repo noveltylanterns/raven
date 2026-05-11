@@ -11,12 +11,12 @@ declare(strict_types=1);
 
 namespace Raven\Lib\Extension\Panel;
 
+use Raven\Core\Router\RouteHandler;
 use Raven\Lib\Auth\Panel\PermissionBase as PanelAccess;
 use Raven\Lib\Auth\Panel\SessionGuard;
 use Raven\Lib\Extension\Resolver;
 use Raven\Lib\Parser\PanelParser;
 use Raven\Lib\View\Panel\Theme as PanelTheme;
-use Raven\Core\Router\RouteHandler;
 
 /**
  * Registers extension-provided panel routes for enabled extensions.

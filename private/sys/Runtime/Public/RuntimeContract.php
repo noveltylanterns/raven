@@ -35,16 +35,6 @@ final class RuntimeContract
     ];
 
     /**
-     * Returns the required callable-key list for public entry orchestration.
-     *
-     * @return array<int, string> Ordered required public runtime keys.
-     */
-    public static function requiredFactoryKeys(): array
-    {
-        return self::REQUIRED_FACTORY_KEYS;
-    }
-
-    /**
      * Validates that one runtime payload contains all required public callables.
      *
      * @param array<string, mixed> $runtime Public runtime payload array.
@@ -53,5 +43,15 @@ final class RuntimeContract
     public static function assert(array $runtime): void
     {
         RuntimeAssert::assertRequiredCallables($runtime, self::REQUIRED_FACTORY_KEYS, 'public');
+    }
+
+    /**
+     * Returns the required callable-key list for public entry orchestration.
+     *
+     * @return array<int, string> Ordered required public runtime keys.
+     */
+    public static function requiredFactoryKeys(): array
+    {
+        return self::REQUIRED_FACTORY_KEYS;
     }
 }

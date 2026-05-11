@@ -12,8 +12,8 @@ declare(strict_types=1);
 namespace Raven\Lib\Auth;
 
 use Raven\Core\Config;
-use Raven\Core\Postmaster;
 use Raven\Core\Gatekeeper;
+use Raven\Core\Postmaster;
 use Raven\Lib\Auth\Login2fa;
 use Raven\Lib\Auth\LoginEmail;
 use Raven\Lib\Auth\LoginUiState;
