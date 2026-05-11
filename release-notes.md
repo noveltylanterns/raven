@@ -2,6 +2,12 @@
 
 *The machine is supposed to be logging patches & mods to this file. Sometimes it does, sometimes it doesn't. It might be useful for historical architectural context to your Agent at one point.*
 
+### May 11, 2026 — PHPDoc completion sweep + merge/flatten audit
+
+- **PHPDoc gaps closed** — 12 public/protected methods across `lib/` and `sys/` were missing PHPDoc entirely; added full blocks to `ImageVariantProcessor::__construct`, `Renderer::__construct`, and all 10 public methods on `RavenCliContext` in `Shell.php`. Fixed 8 incomplete docblocks missing `@return` tags: `MediaUpload::deleteImageForPage`, `AvatarUpload::storeSanitizedUpload` and `storeSanitizedImageUpload`, `Scheduler/Registry::getLastRunTime`, `Gatekeeper::isLoggedIn`, `userId`, `isTwoFactorVerifiedForUser`, and `verifyPendingRecoveryCode`. All public and protected methods in `lib/` and `sys/` now have complete PHPDoc blocks.
+- **Merge/flatten audit** — systematic scan of all `lib/` and `sys/` classes for thin wrappers and redundant logic found no removal candidates. All same-name delegation patterns are intentional facades (`Gatekeeper`, `PanelRouter`/`PublicRouter`, `Archive/Package`) or documented convenience points for extension authors (`InviteWrite` token helpers, `Extension/Panel/Manager` permission delegates). Codebase is clean.
+- **Alphabetical ordering pass** — applied consistent alphabetical ordering to `use` import blocks and method declarations across 61 files in `sys/` controllers, routers, runtime factories, repositories, and `lib/` media, view, transport, and database classes. No logic changes.
+
 ### May 7, 2026 — registrationMode inlined at call sites; removed from UserPolicy
 
 - **UserPolicy::registrationMode() removed** — a direct `ConfigRead`-style read with a simple allowlist; no reason to live on a routing policy class. Inlined as a private `registrationMode()` helper in `UserInviteController`, `UserListController`, and `AuthController`. `UserPolicy` injection removed from `UserInviteController` and `UserListController` constructors and their `ControllerFactory` slots; `AuthController` self-instantiated `UserPolicy` solely for this method and that instantiation is also removed.

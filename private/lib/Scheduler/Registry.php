@@ -209,8 +209,9 @@ final class Registry
     /**
      * Returns the Unix timestamp of the last successful run for a given job, or null if never run.
      *
-     * @param string $owner Owner key.
-     * @param string $name  Job name.
+     * @param string $owner Owner key identifying the extension or core subsystem.
+     * @param string $name Job name within that owner namespace.
+     * @return int|null Unix timestamp of the last successful run, or null if the job has never run.
      */
     public function getLastRunTime(string $owner, string $name): ?int
     {

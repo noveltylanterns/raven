@@ -308,6 +308,10 @@ final class MediaUpload
 
     /**
      * Deletes one image row (and variants) and removes its files from local storage.
+     *
+     * @param int $pageId Page the image belongs to.
+     * @param int $imageId Image record to delete.
+     * @return bool True when the row and all stored files were successfully deleted.
      */
     public function deleteImageForPage(int $pageId, int $imageId): bool
     {

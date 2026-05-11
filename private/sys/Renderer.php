@@ -23,6 +23,11 @@ final class Renderer
     /** Absolute base path that contains templates. */
     private string $viewsPath;
 
+    /**
+     * Sets the base template directory used for all view resolution.
+     *
+     * @param string $viewsPath Absolute path to the root views/templates directory.
+     */
     public function __construct(string $viewsPath)
     {
         $this->viewsPath = rtrim($viewsPath, '/');

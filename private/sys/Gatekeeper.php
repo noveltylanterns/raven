@@ -265,6 +265,8 @@ final class Gatekeeper
 
     /**
      * Indicates whether a user is authenticated.
+     *
+     * @return bool True when a valid user session is active.
      */
     public function isLoggedIn(): bool
     {
@@ -272,7 +274,9 @@ final class Gatekeeper
     }
 
     /**
-     * Returns authenticated user id or null.
+     * Returns the authenticated user id, or null when no session is active.
+     *
+     * @return int|null Positive user ID when logged in, null otherwise.
      */
     public function userId(): ?int
     {
@@ -285,7 +289,10 @@ final class Gatekeeper
     }
 
     /**
-     * Returns true when current session has passed interactive 2FA requirements.
+     * Returns true when the current session has passed all interactive 2FA requirements for a user.
+     *
+     * @param int|null $userId User to check; defaults to the currently authenticated user.
+     * @return bool True when the session is 2FA-verified for the given user.
      */
     public function isTwoFactorVerifiedForUser(?int $userId = null): bool
     {
@@ -459,9 +466,13 @@ final class Gatekeeper
     }
 
     /**
-     * Verifies one submitted recovery phrase for pending 2FA session.
+     * Verifies one submitted recovery phrase for a pending 2FA session.
      *
      * Non-reusable recovery methods are removed after one successful verification.
+     *
+     * @param string $submittedPhrase Recovery phrase entered by the user.
+     * @param string $selectedMethodKey Optional method key to narrow the match to one recovery slot.
+     * @return bool True when the phrase matched a valid recovery method.
      */
     public function verifyPendingRecoveryCode(string $submittedPhrase, string $selectedMethodKey = ''): bool
     {

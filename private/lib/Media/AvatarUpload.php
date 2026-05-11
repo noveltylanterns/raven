@@ -25,9 +25,9 @@ final class AvatarUpload
     /**
      * Stores one avatar upload after decode/re-encode metadata stripping.
      *
-     * Returns `null` on success, otherwise one user-facing error message.
-     *
-     * @param array<string, mixed> $upload
+     * @param array<string, mixed> $upload Raw uploaded-file array from PHP superglobal.
+     * @param string $destination Absolute destination path for the stored file.
+     * @return string|null null on success, or a user-facing error message on failure.
      */
     public function storeSanitizedUpload(array $upload, string $destination): ?string
     {
@@ -52,9 +52,9 @@ final class AvatarUpload
     /**
      * Stores one sanitized image upload without generating avatar thumbnail derivatives.
      *
-     * Returns `null` on success, otherwise one user-facing error message.
-     *
-     * @param array<string, mixed> $upload
+     * @param array<string, mixed> $upload Raw uploaded-file array from PHP superglobal.
+     * @param string $destination Absolute destination path for the stored file.
+     * @return string|null null on success, or a user-facing error message on failure.
      */
     public function storeSanitizedImageUpload(array $upload, string $destination): ?string
     {

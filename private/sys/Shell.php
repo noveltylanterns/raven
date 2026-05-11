@@ -82,6 +82,16 @@ final class RavenCliContext
     /** @var array<string, mixed>|null */
     private ?array $rvn = null;
 
+    /**
+     * Initialises the CLI execution context for the current invocation.
+     *
+     * @param string $root Absolute project root path.
+     * @param bool $verboseStatus Whether to emit verbose [status] lines.
+     * @param bool $verboseErrors Whether to include exception traces in error output.
+     * @param bool $interactive Whether the terminal is interactive (readline available).
+     * @param bool $json Whether to emit JSON-only output (suppresses human text).
+     * @param bool $noBanner Whether to suppress the startup banner.
+     */
     public function __construct(
         string $root,
         bool $verboseStatus,
@@ -126,11 +136,23 @@ final class RavenCliContext
         return $loaded;
     }
 
+    /**
+     * Emits one line of raw text output followed by a newline.
+     *
+     * @param string $message Text to print.
+     * @return void
+     */
     public function line(string $message): void
     {
         echo $message . PHP_EOL;
     }
 
+    /**
+     * Emits an informational message when not in JSON mode.
+     *
+     * @param string $message Message text to print.
+     * @return void
+     */
     public function info(string $message): void
     {
         if ($this->json) {
@@ -140,6 +162,12 @@ final class RavenCliContext
         $this->line($message);
     }
 
+    /**
+     * Emits a verbose status line when verbose-status mode is enabled and not in JSON mode.
+     *
+     * @param string $message Status text to prefix with `[status]`.
+     * @return void
+     */
     public function status(string $message): void
     {
         if ($this->verboseStatus && !$this->json) {
@@ -147,6 +175,12 @@ final class RavenCliContext
         }
     }
 
+    /**
+     * Emits an `[ok]` confirmation line when not in JSON mode.
+     *
+     * @param string $message Success message text.
+     * @return void
+     */
     public function ok(string $message): void
     {
         if ($this->json) {
@@ -170,6 +204,13 @@ final class RavenCliContext
         $this->line($encoded);
     }
 
+    /**
+     * Emits an error to stderr or JSON output, optionally including exception detail.
+     *
+     * @param string $message Human-readable error summary.
+     * @param Throwable|null $exception Optional thrown exception for verbose-error trace output.
+     * @return void
+     */
     public function error(string $message, ?Throwable $exception = null): void
     {
         if ($this->json) {
@@ -190,6 +231,13 @@ final class RavenCliContext
         }
     }
 
+    /**
+     * Prompts the user for a text value, returning a default when input is empty.
+     *
+     * @param string $question Prompt text displayed to the user.
+     * @param string $default Value returned when the user presses Enter without typing.
+     * @return string User-supplied value, or $default when input is empty.
+     */
     public function prompt(string $question, string $default = ''): string
     {
         $suffix = $default !== '' ? ' [' . $default . ']' : '';
@@ -210,6 +258,13 @@ final class RavenCliContext
         return $value !== '' ? $value : $default;
     }
 
+    /**
+     * Prompts the user for a yes/no confirmation.
+     *
+     * @param string $question Question text; `[Y/n]` or `[y/N]` suffix is appended automatically.
+     * @param bool $default Default answer when the user presses Enter without typing.
+     * @return bool True when the user confirms.
+     */
     public function confirm(string $question, bool $default = false): bool
     {
         $suffix = $default ? ' [Y/n]' : ' [y/N]';
@@ -221,6 +276,12 @@ final class RavenCliContext
         return in_array($answer, ['y', 'yes', '1', 'true', 'on'], true);
     }
 
+    /**
+     * Prints the startup CLI banner unless suppressed by `--no-banner` or JSON mode.
+     *
+     * @param string $mode Runtime mode label (e.g. 'public', 'panel') shown in the banner line.
+     * @return void
+     */
     public function renderBanner(string $mode): void
     {
         if ($this->noBanner || $this->json) {
@@ -231,6 +292,12 @@ final class RavenCliContext
         $this->line('[banner placeholder] TODO: add ASCII-art welcome/banner blocks.');
     }
 
+    /**
+     * Prints the CLI help header for one topic unless suppressed by `--no-banner` or JSON mode.
+     *
+     * @param string $topic Help topic label appended to the header line.
+     * @return void
+     */
     public function renderHelpHeader(string $topic): void
     {
         if ($this->noBanner || $this->json) {

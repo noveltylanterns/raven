@@ -20,13 +20,20 @@ final class ImageVariantProcessor
 {
     private Config $config;
 
+    /**
+     * Injects the site configuration for variant dimension resolution.
+     *
+     * @param Config $config Site configuration used to read media thumb dimensions.
+     */
     public function __construct(Config $config)
     {
         $this->config = $config;
     }
 
     /**
-     * @return array<string, array{width: int, height: int}>
+     * Returns the resolved variant dimension map for the active media config.
+     *
+     * @return array<string, array{width: int, height: int}> Keyed by variant name (sm/md/lg); 0 means auto-axis.
      */
     public function variantSpecs(): array
     {
