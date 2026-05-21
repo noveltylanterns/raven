@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/Media/AvatarConfig.php
  * Avatar config readers and template-facing avatar path helpers.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -38,6 +38,7 @@ final class AvatarConfig
     public function resolveMaxFilesizeBytes(int $defaultBytes = 1048576): int
     {
         $kb = (int) $this->config->get('user.avatar.max_filesize_kb', -1);
+        // Avatar-specific config overrides shared defaults when explicitly set.
         if ($kb >= 0) {
             return $kb === 0 ? 0 : max(1, $kb * 1024);
         }
@@ -53,6 +54,7 @@ final class AvatarConfig
     public function allowedExtensionsCsv(): string
     {
         $avatarAllowList = trim((string) $this->config->get('user.avatar.allowed_extensions', ''));
+        // Prefer avatar-specific allowlists when present.
         if ($avatarAllowList !== '') {
             return $avatarAllowList;
         }
@@ -68,14 +70,17 @@ final class AvatarConfig
     public function allowedExtensionsLabel(): string
     {
         $raw = strtolower(trim($this->allowedExtensionsCsv()));
+        // Empty policy strings render as `none` for panel clarity.
         if ($raw === '') {
             return 'none';
         }
 
         $parts = preg_split('/[\s,]+/', $raw) ?: [];
         $allowed = [];
+        // Normalize and filter each token to the supported avatar image extensions.
         foreach ($parts as $part) {
             $token = trim($part);
+            // Discard unknown extensions so panel text mirrors enforceable upload rules.
             if (!in_array($token, ['gif', 'jpg', 'jpeg', 'png'], true)) {
                 continue;
             }
@@ -83,6 +88,7 @@ final class AvatarConfig
             $allowed[$token] = $token;
         }
 
+        // Invalid or unsupported token sets collapse to an explicit `none` label.
         if ($allowed === []) {
             return 'none';
         }
@@ -114,16 +120,19 @@ final class AvatarConfig
     public function templateData(string $avatarPath): array
     {
         $normalized = trim($avatarPath);
+        // Empty stored values map to blank template fields.
         if ($normalized === '') {
             return ['filename' => '', 'url' => '', 'thumb_url' => ''];
         }
 
         $filename = basename($normalized);
+        // Guard against basename edge cases that are not real filenames.
         if ($filename === '' || $filename === '.' || $filename === '..') {
             return ['filename' => '', 'url' => '', 'thumb_url' => ''];
         }
 
         $thumbFilename = $this->thumbnailFilename($filename);
+        // Keep legacy nested avatar paths intact instead of forcing the default uploads directory.
         if (str_contains($normalized, '/')) {
             $dir = ltrim(dirname($normalized), '/');
             return [
@@ -149,6 +158,7 @@ final class AvatarConfig
     public function thumbnailFilename(string $filename): string
     {
         $base = (string) pathinfo($filename, PATHINFO_FILENAME);
+        // Provide a deterministic fallback when source filenames have no basename stem.
         if ($base === '') {
             $base = 'avatar';
         }

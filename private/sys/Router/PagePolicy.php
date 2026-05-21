@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/sys/Router/PagePolicy.php
  * Static page URL segment resolution and route-segment building helpers.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

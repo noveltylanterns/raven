@@ -4,6 +4,7 @@
  * RAVEN CMS
  * ~/private/tpl/panel/auth/login_2fa.php
  * Admin panel 2FA challenge template.
+ * Docs: https://lanterns.io/raven
  */
 
 /** @var array<string, string> $site */

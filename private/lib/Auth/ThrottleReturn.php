@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/Auth/ThrottleReturn.php
  * Read and write orchestration for auth-throttle buckets.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -50,12 +50,14 @@ final class ThrottleReturn
 
         $bucketHash = self::bucketHash($username, $ipAddress);
         $row = $this->throttle->loadRow($bucketHash);
+        // Missing bucket rows mean no active lock state for this identifier+IP.
         if ($row === null) {
             return false;
         }
 
         $now = time();
         $lockedUntil = (int) ($row['locked_until'] ?? 0);
+        // Lock remains active while its expiration timestamp is in the future.
         if ($lockedUntil > $now) {
             return true;
         }

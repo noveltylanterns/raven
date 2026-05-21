@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/ext/contact/tpl/panel_submissions.php
  * Contact Forms extension per-form submissions page template.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

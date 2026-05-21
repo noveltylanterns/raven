@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/sys/Schema/SchemaPipeline.php
  * Ordered schema ensure pipeline for app and auth databases.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

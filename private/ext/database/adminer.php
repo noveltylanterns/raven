@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/ext/database/adminer.php
  * Database Manager extension entrypoint that boots Adminer.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 // Inline note: This file is executed by the extension web entrypoint under `~/panel/ext/database/adminer/index.php`.

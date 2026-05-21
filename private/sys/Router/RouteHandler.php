@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/sys/Router/RouteHandler.php
  * Minimal route registration and dispatch helper.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

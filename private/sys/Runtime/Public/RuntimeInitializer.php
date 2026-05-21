@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/sys/Runtime/Public/RuntimeInitializer.php
  * Public runtime initialization closure wiring.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

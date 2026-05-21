@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/Auth/LoginUiState.php
  * Session state manager for login UI redirects and 2FA challenge flow state.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -27,6 +27,11 @@ final class LoginUiState
     private string $forceMethodPickerKey;
     private string $emailInputKey;
 
+    /**
+     * Builds one surface-scoped session-key namespace for login UI state.
+     *
+     * @param string $prefix Session-key prefix (`_raven` or `_raven_public`).
+     */
     private function __construct(string $prefix)
     {
         $prefix = trim($prefix);
@@ -76,6 +81,7 @@ final class LoginUiState
     public function storePostLoginRedirect(string $value): void
     {
         $value = trim($value);
+        // Empty values clear redirect state instead of storing a blank route.
         if ($value === '') {
             unset($_SESSION[$this->postLoginRedirectKey]);
             return;
@@ -122,6 +128,7 @@ final class LoginUiState
     public function storeSelectedMethodKey(string $value): void
     {
         $value = trim($value);
+        // Empty method key input clears prior 2FA selection state.
         if ($value === '') {
             unset($_SESSION[$this->selectedMethodKeyKey]);
             return;
@@ -181,6 +188,7 @@ final class LoginUiState
      */
     public function storeWebauthnChallenge(string $challenge): void
     {
+        // Empty challenge payload clears stale WebAuthn challenge state.
         if ($challenge === '') {
             unset($_SESSION[$this->webauthnChallengeKey]);
             return;
@@ -214,6 +222,7 @@ final class LoginUiState
      */
     public function setForceMethodPicker(bool $force): void
     {
+        // True stores the force-picker flag for the next challenge render.
         if ($force) {
             $_SESSION[$this->forceMethodPickerKey] = true;
             return;
@@ -240,6 +249,7 @@ final class LoginUiState
     public function storeEmailInput(string $value): void
     {
         $value = trim($value);
+        // Empty email input clears the persisted challenge email field.
         if ($value === '') {
             unset($_SESSION[$this->emailInputKey]);
             return;

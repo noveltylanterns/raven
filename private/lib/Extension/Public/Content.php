@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/Extension/Public/Content.php
  * Public-side extension body-block catalog for the page renderer.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -46,8 +46,10 @@ final class Content
     public function publicBodyBlockDefinitions(): array
     {
         $definitions = [];
+        // Walk enabled extension directories and collect eligible block definitions.
         foreach (Registry::enabledDirectories($this->projectRoot, true) as $extensionName) {
             $manifest = Registry::readManifest($this->projectRoot, $extensionName);
+            // Include only content/module manifests for public block rendering.
             if (
                 !is_array($manifest)
                 || !in_array((string) ($manifest['type'] ?? ''), ['content', 'module'], true)
@@ -62,6 +64,7 @@ final class Content
                     'extension' => (string) $extensionName,
                 ]
             );
+            // Skip extensions without a valid fields.php provider payload.
             if ($fields === null) {
                 continue;
             }

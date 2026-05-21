@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/ext/smallweb/tpl/panel_index.php
  * Smallweb extension tabbed index: settings + per-protocol file lists.
- * docs: /private/ext/AGENTS.md
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

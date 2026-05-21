@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/sys/Router/Public/PublicPayload.php
  * Shared dependency payload for public route-family registrars.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

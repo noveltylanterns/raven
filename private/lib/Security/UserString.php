@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/Security/UserString.php
  * Generates normalized random public user selector strings.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -33,6 +33,7 @@ final class UserString
     public function normalizeLength(mixed $value, int $default = self::DEFAULT_LENGTH): int
     {
         $length = is_numeric($value) ? (int) $value : $default;
+        // Non-positive lengths fall back to default to preserve usable output.
         if ($length < 1) {
             $length = $default;
         }
@@ -57,6 +58,7 @@ final class UserString
 
         for ($attempt = 0; $attempt < 256; $attempt++) {
             $candidate = $this->generate($normalizedLength);
+            // Return immediately once the caller confirms uniqueness.
             if (!$exists($candidate)) {
                 return $candidate;
             }

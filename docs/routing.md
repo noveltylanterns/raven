@@ -1,191 +1,137 @@
-# Raven CMS Routing Table
+# Raven Routing Guide
 
-***Note: This document was generated with ChatGPT Codex. I have not been able to personally verify every detail within matches the actual script. I do not plan on hammering these `docs/` files down until later releases, so use them with caution!***
+This document describes Raven's runtime routing model and the panel Routing Table screen.
 
-This document explains Raven's Routing Table screen for both panel users and developers/agents.
+## 1) Routing Architecture
 
-Maintenance note: keep this file updated whenever Routing Table routes, row-building/conflict logic, export behavior, or Routing Table panel views change (`private/tpl/panel/routing.php`, `RoutingController::routing*`, or routing inventory composition helpers).
+Raven keeps routing responsibilities split by scope:
 
-Public-routing note: public entry orchestration lives directly in `public/index.php`, where controller-aligned routers from `private/sys/Router/Public/` map stock public route families onto the split handlers under `private/sys/Controller/Public/`. Shared low-level routing primitives live in `private/sys/Router/`, while scope-specific gating stays in the index entry files. Keep those files and `public/theme/AGENTS.md` in sync when public route families are added or changed.
+- Shared dispatch primitives:
+  - `private/sys/Router/RouteHandler.php`
+  - `private/sys/Router/RouteRequest.php`
+  - `private/sys/Router/RouteResponse.php`
+  - `private/sys/Router/RouteValidator.php`
+- Public route orchestration:
+  - `private/sys/Router/Public/PublicRouter.php`
+- Panel route orchestration:
+  - `private/sys/Router/Panel/PanelRouter.php`
 
-Developer note — dispatch contracts vs HTTP helpers: Raven has two pairs of `Request`/`Response` classes with distinct roles; do not confuse them.
-- `Raven\Core\Router\RouteRequest` / `Raven\Core\Router\RouteResponse` — immutable dispatch contracts passed to and returned by the router. They carry only method + path (request) and handled state + params (response).
-- `Raven\Lib\Transport\Request` / `Raven\Lib\Transport\Response` — HTTP environment helpers. `Transport\Request` reads from `$_SERVER` (path extraction, URL/host/client normalization). `Transport\Response` emits HTTP output helpers (JSON encoding, cache headers).
-Files that need both should import `Raven\Lib\Transport\Request as HttpRequest` to avoid the name collision.
+Both scope routers register route families in a fixed order, then dispatch through one isolated `RouteHandler` instance.
 
-## 1) Panel Guide (Routing Table)
+## 2) Public Route Registration Order
 
-### Where To Go
+Public route families are registered in this order inside `PublicRouter::register(...)`:
 
-- Open panel sidebar: `Taxonomy` -> `Routing Table`.
+1. `AuthRouter`
+2. Extension public routes (`Raven\Lib\Extension\Public\Routes`)
+3. `CategoryRouter`
+4. `ChannelRouter`
+5. `FeedRouter`
+6. `ProfileRouter`
+7. `GroupRouter`
+8. `TagRouter`
+9. `PageRouter`
 
-Access requirement:
+Because extension routes register early, they can expose explicit custom endpoints before generic content routes.
 
-- Requires `Manage Taxonomy` permission.
+## 3) Public Route Families
 
-### Routing Table Screen (`/routing`)
+Core public family behavior:
 
-Summary cards:
+- Auth helpers:
+  - `/login`, `/login/2fa`, `/register` (+ POST variants)
+- Feed routes:
+  - RSS/Atom roots, channel feeds, and taxonomy feeds when enabled by config
+- Taxonomy routes:
+  - category and tag listing routes (prefix-based)
+- Profile/group routes:
+  - enabled only when their prefixes/modes are configured
+- Content routes:
+  - `/` homepage
+  - `/{slug}` channel landing/root fallback seam
+  - `/{channel}/{slug}` channel-scoped pages
+- Embedded form route:
+  - `POST /forms/submit` (extension-agnostic form submit gateway)
 
-- `Pages`
-- `Channels`
-- `Redirects`
-- `Conflicts`
+For the full public matching order and prefix rules, see:
 
-Conflict utilities:
+- `public/theme/AGENTS.md` (Public Route Matching Order section)
 
-- `Conflicts Only` toggle appears when conflict count is above zero.
+## 4) Public Route Policy Inputs
 
-Top and bottom action bars:
+`private/sys/Router/Public/PublicPolicy.php` builds normalized route policy values from config, including:
 
-- `Export CSV`
+- category/tag/profile/group prefixes
+- feed route slugs
+- reserved first-segment prefixes
+- availability-bypass paths (login/register)
 
-Filter controls:
+The reserved-prefix list prevents content routes from colliding with panel/auth/feed/taxonomy system paths.
 
-- `Search` box (title/URL/type/status text)
-  - query-string prefill via `?search=...` is supported and rendered as escaped plain text
-- `Status` dropdown
-- `Types` checkbox filters (all enabled by default)
+## 5) Panel Route Registration Order
 
-Table columns:
+Panel route families are registered in this order inside `PanelRouter::register(...)`:
 
-- `URI`
-- `Title`
-- `Type`
-- `Status`
+1. `AuthRouter`
+2. `DashboardRouter`
+3. `PageRouter`
+4. `ChannelRouter`
+5. `CategoryRouter`
+6. `TagRouter`
+7. `RedirectRouter`
+8. `UserRouter`
+9. `GroupRouter`
+10. `LogsRouter`
+11. `RoutingRouter`
+12. `UpdateRouter`
+13. `PreferencesRouter`
+14. `ConfigRouter`
+15. `ThemeRouter`
+16. `ExtensionRouter`
+17. Extension panel routes (`Raven\Lib\Extension\Panel\Routes`)
 
-Per-row behaviors:
+Core panel route families generally follow list/edit/save/delete seams per domain.
 
-- Copy-to-clipboard icon before URI link
-- URI opens in a new tab
-- Title links to edit screen when an edit route is available
+## 6) Routing Table Screen (Panel)
 
-Sorting:
+The Routing Table screen is served from:
 
-- Click any sortable header to toggle asc/desc sort.
-
-### CSV Export (`/routing/export`)
-
-Export fields include:
-
-- Type
-- Title
-- Public URL
-- Target URL
-- Status
-- Notes
-- Conflict
-
-## 2) Developer And Agent Internals
-
-### Key Files
-
-- Panel view:
-  - `private/tpl/panel/routing.php`
-- Panel controller:
-  - `private/sys/Controller/Panel/RoutingController.php`
-- Public route bootstrap:
-  - `public/index.php`
-  - `private/sys/Router/Public/*Router.php`
-- Panel route bootstrap:
-  - `panel/index.php`
-  - `private/sys/Router/Panel/*Router.php`
-  - Channel/category/tag panel routes are now registered through their own `ChannelRouter.php`, `CategoryRouter.php`, and `TagRouter.php` files instead of a shared taxonomy registrar bundle.
-  - Event-log routes are now registered through `LogRouter.php` instead of riding through the broader system-route registrar.
-  - Routing diagnostics routes are now registered through `RoutingRouter.php` instead of riding through the broader system-route registrar.
-  - Updater routes are now registered through `UpdateRouter.php` instead of riding through the broader system-route registrar.
-  - Output profiler hook/renderer (`OutputProfiler`, `private/sys/Debug`)
-  - `private/lib/Scheduler/Cron.php`
-- Public auth controller:
-  - `private/sys/Controller/Public/AuthController.php`
-- Public profile controller:
-  - `private/sys/Controller/Public/UserController.php`
-- Public group controller:
-  - `private/sys/Controller/Public/GroupController.php`
-- Public category controller:
-  - `private/sys/Controller/Public/CategoryController.php`
-- Public channel controller:
-  - `private/sys/Controller/Public/ChannelController.php`
-- Public tag controller:
-  - `private/sys/Controller/Public/TagController.php`
-- Public feed controller:
-  - `private/sys/Controller/Public/FeedController.php`
-- Public content controller:
-  - `private/sys/Controller/Public/PageController.php`
-- Shared public request context:
-  - `private/sys/Controller/Public/SharedController.php`
-
-### Panel Routes
-
-Declared through `private/sys/Router/Panel/RoutingRouter.php` and wired by `panel/index.php`:
-
-- `GET /routing` -> routing inventory screen
+- `GET /routing` -> inventory UI
 - `GET /routing/export` -> CSV export
 
-### Controller Flow
+Primary implementation files:
 
-`RoutingController::routing()`:
+- `private/sys/Controller/Panel/RoutingController.php`
+- `private/tpl/panel/routing.php`
+- `private/sys/Router/Panel/RoutingRouter.php`
 
-1. Requires panel login.
-2. Requires `Manage Taxonomy`.
-3. Builds row inventory via `routingRowsForPanel()`.
-4. Normalizes optional `search` query prefill for the filter UI.
-5. Computes summary counters and renders routing view.
+Behavior summary:
 
-`RoutingController::routingExport()`:
+- Requires panel login and taxonomy-management permission.
+- Builds a merged read-only route inventory (pages, channels, redirects, feeds, taxonomy, user/group profile routes, and conflict metadata).
+- Supports filter/search/sort in UI and CSV export.
 
-1. Requires panel login + `Manage Taxonomy`.
-2. Rebuilds rows via `routingRowsForPanel()`.
-3. Streams CSV with no-store headers.
+## 7) Extension Routes
 
-### Row Composition Model
+Extension route loading is explicit and scope-specific:
 
-`routingRowsForPanel()` composes read-only inventory rows for:
+- Public: `Raven\Lib\Extension\Public\Routes::register(...)`
+- Panel: `Raven\Lib\Extension\Panel\Routes::register(...)`
 
-- Feeds (when root feed routes and channel-specific sub-feeds are active)
-- Channels
-- Pages
-- Categories (when category routes are enabled)
-- Tags (when tag routes are enabled)
-- Groups (when group routes are enabled and per-group routing is enabled)
-- Users (when profile routes are enabled)
-- Redirects
+Extension provider files are loaded from extension roots (for example `routes_public.php`, `routes_panel.php`) under `private/ext/{slug}/`.
 
-Each row includes:
+## 8) Diagnostics And Verification
 
-- `type_key`, `type_label`
-- source title/label and optional panel edit URL
-- public URL and target URL
-- status key/label
-- notes
-- conflict flag
+Route inventory smoke snapshots:
 
-### Conflict And Notes Logic
+- `debug/smoke/snapshots/routes-public.json`
+- `debug/smoke/snapshots/routes-panel.json`
 
-- Conflict tracking is keyed by normalized `public_url` path usage.
-- If multiple rows claim the same public URL, each row is marked conflict and notes are annotated.
-- Additional notes are attached for reserved-prefix collisions and missing channel landing index/template scenarios.
+Use these when validating route-order or route-surface changes.
 
-### Inclusion/Visibility Rules
+## 9) Related Docs
 
-- Profile rows require enabled profile routing config.
-- Public profile routes use `/{user.prefix}/{username}` when `user.auth.login=username`, and `/{user.prefix}/{user_id}` when usernames are disabled (`user.auth.login=email`).
-- Group rows require enabled group routing config + per-group route toggle + non-guest/validating/banned group role.
-- Feed rows use the single Routing Table type label `Feed`.
-- `GET /{feed.rss}` is emitted when `feed.enabled` is on and `feed.rss` is non-blank.
-- `GET /{feed.atom}` is emitted when `feed.enabled` is on and `feed.atom` is non-blank.
-- `GET /{feed.rss}/{channel_slug}` and `GET /{feed.atom}/{channel_slug}` are emitted only when feeds are enabled globally and the addressed non-root channel has its per-channel feed toggle enabled.
-- `GET /{feed.rss}/{category.prefix}/{category_slug}` and `GET /{feed.atom}/{category.prefix}/{category_slug}` are active only when both feeds and category routes are enabled.
-- `GET /{feed.rss}/{tag.prefix}/{tag_slug}` and `GET /{feed.atom}/{tag.prefix}/{tag_slug}` are active only when both feeds and tag routes are enabled.
-- Category/tag feed routes remain public runtime routes for now and are not emitted as Routing Table inventory rows.
-- Edit links are emitted only when current user has the relevant management permission.
-
-### Security/Validation Expectations
-
-- Permission gate: `Manage Taxonomy`.
-- Screen is read-only; no state-changing form actions.
-- Export route streams computed data only (no mutating side effects).
-
-### Update Discipline
-
-When routing inventory behavior changes, update this document in the same task. That includes row sources, status/conflict semantics, filters/sorting UI, and export columns.
+- `docs/appendix/templates/public.md`
+- `docs/appendix/templates/panel.md`
+- `docs/appendix/core/router.md`
+- `docs/appendix/core/controller.md`

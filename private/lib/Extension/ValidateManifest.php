@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/Extension/ValidateManifest.php
  * Validates extension manifest metadata and type/file capability contracts.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -38,6 +38,7 @@ final class ValidateManifest
     public function normalizeType(string $type): string
     {
         $type = strtolower(trim($type));
+        // Unknown type tokens normalize to `content`.
         if (!in_array($type, ['helper', 'content', 'framework', 'module', 'system'], true)) {
             return 'content';
         }
@@ -62,18 +63,22 @@ final class ValidateManifest
         $hasShortcodes = Resolver::hasProvider($extensionRoot, 'shortcodes.php');
         $hasFields = Resolver::hasProvider($extensionRoot, 'fields.php');
 
+        // Framework extensions cannot expose panel route providers.
         if ($hasPanelRoutes && $type === 'framework') {
             return 'Framework extensions may not define routes_panel.php.';
         }
 
+        // Only module extensions may expose public route providers.
         if ($hasPublicRoutes && $type !== 'module') {
             return 'Only module extensions may define routes_public.php.';
         }
 
+        // Shortcodes providers are restricted to content/module types.
         if ($hasShortcodes && !in_array($type, ['content', 'module'], true)) {
             return 'Only content/module extensions may define shortcodes.php.';
         }
 
+        // Fields providers are restricted to content/module types.
         if ($hasFields && !in_array($type, ['content', 'module'], true)) {
             return 'Only content/module extensions may define fields.php.';
         }
@@ -95,32 +100,38 @@ final class ValidateManifest
      */
     public function readManifest(string $root, string $directoryName): ?array
     {
+        // Reject unsafe extension directory names before filesystem access.
         if (!$this->isSafeDirectoryName($directoryName)) {
             return null;
         }
 
         $manifestPath = rtrim($root, '/') . '/private/ext/' . $directoryName . '/ext.json';
+        // Missing ext.json means manifest validation fails.
         if (!is_file($manifestPath)) {
             return null;
         }
 
         $raw = file_get_contents($manifestPath);
+        // Empty/unreadable manifest payload is invalid.
         if ($raw === false || trim($raw) === '') {
             return null;
         }
 
         /** @var mixed $decoded */
         $decoded = json_decode($raw, true);
+        // Manifest must decode to an associative array/object.
         if (!is_array($decoded)) {
             return null;
         }
 
         $name = trim((string) ($decoded['name'] ?? ''));
+        // Non-empty name is required for valid manifests.
         if ($name === '') {
             return null;
         }
 
         $slug = strtolower(trim((string) ($decoded['slug'] ?? '')));
+        // Slug must be present and match extension slug rules.
         if ($slug === '' || preg_match('/^[a-z0-9][a-z0-9_-]{0,119}$/', $slug) !== 1) {
             return null;
         }
@@ -128,6 +139,7 @@ final class ValidateManifest
         $type = $this->normalizeType((string) ($decoded['type'] ?? 'content'));
 
         $extensionRoot = rtrim($root, '/') . '/private/ext/' . $directoryName;
+        // Fail when declared providers violate the normalized type contract.
         if ($this->typeContractError($extensionRoot, $type) !== null) {
             return null;
         }

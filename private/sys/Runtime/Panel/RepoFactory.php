@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/sys/Runtime/Panel/RepoFactory.php
  * Panel repository and parser factory wiring extracted from panel runtime builder.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

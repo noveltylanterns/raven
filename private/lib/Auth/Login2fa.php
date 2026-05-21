@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/Auth/Login2fa.php
  * Consolidated 2FA key, rule, and method-normalization primitives for auth and panel flows.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -134,6 +134,7 @@ final class Login2fa
     public static function extractWebauthnCredentialId(string $methodKey): string
     {
         $methodKey = trim($methodKey);
+        // Only WebAuthn-prefixed keys carry credential-id payloads.
         if (!str_starts_with($methodKey, 'webauthn:')) {
             return '';
         }
@@ -190,10 +191,12 @@ final class Login2fa
     public static function normalizeLabel(string $label, string $type, int $maxLength = 80): string
     {
         $normalized = trim($label);
+        // Empty labels fall back to type-specific defaults.
         if ($normalized === '') {
             $normalized = self::defaultLabelForType($type);
         }
 
+        // Enforce max label length for safe UI rendering/storage.
         if (mb_strlen($normalized) > $maxLength) {
             $normalized = mb_substr($normalized, 0, $maxLength);
         }
@@ -211,14 +214,17 @@ final class Login2fa
     public static function normalizeStatus(string $status, string $type): string
     {
         $normalizedStatus = strtolower(trim($status));
+        // Preserve explicit valid status values.
         if (in_array($normalizedStatus, self::STATUSES, true)) {
             return $normalizedStatus;
         }
 
         $normalizedType = self::normalizeType($type);
+        // TOTP defaults to pending until challenge verification occurs.
         if ($normalizedType === 'totp') {
             return 'pending';
         }
+        // Recovery/email methods default to confirmed on normalization.
         if (in_array($normalizedType, ['recovery', 'email'], true)) {
             return 'confirmed';
         }
@@ -263,12 +269,15 @@ final class Login2fa
     public static function normalizeStored(array $methods): array
     {
         $normalized = [];
+        // Normalize each stored method row and discard invalid entries.
         foreach ($methods as $method) {
+            // Skip malformed non-array method entries.
             if (!is_array($method)) {
                 continue;
             }
 
             $type = self::normalizeType((string) ($method['type'] ?? ''));
+            // Skip unknown 2FA method types.
             if (!self::isKnownType($type)) {
                 continue;
             }
@@ -282,22 +291,27 @@ final class Login2fa
                 'added_at' => self::normalizeAddedAt($method['added_at'] ?? null),
             ];
 
+            // TOTP rows require a valid normalized secret.
             if ($type === 'totp') {
                 $secret = Totp::normalizeSecret((string) ($method['secret'] ?? ''));
+                // Skip TOTP rows when the secret is missing/invalid.
                 if (!Totp::isValidSecret($secret)) {
                     continue;
                 }
                 $row['secret'] = $secret;
             } elseif ($type === 'recovery') {
                 $recoveryHash = trim((string) ($method['recovery_hash'] ?? ''));
+                // Backfill hash from legacy recovery_code when needed.
                 if (!PhraseValidate::isValidHash($recoveryHash)) {
                     $recoveryCode = PhraseValidate::normalize((string) ($method['recovery_code'] ?? ''));
+                    // Hash valid legacy recovery codes into canonical storage format.
                     if (PhraseValidate::isValid($recoveryCode, 12)) {
                         $hashedRecoveryCode = PhraseGenerate::hash($recoveryCode, 12);
                         $recoveryHash = is_string($hashedRecoveryCode) ? $hashedRecoveryCode : '';
                     }
                 }
 
+                // Skip recovery rows that still have no valid hash.
                 if (!PhraseValidate::isValidHash($recoveryHash)) {
                     continue;
                 }
@@ -308,7 +322,9 @@ final class Login2fa
                 $row['reusable'] = (bool) ($method['reusable'] ?? false);
             } elseif ($type === 'webauthn') {
                 $credentialId = trim((string) ($method['credential_id'] ?? ''));
+                // Keep credential-id payload only when non-empty.
                 if ($credentialId !== '') {
+                    // Truncate oversized credential ids to storage-safe limits.
                     if (mb_strlen($credentialId) > 512) {
                         $credentialId = mb_substr($credentialId, 0, 512);
                     }
@@ -316,7 +332,9 @@ final class Login2fa
                 }
 
                 $credentialPublicKey = trim((string) ($method['credential_public_key'] ?? ''));
+                // Keep credential public-key payload only when non-empty.
                 if ($credentialPublicKey !== '') {
+                    // Truncate oversized public keys to storage-safe limits.
                     if (mb_strlen($credentialPublicKey) > 4096) {
                         $credentialPublicKey = mb_substr($credentialPublicKey, 0, 4096);
                     }
@@ -324,6 +342,7 @@ final class Login2fa
                 }
 
                 $signatureCounter = (int) ($method['signature_counter'] ?? 0);
+                // Coerce negative signature counters to zero.
                 if ($signatureCounter < 0) {
                     $signatureCounter = 0;
                 }
@@ -334,6 +353,7 @@ final class Login2fa
                 $row['require_uv'] = (bool) ($method['require_uv'] ?? false);
             } else {
                 $email = self::sanitizeEmail((string) ($method['email'] ?? ''));
+                // Skip email rows with invalid/empty addresses.
                 if ($email === null) {
                     continue;
                 }
@@ -346,6 +366,7 @@ final class Login2fa
             $dedupeLabel = trim((string) ($row['label'] ?? $label));
             $dedupeKey = self::dedupeKey($type, $dedupeLabel, $dedupeValue);
             $normalized[$dedupeKey] = $row;
+            // Hard cap stored methods to guard payload size.
             if (count($normalized) >= self::MAX_METHODS) {
                 break;
             }
@@ -354,9 +375,16 @@ final class Login2fa
         return array_values($normalized);
     }
 
+    /**
+     * Normalizes one persisted method timestamp, defaulting to current UTC time.
+     *
+     * @param mixed $value Raw `added_at` value from input/state payloads.
+     * @return string Non-empty timestamp string.
+     */
     private static function normalizeAddedAt(mixed $value): string
     {
         $addedAt = trim((string) $value);
+        // Missing timestamps default to current UTC for stable ordering.
         if ($addedAt === '') {
             return gmdate('Y-m-d H:i:s');
         }
@@ -364,10 +392,18 @@ final class Login2fa
         return $addedAt;
     }
 
+    /**
+     * Trims, strips control bytes, and length-limits one user-facing string.
+     *
+     * @param string $value Raw input value.
+     * @param int $maxLength Maximum allowed UTF-8 character length.
+     * @return string Sanitized display-safe string.
+     */
     private static function sanitizeText(string $value, int $maxLength): string
     {
         $value = trim($value);
         $value = preg_replace('/[\x00-\x1F\x7F]/u', '', $value) ?? '';
+        // Trim oversized text values to caller-defined limits.
         if (mb_strlen($value) > $maxLength) {
             $value = mb_substr($value, 0, $maxLength);
         }
@@ -375,13 +411,21 @@ final class Login2fa
         return $value;
     }
 
+    /**
+     * Normalizes and validates one email address candidate.
+     *
+     * @param string $value Raw email candidate.
+     * @return string|null Lowercased validated email, or null when invalid.
+     */
     private static function sanitizeEmail(string $value): ?string
     {
         $value = strtolower(self::sanitizeText($value, 254));
+        // Empty normalized values are treated as absent emails.
         if ($value === '') {
             return null;
         }
 
+        // Reject non-RFC-valid email values.
         if (!filter_var($value, FILTER_VALIDATE_EMAIL)) {
             return null;
         }

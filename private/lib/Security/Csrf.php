@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/Security/Csrf.php
  * Generic CSRF token generation, rotation, field rendering, and validation helper.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -45,6 +45,7 @@ final class Csrf
     public function token(): string
     {
         $token = $this->store->get($this->tokenKey);
+        // Reuse persisted token when present to keep one stable token per session window.
         if (is_string($token) && $token !== '') {
             return $token;
         }
@@ -88,6 +89,7 @@ final class Csrf
      */
     public function validate(?string $submitted): bool
     {
+        // Missing or empty submissions fail fast before constant-time comparison.
         if (!is_string($submitted) || $submitted === '') {
             return false;
         }

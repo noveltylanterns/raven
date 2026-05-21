@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/sys/Router/Public/PublicPolicy.php
  * Public route-prefix and reserved-path policy assembly.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

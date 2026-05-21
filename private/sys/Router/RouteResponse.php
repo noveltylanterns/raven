@@ -5,7 +5,7 @@
  * ~/private/sys/Router/RouteResponse.php
  * Immutable routing dispatch result — handled state + matched params returned by the router.
  * Not to be confused with Raven\Lib\Transport\Response, which emits HTTP output helpers.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

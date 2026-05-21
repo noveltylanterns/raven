@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/View/Public/PageMarkdown.php
  * Public page Markdown-to-HTML rendering helpers.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

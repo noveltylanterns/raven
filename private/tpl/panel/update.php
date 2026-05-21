@@ -1,5 +1,12 @@
 <?php
 
+/**
+ * RAVEN CMS
+ * ~/private/tpl/panel/update.php
+ * Admin panel update workflow template.
+ * Docs: https://lanterns.io/raven
+ */
+
 declare(strict_types=1);
 
 /** @var array<string, string> $site */

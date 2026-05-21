@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/sys/Router/RoutePreview.php
  * Shared routing-preview derivation helpers for panel diagnostics.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

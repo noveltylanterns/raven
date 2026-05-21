@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/Extension/Public/FormInstance.php
  * Shortcode runtime resolver and renderer for embedded form and content runtimes.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -63,20 +63,25 @@ final class FormInstance
     {
         $runtimes = [];
 
+        // Scan each extension service bucket for registered shortcode runtimes.
         foreach ($extensionServices as $serviceBucket) {
+            // Skip malformed service buckets.
             if (!is_array($serviceBucket)) {
                 continue;
             }
 
             /** @var mixed $rawCandidates */
             $rawCandidates = $serviceBucket['shortcode_runtimes'] ?? [];
+            // Allow one-object shorthand by wrapping into a one-item array.
             if (is_object($rawCandidates)) {
                 $rawCandidates = [$rawCandidates];
             }
+            // Skip buckets whose runtime entries are not array-like after normalization.
             if (!is_array($rawCandidates)) {
                 continue;
             }
 
+            // Normalize and register first-wins runtimes by type token.
             foreach ($rawCandidates as $candidate) {
                 // Accept either interface; FormRuntime is not required to extend Shortcodes
                 // so we check both explicitly.
@@ -86,10 +91,12 @@ final class FormInstance
                 }
 
                 $type = strtolower(trim($candidate->type()));
+                // Runtime type must be non-empty and sanitize to a valid slug token.
                 if ($type === '' || $this->input->slug($type) === null) {
                     continue;
                 }
 
+                // First registration for a type wins; later duplicates are ignored.
                 if (!isset($runtimes[$type])) {
                     $runtimes[$type] = $candidate;
                 }
@@ -144,11 +151,13 @@ final class FormInstance
      */
     public function renderShortcodes(string $html, array $runtimes, callable $renderMarkup): string
     {
+        // Empty markup has no shortcode work to perform.
         if ($html === '') {
             return '';
         }
 
         $shortcodePattern = $this->shortcodePattern($runtimes);
+        // Leave markup unchanged when no shortcode runtimes are registered.
         if ($shortcodePattern === null) {
             return $html;
         }
@@ -159,11 +168,13 @@ final class FormInstance
                 $type = strtolower((string) ($matches[1] ?? ''));
                 $rawArgumentChunk = (string) ($matches[2] ?? '');
                 $slug = $this->extractSlug($rawArgumentChunk);
+                // Invalid shortcode tokens resolve to empty output.
                 if ($type === '' || $slug === '') {
                     return '';
                 }
 
                 $runtime = $this->runtime($type, $runtimes);
+                // Disabled or missing runtimes are treated as non-renderable.
                 if ($runtime === null || !$this->isRuntimeEnabled($runtime)) {
                     return '';
                 }
@@ -183,11 +194,13 @@ final class FormInstance
     public function sanitizeReturnPath(string $rawPath): string
     {
         $rawPath = trim($rawPath);
+        // Reject empty, null-byte, or backslash-containing values as unsafe return paths.
         if ($rawPath === '' || str_contains($rawPath, "\0") || str_contains($rawPath, '\\')) {
             return '/';
         }
 
         $path = (string) parse_url($rawPath, PHP_URL_PATH);
+        // Require a normalized single-slash-prefixed absolute path.
         if ($path === '' || !str_starts_with($path, '/') || str_starts_with($path, '//')) {
             return '/';
         }
@@ -222,6 +235,7 @@ final class FormInstance
             function (string $type, string $slug, string $rawArgs) use ($runtimes, $returnPath, $csrfField, $captchaMarkup): string {
                 $runtime = $this->runtime($type, $runtimes);
 
+                // Dispatch form runtimes with full form rendering context.
                 if ($runtime instanceof FormRuntime) {
                     // Form runtime: look up the registered form definition and render with full form context.
                     $definition = $this->findFormDefinition($type, $slug, $runtimes);
@@ -232,6 +246,7 @@ final class FormInstance
                     return $runtime->render($definition, $returnPath, $csrfField, (string) $captchaMarkup());
                 }
 
+                // Dispatch content runtimes with lightweight shortcode context.
                 if ($runtime instanceof Shortcodes) {
                     // Content runtime: render with lightweight slug/args context; no form wiring needed.
                     return $runtime->render(['slug' => $slug, 'raw_args' => $rawArgs]);
@@ -254,11 +269,13 @@ final class FormInstance
     {
         $type = strtolower(trim($type));
         $slug = strtolower(trim($slug));
+        // Type and slug are both required to resolve a form definition.
         if ($type === '' || $slug === '') {
             return null;
         }
 
         $runtime = $this->formRuntime($type, $runtimes);
+        // Runtime must exist, be form-capable, and belong to an enabled extension.
         if ($runtime === null || !$this->isRuntimeEnabled($runtime)) {
             return null;
         }
@@ -276,11 +293,13 @@ final class FormInstance
      */
     private function formDefinitionLookup(string $type, array $runtimes): array
     {
+        // Reuse cached lookup maps for repeated type resolution in one request.
         if (isset($this->embeddedFormLookupCache[$type])) {
             return $this->embeddedFormLookupCache[$type];
         }
 
         $runtime = $this->formRuntime($type, $runtimes);
+        // Missing form runtime yields an empty lookup map.
         if ($runtime === null) {
             $this->embeddedFormLookupCache[$type] = [];
             return [];
@@ -288,12 +307,15 @@ final class FormInstance
 
         $forms = $runtime->listEnabledForms();
         $lookup = [];
+        // Normalize runtime form definitions into a slug-keyed lookup table.
         foreach ($forms as $form) {
+            // Skip malformed form definition rows.
             if (!is_array($form)) {
                 continue;
             }
 
             $slug = $this->input->slug((string) ($form['slug'] ?? ''));
+            // Keep only forms with valid normalized slug identifiers.
             if ($slug === null || $slug === '') {
                 continue;
             }
@@ -305,8 +327,15 @@ final class FormInstance
         return $lookup;
     }
 
+    /**
+     * Checks whether one extension is currently enabled in the registry map.
+     *
+     * @param string $extensionName Extension slug.
+     * @return bool True when the extension is enabled.
+     */
     private function isExtensionEnabled(string $extensionName): bool
     {
+        // Lazily load enabled-extension map once per request.
         if ($this->enabledExtensionMap === null) {
             $this->enabledExtensionMap = Registry::enabledMap($this->projectRoot);
         }
@@ -327,6 +356,7 @@ final class FormInstance
     {
         $args = html_entity_decode($rawArgs, ENT_QUOTES | ENT_HTML5, 'UTF-8');
         $args = trim($args);
+        // Empty shortcode arguments provide no slug candidate.
         if ($args === '') {
             return '';
         }
@@ -334,8 +364,10 @@ final class FormInstance
         // Handle explicit `slug=...` first (quoted or unquoted).
         if (preg_match('/(?:^|\s)slug\s*=\s*(?:"([^"]+)"|\'([^\']+)\'|([a-z0-9_-]+))/i', $args, $matches) === 1) {
             $candidate = '';
+            // Use the first non-empty captured slug variant.
             for ($index = 1; $index <= 3; $index++) {
                 $value = trim((string) ($matches[$index] ?? ''));
+                // Keep the first populated capture group and ignore the rest.
                 if ($value !== '') {
                     $candidate = $value;
                     break;
@@ -364,6 +396,7 @@ final class FormInstance
     private function shortcodePattern(array $runtimes): ?string
     {
         $types = array_keys($runtimes);
+        // No runtime types means no shortcode-matching pattern to build.
         if ($types === []) {
             return null;
         }

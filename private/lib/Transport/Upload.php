@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/Transport/Upload.php
  * Shared upload normalization and validation helpers.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -31,6 +31,7 @@ final class Upload
      */
     public function normalize(mixed $raw): array
     {
+        // Require the canonical `$_FILES` shape before flattening.
         if (!is_array($raw) || !isset($raw['name'], $raw['type'], $raw['tmp_name'], $raw['error'], $raw['size'])) {
             return [];
         }
@@ -83,17 +84,20 @@ final class Upload
     public function validateSingleUpload(mixed $raw, string $fileLabel = 'file', array $options = []): array
     {
         $upload = $this->first($raw);
+        // Missing upload rows map to the shared "no file" error.
         if ($upload === null) {
             return ['ok' => false, 'error' => $this->uploadErrorMessage(UPLOAD_ERR_NO_FILE, $fileLabel)];
         }
 
         $uploadError = (int) ($upload['error'] ?? UPLOAD_ERR_NO_FILE);
+        // Surface native PHP upload error codes before additional checks.
         if ($uploadError !== UPLOAD_ERR_OK) {
             return ['ok' => false, 'error' => $this->uploadErrorMessage($uploadError, $fileLabel)];
         }
 
         $tmpPath = trim((string) ($upload['tmp_name'] ?? ''));
         $requireHttpUpload = (bool) ($options['require_http_upload'] ?? true);
+        // Require an existing temp file and optionally enforce HTTP-upload provenance.
         if (
             $tmpPath === ''
             || !is_file($tmpPath)
@@ -107,6 +111,7 @@ final class Upload
 
         $size = max(0, (int) ($upload['size'] ?? 0));
         $minBytes = max(0, (int) ($options['min_bytes'] ?? 1));
+        // Reject payloads smaller than required minimum bytes.
         if ($size < $minBytes) {
             return [
                 'ok' => false,
@@ -116,6 +121,7 @@ final class Upload
 
         /** @var int|null $maxBytes */
         $maxBytes = isset($options['max_bytes']) ? (int) $options['max_bytes'] : null;
+        // Enforce optional max-bytes policy when configured.
         if ($maxBytes !== null && $maxBytes > 0 && $size > $maxBytes) {
             return [
                 'ok' => false,
@@ -143,16 +149,20 @@ final class Upload
     public function filenameUsesAllowedExtension(string $filename, array $allowedExtensions): bool
     {
         $candidate = strtolower(trim($filename));
+        // Empty filenames cannot satisfy extension allowlists.
         if ($candidate === '') {
             return false;
         }
 
+        // Compare candidate against each normalized allowed suffix.
         foreach ($allowedExtensions as $allowedExtension) {
             $normalizedExtension = ltrim(strtolower(trim((string) $allowedExtension)), '.');
+            // Ignore blank allowlist entries.
             if ($normalizedExtension === '') {
                 continue;
             }
 
+            // Match against full extension suffix (supports multipart extensions).
             if (str_ends_with($candidate, '.' . $normalizedExtension)) {
                 return true;
             }
@@ -203,6 +213,7 @@ final class Upload
         mixed $sizeNode,
         array &$uploads
     ): void {
+        // Recurse through nested upload trees from multi-file form fields.
         if (is_array($nameNode)) {
             foreach ($nameNode as $index => $childNameNode) {
                 $this->flattenNodes(
@@ -219,12 +230,14 @@ final class Upload
         }
 
         $error = is_array($errorNode) ? UPLOAD_ERR_NO_FILE : (int) $errorNode;
+        // Skip empty leaves where no file was selected.
         if ($error === UPLOAD_ERR_NO_FILE) {
             return;
         }
 
         $name = is_array($nameNode) ? '' : trim((string) $nameNode);
         $tmpName = is_array($tmpNameNode) ? '' : trim((string) $tmpNameNode);
+        // Reject leaves with neither client filename nor temp path.
         if ($name === '' && $tmpName === '') {
             return;
         }
@@ -247,6 +260,7 @@ final class Upload
     private function fileLabelSubject(string $fileLabel): string
     {
         $label = trim($fileLabel);
+        // Default to generic noun when no label was supplied.
         if ($label === '') {
             return 'file';
         }

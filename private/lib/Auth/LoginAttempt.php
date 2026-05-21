@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/Auth/LoginAttempt.php
  * Shared password-auth login workflow with throttle policy reads for panel/public routes.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -77,12 +77,14 @@ final class LoginAttempt
         $password = $this->input->text($post['password'] ?? null, 255);
         $identifier = null;
 
+        // Normalize identifier by the active login mode (email-only vs username/email).
         if ($loginMode === 'email') {
             $identifier = $this->input->email($identifierRaw);
         } else {
             $identifier = $this->identifierResolver->normalizeUsernameOrEmail($this->input, $identifierRaw);
         }
 
+        // Credentials must be present before throttle/auth checks.
         if ($identifierRaw === '' || $password === '') {
             return [
                 'status' => 'missing_credentials',
@@ -91,7 +93,9 @@ final class LoginAttempt
             ];
         }
 
+        // Invalid identifiers still pass through throttle policy and failure tracking.
         if ($identifier === null) {
+            // Return lock message when throttle window is currently locked.
             if ($this->isTemporarilyLocked($auth, $identifierRaw, $clientIpAddress)) {
                 return [
                     'status' => 'locked',
@@ -108,6 +112,7 @@ final class LoginAttempt
             ];
         }
 
+        // Guard valid identifiers with the same throttle lock policy.
         if ($this->isTemporarilyLocked($auth, $identifier, $clientIpAddress)) {
             return [
                 'status' => 'locked',
@@ -120,6 +125,7 @@ final class LoginAttempt
             ? $auth->attemptLoginByEmail($identifier, $password)
             : $auth->attemptLoginByUsername($identifier, $password);
 
+        // Failed password checks are recorded for throttle escalation.
         if (!(bool) ($result['ok'] ?? false)) {
             $this->recordFailure($auth, $identifier, $clientIpAddress);
             return [
@@ -132,6 +138,7 @@ final class LoginAttempt
         $this->clearFailures($auth, $identifier, $clientIpAddress);
 
         $userId = $auth->userId();
+        // Abort when auth layer cannot resolve a concrete logged-in user id.
         if ($userId === null) {
             $auth->logout();
             $uiState->clearTwoFactorState();
@@ -142,8 +149,10 @@ final class LoginAttempt
             ];
         }
 
+        // Optional access guard can veto login after credential verification.
         if ($accessGuard !== null) {
             $accessResult = $accessGuard($auth, $userId);
+            // On access failure, clear session and return denial payload.
             if (!(bool) ($accessResult['ok'] ?? false)) {
                 $auth->logout();
                 $uiState->clearTwoFactorState();
@@ -156,11 +165,13 @@ final class LoginAttempt
             }
         }
 
+        // Rotate session id at successful primary-auth boundary.
         if (session_status() === PHP_SESSION_ACTIVE) {
             session_regenerate_id(true);
         }
 
         $interactiveMethods = $auth->interactiveTwoFactorMethodsForUser($userId);
+        // Route to 2FA challenge flow when interactive methods exist.
         if ($interactiveMethods !== []) {
             $auth->beginTwoFactorChallenge($userId, $interactiveMethods);
             $uiState->clearTwoFactorState();
@@ -248,6 +259,7 @@ final class LoginAttempt
     private function normalizedClientIpAddress(string $clientIpAddress): string
     {
         $candidate = trim($clientIpAddress);
+        // Invalid or blank client IPs collapse to a shared unknown throttle bucket.
         if ($candidate === '' || filter_var($candidate, FILTER_VALIDATE_IP) === false) {
             return 'unknown';
         }

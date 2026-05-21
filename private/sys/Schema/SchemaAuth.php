@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/sys/Schema/SchemaAuth.php
  * Ensures auth-side schema objects and Raven-specific user profile columns.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

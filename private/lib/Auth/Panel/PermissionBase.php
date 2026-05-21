@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/Auth/Panel/PermissionBase.php
  * Canonical panel permission bitmask constants, route maps, and capability helpers.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -287,6 +287,7 @@ final class PermissionBase
      */
     public static function hasPanelPermissionBit(int $mask, int $bit): bool
     {
+        // Non-positive bits are invalid and can never be present in the mask.
         if ($bit <= 0) {
             return false;
         }
@@ -303,7 +304,9 @@ final class PermissionBase
      */
     public static function hasAnyPanelPermissionBit(int $mask, array $bits): bool
     {
+        // Return true as soon as any candidate permission bit is present.
         foreach ($bits as $bit) {
+            // Cast each supplied value to int before bit-checking.
             if (self::hasPanelPermissionBit($mask, (int) $bit)) {
                 return true;
             }
@@ -319,6 +322,7 @@ final class PermissionBase
      */
     public static function stockPanelRoutePermissions(): array
     {
+        // Reuse cached route-permission map after first construction.
         if (is_array(self::$stockPanelRoutePermissionsCache)) {
             return self::$stockPanelRoutePermissionsCache;
         }
@@ -436,14 +440,18 @@ final class PermissionBase
      */
     public static function allStockPanelBits(): array
     {
+        // Return cached flattened stock bits after first computation.
         if (is_array(self::$allStockPanelBitsCache)) {
             return self::$allStockPanelBitsCache;
         }
 
         $bits = [];
+        // Walk each route definition and extract action-specific bit values.
         foreach (self::stockPanelRoutePermissions() as $permissionRow) {
+            // Examine every supported action column in the route permission row.
             foreach (['view', 'create', 'edit', 'delete', 'uninstall'] as $action) {
                 $bit = (int) ($permissionRow[$action] ?? 0);
+                // Keep only positive bit constants.
                 if ($bit > 0) {
                     $bits[] = $bit;
                 }
@@ -516,6 +524,7 @@ final class PermissionBase
     public static function maskFromBits(array $bits): int
     {
         $mask = 0;
+        // OR each bit into the running combined permission mask.
         foreach ($bits as $bit) {
             $mask |= (int) $bit;
         }
@@ -544,6 +553,7 @@ final class PermissionBase
      */
     public static function normalizeMaskForPanelAccess(int $mask): int
     {
+        // Remove route-level grants when panel login itself is missing.
         if (($mask & self::PANEL_LOGIN) !== self::PANEL_LOGIN) {
             $mask &= ~self::allStockPanelBitsMask();
             $mask &= ~self::VIEW_DISABLED_SITE;
@@ -561,13 +571,16 @@ final class PermissionBase
     private static function routeBits(string $route): array
     {
         $row = self::stockPanelRoutePermission($route);
+        // Unknown route keys do not contribute any permission bits.
         if ($row === null) {
             return [];
         }
 
         $bits = [];
+        // Extract positive action bits from one route permission row.
         foreach (['view', 'create', 'edit', 'delete', 'uninstall'] as $action) {
             $bit = (int) ($row[$action] ?? 0);
+            // Keep only action bits that are actually defined.
             if ($bit > 0) {
                 $bits[] = $bit;
             }
@@ -585,6 +598,7 @@ final class PermissionBase
     private static function routesBits(array $routes): array
     {
         $bits = [];
+        // Merge each route's bit list into one flat combined array.
         foreach ($routes as $route) {
             $bits = array_merge($bits, self::routeBits($route));
         }

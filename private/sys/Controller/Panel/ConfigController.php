@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/sys/Controller/Panel/ConfigController.php
  * Panel sub-controller for the configuration editor route family.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -604,8 +604,10 @@ final class ConfigController
     ): mixed {
         $value = $this->input->text($rawValue, 1000);
 
+        // Panel path must remain a normalized slug for route registration safety.
         if ($path === 'panel.path') {
             $slug = $this->input->slug($value);
+            // Reject invalid panel path slugs at save time.
             if ($slug === null) {
                 throw new \RuntimeException('panel.path must be a valid slug.');
             }
@@ -613,7 +615,9 @@ final class ConfigController
             return $slug;
         }
 
+        // Domain cannot be blank because public URL generation depends on it.
         if ($path === 'site.domain') {
+            // Reject empty domain values explicitly.
             if ($value === '') {
                 throw new \RuntimeException('site.domain is required.');
             }
@@ -621,8 +625,10 @@ final class ConfigController
             return $value;
         }
 
+        // Normalize site visibility mode to one supported enum value.
         if ($path === 'site.visibility') {
             $mode = strtolower(trim($value));
+            // Reject unsupported visibility modes.
             if (!in_array($mode, ['public', 'private', 'disabled'], true)) {
                 throw new \RuntimeException('site.visibility must be public, private, or disabled.');
             }
@@ -630,8 +636,10 @@ final class ConfigController
             return $mode;
         }
 
+        // Protocol must remain one HTTP scheme for canonical URL generation.
         if ($path === 'site.protocol') {
             $protocol = strtolower(trim($value));
+            // Reject unsupported protocol values.
             if (!in_array($protocol, ['http', 'https'], true)) {
                 throw new \RuntimeException('site.protocol must be http or https.');
             }
@@ -639,8 +647,10 @@ final class ConfigController
             return $protocol;
         }
 
+        // Scheduler mode is constrained to the supported execution policies.
         if ($path === 'site.scheduler') {
             $mode = strtolower(trim($value));
+            // Reject unsupported scheduler mode values.
             if (!in_array($mode, ['off', 'panel', 'always'], true)) {
                 throw new \RuntimeException('site.scheduler must be off, panel, or always.');
             }
@@ -648,12 +658,15 @@ final class ConfigController
             return $mode;
         }
 
+        // Timezone may be blank or one valid PHP timezone identifier.
         if ($path === 'site.timezone') {
             $tz = trim($value);
+            // Allow explicit blank timezone to fall back to runtime defaults.
             if ($tz === '') {
                 return '';
             }
 
+            // Reject unknown timezone identifiers to avoid runtime date warnings.
             if (!in_array($tz, self::timezoneIdentifiers(), true)) {
                 throw new \RuntimeException('site.timezone must be a valid timezone identifier or empty.');
             }
@@ -661,8 +674,10 @@ final class ConfigController
             return $tz;
         }
 
+        // Database driver must remain one known Raven backend.
         if ($path === 'database.driver') {
             $driver = strtolower($value);
+            // Reject unsupported driver values.
             if (!in_array($driver, ['sqlite', 'mysql', 'pgsql'], true)) {
                 throw new \RuntimeException('database.driver must be sqlite, mysql, or pgsql.');
             }
@@ -670,8 +685,10 @@ final class ConfigController
             return $driver;
         }
 
+        // Feed item count must be a positive integer.
         if ($path === 'feed.items') {
             $items = $this->normalizeInt($path, $value);
+            // Reject non-positive feed item counts.
             if ($items < 1) {
                 throw new \RuntimeException($path . ' must be greater than 0.');
             }
@@ -679,8 +696,10 @@ final class ConfigController
             return $items;
         }
 
+        // User bio length must be positive.
         if ($path === 'user.bio') {
             $length = $this->normalizeInt($path, $value);
+            // Reject non-positive limits.
             if ($length < 1) {
                 throw new \RuntimeException($path . ' must be greater than 0.');
             }
@@ -688,8 +707,10 @@ final class ConfigController
             return $length;
         }
 
+        // User string/profile code length must be positive and bounded.
         if ($path === 'user.string') {
             $length = $this->normalizeInt($path, $value);
+            // Reject non-positive limits.
             if ($length < 1) {
                 throw new \RuntimeException($path . ' must be greater than 0.');
             }
@@ -697,14 +718,18 @@ final class ConfigController
             return min(128, $length);
         }
 
+        // Taxonomy defaults must reference an existing set id.
         if ($path === 'category.set' || $path === 'tag.set') {
             $setId = $this->normalizeInt($path, $value);
+            // Reject missing/invalid set ids.
             if ($setId < 1) {
                 throw new \RuntimeException($path . ' must be a valid set id.');
             }
 
             $options = $path === 'tag.set' ? $tagSetOptions : $categorySetOptions;
+            // Accept only ids present in the current option inventory.
             foreach ($options as $option) {
+                // Return immediately when a matching set id is found.
                 if ((int) ($option['id'] ?? 0) === $setId) {
                     return $setId;
                 }
@@ -713,12 +738,15 @@ final class ConfigController
             throw new \RuntimeException($path . ' must reference an existing set.');
         }
 
+        // Taxonomy enabled flags are boolean coercions.
         if ($path === 'category.enabled' || $path === 'tag.enabled') {
             return $this->normalizeBool($path, $value);
         }
 
+        // Taxonomy selector mode must be one supported routing selector.
         if ($path === 'category.selector' || $path === 'tag.selector') {
             $selector = strtolower(trim($value));
+            // Reject unsupported selector modes.
             if (!in_array($selector, ['id', 'slug'], true)) {
                 throw new \RuntimeException($path . ' must be id or slug.');
             }
@@ -726,8 +754,10 @@ final class ConfigController
             return $selector;
         }
 
+        // Group selector mode must be one supported routing selector.
         if ($path === 'group.selector') {
             $selector = strtolower(trim($value));
+            // Reject unsupported selector modes.
             if (!in_array($selector, ['id', 'slug'], true)) {
                 throw new \RuntimeException('group.selector must be id or slug.');
             }
@@ -735,13 +765,16 @@ final class ConfigController
             return $selector;
         }
 
+        // Category/tag route prefixes must be slug-safe and collision-free.
         if ($path === 'category.prefix' || $path === 'tag.prefix') {
             $trimmedValue = trim($value);
+            // Blank prefixes are allowed and collapse this route family prefix.
             if ($trimmedValue === '') {
                 return '';
             }
 
             $prefix = $this->input->slug($trimmedValue);
+            // Reject invalid prefix slugs.
             if ($prefix === null) {
                 throw new \RuntimeException($path . ' must be a valid slug.');
             }
@@ -756,16 +789,19 @@ final class ConfigController
                     ConfigRead::get($workingConfig, 'tag.enabled', $this->config->get('tag.enabled', false)),
                     false
                 );
+            // If this taxonomy family is disabled, only local validation is required.
             if (!$thisEnabled) {
                 return $prefix;
             }
 
             $panelPathValue = (string) ConfigRead::get($workingConfig, 'panel.path', $this->config->get('panel.path', 'panel'));
             $panelPrefix = $this->input->slug($panelPathValue);
+            // Prevent collisions with the reserved panel route prefix.
             if ($panelPrefix !== null && $prefix === $panelPrefix) {
                 throw new \RuntimeException($path . ' cannot match panel.path.');
             }
 
+            // Prevent collisions with globally reserved public prefixes.
             if (in_array($prefix, ['panel', 'boot', 'mce', 'theme'], true)) {
                 throw new \RuntimeException($path . ' uses a reserved public prefix.');
             }
@@ -783,6 +819,7 @@ final class ConfigController
                 );
             $otherRaw = (string) ConfigRead::get($workingConfig, $otherPath, $this->config->get($otherPath, $otherDefault));
             $otherPrefix = $this->input->slug($otherRaw);
+            // Enforce distinct category/tag prefixes when both families are enabled.
             if ($otherEnabled && $otherPrefix !== null && $otherPrefix !== '' && $otherPrefix === $prefix) {
                 throw new \RuntimeException('category.prefix and tag.prefix must be different values.');
             }
@@ -790,13 +827,16 @@ final class ConfigController
             return $prefix;
         }
 
+        // Feed route prefixes must be slug-safe and collision-free.
         if ($path === 'feed.rss' || $path === 'feed.atom') {
             $trimmedValue = trim($value);
+            // Blank feed prefixes are allowed when routes are not required.
             if ($trimmedValue === '') {
                 return '';
             }
 
             $prefix = $this->input->slug($trimmedValue);
+            // Reject invalid feed prefix slugs.
             if ($prefix === null) {
                 throw new \RuntimeException($path . ' must be a valid slug.');
             }
@@ -805,16 +845,19 @@ final class ConfigController
                 ConfigRead::get($workingConfig, 'feed.enabled', $this->config->get('feed.enabled', false)),
                 false
             );
+            // When feeds are disabled, collision checks can be skipped.
             if (!$feedEnabled) {
                 return $prefix;
             }
 
             $panelPathValue = (string) ConfigRead::get($workingConfig, 'panel.path', $this->config->get('panel.path', 'panel'));
             $panelPrefix = $this->input->slug($panelPathValue);
+            // Prevent feed routes from shadowing panel routes.
             if ($panelPrefix !== null && $prefix === $panelPrefix) {
                 throw new \RuntimeException($path . ' cannot match panel.path.');
             }
 
+            // Prevent feed routes from using globally reserved public prefixes.
             if (in_array($prefix, ['panel', 'boot', 'mce', 'theme'], true)) {
                 throw new \RuntimeException($path . ' uses a reserved public prefix.');
             }
@@ -826,6 +869,7 @@ final class ConfigController
                 ConfigRead::get($workingConfig, 'category.enabled', $this->config->get('category.enabled', false)),
                 false
             );
+            // Prevent collisions with enabled category route prefixes.
             if ($categoryEnabled && $categoryPrefix !== null && $categoryPrefix !== '' && $prefix === $categoryPrefix) {
                 throw new \RuntimeException($path . ' cannot match category.prefix while categories are enabled.');
             }
@@ -837,6 +881,7 @@ final class ConfigController
                 ConfigRead::get($workingConfig, 'tag.enabled', $this->config->get('tag.enabled', false)),
                 false
             );
+            // Prevent collisions with enabled tag route prefixes.
             if ($tagEnabled && $tagPrefix !== null && $tagPrefix !== '' && $prefix === $tagPrefix) {
                 throw new \RuntimeException($path . ' cannot match tag.prefix while tags are enabled.');
             }
@@ -844,6 +889,7 @@ final class ConfigController
             $userPrefix = $this->input->slug(
                 (string) ConfigRead::get($workingConfig, 'user.prefix', $this->config->get('user.prefix', 'user'))
             );
+            // Prevent collisions with configured profile route prefixes.
             if ($userPrefix !== null && $userPrefix !== '' && $prefix === $userPrefix) {
                 throw new \RuntimeException($path . ' cannot match user.prefix.');
             }
@@ -851,6 +897,7 @@ final class ConfigController
             $groupPrefix = $this->input->slug(
                 (string) ConfigRead::get($workingConfig, 'group.prefix', $this->config->get('group.prefix', 'group'))
             );
+            // Prevent collisions with configured group route prefixes.
             if ($groupPrefix !== null && $groupPrefix !== '' && $prefix === $groupPrefix) {
                 throw new \RuntimeException($path . ' cannot match group.prefix.');
             }
@@ -859,6 +906,7 @@ final class ConfigController
             $otherDefault = $path === 'feed.rss' ? 'atom' : 'rss';
             $otherRaw = (string) ConfigRead::get($workingConfig, $otherPath, $this->config->get($otherPath, $otherDefault));
             $otherPrefix = $this->input->slug($otherRaw);
+            // Keep RSS and Atom route prefixes distinct from each other.
             if ($otherPrefix !== null && $otherPrefix !== '' && $otherPrefix === $prefix) {
                 throw new \RuntimeException('feed.rss and feed.atom must be different values.');
             }
@@ -866,8 +914,10 @@ final class ConfigController
             return $prefix;
         }
 
+        // User visibility mode must map to one supported visibility contract.
         if ($path === 'user.visibility') {
             $mode = strtolower(trim($value));
+            // Reject unsupported profile visibility modes.
             if (!in_array($mode, ['public_full', 'public_limited', 'private', 'disabled'], true)) {
                 throw new \RuntimeException('user.visibility must be public_full, public_limited, private, or disabled.');
             }
@@ -875,8 +925,10 @@ final class ConfigController
             return $mode;
         }
 
+        // Login identifier mode must be either email-only or username-enabled.
         if ($path === 'user.auth.method') {
             $mode = strtolower(trim($value));
+            // Reject unsupported auth modes.
             if (!in_array($mode, ['email', 'username'], true)) {
                 throw new \RuntimeException('user.auth.method must be email or username.');
             }
@@ -884,8 +936,10 @@ final class ConfigController
             return $mode;
         }
 
+        // Registration mode must map to one supported access policy.
         if ($path === 'user.auth.registration') {
             $mode = strtolower(trim($value));
+            // Reject unsupported registration modes.
             if (!in_array($mode, ['open', 'invite', 'closed'], true)) {
                 throw new \RuntimeException('user.auth.registration must be open, invite, or closed.');
             }
@@ -893,13 +947,16 @@ final class ConfigController
             return $mode;
         }
 
+        // Profile selector must match one supported route identity mode.
         if ($path === 'user.selector') {
             $selector = strtolower(trim($value));
+            // Reject unsupported selector values.
             if (!in_array($selector, ['id', 'username', 'string'], true)) {
                 throw new \RuntimeException('user.selector must be id, username, or string.');
             }
 
             $loginMode = strtolower(trim((string) ConfigRead::get($workingConfig, 'user.auth.method', $this->config->get('user.auth.method', 'email'))));
+            // Username selectors require username-auth mode to be enabled.
             if ($selector === 'username' && $loginMode !== 'username') {
                 throw new \RuntimeException('user.selector can only use username when user.auth.method is username.');
             }
@@ -907,19 +964,23 @@ final class ConfigController
             return $selector;
         }
 
+        // Profile route prefix must be slug-safe and collision-free.
         if ($path === 'user.prefix') {
             $trimmedValue = trim($value);
+            // Blank profile prefixes are allowed to disable the segment.
             if ($trimmedValue === '') {
                 return '';
             }
 
             $prefix = $this->input->slug($trimmedValue);
+            // Reject invalid profile prefix slugs.
             if ($prefix === null) {
                 throw new \RuntimeException('user.prefix must be a valid slug.');
             }
 
             $panelPathValue = (string) ConfigRead::get($workingConfig, 'panel.path', $this->config->get('panel.path', 'panel'));
             $panelPrefix = $this->input->slug($panelPathValue);
+            // Prevent profile routes from shadowing panel routes.
             if ($panelPrefix !== null && $prefix === $panelPrefix) {
                 throw new \RuntimeException('user.prefix cannot match panel.path.');
             }
@@ -931,6 +992,7 @@ final class ConfigController
                 ConfigRead::get($workingConfig, 'category.enabled', $this->config->get('category.enabled', false)),
                 false
             );
+            // Prevent collisions with enabled category route prefixes.
             if ($categoryEnabled && $categoryPrefix !== null && $prefix === $categoryPrefix) {
                 throw new \RuntimeException('user.prefix cannot match category.prefix.');
             }
@@ -942,6 +1004,7 @@ final class ConfigController
                 ConfigRead::get($workingConfig, 'tag.enabled', $this->config->get('tag.enabled', false)),
                 false
             );
+            // Prevent collisions with enabled tag route prefixes.
             if ($tagEnabled && $tagPrefix !== null && $prefix === $tagPrefix) {
                 throw new \RuntimeException('user.prefix cannot match tag.prefix.');
             }
@@ -949,10 +1012,12 @@ final class ConfigController
             $groupPrefix = $this->input->slug(
                 (string) ConfigRead::get($workingConfig, 'group.prefix', $this->config->get('group.prefix', 'group'))
             );
+            // Prevent collisions with group route prefixes.
             if ($groupPrefix !== null && $groupPrefix !== '' && $prefix === $groupPrefix) {
                 throw new \RuntimeException('user.prefix cannot match group.prefix.');
             }
 
+            // Block globally reserved prefixes from profile routes.
             if (in_array($prefix, ['panel', 'boot', 'mce', 'theme'], true)) {
                 throw new \RuntimeException('user.prefix uses a reserved public prefix.');
             }
@@ -960,11 +1025,14 @@ final class ConfigController
             return $prefix;
         }
 
+        // Group visibility mode must map to one supported visibility contract.
         if ($path === 'group.visibility') {
             $mode = strtolower(trim($value));
+            // Accept legacy "public" alias and normalize it to the explicit mode.
             if ($mode === 'public') {
                 $mode = 'public_full';
             }
+            // Reject unsupported group visibility modes.
             if (!in_array($mode, ['public_full', 'public_limited', 'private', 'disabled'], true)) {
                 throw new \RuntimeException(
                     'group.visibility must be public_full, public_limited, private, or disabled.'
@@ -974,19 +1042,23 @@ final class ConfigController
             return $mode;
         }
 
+        // Group route prefix must be slug-safe and collision-free.
         if ($path === 'group.prefix') {
             $trimmedValue = trim($value);
+            // Blank group prefixes are allowed to disable the segment.
             if ($trimmedValue === '') {
                 return '';
             }
 
             $prefix = $this->input->slug($trimmedValue);
+            // Reject invalid group prefix slugs.
             if ($prefix === null) {
                 throw new \RuntimeException('group.prefix must be a valid slug.');
             }
 
             $panelPathValue = (string) ConfigRead::get($workingConfig, 'panel.path', $this->config->get('panel.path', 'panel'));
             $panelPrefix = $this->input->slug($panelPathValue);
+            // Prevent group routes from shadowing panel routes.
             if ($panelPrefix !== null && $prefix === $panelPrefix) {
                 throw new \RuntimeException('group.prefix cannot match panel.path.');
             }
@@ -998,6 +1070,7 @@ final class ConfigController
                 ConfigRead::get($workingConfig, 'category.enabled', $this->config->get('category.enabled', false)),
                 false
             );
+            // Prevent collisions with enabled category route prefixes.
             if ($categoryEnabled && $categoryPrefix !== null && $prefix === $categoryPrefix) {
                 throw new \RuntimeException('group.prefix cannot match category.prefix.');
             }
@@ -1009,6 +1082,7 @@ final class ConfigController
                 ConfigRead::get($workingConfig, 'tag.enabled', $this->config->get('tag.enabled', false)),
                 false
             );
+            // Prevent collisions with enabled tag route prefixes.
             if ($tagEnabled && $tagPrefix !== null && $prefix === $tagPrefix) {
                 throw new \RuntimeException('group.prefix cannot match tag.prefix.');
             }
@@ -1016,10 +1090,12 @@ final class ConfigController
             $profilePrefix = $this->input->slug(
                 (string) ConfigRead::get($workingConfig, 'user.prefix', $this->config->get('user.prefix', 'user'))
             );
+            // Prevent collisions with profile route prefixes.
             if ($profilePrefix !== null && $profilePrefix !== '' && $prefix === $profilePrefix) {
                 throw new \RuntimeException('group.prefix cannot match user.prefix.');
             }
 
+            // Block globally reserved prefixes from group routes.
             if (in_array($prefix, ['panel', 'boot', 'mce', 'theme'], true)) {
                 throw new \RuntimeException('group.prefix uses a reserved public prefix.');
             }

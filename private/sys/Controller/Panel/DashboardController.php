@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/sys/Controller/Panel/DashboardController.php
  * Split panel dashboard controller.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

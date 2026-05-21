@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/sys/Controller/Panel/TagEditController.php
  * Panel tag edit controller for tag and tag-set CRUD routes.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

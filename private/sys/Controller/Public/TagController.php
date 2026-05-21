@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/sys/Controller/Public/TagController.php
  * Split public tag controller for tag routes.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

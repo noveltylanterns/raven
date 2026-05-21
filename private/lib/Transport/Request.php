@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/Transport/Request.php
  * Request URL, path, scheme, host, and client-network normalization helpers.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -51,6 +51,7 @@ final class Request
         $query = str_replace(["\r", "\n", "\0"], '', $query);
 
         $url = $scheme . '://' . $host . $path;
+        // Preserve query string when present after control-character stripping.
         if ($query !== '') {
             $url .= '?' . $query;
         }
@@ -86,22 +87,26 @@ final class Request
     public function resolveRequestScheme(?array $server = null, string $configuredProtocol = ''): string
     {
         $normalizedConfigured = strtolower(trim($configuredProtocol));
+        // Explicit config protocol override wins when valid.
         if (in_array($normalizedConfigured, ['http', 'https'], true)) {
             return $normalizedConfigured;
         }
 
         $serverMap = $server ?? $_SERVER;
         $forwarded = strtolower(trim((string) ($serverMap['HTTP_X_FORWARDED_PROTO'] ?? '')));
+        // Respect trusted proxy forwarded protocol when supplied.
         if (in_array($forwarded, ['http', 'https'], true)) {
             return $forwarded;
         }
 
         $requestScheme = strtolower(trim((string) ($serverMap['REQUEST_SCHEME'] ?? '')));
+        // Fall back to REQUEST_SCHEME when proxy headers are absent.
         if (in_array($requestScheme, ['http', 'https'], true)) {
             return $requestScheme;
         }
 
         $https = (string) ($serverMap['HTTPS'] ?? '');
+        // Classic HTTPS server var check for environments without REQUEST_SCHEME.
         if ($https !== '' && strtolower($https) !== 'off' && $https !== '0') {
             return 'https';
         }
@@ -121,16 +126,21 @@ final class Request
         $serverMap = $server ?? $_SERVER;
         $configured = trim($configuredDomain);
 
+        // Prefer configured host/domain when present and valid.
         if ($configured !== '') {
+            // Handle full URL config values by extracting host/port.
             if (str_contains($configured, '://')) {
                 $parsedHost = trim((string) parse_url($configured, PHP_URL_HOST));
                 $parsedPort = parse_url($configured, PHP_URL_PORT);
+                // Accept parsed host once rebuilt candidate passes host validation.
                 if ($parsedHost !== '') {
                     $candidate = $parsedHost;
+                    // Keep configured port only when it is a positive integer.
                     if (is_int($parsedPort) && $parsedPort > 0) {
                         $candidate .= ':' . $parsedPort;
                     }
 
+                    // Return first valid configured host candidate.
                     if ($this->isValidHost($candidate)) {
                         return $candidate;
                     }
@@ -145,6 +155,7 @@ final class Request
         }
 
         $serverHost = trim((string) ($serverMap['HTTP_HOST'] ?? $serverMap['SERVER_NAME'] ?? 'localhost'));
+        // Use server host when config is absent/invalid.
         if ($this->isValidHost($serverHost)) {
             return $serverHost;
         }
@@ -160,14 +171,17 @@ final class Request
      */
     private function isValidHost(string $value): bool
     {
+        // Reject empty values and obvious path separators.
         if ($value === '' || str_contains($value, '/') || str_contains($value, '\\')) {
             return false;
         }
 
+        // Reject control characters to prevent header-injection vectors.
         if (preg_match('/[\r\n\0]/', $value) === 1) {
             return false;
         }
 
+        // Accept DNS-style hostnames with optional numeric port.
         if (preg_match('/^[a-z0-9.-]+(?::\d{1,5})?$/i', $value) === 1) {
             return true;
         }
@@ -185,14 +199,17 @@ final class Request
     private function configuredBasePath(string $configuredDomain): string
     {
         $configuredDomain = trim($configuredDomain);
+        // No configured domain means no configured base-path suffix.
         if ($configuredDomain === '') {
             return '';
         }
 
         $path = '';
+        // Extract path from URL-style configured domains.
         if (str_contains($configuredDomain, '://')) {
             $path = (string) parse_url($configuredDomain, PHP_URL_PATH);
         } elseif (str_contains($configuredDomain, '/')) {
+            // Bare domain/path config values still carry a path suffix.
             $parts = explode('/', $configuredDomain, 2);
             $path = '/' . (string) ($parts[1] ?? '');
         }
@@ -210,6 +227,7 @@ final class Request
     private static function pathFromRequestUri(string $requestUri): string
     {
         $path = (string) parse_url($requestUri, PHP_URL_PATH);
+        // Invalid or relative paths normalize to root.
         if ($path === '' || !str_starts_with($path, '/')) {
             return '/';
         }

@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/sys/Controller/Panel/PageListController.php
  * Panel page list controller for the page list route.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

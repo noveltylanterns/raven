@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/sys/Router/Panel/ThemeRouter.php
  * Panel theme-manager route registration.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

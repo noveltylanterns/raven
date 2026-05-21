@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/Security/EmailValidate.php
  * Primitive email validation and normalization helpers for login flows.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -31,6 +31,7 @@ final class EmailValidate
     public static function normalize(string $email): ?string
     {
         $email = strtolower(trim($email));
+        // Reject blanks and syntactically invalid email values.
         if ($email === '' || filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
             return null;
         }

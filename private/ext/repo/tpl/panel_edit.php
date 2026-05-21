@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/ext/repo/tpl/panel_edit.php
  * Repositories extension per-repo settings editor.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

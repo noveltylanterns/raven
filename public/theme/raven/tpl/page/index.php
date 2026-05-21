@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/public/theme/raven/tpl/page/index.php
  * Public-facing view template for site output.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 if (!defined('RAVEN_VIEW_RENDER_CONTEXT')) {

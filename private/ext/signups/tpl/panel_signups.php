@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/ext/signups/tpl/panel_signups.php
  * Signup Sheets extension per-form submissions page template.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

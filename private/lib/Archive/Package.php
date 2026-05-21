@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/Archive/Package.php
  * Shared archive-package helpers for panel upload and export workflows.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -138,16 +138,20 @@ final class Package
      */
     public function hasFiles(string $directory): bool
     {
+        // Missing directories are treated as empty.
         if (!is_dir($directory)) {
             return false;
         }
 
         $entries = scandir($directory);
+        // Unreadable directories are treated as empty.
         if ($entries === false) {
             return false;
         }
 
+        // Return on first non-dot entry to avoid scanning the full directory.
         foreach ($entries as $entry) {
+            // Skip dot entries during emptiness checks.
             if ($entry === '.' || $entry === '..') {
                 continue;
             }
@@ -197,6 +201,7 @@ final class Package
     public function downloadName(string $prefix, string $format, ?string $timestamp = null): string
     {
         $safePrefix = trim(preg_replace('/[^a-z0-9._-]+/i', '-', $prefix) ?? '', '-_.');
+        // Fall back to a stable filename stem when sanitization strips everything.
         if ($safePrefix === '') {
             $safePrefix = 'package';
         }
@@ -244,6 +249,7 @@ final class Package
         }
 
         $stream = fopen($path, 'rb');
+        // Abort with a server error when the export file cannot be opened.
         if (!is_resource($stream)) {
             @unlink($path);
             http_response_code(500);
@@ -252,6 +258,7 @@ final class Package
         }
 
         $size = (int) @filesize($path);
+        // Emit content length only when a positive size can be resolved.
         if ($size > 0) {
             header('Content-Length: ' . $size);
         }
@@ -260,6 +267,7 @@ final class Package
         header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
         header('Pragma: no-cache');
 
+        // Flag stream failures as server errors after header emission.
         if (fpassthru($stream) === false) {
             http_response_code(500);
         }
@@ -291,6 +299,7 @@ final class Package
     public function uploadErrorMessage(int $code, string $packageLabel): string
     {
         $packageLabel = trim($packageLabel);
+        // Normalize blank labels to one stable fallback for error text.
         if ($packageLabel === '') {
             $packageLabel = 'Package';
         }
@@ -320,31 +329,38 @@ final class Package
             $this->projectRoot . '/.tmp/exports',
         ];
 
+        // Try each writable temporary root until allocation succeeds.
         foreach ($candidateDirectories as $candidateDirectory) {
             $directory = trim($candidateDirectory);
+            // Skip empty candidate roots.
             if ($directory === '') {
                 continue;
             }
 
+            // Lazily create missing temp roots before allocation.
             if (!is_dir($directory) && !@mkdir($directory, 0775, true) && !is_dir($directory)) {
                 continue;
             }
 
+            // Skip roots that are not writable by the current runtime user.
             if (!is_writable($directory)) {
                 continue;
             }
 
             $path = @tempnam($directory, 'rvn-export-');
+            // Skip roots where tempnam allocation failed.
             if (!is_string($path) || $path === '') {
                 continue;
             }
 
+            // Return immediately when no suffix rewrite is requested.
             if ($suffix === '') {
                 @unlink($path);
                 return $path;
             }
 
             $suffixedPath = $path . $suffix;
+            // Prefer rename so the suffix is part of the reserved path.
             if (@rename($path, $suffixedPath)) {
                 @unlink($suffixedPath);
                 return $suffixedPath;
@@ -366,6 +382,7 @@ final class Package
     private function exportFormat(string $format): string
     {
         $resolved = strtolower(trim($format));
+        // Normalize common tar alias extensions to canonical format keys.
         if ($resolved === 'tgz') {
             $resolved = 'tar.gz';
         } elseif ($resolved === 'tbz2') {
@@ -376,6 +393,7 @@ final class Package
             $resolved = 'tar.zst';
         }
 
+        // Reject unsupported export formats before compression starts.
         if (!in_array($resolved, $this->exportFormats(), true)) {
             throw new \RuntimeException('Unsupported export archive format: ' . $format);
         }

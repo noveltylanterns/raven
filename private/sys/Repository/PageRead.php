@@ -3,7 +3,7 @@
  * RAVEN CMS
  * ~/private/sys/Repository/PageRead.php
  * Read-only data access for page records, public listing, and taxonomy filter queries.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

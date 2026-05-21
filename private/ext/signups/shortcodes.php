@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/ext/signups/shortcodes.php
  * Signup Sheets shortcode provider.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

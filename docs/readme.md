@@ -2,26 +2,32 @@
 
 ***Note: This document was generated with ChatGPT Codex. I have not been able to personally verify every detail within matches the actual script. I do not plan on hammering these `docs/` files down until later releases, so use them with caution!***
 
+### Start Here
+- [Introduction](./intro.md)
+- [Filetree](./appendix/filetree.md)
+- [Developer API](./appendix/api.md)
+- [Architecture](./appendix/architecture.md)
+
 ### Basic Functions
-- [Configuration](./Configuration.md)
-- [Preferences](./Preferences.md)
-- [Routing Table](./Routing.md)
-- [Updates](./Updates.md)
+- [Configuration](./configuration.md)
+- [Preferences](./preferences.md)
+- [Routing Table](./routing.md)
+- [Updates](./updates.md)
 
 ### Content
-- [Pages](./Pages.md)
-- [Redirects](./Redirects.md)
+- [Pages](./pages.md)
+- [Redirects](./redirects.md)
 
 ### Taxonomy
-- [Categories](./Categories.md)
-- [Channels](./Channels.md)
-- [Tags](./Tags.md)
+- [Categories](./categories.md)
+- [Channels](./channels.md)
+- [Tags](./tags.md)
 
 ### Users & Permissions
-- [Groups](./Groups.md)
-- [Users](./Users.md)
+- [Groups](./groups.md)
+- [Users](./users.md)
 
 ### Developers
-- [Extensions](./Extensions.md)
-- [Theming](./Theming.md)
-- [CLI](./CLI.md)
+- [Extensions](./extensions.md)
+- [Theming](./theming.md)
+- [CLI](./cli.md)

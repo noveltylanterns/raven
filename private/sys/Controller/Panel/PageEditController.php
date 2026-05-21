@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/sys/Controller/Panel/PageEditController.php
  * Panel page edit controller for page CRUD and gallery routes.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

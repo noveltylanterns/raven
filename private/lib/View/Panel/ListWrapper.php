@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/View/Panel/ListWrapper.php
  * Universal panel list card renderer with search, filter, and pagination.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

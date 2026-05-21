@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/Media/CoverUpload.php
  * Cover-image upload helper: user cover filesystem writes and entity record payload builder.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -31,6 +31,7 @@ final class CoverUpload
      */
     public function recordPayload(string $entityType, string $filename, array $paths): array
     {
+        // Some entity types still persist filename-only cover columns for compatibility.
         if (PreviewConfig::supportsFilenameStorage($entityType)) {
             return ['cover_image' => $filename];
         }
@@ -58,6 +59,7 @@ final class CoverUpload
     public function storeForUser(int $userId, array $upload, string $extension, string $projectRoot): array
     {
         $normalizedExtension = $this->avatarUpload()->normalizeExtension($extension);
+        // Reuse avatar extension policy so cover uploads share the same safe format rules.
         if ($normalizedExtension === null) {
             return ['ok' => false, 'error' => 'Cover image upload format is not supported.'];
         }
@@ -66,6 +68,7 @@ final class CoverUpload
         $filename = 'cover.' . $normalizedExtension;
         $destination = $directory . '/' . $filename;
         $storeError = $this->avatarUpload()->storeSanitizedImageUpload($upload, $destination);
+        // Forward sanitizer failures directly so callers see the exact upload issue.
         if ($storeError !== null) {
             return ['ok' => false, 'error' => $storeError];
         }
@@ -83,6 +86,7 @@ final class CoverUpload
     private function userDirectory(int $userId, string $projectRoot): string
     {
         $directory = rtrim($projectRoot, '/\\') . '/public/uploads/user/' . $userId;
+        // Create per-user cover directory lazily on first upload.
         if (!is_dir($directory)) {
             @mkdir($directory, 0775, true);
         }
@@ -100,6 +104,7 @@ final class CoverUpload
      */
     private function avatarUpload(): AvatarUpload
     {
+        // Lazily construct shared upload sanitizer to avoid duplicate setup.
         if (!$this->avatarUpload instanceof AvatarUpload) {
             $this->avatarUpload = new AvatarUpload();
         }

@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/Format/Zst.php
  * Zstandard single-file compression and decompression handler via the zstd binary.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -62,6 +62,7 @@ final class Zst
      */
     public function compress(string $sourcePath, string $targetPath, int $level = 3): void
     {
+        // Compression is file-based, so fail before launching zstd when source is missing.
         if (!is_file($sourcePath)) {
             throw new RuntimeException('ZST source file not found: ' . $sourcePath);
         }
@@ -69,6 +70,7 @@ final class Zst
         $level = max(1, min(19, $level));
 
         $dir = dirname($targetPath);
+        // Ensure destination parents exist before stdout redirection writes output files.
         if (!is_dir($dir) && !mkdir($dir, 0775, true) && !is_dir($dir)) {
             throw new RuntimeException('Failed to create directory for ZST output: ' . $dir);
         }
@@ -79,6 +81,7 @@ final class Zst
             $targetPath
         );
 
+        // Remove partial artifacts when zstd exits with a compression error.
         if (!$result['ok']) {
             @unlink($targetPath);
             throw new RuntimeException(
@@ -101,11 +104,13 @@ final class Zst
      */
     public function decompress(string $sourcePath, string $targetPath): void
     {
+        // Decompression also requires a resolvable source file before process startup.
         if (!is_file($sourcePath)) {
             throw new RuntimeException('ZST source file not found: ' . $sourcePath);
         }
 
         $dir = dirname($targetPath);
+        // Prepare decompression output parents so the redirected stream can be written.
         if (!is_dir($dir) && !mkdir($dir, 0775, true) && !is_dir($dir)) {
             throw new RuntimeException('Failed to create directory for ZST decompression output: ' . $dir);
         }
@@ -116,6 +121,7 @@ final class Zst
             $targetPath
         );
 
+        // Clean up incomplete targets when decompression fails.
         if (!$result['ok']) {
             @unlink($targetPath);
             throw new RuntimeException(
@@ -150,22 +156,26 @@ final class Zst
 
         $process = @proc_open($command, $descriptors, $pipes, $cwd);
 
+        // Return normalized process-start failures so callers can emit clear errors.
         if (!is_resource($process)) {
             return ['ok' => false, 'exit_code' => -1, 'stderr' => 'Failed to start zstd process.'];
         }
 
         $stderr = '';
 
+        // Close all allocated pipes before waiting for zstd to exit.
         try {
             if (isset($pipes[0]) && is_resource($pipes[0])) {
                 fclose($pipes[0]);
             }
 
+            // Consume stdout only when using an in-memory pipe instead of file redirection.
             if ($outputFile === null && isset($pipes[1]) && is_resource($pipes[1])) {
                 stream_get_contents($pipes[1]);
                 fclose($pipes[1]);
             }
 
+            // Always capture stderr for actionable diagnostics on binary failures.
             if (isset($pipes[2]) && is_resource($pipes[2])) {
                 $stderr = (string) stream_get_contents($pipes[2]);
                 fclose($pipes[2]);

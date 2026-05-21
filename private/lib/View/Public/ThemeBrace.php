@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/View/Public/ThemeBrace.php
  * Public-theme brace-tag compiler, cache, and runtime resolver.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

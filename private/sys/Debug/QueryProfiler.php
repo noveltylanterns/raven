@@ -4,13 +4,19 @@
  * RAVEN CMS
  * ~/private/sys/Debug/QueryProfiler.php
  * Contract for query profiler implementations used by QueryProfilerPdo and QueryProfilerStatement.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
 
 namespace Raven\Core\Debug;
 
+/**
+ * Contract for request-scoped SQL query profiling adapters.
+ *
+ * Implementations decide whether profiling is active and how query events are
+ * persisted/forwarded to debug collectors.
+ */
 interface QueryProfiler
 {
     /**

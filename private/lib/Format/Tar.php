@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/Format/Tar.php
  * TAR archive handler — extract, inspect, and build TAR-family archives.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -54,6 +54,7 @@ final class Tar
      */
     public function extractTo(string $archivePath, string $targetDir, ?string $subDir = null): void
     {
+        // Wrap PharData open/extract errors in a Raven-format runtime exception.
         try {
             $phar = new PharData($archivePath);
             $phar->extractTo($targetDir, $subDir, true);
@@ -82,6 +83,7 @@ final class Tar
     {
         $entry = $this->normalizeEntryName($entryName);
 
+        // Wrap PharData open errors in a Raven-format runtime exception.
         try {
             $phar = new PharData($archivePath);
         } catch (\Throwable $e) {
@@ -98,6 +100,7 @@ final class Tar
         }
 
         $contents = file_get_contents('phar://' . $archivePath . '/' . $entry);
+        // Entry content must be readable through the phar stream wrapper.
         if ($contents === false) {
             throw new RuntimeException('Failed to read entry "' . $entry . '" from TAR archive.');
         }
@@ -119,29 +122,36 @@ final class Tar
         $directory = $this->normalizeDirEntry($entryName);
         $matches = [];
 
+        // Keep entries that match the exact directory marker or its descendants.
         foreach ($this->listEntries($archivePath) as $entry) {
             $normalized = rtrim($entry, '/');
+            // Preserve explicit directory marker entries with trailing slash.
             if ($normalized === trim($directory, '/')) {
                 $matches[] = $normalized . '/';
                 continue;
             }
 
+            // Keep descendant entries under the requested directory prefix.
             if (str_starts_with($entry, $directory)) {
                 $matches[] = $entry;
             }
         }
 
+        // Requested directory prefix must resolve to at least one archive entry.
         if ($matches === []) {
             throw new RuntimeException('Directory "' . trim($directory, '/') . '" not found in TAR archive.');
         }
 
+        // Materialize directory entries and file entries under the target directory.
         foreach (array_values(array_unique($matches)) as $match) {
             $relative = ltrim(substr($match, strlen($directory)), '/');
+            // Skip the directory root marker itself.
             if ($relative === '') {
                 continue;
             }
 
             $targetPath = $targetDir . '/' . $relative;
+            // Ensure empty directory entries are created.
             if (str_ends_with($match, '/')) {
                 if (!is_dir($targetPath) && !mkdir($targetPath, 0775, true) && !is_dir($targetPath)) {
                     throw new RuntimeException('Failed to create directory for extracted TAR entry.');
@@ -164,11 +174,13 @@ final class Tar
      */
     public function compressPath(string $sourcePath, string $outputPath, ?string $entryName = null): void
     {
+        // Source path must exist before staging/compression.
         if (!file_exists($sourcePath)) {
             throw new RuntimeException('TAR source path could not be resolved: ' . $sourcePath);
         }
 
         $outputDirectory = dirname($outputPath);
+        // Ensure output directory exists before writing archive.
         if (!is_dir($outputDirectory) && !mkdir($outputDirectory, 0775, true) && !is_dir($outputDirectory)) {
             throw new RuntimeException('Failed to create TAR output directory.');
         }
@@ -177,6 +189,7 @@ final class Tar
 
         $staging = $this->stagePath($sourcePath, $entryName);
 
+        // Run tar create command from staging tree; clean up on failure.
         try {
             $result = $this->runBinary([
                 '-cf',
@@ -185,6 +198,7 @@ final class Tar
                 $staging['directory'],
                 $staging['target'],
             ]);
+            // Non-zero tar exit status is surfaced as a runtime exception.
             if (!$result['ok']) {
                 throw new RuntimeException($result['stderr'] !== '' ? $result['stderr'] : $result['stdout']);
             }
@@ -382,17 +396,20 @@ final class Tar
      */
     public function addPath(string $archivePath, string $sourcePath, ?string $entryName = null): void
     {
+        // Source path must exist before staging/archive update.
         if (!file_exists($sourcePath)) {
             throw new RuntimeException('TAR source path could not be resolved: ' . $sourcePath);
         }
 
         $archiveDirectory = dirname($archivePath);
+        // Ensure archive destination directory exists.
         if (!is_dir($archiveDirectory) && !mkdir($archiveDirectory, 0775, true) && !is_dir($archiveDirectory)) {
             throw new RuntimeException('Failed to create TAR archive directory.');
         }
 
         $staging = $this->stagePath($sourcePath, $entryName);
 
+        // Run tar add/update command from staging tree; clean up staging in finally.
         try {
             $command = [
                 is_file($archivePath) ? '-rf' : '-cf',
@@ -402,6 +419,7 @@ final class Tar
                 $staging['target'],
             ];
             $result = $this->runBinary($command);
+            // Non-zero tar exit status is surfaced as a runtime exception.
             if (!$result['ok']) {
                 throw new RuntimeException($result['stderr'] !== '' ? $result['stderr'] : $result['stdout']);
             }
@@ -425,13 +443,18 @@ final class Tar
      */
     public function listEntries(string $archivePath): array
     {
+        // Wrap PharData read/list errors in a Raven-format runtime exception.
         try {
             $phar = new PharData($archivePath);
             $entries = [];
+            // Traverse archive entries and collect normalized entry paths.
             foreach (new \RecursiveIteratorIterator($phar, \RecursiveIteratorIterator::SELF_FIRST) as $file) {
+                // Keep only PharFileInfo entries returned by the iterator.
                 if ($file instanceof \PharFileInfo) {
                     $entryPath = $this->pharEntryPath($file, $archivePath);
+                    // Skip entries that normalize to empty relative paths.
                     if ($entryPath !== '') {
+                        // Preserve explicit directory markers with trailing slash.
                         if ($file->isDir()) {
                             $entryPath = rtrim($entryPath, '/') . '/';
                         }
@@ -462,14 +485,17 @@ final class Tar
     private function isSafeEntryPath(string $entryName): bool
     {
         $path = str_replace('\\', '/', trim($entryName));
+        // Reject empty, absolute, or drive-prefixed entry paths.
         if ($path === '' || str_starts_with($path, '/') || preg_match('/^[A-Za-z]:\//', $path)) {
             return false;
         }
 
+        // Reject null-byte paths.
         if (str_contains($path, "\0")) {
             return false;
         }
 
+        // Reject dot-segment traversal path components.
         foreach (explode('/', $path) as $segment) {
             if ($segment === '.' || $segment === '..') {
                 return false;
@@ -497,7 +523,9 @@ final class Tar
     ): void {
         $temporaryTarPath = $this->tempTar();
 
+        // Build temporary tar then apply outer compression; clean up temp file in finally.
         try {
+            // Source path must exist before staging/compression.
             if (!file_exists($sourcePath)) {
                 throw new RuntimeException('TAR source path could not be resolved: ' . $sourcePath);
             }
@@ -523,8 +551,10 @@ final class Tar
      */
     private function tempTar(): string
     {
+        // Probe writable temp roots until tempnam/unlink yields a usable tar path.
         foreach ($this->tempRoots() as $directory) {
             $path = @tempnam($directory, 'rvn-tar-');
+            // Skip unusable tempnam results.
             if (!is_string($path) || $path === '') {
                 continue;
             }
@@ -532,6 +562,7 @@ final class Tar
             // PharData expects to create a fresh archive file itself; leaving the
             // tempnam placeholder in place causes it to interpret an empty file as
             // a truncated TAR. Remove the placeholder and return a fresh suffix path.
+            // Skip candidate when placeholder cleanup fails.
             if (!@unlink($path)) {
                 continue;
             }
@@ -557,15 +588,19 @@ final class Tar
         ];
         $directories = [];
 
+        // Keep only writable temp roots, creating missing ones when possible.
         foreach ($candidates as $candidate) {
+            // Skip empty candidate values.
             if ($candidate === '') {
                 continue;
             }
 
+            // Attempt to create candidate directory when missing.
             if (!is_dir($candidate) && !@mkdir($candidate, 0775, true) && !is_dir($candidate)) {
                 continue;
             }
 
+            // Skip non-writable candidates.
             if (!is_writable($candidate)) {
                 continue;
             }
@@ -595,10 +630,12 @@ final class Tar
         ];
 
         $resolvedArchivePath = realpath($archivePath);
+        // Add realpath-based prefix variant when resolvable.
         if (is_string($resolvedArchivePath) && $resolvedArchivePath !== '') {
             $candidatePrefixes[] = 'phar://' . str_replace('\\', '/', $resolvedArchivePath) . '/';
         }
 
+        // Strip the first matching phar wrapper prefix from the entry path.
         foreach ($candidatePrefixes as $prefix) {
             if (str_starts_with($entryPath, $prefix)) {
                 return ltrim(substr($entryPath, strlen($prefix)), '/');
@@ -618,6 +655,7 @@ final class Tar
     private function normalizeEntryName(string $entryName): string
     {
         $normalized = trim(str_replace('\\', '/', $entryName), '/');
+        // Reject unsafe normalized entry paths.
         if (!$this->isSafeEntryPath($normalized)) {
             throw new RuntimeException('Unsafe TAR entry path: ' . $entryName);
         }
@@ -656,12 +694,15 @@ final class Tar
         $destinationPath = $stagingDirectory . '/' . $stagedEntryPath;
         $destinationDirectory = dirname($destinationPath);
 
+        // Stage copy paths may be nested by entry name, so create the parent chain up front.
         if (!is_dir($destinationDirectory) && !mkdir($destinationDirectory, 0775, true) && !is_dir($destinationDirectory)) {
             $this->deleteTree($stagingDirectory);
             throw new RuntimeException('Failed to prepare TAR staging directory.');
         }
 
+        // Any failed copy leaves temporary partial state, so always tear staging down on exceptions.
         try {
+            // Directory sources preserve their tree shape; file sources map directly to one target path.
             if (is_dir($sourcePath)) {
                 $this->copyTree($sourcePath, $destinationPath);
             } else {
@@ -687,6 +728,7 @@ final class Tar
      */
     private function stagedPath(string $sourcePath, ?string $entryName): string
     {
+        // Explicit entry names take precedence so callers can control archive-internal paths.
         if (is_string($entryName) && trim($entryName) !== '') {
             return $this->normalizeEntryName($entryName);
         }
@@ -720,13 +762,16 @@ final class Tar
      */
     private function tempDir(): string
     {
+        // Probe each writable temp root so environments without /tmp still succeed.
         foreach ($this->tempRoots() as $directory) {
             for ($attempt = 0; $attempt < 5; $attempt++) {
                 $path = $directory . '/rvn-tar-stage-' . bin2hex(random_bytes(6));
+                // Fresh directory creation is the normal success path.
                 if (mkdir($path, 0775, true)) {
                     return $path;
                 }
 
+                // Concurrent creators can win the race; treat an existing directory as usable.
                 if (is_dir($path)) {
                     return $path;
                 }
@@ -749,6 +794,7 @@ final class Tar
      */
     private function copyTree(string $sourceDir, string $targetDir): void
     {
+        // Source directory copies need a root destination before iterating entries.
         if (!is_dir($targetDir) && !mkdir($targetDir, 0775, true) && !is_dir($targetDir)) {
             throw new RuntimeException('Failed to create TAR staging directory.');
         }
@@ -759,6 +805,7 @@ final class Tar
         );
         $directoryMetadata = [];
 
+        // Walk each node once so directory metadata can be restored after file copies.
         foreach ($iterator as $item) {
             /** @var \SplFileInfo $item */
             if ($item->isLink()) {
@@ -767,11 +814,13 @@ final class Tar
 
             $absolutePath = $item->getPathname();
             $relativePath = ltrim(substr($absolutePath, strlen($sourceDir)), DIRECTORY_SEPARATOR);
+            // Ignore the synthetic root iterator item so we do not duplicate target roots.
             if ($relativePath === '') {
                 continue;
             }
 
             $destinationPath = $targetDir . '/' . str_replace('\\', '/', $relativePath);
+            // Directories are created and tracked so their original mode/mtime can be restored later.
             if ($item->isDir()) {
                 if (!is_dir($destinationPath) && !mkdir($destinationPath, 0775, true) && !is_dir($destinationPath)) {
                     throw new RuntimeException('Failed to create TAR staging directory path.');
@@ -794,6 +843,7 @@ final class Tar
             return substr_count((string) $right['path'], '/') <=> substr_count((string) $left['path'], '/');
         });
 
+        // Restore permissions and mtimes after copy operations that touched directory metadata.
         foreach ($directoryMetadata as $directory) {
             @chmod((string) $directory['path'], (int) $directory['mode']);
             @touch((string) $directory['path'], (int) $directory['mtime']);
@@ -814,10 +864,12 @@ final class Tar
     private function copyFile(string $sourcePath, string $destinationPath): void
     {
         $destinationDirectory = dirname($destinationPath);
+        // Extract targets may require nested folders, so ensure the parent chain exists first.
         if (!is_dir($destinationDirectory) && !mkdir($destinationDirectory, 0775, true) && !is_dir($destinationDirectory)) {
             throw new RuntimeException('Failed to create TAR staging parent directory.');
         }
 
+        // Bubble copy failures so callers stop archive generation instead of emitting partial data.
         if (!@copy($sourcePath, $destinationPath)) {
             throw new RuntimeException('Failed to copy file into TAR staging directory.');
         }
@@ -834,6 +886,7 @@ final class Tar
      */
     private function deleteTree(string $directory): void
     {
+        // Empty or missing roots indicate cleanup already happened, so nothing needs deleting.
         if ($directory === '' || !is_dir($directory)) {
             return;
         }
@@ -843,6 +896,7 @@ final class Tar
             \RecursiveIteratorIterator::CHILD_FIRST
         );
 
+        // Delete children before parents so directory removal succeeds consistently.
         foreach ($iterator as $item) {
             /** @var \SplFileInfo $item */
             $path = $item->getPathname();
@@ -874,6 +928,7 @@ final class Tar
         ];
 
         $process = @proc_open($command, $descriptors, $pipes, $workingDirectory);
+        // Process startup failures still return a normalized error shape for all callers.
         if (!is_resource($process)) {
             return [
                 'ok' => false,
@@ -909,10 +964,12 @@ final class Tar
     private function writeExtractedEntry(string $targetPath, string $contents): void
     {
         $directory = dirname($targetPath);
+        // Individual extracted files can be nested, so create missing parents before writing.
         if (!is_dir($directory) && !mkdir($directory, 0775, true) && !is_dir($directory)) {
             throw new RuntimeException('Failed to create directory for extracted TAR entry.');
         }
 
+        // Fail fast when disk writes do not complete so extraction callers can abort safely.
         if (file_put_contents($targetPath, $contents) === false) {
             throw new RuntimeException('Failed to write extracted TAR entry to "' . $targetPath . '".');
         }

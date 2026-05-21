@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/ext/cron/schema.php
  * Scheduled Tasks extension schema provider.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

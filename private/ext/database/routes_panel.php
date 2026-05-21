@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/ext/database/routes_panel.php
  * Database Manager extension panel route registration.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 // Inline note: This file keeps Database Manager routing logic isolated from panel/index.php.

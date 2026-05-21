@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/Media/AvatarDelete.php
  * Filesystem deletion helper for user avatar files and thumbnails.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -46,10 +46,12 @@ final class AvatarDelete
     public function deleteFile(string $storedPath): void
     {
         $normalized = trim($storedPath);
+        // Empty avatar fields mean there is nothing to remove.
         if ($normalized === '') {
             return;
         }
 
+        // Paths with separators represent the current per-user storage layout.
         if (str_contains($normalized, '/')) {
             // New per-user path: uploads/user/{uid}/avatar.ext — resolve from public root.
             $absolute = $this->projectRoot . '/public/' . ltrim($normalized, '/');
@@ -74,11 +76,13 @@ final class AvatarDelete
 
         $legacyDir = $this->projectRoot . '/public/uploads/avatars';
         $path = $legacyDir . '/' . $safeName;
+        // Legacy source file cleanup remains for rows written before per-user paths existed.
         if (is_file($path)) {
             @unlink($path);
         }
 
         $thumbPath = $legacyDir . '/' . $this->thumbnailFilename($safeName);
+        // Remove legacy thumbnails alongside their source file counterparts.
         if (is_file($thumbPath)) {
             @unlink($thumbPath);
         }
@@ -96,6 +100,7 @@ final class AvatarDelete
     private function thumbnailFilename(string $filename): string
     {
         $base = (string) pathinfo($filename, PATHINFO_FILENAME);
+        // Keep deletion naming rules aligned with upload-time thumbnail naming.
         if ($base === '') {
             $base = 'avatar';
         }

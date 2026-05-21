@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/Extension/StorageProvisioner.php
  * Creates extension-owned local storage directories and asset mirrors.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -82,20 +82,24 @@ final class StorageProvisioner
      */
     public function ensureAuxStorageDirectory(string $directoryName): string
     {
+        // Aux directory names must match the safe root-directory slug pattern.
         if (preg_match('/^[a-z0-9][a-z0-9_-]{0,119}$/', $directoryName) !== 1) {
             throw new RuntimeException('Invalid extension aux storage directory name.');
         }
 
         $reserved = ['composer', 'debug', 'docs', 'panel', 'private', 'public'];
+        // Block reserved top-level project directories from aux allocation.
         if (in_array(strtolower($directoryName), $reserved, true)) {
             throw new RuntimeException('Reserved root directory name cannot be used for extension aux storage.');
         }
 
         $targetPath = $this->projectRoot . '/' . $directoryName;
+        // Prevent replacing existing files with directory targets.
         if (is_file($targetPath)) {
             throw new RuntimeException('Failed to create aux/' . $directoryName . ' directory because a file already exists there.');
         }
 
+        // Create aux directory recursively and verify success.
         if (!is_dir($targetPath) && !mkdir($targetPath, 0775, true) && !is_dir($targetPath)) {
             throw new RuntimeException('Failed to create aux/' . $directoryName . ' directory.');
         }
@@ -111,17 +115,20 @@ final class StorageProvisioner
      */
     public function ensureBinSymlinks(string $directoryName): void
     {
+        // Bin symlink provisioning requires a safe extension directory slug.
         if (!$this->manifestValidator->isSafeDirectoryName($directoryName)) {
             throw new RuntimeException('Invalid extension directory name for bin storage.');
         }
 
         $sourceBin = $this->projectRoot . '/private/ext/' . $directoryName . '/bin';
+        // No extension bin directory means nothing to symlink.
         if (!is_dir($sourceBin)) {
             // No bin/ directory in the extension; nothing to link.
             return;
         }
 
         $targetBin = $this->projectRoot . '/private/bin';
+        // Ensure shared private/bin target directory exists.
         if (!is_dir($targetBin) && !mkdir($targetBin, 0775, true) && !is_dir($targetBin)) {
             throw new RuntimeException('Failed to ensure private/bin directory for extension bin storage.');
         }
@@ -129,7 +136,9 @@ final class StorageProvisioner
         // Create one symlink per file in the extension bin/ directory.
         // Only files are linked; subdirectories are ignored since CLI commands are single files.
         $iterator = new \DirectoryIterator($sourceBin);
+        // Create symlinks for each eligible source-bin file.
         foreach ($iterator as $item) {
+            // Skip dot entries and nested directories.
             if ($item->isDot() || $item->isDir()) {
                 continue;
             }
@@ -143,16 +152,19 @@ final class StorageProvisioner
             $linkPath = $targetBin . '/' . $name;
             $targetPath = $item->getRealPath();
 
+            // Existing symlink already satisfies this command alias.
             if (is_link($linkPath)) {
                 // Already linked; skip (idempotent).
                 continue;
             }
 
+            // Never overwrite an existing non-symlink file at alias location.
             if (file_exists($linkPath)) {
                 // A real file already occupies the name; do not clobber it.
                 throw new RuntimeException('Cannot create bin symlink for "' . $name . '": a non-symlink file already exists at private/bin/' . $name . '.');
             }
 
+            // Create alias symlink from private/bin to extension bin executable.
             if (!symlink($targetPath, $linkPath)) {
                 throw new RuntimeException('Failed to create bin symlink for "' . $name . '" in private/bin/.');
             }
@@ -182,15 +194,19 @@ final class StorageProvisioner
      */
     public function provision(string $directoryName, array $storage): void
     {
+        // Storage provisioning requires a safe extension directory slug.
         if (!$this->manifestValidator->isSafeDirectoryName($directoryName)) {
             throw new RuntimeException('Invalid extension directory name for storage provisioning.');
         }
 
+        // Provision local data directory when requested by contract.
         if (!empty($storage['local'])) {
             $this->ensureLocalStorageDirectory($directoryName);
         }
 
+        // Provision each declared auxiliary storage directory.
         foreach ((array) ($storage['aux'] ?? []) as $auxDirectory) {
+            // Skip malformed aux directory entries.
             if (!is_string($auxDirectory)) {
                 continue;
             }
@@ -198,16 +214,19 @@ final class StorageProvisioner
             $this->ensureAuxStorageDirectory($auxDirectory);
         }
 
+        // Provision panel asset directory and sync bundled panel assets.
         if (!empty($storage['panel'])) {
             $target = $this->ensurePanelStorageDirectory($directoryName);
             $this->syncBundledAssets($directoryName, 'panel', $target);
         }
 
+        // Provision public asset directory and sync bundled public assets.
         if (!empty($storage['public'])) {
             $target = $this->ensurePublicStorageDirectory($directoryName);
             $this->syncBundledAssets($directoryName, 'public', $target);
         }
 
+        // Provision private/bin symlink aliases when requested by contract.
         if (!empty($storage['bin'])) {
             $this->ensureBinSymlinks($directoryName);
         }
@@ -225,15 +244,18 @@ final class StorageProvisioner
      */
     private function ensureDirectory(string $basePath, string $directoryName, string $label): string
     {
+        // Directory provisioning requires a safe extension slug.
         if (!$this->manifestValidator->isSafeDirectoryName($directoryName)) {
             throw new RuntimeException('Invalid extension directory name for ' . $label . ' storage.');
         }
 
+        // Ensure base path exists before creating extension-specific child directory.
         if (!is_dir($basePath) && !mkdir($basePath, 0775, true) && !is_dir($basePath)) {
             throw new RuntimeException('Failed to create ' . $label . ' directory.');
         }
 
         $targetPath = $basePath . '/' . $directoryName;
+        // Ensure extension-specific storage directory exists.
         if (!is_dir($targetPath) && !mkdir($targetPath, 0775, true) && !is_dir($targetPath)) {
             throw new RuntimeException('Failed to create ' . $label . '/' . $directoryName . ' directory.');
         }
@@ -257,6 +279,7 @@ final class StorageProvisioner
     private function syncBundledAssets(string $directoryName, string $scope, string $targetRoot): void
     {
         $sourceRoot = $this->projectRoot . '/private/ext/' . $directoryName . '/assets/' . $scope;
+        // Missing bundled-asset source directory is a valid no-op.
         if (!is_dir($sourceRoot)) {
             return;
         }
@@ -266,13 +289,16 @@ final class StorageProvisioner
             \RecursiveIteratorIterator::SELF_FIRST
         );
 
+        // Mirror every file/directory from source assets into target storage root.
         foreach ($iterator as $item) {
             $relative = substr($item->getPathname(), strlen($sourceRoot) + 1);
+            // Skip unresolved/empty relative paths.
             if (!is_string($relative) || $relative === '') {
                 continue;
             }
 
             $targetPath = $targetRoot . '/' . str_replace('\\', '/', $relative);
+            // Create destination directory nodes before copying nested files.
             if ($item->isDir()) {
                 if (!is_dir($targetPath) && !mkdir($targetPath, 0775, true) && !is_dir($targetPath)) {
                     throw new RuntimeException('Failed to create extension ' . $scope . ' asset directory.');
@@ -281,10 +307,12 @@ final class StorageProvisioner
             }
 
             $parent = dirname($targetPath);
+            // Ensure parent directory exists before copying a file payload.
             if (!is_dir($parent) && !mkdir($parent, 0775, true) && !is_dir($parent)) {
                 throw new RuntimeException('Failed to prepare extension ' . $scope . ' asset directory.');
             }
 
+            // Copy source asset file into provisioned storage path.
             if (!copy($item->getPathname(), $targetPath)) {
                 throw new RuntimeException('Failed to copy bundled extension ' . $scope . ' asset: ' . $relative);
             }

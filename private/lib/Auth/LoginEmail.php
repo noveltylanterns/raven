@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/Auth/LoginEmail.php
  * Login-time email-code challenge session management and delivery helpers.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -67,29 +67,35 @@ final class LoginEmail
         int $ttlSeconds = self::DEFAULT_TTL_SECONDS,
         string $submittedEmail = ''
     ): array {
+        // A pending 2FA user id is required to bind challenge issuance to one login session.
         if ($pendingUserId === null || $pendingUserId <= 0) {
             return ['ok' => false, 'message' => 'Login session expired.'];
         }
 
         $selectedMethod = $this->findByKey($pendingMethods, trim($selectedMethodKey));
+        // Resolve pooled method keys when no direct method key match exists.
         if (!is_array($selectedMethod)) {
             $selectedMethod = $this->findByKey(
                 $this->pooledCodeMethods($pendingMethods),
                 trim($selectedMethodKey)
             );
         }
+        // Stop when the selected key cannot be resolved to a method entry.
         if (!is_array($selectedMethod)) {
             return ['ok' => false, 'message' => 'Selected verification method is invalid.'];
         }
 
+        // Email challenge flow only supports email-type methods.
         if (strtolower(trim((string) ($selectedMethod['type'] ?? ''))) !== 'email') {
             return ['ok' => false, 'message' => 'Selected verification method does not support email codes.'];
         }
 
         $email = null;
         $methodKey = trim((string) ($selectedMethod['key'] ?? ''));
+        // Email pool entries require submitted target address selection.
         if (Login2fa::isEmailPool($methodKey)) {
             $email = $this->resolvePooledEmailTarget($selectedMethod, $submittedEmail);
+            // Soft-fail without error when no allowed pooled target is selected.
             if ($email === null) {
                 return ['ok' => true, 'sent' => false];
             }
@@ -97,10 +103,12 @@ final class LoginEmail
             $methodKey = Login2fa::forEmailAddress($email);
         } else {
             $email = EmailValidate::normalize((string) ($selectedMethod['email'] ?? ''));
+            // Non-pooled email methods must carry one valid target address.
             if ($email === null) {
                 return ['ok' => false, 'message' => 'Email code target address is missing or invalid.'];
             }
 
+            // Backfill method key for legacy email entries missing normalized key storage.
             if ($methodKey === '') {
                 $methodKey = Login2fa::forEmailAddress($email);
             }
@@ -108,6 +116,7 @@ final class LoginEmail
 
         $now = time();
         $existing = $this->pendingEmailCodeChallenge($pendingUserId, $methodKey);
+        // Reuse an active challenge instead of issuing and sending duplicate codes.
         if (is_array($existing) && (int) ($existing['expires_at'] ?? 0) > $now) {
             return [
                 'ok' => true,
@@ -118,12 +127,14 @@ final class LoginEmail
             ];
         }
 
+        // Code generation may throw; convert to a user-safe issuance failure.
         try {
             $code = EmailGenerate::code();
         } catch (\Throwable $exception) {
             return ['ok' => false, 'message' => 'Unable to generate an email verification challenge.'];
         }
         $codeHash = password_hash($code, PASSWORD_DEFAULT);
+        // Hash creation must succeed before storing challenge material.
         if (!is_string($codeHash) || $codeHash === '') {
             return ['ok' => false, 'message' => 'Unable to generate an email verification challenge.'];
         }
@@ -161,12 +172,15 @@ final class LoginEmail
     ): bool {
         $pendingUserId = (int) $pendingUserId;
         $selectedMethodKey = trim($selectedMethodKey);
+        // Verification is invalid without a pending 2FA user context.
         if ($pendingUserId <= 0) {
             return false;
         }
 
+        // Email pool keys require one concrete submitted email target.
         if (Login2fa::isEmailPool($selectedMethodKey)) {
             $normalizedEmail = EmailValidate::normalize($submittedEmail);
+            // Pool verification cannot proceed without a valid submitted address.
             if ($normalizedEmail === null) {
                 return false;
             }
@@ -174,26 +188,31 @@ final class LoginEmail
             $selectedMethodKey = Login2fa::forEmailAddress($normalizedEmail);
         }
 
+        // Derived method key must be non-empty before challenge lookup.
         if ($selectedMethodKey === '') {
             return false;
         }
 
         $challenge = $this->pendingEmailCodeChallenge($pendingUserId, $selectedMethodKey);
+        // Stop when no pending challenge exists for this user and method key.
         if (!is_array($challenge)) {
             return false;
         }
 
+        // Expired challenges are cleared immediately and treated as invalid.
         if ((int) ($challenge['expires_at'] ?? 0) <= time()) {
             $this->clearEmailCodeChallenge($selectedMethodKey);
             return false;
         }
 
         $normalizedCode = EmailValidate::normalizeCode($submittedCode);
+        // Empty/invalid code input can never pass hash verification.
         if ($normalizedCode === '') {
             return false;
         }
 
         $codeHash = (string) ($challenge['code_hash'] ?? '');
+        // Verify provided code against stored hash; fail closed on missing hash.
         if ($codeHash === '' || !password_verify($normalizedCode, $codeHash)) {
             return false;
         }
@@ -223,6 +242,7 @@ final class LoginEmail
         $methodKey = trim($methodKey);
         $email = strtolower(trim($email));
         $codeHash = trim($codeHash);
+        // Require complete and internally consistent challenge payloads before storage.
         if (
             $userId <= 0
             || $methodKey === ''
@@ -264,17 +284,20 @@ final class LoginEmail
     public function pendingEmailCodeChallenge(int $userId, string $methodKey): ?array
     {
         $methodKey = trim($methodKey);
+        // Lookup requires both a valid pending user id and a non-empty method key.
         if ($userId <= 0 || $methodKey === '') {
             return null;
         }
 
         $map = $this->emailChallengeMap();
         $challenge = $map[$methodKey] ?? null;
+        // Missing or malformed map entries are treated as absent challenges.
         if (!is_array($challenge)) {
             return null;
         }
 
         $challengeUserId = (int) ($challenge['user_id'] ?? 0);
+        // Enforce per-user challenge isolation by matching stored user id.
         if ($challengeUserId !== $userId) {
             return null;
         }
@@ -283,6 +306,7 @@ final class LoginEmail
         $codeHash = trim((string) ($challenge['code_hash'] ?? ''));
         $issuedAt = (int) ($challenge['issued_at'] ?? 0);
         $expiresAt = (int) ($challenge['expires_at'] ?? 0);
+        // Reject stored challenge rows with incomplete or invalid timing/data.
         if (
             $email === ''
             || $codeHash === ''
@@ -310,17 +334,20 @@ final class LoginEmail
     public function clearEmailCodeChallenge(string $methodKey = ''): void
     {
         $methodKey = trim($methodKey);
+        // Empty key means clear every pending email challenge in session.
         if ($methodKey === '') {
             unset($_SESSION[self::SESSION_EMAIL_CHALLENGES]);
             return;
         }
 
         $map = $this->emailChallengeMap();
+        // No-op when the requested method key is not present.
         if (!array_key_exists($methodKey, $map)) {
             return;
         }
 
         unset($map[$methodKey]);
+        // Remove the session container entirely when last entry was removed.
         if ($map === []) {
             unset($_SESSION[self::SESSION_EMAIL_CHALLENGES]);
             return;
@@ -365,16 +392,19 @@ final class LoginEmail
         int $ttlSeconds = 600
     ): array {
         $recipientEmail = EmailValidate::normalize($recipientEmail);
+        // Delivery requires one syntactically valid recipient address.
         if ($recipientEmail === null) {
             return ['ok' => false, 'message' => 'Email code recipient is invalid.'];
         }
 
         $code = preg_replace('/\D+/', '', $code) ?? '';
+        // Login email codes are fixed-width eight-digit values.
         if (strlen($code) !== 8) {
             return ['ok' => false, 'message' => 'Email code payload is invalid.'];
         }
 
         $safeSiteName = Address::sanitizeHeader($siteName, 120);
+        // Fall back to canonical product name when site title sanitizes to empty.
         if ($safeSiteName === '') {
             $safeSiteName = 'Raven CMS';
         }
@@ -401,6 +431,12 @@ final class LoginEmail
     // Private helpers
     // -------------------------------------------------------------------------
 
+    /**
+     * Clamps one email-code lifetime to Raven's supported range.
+     *
+     * @param int $ttlSeconds Requested TTL in seconds.
+     * @return int TTL constrained to MIN/MAX bounds.
+     */
     private function normalizeTtlSeconds(int $ttlSeconds): int
     {
         return max(self::MIN_TTL_SECONDS, min(self::MAX_TTL_SECONDS, $ttlSeconds));
@@ -416,16 +452,20 @@ final class LoginEmail
     private function resolvePooledEmailTarget(array $selectedMethod, string $submittedEmail): ?string
     {
         $normalizedSubmitted = EmailValidate::normalize($submittedEmail);
+        // Submitted pooled target must be one valid normalized email.
         if ($normalizedSubmitted === null) {
             return null;
         }
 
         $allowedEmailsRaw = $selectedMethod['emails'] ?? [];
+        // Pooled email methods must provide an array of allowed target addresses.
         if (!is_array($allowedEmailsRaw)) {
             return null;
         }
 
+        // Accept only submitted addresses that appear in the allowed pool list.
         foreach ($allowedEmailsRaw as $rawEmail) {
+            // Match using normalized addresses to avoid case/format mismatches.
             if (EmailValidate::normalize((string) $rawEmail) === $normalizedSubmitted) {
                 return $normalizedSubmitted;
             }
@@ -444,15 +484,19 @@ final class LoginEmail
     private function findByKey(array $methods, string $methodKey): ?array
     {
         $methodKey = trim($methodKey);
+        // Empty keys cannot resolve to any method row.
         if ($methodKey === '') {
             return null;
         }
 
+        // Scan candidate rows until one exact key match is found.
         foreach ($methods as $method) {
+            // Ignore malformed candidate rows.
             if (!is_array($method)) {
                 continue;
             }
 
+            // Return the first method row whose key matches exactly.
             if (trim((string) ($method['key'] ?? '')) === $methodKey) {
                 return $method;
             }
@@ -477,14 +521,17 @@ final class LoginEmail
         $hasRecovery = false;
         $emailMap = [];
 
+        // Collapse raw method rows into pooled code-selection entries.
         foreach ($methods as $method) {
             if (!is_array($method)) {
                 continue;
             }
 
             $type = strtolower(trim((string) ($method['type'] ?? '')));
+            // Keep TOTP methods as direct entries in pooled options.
             if ($type === 'totp') {
                 $methodKey = trim((string) ($method['key'] ?? ''));
+                // Drop malformed TOTP rows with missing method keys.
                 if ($methodKey === '') {
                     continue;
                 }
@@ -493,16 +540,19 @@ final class LoginEmail
                 continue;
             }
 
+            // Any recovery method yields one pooled recovery option.
             if ($type === 'recovery') {
                 $hasRecovery = true;
                 continue;
             }
 
+            // Ignore non-email/non-recovery method types for email challenge picker.
             if ($type !== 'email') {
                 continue;
             }
 
             $email = strtolower(trim((string) ($method['email'] ?? '')));
+            // Ignore email methods with missing target address.
             if ($email === '') {
                 continue;
             }
@@ -510,6 +560,7 @@ final class LoginEmail
             $emailMap[$email] = true;
         }
 
+        // Append one pooled recovery row when recovery methods are present.
         if ($hasRecovery) {
             $pooled[] = [
                 'type' => 'recovery',
@@ -518,6 +569,7 @@ final class LoginEmail
             ];
         }
 
+        // Append one pooled email row listing all distinct available addresses.
         if ($emailMap !== []) {
             $pooled[] = [
                 'type' => 'email',
@@ -538,13 +590,16 @@ final class LoginEmail
     private function emailChallengeMap(): array
     {
         $raw = $_SESSION[self::SESSION_EMAIL_CHALLENGES] ?? null;
+        // Session storage may be absent or malformed; normalize to empty map.
         if (!is_array($raw)) {
             return [];
         }
 
         $map = [];
+        // Keep only entries with non-empty keys and array payloads.
         foreach ($raw as $key => $value) {
             $methodKey = trim((string) $key);
+            // Drop malformed session rows lacking a usable key or array payload.
             if ($methodKey === '' || !is_array($value)) {
                 continue;
             }
@@ -556,4 +611,3 @@ final class LoginEmail
     }
 
 }
-

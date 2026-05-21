@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/Format/Zip.php
  * ZIP archive handler — extract, inspect, and build ZIP archives.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -46,6 +46,7 @@ final class Zip
     public function isSafeEntryPath(string $entryName): bool
     {
         $path = str_replace('\\', '/', trim($entryName));
+        // Empty entry names are invalid extraction targets.
         if ($path === '') {
             return false;
         }
@@ -86,18 +87,22 @@ final class Zip
     {
         $zip = $this->open($archivePath);
 
+        // Keep archive handles balanced even when validation or extraction fails.
         try {
+            // Empty archives are treated as invalid package payloads.
             if ($zip->numFiles < 1) {
                 throw new RuntimeException('ZIP archive is empty.');
             }
 
             for ($i = 0; $i < $zip->numFiles; $i++) {
                 $name = $zip->getNameIndex($i);
+                // Every entry must validate before any filesystem writes occur.
                 if (!is_string($name) || !$this->isSafeEntryPath($name)) {
                     throw new RuntimeException('ZIP archive contains an unsafe entry path.');
                 }
             }
 
+            // Delegate final write-out to ZipArchive once pre-validation has passed.
             if (!$zip->extractTo($targetDir)) {
                 throw new RuntimeException('Failed to extract ZIP archive to target directory.');
             }
@@ -124,8 +129,10 @@ final class Zip
         $entry = $this->normalizeEntryName($entryName);
         $zip = $this->open($archivePath);
 
+        // Close the archive on both success and error paths.
         try {
             $contents = $zip->getFromName($entry);
+            // A missing entry must fail explicitly so callers do not create empty target files.
             if ($contents === false) {
                 throw new RuntimeException('Entry "' . $entry . '" not found in ZIP archive.');
             }
@@ -150,38 +157,47 @@ final class Zip
         $directory = $this->normalizeDirEntry($entryName);
         $zip = $this->open($archivePath);
 
+        // Track matching members while guaranteeing the archive closes at the end.
         try {
             $matches = [];
 
             for ($i = 0; $i < $zip->numFiles; $i++) {
                 $name = $zip->getNameIndex($i);
+                // Ignore invalid names instead of extracting them into caller paths.
                 if (!is_string($name) || !$this->isSafeEntryPath($name)) {
                     continue;
                 }
 
                 $normalized = rtrim(str_replace('\\', '/', $name), '/');
+                // Include exact directory entries when archives store explicit folder markers.
                 if ($normalized === trim($directory, '/')) {
                     $matches[] = $normalized . '/';
                     continue;
                 }
 
+                // Include descendants so the full requested subtree is restored.
                 if (str_starts_with(str_replace('\\', '/', $name), $directory)) {
                     $matches[] = str_replace('\\', '/', $name);
                 }
             }
 
+            // Fail when no entries map to the requested subtree.
             if ($matches === []) {
                 throw new RuntimeException('Directory "' . trim($directory, '/') . '" not found in ZIP archive.');
             }
 
+            // Deduplicate because some archives include both dir markers and repeated paths.
             foreach (array_values(array_unique($matches)) as $match) {
                 $relative = ltrim(substr($match, strlen($directory)), '/');
+                // Skip the directory root marker itself; only children map to output paths.
                 if ($relative === '') {
                     continue;
                 }
 
                 $targetPath = $targetDir . '/' . $relative;
+                // Preserve directory entries so empty subfolders are recreated on disk.
                 if (str_ends_with($match, '/')) {
+                    // Create nested folders lazily as directory markers are encountered.
                     if (!is_dir($targetPath) && !mkdir($targetPath, 0775, true) && !is_dir($targetPath)) {
                         throw new RuntimeException('Failed to create directory for extracted ZIP entry.');
                     }
@@ -189,6 +205,7 @@ final class Zip
                 }
 
                 $contents = $zip->getFromName($match);
+                // File entries must resolve to bytes before any write attempt.
                 if ($contents === false) {
                     throw new RuntimeException('Entry "' . $match . '" not found in ZIP archive.');
                 }
@@ -213,21 +230,25 @@ final class Zip
     {
         $this->assertAvailable();
 
+        // Source presence is validated before archive creation to avoid empty output artifacts.
         if (!file_exists($sourcePath)) {
             throw new RuntimeException('ZIP source path could not be resolved: ' . $sourcePath);
         }
 
         $outputDirectory = dirname($outputPath);
+        // Ensure output parent directories exist before creating the archive file.
         if (!is_dir($outputDirectory) && !mkdir($outputDirectory, 0775, true) && !is_dir($outputDirectory)) {
             throw new RuntimeException('Failed to create ZIP output directory.');
         }
 
         $zip = new ZipArchive();
         $result = $zip->open($outputPath, ZipArchive::CREATE | ZipArchive::OVERWRITE);
+        // ZipArchive::open returns non-true status codes when creation cannot proceed.
         if ($result !== true) {
             throw new RuntimeException('Failed to create ZIP archive at: ' . $outputPath);
         }
 
+        // Delete partially built archives when path population fails mid-stream.
         try {
             $this->addPathToArchive($zip, $sourcePath, $entryName);
         } catch (\Throwable $exception) {
@@ -291,21 +312,25 @@ final class Zip
     {
         $this->assertAvailable();
 
+        // Reject unresolved sources before attempting to open or mutate the archive.
         if (!file_exists($sourcePath)) {
             throw new RuntimeException('ZIP source path not found: ' . $sourcePath);
         }
 
         $archiveDirectory = dirname($archivePath);
+        // Create archive parents for first-write cases where the zip file does not exist yet.
         if (!is_dir($archiveDirectory) && !mkdir($archiveDirectory, 0775, true) && !is_dir($archiveDirectory)) {
             throw new RuntimeException('Failed to create ZIP archive directory.');
         }
 
         $zip = new ZipArchive();
         $flags = is_file($archivePath) ? 0 : ZipArchive::CREATE;
+        // Surface open failures immediately so callers can report archive write issues.
         if ($zip->open($archivePath, $flags) !== true) {
             throw new RuntimeException('Failed to open ZIP archive for writing: ' . $archivePath);
         }
 
+        // Always close the archive handle, even when adding paths throws.
         try {
             $this->addPathToArchive($zip, $sourcePath, $entryName);
         } finally {
@@ -324,10 +349,12 @@ final class Zip
     {
         $zip = $this->open($archivePath);
 
+        // Keep read handles balanced across all early returns and errors.
         try {
             $entries = [];
             for ($i = 0; $i < $zip->numFiles; $i++) {
                 $name = $zip->getNameIndex($i);
+                // Skip non-string slots returned by ZipArchive internals.
                 if (is_string($name)) {
                     $entries[] = $name;
                 }
@@ -350,21 +377,25 @@ final class Zip
      * @param int    $maxSlugLength    Maximum allowed slug length for the regex check.
      * @return string|null The slug string, or null if none found or valid.
      */
-    public function manifestSlug(string $archivePath, string $manifestFilename, int $maxSlugLength): ?string
+        public function manifestSlug(string $archivePath, string $manifestFilename, int $maxSlugLength): ?string
     {
         $filename = strtolower(trim($manifestFilename));
+        // Empty manifest names cannot be matched against archive entries.
         if ($filename === '') {
             return null;
         }
 
         $zip = $this->open($archivePath);
 
+        // Search candidate manifests while guaranteeing the archive handle closes.
         try {
             $slugPattern = '/^[a-z0-9][a-z0-9_-]{0,' . max(0, $maxSlugLength) . '}$/';
             $indexes = $this->manifestEntryIndexes($zip, $filename);
 
+            // Candidate indexes are already ordered by preferred manifest depth.
             foreach ($indexes as $index) {
                 $raw = $zip->getFromIndex($index);
+                // Ignore missing or blank manifest payloads.
                 if (!is_string($raw) || trim($raw) === '') {
                     continue;
                 }
@@ -376,6 +407,7 @@ final class Zip
                 }
 
                 $slug = strtolower(trim((string) ($decoded['slug'] ?? '')));
+                // Return the first slug that matches Raven's manifest slug contract.
                 if ($slug !== '' && preg_match($slugPattern, $slug) === 1) {
                     return $slug;
                 }
@@ -399,6 +431,7 @@ final class Zip
         $this->assertAvailable();
 
         $zip = new ZipArchive();
+        // Reading flows require a successfully opened archive handle.
         if ($zip->open($archivePath) !== true) {
             throw new RuntimeException('Failed to open ZIP archive: ' . $archivePath);
         }
@@ -423,21 +456,25 @@ final class Zip
 
         for ($i = 0; $i < $zip->numFiles; $i++) {
             $name = $zip->getNameIndex($i);
+            // Ignore invalid or unsafe names before manifest filename matching.
             if (!is_string($name) || !$this->isSafeEntryPath($name)) {
                 continue;
             }
 
             $normalized = trim(str_replace('\\', '/', $name), '/');
+            // Candidate entries must resolve to the requested manifest basename.
             if ($normalized === '' || strtolower((string) pathinfo($normalized, PATHINFO_BASENAME)) !== $manifestFile) {
                 continue;
             }
 
             $dir = trim((string) pathinfo($normalized, PATHINFO_DIRNAME), '.');
             $depth = $dir === '' ? 0 : substr_count($dir, '/') + 1;
+            // Only root-level or one-wrapper manifests are supported by contract.
             if ($depth > 1) {
                 continue;
             }
 
+            // Root manifests are preferred over wrapped manifests during lookup.
             if ($depth === 0) {
                 $root[] = $i;
             } else {
@@ -456,6 +493,7 @@ final class Zip
      */
     private function assertAvailable(): void
     {
+        // Guard every ZIP entrypoint behind extension availability checks.
         if (!$this->isAvailable()) {
             throw new RuntimeException('PHP zip extension is not available.');
         }
@@ -471,6 +509,7 @@ final class Zip
     private function normalizeEntryName(string $entryName): string
     {
         $normalized = trim(str_replace('\\', '/', $entryName), '/');
+        // Re-run path safety checks after normalization to block traversal aliases.
         if (!$this->isSafeEntryPath($normalized)) {
             throw new RuntimeException('Unsafe ZIP entry path: ' . $entryName);
         }
@@ -503,11 +542,13 @@ final class Zip
     {
         $entry = $this->normalizeEntryName($entryName);
 
+        // Directory sources are expanded recursively into archive members.
         if (is_dir($sourcePath)) {
             $this->addDirTree($zip, $sourcePath, $entry);
             return;
         }
 
+        // File sources map to one target entry and must succeed atomically.
         if (!$zip->addFile($sourcePath, $entry)) {
             throw new RuntimeException('Failed to add file "' . $entry . '" to ZIP archive.');
         }
@@ -525,10 +566,12 @@ final class Zip
     private function addDirTree(ZipArchive $zip, string $sourceDir, string $entryRoot): void
     {
         $sourceRoot = realpath($sourceDir);
+        // Realpath resolution guarantees stable prefixes while iterating child entries.
         if ($sourceRoot === false || !is_dir($sourceRoot)) {
             throw new RuntimeException('ZIP source directory could not be resolved: ' . $sourceDir);
         }
 
+        // Create the archive root folder first so relative children have a parent container.
         if (!$zip->addEmptyDir($entryRoot)) {
             throw new RuntimeException('Failed to initialize ZIP archive root directory.');
         }
@@ -538,6 +581,7 @@ final class Zip
             \RecursiveIteratorIterator::SELF_FIRST
         );
 
+        // Add directories/files in one pass while skipping symlinks for package safety.
         foreach ($iterator as $item) {
             /** @var \SplFileInfo $item */
             if ($item->isLink()) {
@@ -546,19 +590,23 @@ final class Zip
 
             $absolute = $item->getPathname();
             $relative = ltrim(substr($absolute, strlen($sourceRoot)), DIRECTORY_SEPARATOR);
+            // Ignore the source root pseudo-entry because the archive root already exists.
             if ($relative === '') {
                 continue;
             }
 
             $zipPath = $entryRoot . '/' . str_replace('\\', '/', $relative);
 
+            // Directory nodes become explicit ZIP directory entries.
             if ($item->isDir()) {
+                // Nested folder creation failures should abort the archive write.
                 if (!$zip->addEmptyDir($zipPath)) {
                     throw new RuntimeException('Failed to add directory "' . $relative . '" to ZIP archive.');
                 }
                 continue;
             }
 
+            // Non-directory nodes are copied as file entries under the computed ZIP path.
             if (!$zip->addFile($absolute, $zipPath)) {
                 throw new RuntimeException('Failed to add file "' . $relative . '" to ZIP archive.');
             }
@@ -577,10 +625,12 @@ final class Zip
     private function writeExtractedEntry(string $targetPath, string $contents, string $label): void
     {
         $directory = dirname($targetPath);
+        // Create missing destination parents before writing extracted file content.
         if (!is_dir($directory) && !mkdir($directory, 0775, true) && !is_dir($directory)) {
             throw new RuntimeException('Failed to create directory for extracted ' . $label . ' entry.');
         }
 
+        // Fail hard on write errors so extraction callers never assume success.
         if (file_put_contents($targetPath, $contents) === false) {
             throw new RuntimeException('Failed to write extracted ' . $label . ' entry to "' . $targetPath . '".');
         }

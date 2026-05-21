@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/ext/cron/lib/Cron/CronShellRunner.php
  * Shell command runner for Scheduled Tasks jobs.
- * Docs: /private/ext/AGENTS.md
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/sys/Shell.php
  * Shared CLI runtime and command handlers for Raven CLI tools.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -70,6 +70,12 @@ spl_autoload_register(static function (string $class): void {
     }
 });
 
+/**
+ * Request-scoped dependency and output context for Raven CLI command handlers.
+ *
+ * Holds bootstrap state, verbosity flags, JSON output mode, and lazy-loaded
+ * core container bindings shared across all CLI command families.
+ */
 final class RavenCliContext
 {
     public string $root;
@@ -464,6 +470,12 @@ function raven_cli_option(array $options, string $name, mixed $default = null, ?
     return $default;
 }
 
+/**
+ * Returns true when CLI tokens include a help switch.
+ *
+ * @param array<int, string> $tokens Parsed command tokens.
+ * @return bool True when `-h`, `--help`, or `help` is present.
+ */
 function raven_cli_is_help_requested(array $tokens): bool
 {
     foreach ($tokens as $token) {
@@ -520,6 +532,14 @@ function raven_cli_required_scalar_option(array $options, string $name, string $
     return trim((string) $raw);
 }
 
+/**
+ * Normalizes one free-text input into a CLI-safe slug or exits with error.
+ *
+ * @param array<string, mixed> $rvn Bootstrapped Raven container map.
+ * @param string $raw Raw user-provided slug text.
+ * @param string $label Field label used in validation error output.
+ * @return string Normalized slug value.
+ */
 function raven_cli_slug_from_text(array $rvn, string $raw, string $label = 'Slug'): string
 {
     $slug = $rvn['input']->slug($raw);
@@ -623,6 +643,12 @@ function raven_cli_extension_state_save(string $root, array $enabled, array $per
     raven_cli_extension_state_store($root)->saveState($enabled, $permissions);
 }
 
+/**
+ * Recursively removes one directory tree for CLI cleanup workflows.
+ *
+ * @param string $directory Absolute directory path to remove.
+ * @return void
+ */
 function raven_cli_remove_directory_recursive(string $directory): void
 {
     if (!is_dir($directory)) {
@@ -645,6 +671,13 @@ function raven_cli_remove_directory_recursive(string $directory): void
     @rmdir($directory);
 }
 
+/**
+ * Recursively copies one directory tree for CLI install/export workflows.
+ *
+ * @param string $source Absolute source directory path.
+ * @param string $target Absolute destination directory path.
+ * @return void
+ */
 function raven_cli_copy_directory_recursive(string $source, string $target): void
 {
     if (!is_dir($source)) {
@@ -697,11 +730,23 @@ function raven_cli_copy_directory_recursive(string $source, string $target): voi
     }
 }
 
+/**
+ * Builds the shared archive-package helper for CLI package commands.
+ *
+ * @param string $root Absolute project root path.
+ * @return ArchivePackage Archive package helper instance.
+ */
 function raven_cli_archive_packages(string $root): ArchivePackage
 {
     return new ArchivePackage($root);
 }
 
+/**
+ * Builds the shared package-install workflow helper for CLI install commands.
+ *
+ * @param string $root Absolute project root path.
+ * @return ArchiveInstall Archive install workflow helper.
+ */
 function raven_cli_package_install_workflow(string $root): ArchiveInstall
 {
     return new ArchiveInstall(new InputSanitizer(), new Upload(), raven_cli_archive_packages($root));
@@ -752,6 +797,13 @@ function raven_cli_flatten_config_keys(array $node, string $prefix = ''): array
     return $keys;
 }
 
+/**
+ * Checks whether one dot-path exists in the config array.
+ *
+ * @param array<string, mixed> $config Loaded config payload.
+ * @param string $path Dot-notation key path.
+ * @return bool True when the key path resolves to a value.
+ */
 function raven_cli_has_config_key(array $config, string $path): bool
 {
     $segments = array_values(array_filter(explode('.', trim($path)), static fn (string $item): bool => $item !== ''));
@@ -771,6 +823,13 @@ function raven_cli_has_config_key(array $config, string $path): bool
     return true;
 }
 
+/**
+ * Resolves one dot-path value from the config array.
+ *
+ * @param array<string, mixed> $config Loaded config payload.
+ * @param string $path Dot-notation key path.
+ * @return mixed Resolved value, or null when not present.
+ */
 function raven_cli_get_config_value(array $config, string $path): mixed
 {
     $segments = array_values(array_filter(explode('.', trim($path)), static fn (string $item): bool => $item !== ''));
@@ -811,6 +870,15 @@ function raven_cli_set_config_value(array &$config, string $path, mixed $value):
     }
 }
 
+/**
+ * Parses one CLI string value into the requested config scalar/array type.
+ *
+ * @param string $raw Raw CLI value token.
+ * @param string $type Target type label (`string`, `int`, `bool`, `array`, etc.).
+ * @param mixed $existingValue Existing config value for merge-aware conversions.
+ * @param bool $hasExisting True when an existing value is available.
+ * @return mixed Typed value ready for config persistence.
+ */
 function raven_cli_parse_typed_value(string $raw, string $type, mixed $existingValue = null, bool $hasExisting = false): mixed
 {
     $normalizedType = strtolower(trim($type));
@@ -936,6 +1004,12 @@ function raven_cli_run_process(array $command, string $cwd): array
     ];
 }
 
+/**
+ * Prints top-level Raven CLI command usage/help text.
+ *
+ * @param RavenCliContext $context Active CLI execution context.
+ * @return void
+ */
 function raven_cli_print_main_help(RavenCliContext $context): void
 {
     $context->renderHelpHeader('main');
@@ -986,27 +1060,37 @@ function raven_cli_dispatch(string $command, array $tokens, RavenCliContext $con
     };
 }
 
+/**
+ * CLI process entrypoint that dispatches command groups.
+ *
+ * @param array<int, string> $argv Raw process argument vector.
+ * @return int Process exit code.
+ */
 function raven_cli_main(array $argv): int
 {
     [$context, $tokens] = raven_cli_bootstrap($argv);
 
+    // Interactive mode can recover from an empty command line by prompting for one command token.
     if ($tokens === [] && $context->interactive) {
         $context->renderBanner('interactive');
         $picked = strtolower(trim($context->prompt(
             'Choose command (category/channel/group/tag/redirect/config/theme/ext/system/update)',
             'system'
         )));
+        // Only append a prompted command when the operator entered one.
         if ($picked !== '') {
             $tokens[] = $picked;
         }
     }
 
+    // Help and empty-input paths intentionally short-circuit before command dispatch.
     if ($tokens === [] || raven_cli_is_help_requested($tokens)) {
         raven_cli_print_main_help($context);
         return 0;
     }
 
     $command = array_shift($tokens);
+    // Guard against malformed argv state where the first token is missing/non-string.
     if (!is_string($command) || $command === '') {
         raven_cli_print_main_help($context);
         return 1;
@@ -1015,12 +1099,21 @@ function raven_cli_main(array $argv): int
     return raven_cli_dispatch($command, $tokens, $context);
 }
 
+/**
+ * Handles `cat`/category CLI subcommands.
+ *
+ * @param RavenCliContext $context Active CLI execution context.
+ * @param array<int, string> $tokens Command tokens after the group name.
+ * @return int Exit code.
+ */
 function raven_cli_command_category(RavenCliContext $context, array $tokens): int
 {
+    // In interactive mode, prompt for the action when no subcommand was provided.
     if ($tokens === [] && $context->interactive) {
         $tokens[] = strtolower(trim($context->prompt('Category action (list/show/create/update/delete)', 'list')));
     }
 
+    // Help mode prints usage instead of touching runtime dependencies.
     if ($tokens === [] || raven_cli_is_help_requested($tokens)) {
         $context->renderHelpHeader('category');
         $context->info('Usage: private/bin/rvn-cat <action> [options]');
@@ -1033,17 +1126,20 @@ function raven_cli_command_category(RavenCliContext $context, array $tokens): in
     $parsed = raven_cli_parse_tokens($tokens);
     $options = $parsed['options'];
 
+    // Wrap repository work so command errors are reported uniformly.
     try {
         $rvn = $context->rvn();
         $repoRead = new CategoryRead($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix']);
         $repo = new CategoryWrite($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix'], $repoRead);
         $resolveCategory = static function (array $selectorOptions) use ($rvn, $repoRead): ?array {
             $idRaw = raven_cli_option($selectorOptions, 'id', null);
+            // ID selectors take precedence over slug selectors when both are provided.
             if (is_scalar($idRaw) && trim((string) $idRaw) !== '') {
                 return $repoRead->findById((int) $idRaw);
             }
 
             $slug = raven_cli_optional_slug($rvn, raven_cli_option($selectorOptions, 'slug', ''));
+            // Invalid/empty slug input intentionally resolves to "not found".
             if ($slug === null) {
                 return null;
             }
@@ -1051,11 +1147,14 @@ function raven_cli_command_category(RavenCliContext $context, array $tokens): in
             return $repoRead->findBySlug($slug);
         };
 
+        // List mode prints all categories in either JSON or line-oriented output.
         if ($action === 'list') {
             $rows = $repoRead->listAll();
+            // JSON mode emits one structured payload for scripting usage.
             if ($context->json) {
                 $context->printJson(['ok' => true, 'items' => $rows]);
             } else {
+                // Human mode prints compact table-like rows for quick scanning.
                 foreach ($rows as $row) {
                     $context->line((string) ($row['id'] ?? 0) . ' | ' . (string) ($row['slug'] ?? '') . ' | ' . (string) ($row['name'] ?? ''));
                 }
@@ -1065,16 +1164,20 @@ function raven_cli_command_category(RavenCliContext $context, array $tokens): in
             return 0;
         }
 
+        // Show mode resolves one selector target and returns/prints full row fields.
         if ($action === 'show') {
             $row = $resolveCategory($options);
 
+            // Missing selector target is an explicit command error.
             if (!is_array($row)) {
                 throw new RuntimeException('Category not found.');
             }
 
+            // JSON mode emits one structured row payload.
             if ($context->json) {
                 $context->printJson(['ok' => true, 'item' => $row]);
             } else {
+                // Human mode prints each row field on its own line.
                 foreach ($row as $key => $value) {
                     $context->line((string) $key . ': ' . (is_scalar($value) || $value === null ? (string) $value : json_encode($value)));
                 }
@@ -1082,35 +1185,43 @@ function raven_cli_command_category(RavenCliContext $context, array $tokens): in
             return 0;
         }
 
+        // Create/update share one write path with optional existing-row hydration.
         if ($action === 'create' || $action === 'update') {
             $existing = null;
+            // Update requires resolving the existing record first.
             if ($action === 'update') {
                 $existing = $resolveCategory($options);
 
+                // Refuse to update when the selector did not resolve to one row.
                 if (!is_array($existing)) {
                     throw new RuntimeException('Category to update was not found (use --id or --slug).');
                 }
             }
 
             $name = (string) raven_cli_option($options, 'name', '');
+            // Interactive mode prompts for missing required fields.
             if ($name === '' && $context->interactive) {
                 $name = $context->prompt('Category name', is_array($existing) ? (string) ($existing['name'] ?? '') : '');
             }
             $name = $rvn['input']->text($name, 120);
+            // Name is required after sanitization.
             if ($name === '') {
                 throw new RuntimeException('Category name is required.');
             }
 
             $slugInput = (string) raven_cli_option($options, 'slug', '');
+            // Prompt for slug in interactive mode when absent.
             if ($slugInput === '' && $context->interactive) {
                 $slugInput = $context->prompt('Category slug', is_array($existing) ? (string) ($existing['slug'] ?? '') : '');
             }
+            // Update operations may reuse the existing slug by default.
             if ($slugInput === '' && is_array($existing)) {
                 $slugInput = (string) ($existing['slug'] ?? '');
             }
             $slug = raven_cli_slug_from_text($rvn, $slugInput, 'Category slug');
 
             $description = (string) raven_cli_option($options, 'description', is_array($existing) ? (string) ($existing['description'] ?? '') : '');
+            // Description prompt is optional and only used when interactive.
             if ($description === '' && $context->interactive) {
                 $description = $context->prompt('Category description', $description);
             }
@@ -1123,6 +1234,7 @@ function raven_cli_command_category(RavenCliContext $context, array $tokens): in
                 'description' => $description,
             ]);
 
+            // Response format follows the active output mode.
             if ($context->json) {
                 $context->printJson(['ok' => true, 'id' => $id, 'action' => $action]);
             } else {
@@ -1159,6 +1271,13 @@ function raven_cli_command_category(RavenCliContext $context, array $tokens): in
     }
 }
 
+/**
+ * Handles `tag` CLI subcommands.
+ *
+ * @param RavenCliContext $context Active CLI execution context.
+ * @param array<int, string> $tokens Command tokens after the group name.
+ * @return int Exit code.
+ */
 function raven_cli_command_tag(RavenCliContext $context, array $tokens): int
 {
     if ($tokens === [] && $context->interactive) {
@@ -1303,6 +1422,13 @@ function raven_cli_command_tag(RavenCliContext $context, array $tokens): int
     }
 }
 
+/**
+ * Handles `chan`/channel CLI subcommands.
+ *
+ * @param RavenCliContext $context Active CLI execution context.
+ * @param array<int, string> $tokens Command tokens after the group name.
+ * @return int Exit code.
+ */
 function raven_cli_command_channel(RavenCliContext $context, array $tokens): int
 {
     if ($tokens === [] && $context->interactive) {
@@ -1453,6 +1579,13 @@ function raven_cli_command_channel(RavenCliContext $context, array $tokens): int
     }
 }
 
+/**
+ * Handles `group` CLI subcommands.
+ *
+ * @param RavenCliContext $context Active CLI execution context.
+ * @param array<int, string> $tokens Command tokens after the group name.
+ * @return int Exit code.
+ */
 function raven_cli_command_group(RavenCliContext $context, array $tokens): int
 {
     if ($tokens === [] && $context->interactive) {
@@ -1719,6 +1852,13 @@ function raven_cli_command_group(RavenCliContext $context, array $tokens): int
     }
 }
 
+/**
+ * Handles `redir`/redirect CLI subcommands.
+ *
+ * @param RavenCliContext $context Active CLI execution context.
+ * @param array<int, string> $tokens Command tokens after the group name.
+ * @return int Exit code.
+ */
 function raven_cli_command_redirect(RavenCliContext $context, array $tokens): int
 {
     if ($tokens === [] && $context->interactive) {
@@ -1746,11 +1886,13 @@ function raven_cli_command_redirect(RavenCliContext $context, array $tokens): in
 
         $findRedirect = static function (array $options) use ($rvn, $repoRead): ?array {
             $idRaw = raven_cli_option($options, 'id', null);
+            // ID selectors take precedence over slug/channel selectors when present.
             if (is_scalar($idRaw) && trim((string) $idRaw) !== '') {
                 return $repoRead->findById((int) $idRaw);
             }
 
             $slug = raven_cli_optional_slug($rvn, raven_cli_option($options, 'slug', ''));
+            // Invalid slug input is treated as a non-match.
             if ($slug === null) {
                 return null;
             }
@@ -1760,11 +1902,14 @@ function raven_cli_command_redirect(RavenCliContext $context, array $tokens): in
             return $repoRead->findBySlug($slug, $channel);
         };
 
+        // List mode prints all redirects in either JSON or compact text form.
         if ($action === 'list') {
             $rows = $repoRead->listAll();
+            // JSON mode emits one structured payload for automation use.
             if ($context->json) {
                 $context->printJson(['ok' => true, 'items' => $rows]);
             } else {
+                // Human mode prints one compact redirect mapping per line.
                 foreach ($rows as $row) {
                     $context->line(
                         (string) ($row['id'] ?? 0)
@@ -1781,15 +1926,19 @@ function raven_cli_command_redirect(RavenCliContext $context, array $tokens): in
             return 0;
         }
 
+        // Show mode resolves one redirect and prints the full field set.
         if ($action === 'show') {
             $row = $findRedirect($options);
+            // Missing selectors are command errors for show mode.
             if (!is_array($row)) {
                 throw new RuntimeException('Redirect not found.');
             }
 
+            // JSON mode emits one structured redirect payload.
             if ($context->json) {
                 $context->printJson(['ok' => true, 'item' => $row]);
             } else {
+                // Human mode prints key/value lines for quick debugging.
                 foreach ($row as $key => $value) {
                     $context->line((string) $key . ': ' . (is_scalar($value) || $value === null ? (string) $value : json_encode($value)));
                 }
@@ -1797,46 +1946,56 @@ function raven_cli_command_redirect(RavenCliContext $context, array $tokens): in
             return 0;
         }
 
+        // Create/update share one persistence path with optional preloaded row data.
         if ($action === 'create' || $action === 'update') {
             $existing = null;
+            // Update requires selecting an existing redirect first.
             if ($action === 'update') {
                 $existing = $findRedirect($options);
+                // Refuse update requests that do not resolve to a real row.
                 if (!is_array($existing)) {
                     throw new RuntimeException('Redirect to update was not found (use --id or --slug + --channel).');
                 }
             }
 
             $title = (string) raven_cli_option($options, 'title', is_array($existing) ? (string) ($existing['title'] ?? '') : '');
+            // Prompt for required fields only in interactive mode.
             if ($title === '' && $context->interactive) {
                 $title = $context->prompt('Redirect title', $title);
             }
             $title = $rvn['input']->text($title, 160);
+            // Title is required after sanitization.
             if ($title === '') {
                 throw new RuntimeException('Redirect title is required.');
             }
 
             $slugInput = (string) raven_cli_option($options, 'slug', is_array($existing) ? (string) ($existing['slug'] ?? '') : '');
+            // Interactive mode can fill in missing slug values.
             if ($slugInput === '' && $context->interactive) {
                 $slugInput = $context->prompt('Redirect slug', $slugInput);
             }
             $slug = raven_cli_slug_from_text($rvn, $slugInput, 'Redirect slug');
 
             $description = (string) raven_cli_option($options, 'description', is_array($existing) ? (string) ($existing['description'] ?? '') : '');
+            // Description remains optional but promptable in interactive mode.
             if ($description === '' && $context->interactive) {
                 $description = $context->prompt('Redirect description', $description);
             }
             $description = $rvn['input']->text($description, 1000);
 
             $target = (string) raven_cli_option($options, 'target', is_array($existing) ? (string) ($existing['target'] ?? '') : '');
+            // Prompt for missing target when interactive mode is active.
             if ($target === '' && $context->interactive) {
                 $target = $context->prompt('Redirect target URL', $target);
             }
             $target = $rvn['input']->text($target, 1000);
+            // Redirect target is required for create/update writes.
             if ($target === '') {
                 throw new RuntimeException('Redirect target URL is required.');
             }
 
             $channelSlug = strtolower(trim((string) raven_cli_option($options, 'channel', is_array($existing) ? (string) ($existing['channel_slug'] ?? '') : '')));
+            // Channel slug is optional; validate it only when provided.
             if ($channelSlug !== '') {
                 $channelSlug = raven_cli_slug_from_text($rvn, $channelSlug, 'Channel slug');
             }
@@ -1858,6 +2017,7 @@ function raven_cli_command_redirect(RavenCliContext $context, array $tokens): in
                 'target' => $target,
             ]);
 
+            // Response payload mirrors requested output mode.
             if ($context->json) {
                 $context->printJson(['ok' => true, 'id' => $id, 'action' => $action]);
             } else {
@@ -1866,18 +2026,22 @@ function raven_cli_command_redirect(RavenCliContext $context, array $tokens): in
             return 0;
         }
 
+        // Delete mode requires resolving one row and removing it by id.
         if ($action === 'delete') {
             $existing = $findRedirect($options);
+            // Missing selector target is a hard command error.
             if (!is_array($existing)) {
                 throw new RuntimeException('Redirect not found (use --id or --slug + --channel).');
             }
 
             $id = (int) ($existing['id'] ?? 0);
+            // Guard against malformed row payloads with invalid ids.
             if ($id < 1) {
                 throw new RuntimeException('Redirect id is invalid.');
             }
 
             $repo->deleteById($id);
+            // Response payload mirrors requested output mode.
             if ($context->json) {
                 $context->printJson(['ok' => true, 'deleted_id' => $id]);
             } else {
@@ -1893,12 +2057,21 @@ function raven_cli_command_redirect(RavenCliContext $context, array $tokens): in
     }
 }
 
+/**
+ * Handles `conf`/configuration CLI subcommands.
+ *
+ * @param RavenCliContext $context Active CLI execution context.
+ * @param array<int, string> $tokens Command tokens after the group name.
+ * @return int Exit code.
+ */
 function raven_cli_command_config(RavenCliContext $context, array $tokens): int
 {
+    // Prompt for an action when interactive mode is active and no action was passed.
     if ($tokens === [] && $context->interactive) {
         $tokens[] = strtolower(trim($context->prompt('Config action (list/get/set/sync-defaults)', 'list')));
     }
 
+    // Help mode prints usage and exits without touching config state.
     if ($tokens === [] || raven_cli_is_help_requested($tokens)) {
         $context->renderHelpHeader('config');
         $context->info('Usage: private/bin/rvn-conf <action> [options]');
@@ -1911,26 +2084,32 @@ function raven_cli_command_config(RavenCliContext $context, array $tokens): int
     $parsed = raven_cli_parse_tokens($tokens);
     $options = $parsed['options'];
 
+    // Wrap config operations so parse/runtime errors use one command error path.
     try {
         $rvn = $context->rvn();
         $configObject = $rvn['config'];
         $config = $configObject->all();
 
+        // List mode resolves keys (optionally by prefix) and prints each value.
         if ($action === 'list') {
             $prefix = trim((string) raven_cli_option($options, 'prefix', ''));
             $keys = raven_cli_flatten_config_keys($config);
+            // Prefix filters narrow list output to one key subtree.
             if ($prefix !== '') {
                 $keys = array_values(array_filter($keys, static fn (string $path): bool => str_starts_with($path, $prefix)));
             }
 
             $items = [];
+            // Materialize each key value for consistent JSON/text rendering.
             foreach ($keys as $path) {
                 $items[$path] = raven_cli_get_config_value($config, $path);
             }
 
+            // JSON mode emits one object keyed by config path.
             if ($context->json) {
                 $context->printJson(['ok' => true, 'items' => $items]);
             } else {
+                // Human mode prints one assignment-style line per key.
                 foreach ($items as $path => $value) {
                     $display = is_array($value) ? json_encode($value, JSON_UNESCAPED_SLASHES) : var_export($value, true);
                     $context->line($path . ' = ' . (string) $display);
@@ -1941,13 +2120,16 @@ function raven_cli_command_config(RavenCliContext $context, array $tokens): int
             return 0;
         }
 
+        // Get mode reads one required key path and prints the resolved value.
         if ($action === 'get') {
             $key = raven_cli_required_scalar_option($options, 'key', 'Missing required --key option.', 'k');
+            // Refuse to read unknown keys so typos fail loudly.
             if (!raven_cli_has_config_key($config, $key)) {
                 throw new RuntimeException('Config key not found: ' . $key);
             }
 
             $value = raven_cli_get_config_value($config, $key);
+            // JSON mode emits the key/value payload for scripts.
             if ($context->json) {
                 $context->printJson(['ok' => true, 'key' => $key, 'value' => $value]);
             } else {
@@ -1957,15 +2139,19 @@ function raven_cli_command_config(RavenCliContext $context, array $tokens): int
             return 0;
         }
 
+        // Set mode parses and persists one typed config value.
         if ($action === 'set') {
             $key = raven_cli_required_scalar_option($options, 'key', 'Missing required --key option.', 'k');
+            // Theme activation is managed by theme commands, not raw config writes.
             if ($key === 'site.theme') {
                 throw new RuntimeException('site.theme is managed by Theme Manager/rvn-theme. Use: private/bin/rvn-theme enable --slug <slug>');
             }
             $valueRaw = raven_cli_option($options, 'value', null, 'v');
+            // Interactive mode can collect missing value input.
             if ((!is_scalar($valueRaw) || trim((string) $valueRaw) === '') && $context->interactive) {
                 $valueRaw = $context->prompt('Config value');
             }
+            // Value is required even after interactive fallback.
             if (!is_scalar($valueRaw)) {
                 throw new RuntimeException('Missing required --value option.');
             }
@@ -1976,6 +2162,7 @@ function raven_cli_command_config(RavenCliContext $context, array $tokens): int
             $parsedValue = raven_cli_parse_typed_value((string) $valueRaw, $type, $existingValue, $exists);
             $config = ConfigWrite::persistValue($configObject->path(), $config, $key, $parsedValue);
 
+            // Response payload mirrors requested output mode.
             if ($context->json) {
                 $context->printJson(['ok' => true, 'key' => $key, 'value' => $parsedValue]);
             } else {
@@ -1984,24 +2171,29 @@ function raven_cli_command_config(RavenCliContext $context, array $tokens): int
             return 0;
         }
 
+        // Sync-defaults mode backfills keys missing from config.php using config.php.dist.
         if ($action === 'sync-defaults') {
             $distPath = $context->root . '/private/dat/config.php.dist';
+            // Dist config is required for default key synchronization.
             if (!is_file($distPath)) {
                 throw new RuntimeException('Missing private/dat/config.php.dist.');
             }
 
             /** @var mixed $dist */
             $dist = require $distPath;
+            // Dist file must return an associative config array.
             if (!is_array($dist)) {
                 throw new RuntimeException('private/dat/config.php.dist must return an array.');
             }
 
             $added = [];
             $merged = raven_cli_merge_missing_config_defaults($config, $dist, $added);
+            // Persist only when at least one missing key was merged in.
             if ($added !== []) {
                 ConfigWrite::persist($configObject->path(), $merged);
             }
 
+            // Response payload mirrors requested output mode.
             if ($context->json) {
                 $context->printJson([
                     'ok' => true,
@@ -2010,6 +2202,7 @@ function raven_cli_command_config(RavenCliContext $context, array $tokens): int
                 ]);
             } else {
                 $context->ok('Config defaults sync complete. Added keys: ' . count($added));
+                // Print each newly added path for operator visibility.
                 foreach ($added as $path) {
                     $context->line('  + ' . $path);
                 }
@@ -2025,6 +2218,13 @@ function raven_cli_command_config(RavenCliContext $context, array $tokens): int
     }
 }
 
+/**
+ * Handles `ext`/extension CLI subcommands.
+ *
+ * @param RavenCliContext $context Active CLI execution context.
+ * @param array<int, string> $tokens Command tokens after the group name.
+ * @return int Exit code.
+ */
 function raven_cli_command_extension(RavenCliContext $context, array $tokens): int
 {
     if ($tokens === [] && $context->interactive) {
@@ -2387,17 +2587,36 @@ function raven_cli_command_extension(RavenCliContext $context, array $tokens): i
     }
 }
 
+/**
+ * Validates one theme slug against Raven's theme-directory pattern.
+ *
+ * @param string $slug Theme slug candidate.
+ * @return bool True when the slug is policy-compliant.
+ */
 function raven_cli_theme_slug_is_valid(string $slug): bool
 {
     return preg_match('/^[a-z0-9][a-z0-9_-]{0,63}$/', $slug) === 1;
 }
 
+/**
+ * Returns true when one slug is reserved for stock Raven themes.
+ *
+ * @param string $slug Theme slug candidate.
+ * @return bool True when the slug is stock/reserved.
+ */
 function raven_cli_theme_is_stock_slug(string $slug): bool
 {
     $normalized = strtolower(trim($slug));
     return in_array($normalized, ['raven'], true);
 }
 
+/**
+ * Handles `theme` CLI subcommands.
+ *
+ * @param RavenCliContext $context Active CLI execution context.
+ * @param array<int, string> $tokens Command tokens after the group name.
+ * @return int Exit code.
+ */
 function raven_cli_command_theme(RavenCliContext $context, array $tokens): int
 {
     if ($tokens === [] && $context->interactive) {
@@ -2666,6 +2885,13 @@ function raven_cli_command_theme(RavenCliContext $context, array $tokens): int
     }
 }
 
+/**
+ * Handles `sys`/system CLI subcommands.
+ *
+ * @param RavenCliContext $context Active CLI execution context.
+ * @param array<int, string> $tokens Command tokens after the group name.
+ * @return int Exit code.
+ */
 function raven_cli_command_system(RavenCliContext $context, array $tokens): int
 {
     if (raven_cli_is_help_requested($tokens)) {

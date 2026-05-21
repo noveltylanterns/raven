@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/Extension/Registry.php
  * Shared extension state, manifest parsing, and per-request runtime lifecycle.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -150,12 +150,15 @@ final class Registry
         $state = self::stateRead($root)->loadStateData();
         /** @var mixed $rawEnabled */
         $rawEnabled = $state['enabled'] ?? [];
+        // Enabled-state payload must be an associative array map.
         if (!is_array($rawEnabled)) {
             return [];
         }
 
         $enabled = [];
+        // Keep only safe directory keys with truthy enabled flags.
         foreach ($rawEnabled as $directory => $flag) {
+            // Directory keys must be safe extension slugs.
             if (
                 !is_string($directory)
                 || preg_match('/^[a-z0-9][a-z0-9_-]{0,63}$/', $directory) !== 1
@@ -163,6 +166,7 @@ final class Registry
                 continue;
             }
 
+            // Include directory only when its enabled flag evaluates true.
             if ((bool) $flag) {
                 $enabled[$directory] = true;
             }
@@ -183,12 +187,15 @@ final class Registry
         $state = self::stateRead($root)->loadStateData();
         /** @var mixed $rawPermissions */
         $rawPermissions = $state['permissions'] ?? [];
+        // Permission-state payload must be an associative array map.
         if (!is_array($rawPermissions)) {
             return [];
         }
 
         $permissions = [];
+        // Keep only safe directory keys and allowed bit values.
         foreach ($rawPermissions as $directory => $rawBit) {
+            // Directory keys must be safe extension slugs.
             if (
                 !is_string($directory)
                 || preg_match('/^[a-z0-9][a-z0-9_-]{0,63}$/', $directory) !== 1
@@ -197,6 +204,7 @@ final class Registry
             }
 
             $bit = (int) $rawBit;
+            // Optional allowed-bit filter prunes unrecognized bit values.
             if ($allowedBits !== [] && !in_array($bit, $allowedBits, true)) {
                 continue;
             }
@@ -222,12 +230,15 @@ final class Registry
     public static function enabledDirectories(string $root, bool $requireValidManifest = true): array
     {
         $directories = [];
+        // Preserve state-file order while filtering to existing/valid directories.
         foreach (array_keys(self::enabledMap($root)) as $directory) {
             $extensionRoot = rtrim($root, '/') . '/private/ext/' . $directory;
+            // Skip enabled entries that no longer exist on disk.
             if (!is_dir($extensionRoot)) {
                 continue;
             }
 
+            // Optionally skip directories whose manifests fail validation.
             if ($requireValidManifest && self::readManifest($root, $directory) === null) {
                 continue;
             }
@@ -253,11 +264,13 @@ final class Registry
     public static function readManifest(string $root, string $directoryName): ?array
     {
         $cacheKey = $root . '::' . $directoryName;
+        // Reuse cached manifest validation results within this process.
         if (array_key_exists($cacheKey, self::$manifestCache)) {
             return self::$manifestCache[$cacheKey];
         }
 
         $manifest = self::validateManifest()->readManifest($root, $directoryName);
+        // Cache invalid/missing manifests as null to avoid repeated reads.
         if ($manifest === null) {
             self::$manifestCache[$cacheKey] = null;
             return null;
@@ -300,6 +313,7 @@ final class Registry
     public static function shortcodes(string $root, string $directoryName, array $context = []): ?array
     {
         $validation = self::validateShortcodesProvider($root, $directoryName, $context);
+        // Invalid providers return null so callers can distinguish from empty lists.
         if (!$validation['valid']) {
             return null;
         }
@@ -342,6 +356,7 @@ final class Registry
     public static function fields(string $root, string $directoryName, array $context = []): ?array
     {
         $validation = self::validateFieldsProvider($root, $directoryName, $context);
+        // Invalid providers return null so callers can distinguish from empty lists.
         if (!$validation['valid']) {
             return null;
         }
@@ -410,16 +425,19 @@ final class Registry
     public function bootExtension(array &$rvn, string $directory): array
     {
         $directory = trim($directory);
+        // Skip blank directory keys and already-booted extensions.
         if ($directory === '' || isset($this->bootedExtensionDirectories[$directory])) {
             return $rvn;
         }
 
         $this->bootedExtensionDirectories[$directory] = true;
         $provider = $this->extensionBootProviders[$directory] ?? null;
+        // Extensions without callable boot providers are no-ops.
         if (!is_callable($provider)) {
             return $rvn;
         }
 
+        // Isolate extension bootstrap failures so one extension cannot break boot.
         try {
             $provider($rvn);
         } catch (\Throwable $exception) {
@@ -442,6 +460,7 @@ final class Registry
     public function resolveExtensionServices(array &$rvn, string $directory): array
     {
         $directory = trim($directory);
+        // Directory key is required to resolve one extension service map.
         if ($directory === '') {
             return [];
         }
@@ -450,17 +469,21 @@ final class Registry
 
         /** @var mixed $rawExtensionServices */
         $rawExtensionServices = $rvn['extension_services'] ?? [];
+        // Service container root must be an associative array.
         if (!is_array($rawExtensionServices)) {
             return [];
         }
 
+        // Requested extension must expose an array service map.
         if (!array_key_exists($directory, $rawExtensionServices) || !is_array($rawExtensionServices[$directory])) {
             return [];
         }
 
         $resolutionState = $this->extensionServiceResolutionStates[$directory] ?? null;
+        // Reuse currently resolving/resolved service snapshots to avoid recursion loops.
         if (is_array($resolutionState)) {
             $cachedServices = $resolutionState['services'] ?? [];
+            // Return cached services for both resolving and resolved states.
             if (in_array((string) ($resolutionState['state'] ?? ''), ['resolving', 'resolved'], true) && is_array($cachedServices)) {
                 return $cachedServices;
             }
@@ -473,7 +496,9 @@ final class Registry
             'services' => $services,
         ];
 
+        // Materialize lazy service values while preserving partial resolution state.
         try {
+            // Resolve each top-level service entry for the requested extension.
             foreach ($services as $serviceKey => &$serviceValue) {
                 $this->materializeExtensionValue($serviceValue);
                 $services[$serviceKey] = $serviceValue;
@@ -508,6 +533,7 @@ final class Registry
     public function resolveAllExtensionServices(array &$rvn): array
     {
         $services = [];
+        // Resolve services for every extension that has a boot provider entry.
         foreach (array_keys($this->extensionBootProviders) as $directory) {
             $services[$directory] = $this->resolveExtensionServices($rvn, $directory);
         }
@@ -526,6 +552,7 @@ final class Registry
      */
     public function bootAllExtensions(array &$rvn): array
     {
+        // Boot every extension that registered a bootstrap provider.
         foreach (array_keys($this->extensionBootProviders) as $directory) {
             $this->bootExtension($rvn, $directory);
         }
@@ -548,10 +575,12 @@ final class Registry
      */
     private function discoverEnabledExtensions(array $enabledExtensionDirectories): void
     {
+        // Discover boot/storage/scheduler metadata for each enabled extension directory.
         foreach ($enabledExtensionDirectories as $directory) {
             // self::readManifest() hits the static cache — no filesystem hit if
             // enabledDirectories() was called before constructing this instance.
             $manifest = self::readManifest($this->root, $directory);
+            // Skip enabled directories whose manifest is missing or invalid.
             if (!is_array($manifest)) {
                 continue;
             }
@@ -559,11 +588,13 @@ final class Registry
             $this->extensionManifests[$directory] = $manifest;
 
             $bootstrap = $this->bootstrapResolver->resolve($this->root, $directory, $manifest);
+            // Skip extensions with invalid ext.php bootstrap contracts.
             if (!$bootstrap['valid']) {
                 error_log('Raven extension bootstrap is invalid for extension "' . $directory . '": ' . (string) ($bootstrap['error'] ?? 'Unknown error.'));
                 continue;
             }
 
+            // Track scheduler-enabled extensions for cron discovery.
             if (!empty($bootstrap['scheduler'])) {
                 $this->schedulerExtensions[] = $directory;
             }
@@ -578,7 +609,9 @@ final class Registry
                 'bin'    => !empty($storage['bin']) ? ($this->root . '/private/ext/' . $directory . '/bin') : '',
             ];
 
+            // Register additional aux storage roots requested by the extension.
             foreach ((array) ($storage['aux'] ?? []) as $auxDirectory) {
+                // Skip malformed/blank aux directory declarations.
                 if (!is_string($auxDirectory) || $auxDirectory === '') {
                     continue;
                 }
@@ -587,6 +620,7 @@ final class Registry
             }
 
             $provider = $bootstrap['boot'] ?? null;
+            // Keep only callable bootstrap providers in the runtime boot map.
             if (is_callable($provider)) {
                 $this->extensionBootProviders[$directory] = $provider;
             }
@@ -602,14 +636,17 @@ final class Registry
      */
     private function materializeExtensionValue(mixed &$value): mixed
     {
+        // Invoke lazy service closures exactly once during materialization.
         if ($value instanceof \Closure) {
             $value = $value();
         }
 
+        // Non-array scalar/object values are already fully materialized.
         if (!is_array($value)) {
             return $value;
         }
 
+        // Recursively materialize nested array service payloads.
         foreach ($value as $key => &$childValue) {
             $this->materializeExtensionValue($childValue);
             $value[$key] = $childValue;
@@ -658,6 +695,7 @@ final class Registry
      */
     private static function validateManifest(): ValidateManifest
     {
+        // Lazily instantiate and cache the shared manifest validator.
         if (!self::$validateManifest instanceof ValidateManifest) {
             self::$validateManifest = new ValidateManifest();
         }
@@ -672,6 +710,7 @@ final class Registry
      */
     private static function validateProvider(): ValidateProvider
     {
+        // Lazily instantiate and cache the shared provider validator.
         if (!self::$validateProvider instanceof ValidateProvider) {
             self::$validateProvider = new ValidateProvider(self::validateManifest());
         }
@@ -688,6 +727,7 @@ final class Registry
     private static function stateRead(string $root): StateRead
     {
         $normalizedRoot = rtrim($root, '/\\');
+        // Cache one StateRead instance per normalized project root.
         if (!isset(self::$stateReads[$normalizedRoot]) || !self::$stateReads[$normalizedRoot] instanceof StateRead) {
             // Auto-derives stateBasePath as private/dat/ext from extensionsBasePath.
             self::$stateReads[$normalizedRoot] = new StateRead($normalizedRoot . '/private/ext');

@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/View/Panel/Header.php
  * Shared panel header-card renderer for core and extension panel views.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

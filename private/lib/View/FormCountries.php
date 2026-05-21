@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/View/FormCountries.php
  * Shared country option catalog for forms and panel reporting.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 // Inline note: Keep country labels centralized so public form options and panel labels always match.

@@ -3,7 +3,7 @@
  * RAVEN CMS
  * ~/private/sys/Repository/PageWrite.php
  * Write-side data access for page records (INSERT, UPDATE, DELETE, schedule flipping).
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

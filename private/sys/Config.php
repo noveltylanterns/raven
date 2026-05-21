@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/sys/Config.php
  * Core runtime configuration loader and read-only accessor.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/Auth/Public/Service.php
  * Public authorization service for site-visibility access checks.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -56,12 +56,15 @@ final class Service
      */
     public function canViewPublicSite(?int $userId = null): bool
     {
+        // Honor explicit positive user-id overrides when provided.
         if ($userId !== null && $userId > 0) {
             return Mask::canViewPublicSite($this->panelService->permissionMaskForUser($userId));
         }
 
+        // Logged-in sessions evaluate visibility against authenticated user permissions.
         if (($this->isLoggedInResolver)()) {
             $resolvedUserId = ($this->userIdResolver)();
+            // Authenticated visibility checks require one valid resolved user id.
             if (!is_int($resolvedUserId) || $resolvedUserId <= 0) {
                 return false;
             }
@@ -81,6 +84,7 @@ final class Service
     public function canViewPrivateSite(?int $userId = null): bool
     {
         $mask = $this->resolveAuthenticatedUserMask($userId);
+        // Private visibility requires a resolvable authenticated user mask.
         if ($mask === null) {
             return false;
         }
@@ -97,6 +101,7 @@ final class Service
     public function canViewDisabledSite(?int $userId = null): bool
     {
         $mask = $this->resolveAuthenticatedUserMask($userId);
+        // Disabled-site visibility requires a resolvable authenticated user mask.
         if ($mask === null) {
             return false;
         }
@@ -132,6 +137,7 @@ final class Service
      */
     private function resolveUserId(?int $userId): ?int
     {
+        // Use explicit user-id overrides when present and valid.
         if ($userId !== null && $userId > 0) {
             return $userId;
         }
@@ -149,6 +155,7 @@ final class Service
     private function resolveAuthenticatedUserMask(?int $userId): ?int
     {
         $resolvedUserId = $this->resolveUserId($userId);
+        // Return null when no authenticated user id can be resolved.
         if ($resolvedUserId === null) {
             return null;
         }

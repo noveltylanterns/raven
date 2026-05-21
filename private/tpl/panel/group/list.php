@@ -3,8 +3,8 @@
 /**
  * RAVEN CMS
  * ~/private/tpl/panel/group/list.php
- * Admin panel view template for this screen.
- * Docs: https://raven.lanterns.io
+ * Admin panel group-listing template.
+ * Docs: https://lanterns.io/raven
  */
 
 // Inline note: Template expects controller-provided data and keeps business logic out of views.

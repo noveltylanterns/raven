@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/Scheduler/Queue.php
  * Standalone DB-backed queue operations for core scheduled jobs.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

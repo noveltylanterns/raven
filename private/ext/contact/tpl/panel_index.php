@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/ext/contact/tpl/panel_index.php
  * Contact Forms extension list page template with CRUD actions.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

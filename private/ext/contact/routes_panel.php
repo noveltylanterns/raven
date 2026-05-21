@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/ext/contact/routes_panel.php
  * Contact Forms extension panel route and CRUD registration.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

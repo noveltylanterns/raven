@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/View/Public/Error.php
  * Public-themed HTTP error renderer shared by public and panel route gates.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

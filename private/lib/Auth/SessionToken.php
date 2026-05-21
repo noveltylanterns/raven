@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/Auth/SessionToken.php
  * PHP session-backed token storage for the shared CSRF helper.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -41,6 +41,7 @@ final class SessionToken implements CsrfToken
      */
     public function set(string $key, string $value): void
     {
+        // Token writes require an active session storage context.
         if (session_status() !== PHP_SESSION_ACTIVE) {
             throw new RuntimeException('Unable to set CSRF token before session start.');
         }
@@ -56,6 +57,7 @@ final class SessionToken implements CsrfToken
      */
     public function remove(string $key): void
     {
+        // Treat token removal as a no-op before session startup.
         if (session_status() !== PHP_SESSION_ACTIVE) {
             return;
         }

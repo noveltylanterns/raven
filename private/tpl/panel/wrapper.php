@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/tpl/panel/wrapper.php
  * Shared layout template for rendered views.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 // Inline note: Layout wraps child content and shared navigation/theme chrome.

@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/ext/cron/lib/Cron/CronTaskService.php
  * Scheduled task orchestration for the Scheduled Tasks extension.
- * Docs: /private/ext/AGENTS.md
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

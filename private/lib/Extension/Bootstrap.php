@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/Extension/Bootstrap.php
  * Loads and validates extension `ext.php` bootstrap + storage contract data.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -52,6 +52,7 @@ final class Bootstrap
      */
     public function resolve(string $root, string $directoryName, ?array $manifest = null): array
     {
+        // Reject unsafe extension directory names before any filesystem access.
         if (!$this->manifestValidator->isSafeDirectoryName($directoryName)) {
             return [
                 'valid' => false,
@@ -67,6 +68,7 @@ final class Bootstrap
         $manifest = is_array($manifest) ? $manifest : ($this->manifestValidator->readManifest($root, $directoryName) ?? []);
         $type = strtolower(trim((string) ($manifest['type'] ?? 'content')));
 
+        // Missing ext.php is valid and simply means no runtime bootstrap contract.
         if (!is_file($providerPath)) {
             return [
                 'valid' => true,
@@ -77,6 +79,7 @@ final class Bootstrap
             ];
         }
 
+        // Load ext.php defensively so provider exceptions surface as validation errors.
         try {
             /** @var mixed $provider */
             $provider = require $providerPath;
@@ -90,6 +93,7 @@ final class Bootstrap
             ];
         }
 
+        // Provider contract must be an array for downstream key lookups.
         if (!is_array($provider)) {
             return [
                 'valid' => false,
@@ -101,6 +105,7 @@ final class Bootstrap
         }
 
         $boot = $provider['boot'] ?? null;
+        // Boot hook, when present, must be callable.
         if ($boot !== null && !is_callable($boot)) {
             return [
                 'valid' => false,
@@ -115,6 +120,7 @@ final class Bootstrap
         $scheduler = $this->boolish($provider['scheduler'] ?? false);
 
         $storage = $this->normalizeStorageRequest($provider['storage'] ?? null, $type);
+        // Bubble storage-contract validation failures with a normalized error payload.
         if (!$storage['valid']) {
             return [
                 'valid' => false,
@@ -155,6 +161,7 @@ final class Bootstrap
      */
     public function normalizeStorageRequest(mixed $rawStorage, string $type): array
     {
+        // Omitted storage section means extension requests no extra storage resources.
         if ($rawStorage === null) {
             return [
                 'valid' => true,
@@ -163,6 +170,7 @@ final class Bootstrap
             ];
         }
 
+        // Storage declaration must be an associative array when supplied.
         if (!is_array($rawStorage)) {
             return [
                 'valid' => false,
@@ -172,7 +180,9 @@ final class Bootstrap
         }
 
         $allowedKeys = ['local', 'table', 'tables', 'aux', 'panel', 'public', 'bin'];
+        // Reject unknown storage keys to keep the contract strict and forward-safe.
         foreach (array_keys($rawStorage) as $key) {
+            // Every key must be a known string option.
             if (!is_string($key) || !in_array($key, $allowedKeys, true)) {
                 return [
                     'valid' => false,
@@ -189,6 +199,7 @@ final class Bootstrap
         $public = $this->boolish($rawStorage['public'] ?? false);
         $bin = $this->boolish($rawStorage['bin'] ?? false);
         $tables = $this->normalizeTableSuffixes($rawStorage['tables'] ?? []);
+        // Invalid table-suffix lists are rejected with an explicit contract error.
         if ($tables === null) {
             return [
                 'valid' => false,
@@ -196,6 +207,7 @@ final class Bootstrap
                 'storage' => $this->emptyStorage(),
             ];
         }
+        // Invalid aux-directory lists are rejected with an explicit contract error.
         if ($aux === null) {
             return [
                 'valid' => false,
@@ -204,6 +216,7 @@ final class Bootstrap
             ];
         }
 
+        // Legacy `table` and modern `tables` options are mutually exclusive.
         if ($table && $tables !== []) {
             return [
                 'valid' => false,
@@ -212,6 +225,7 @@ final class Bootstrap
             ];
         }
 
+        // Public asset storage is restricted to module extensions.
         if ($public && $type !== 'module') {
             return [
                 'valid' => false,
@@ -220,6 +234,7 @@ final class Bootstrap
             ];
         }
 
+        // Panel asset storage is restricted to supported extension types.
         if ($panel && !in_array($type, ['helper', 'content', 'module', 'system'], true)) {
             return [
                 'valid' => false,
@@ -228,6 +243,7 @@ final class Bootstrap
             ];
         }
 
+        // Framework extensions cannot expose panel/public assets.
         if ($type === 'framework' && ($panel || $public)) {
             return [
                 'valid' => false,
@@ -274,10 +290,12 @@ final class Bootstrap
      */
     private function normalizeAuxDirectories(mixed $rawAux): ?array
     {
+        // Empty/falsey aux declarations normalize to an empty list.
         if ($rawAux === null || $rawAux === false || $rawAux === '') {
             return [];
         }
 
+        // Aux declarations must be array lists.
         if (!is_array($rawAux)) {
             return null;
         }
@@ -292,20 +310,25 @@ final class Bootstrap
         ];
 
         $normalized = [];
+        // Normalize, validate, and deduplicate requested aux directory names.
         foreach ($rawAux as $entry) {
+            // Reject non-scalar entries in aux directory lists.
             if (!is_scalar($entry)) {
                 return null;
             }
 
             $directory = strtolower(trim((string) $entry));
+            // Enforce safe root-directory naming rules for aux entries.
             if ($directory === '' || preg_match('/^[a-z0-9][a-z0-9_-]{0,119}$/', $directory) !== 1) {
                 return null;
             }
 
+            // Block reserved top-level project directory names.
             if (in_array($directory, $reserved, true)) {
                 return null;
             }
 
+            // Keep one canonical copy of each normalized directory name.
             if (!isset($normalized[$directory])) {
                 $normalized[$directory] = $directory;
             }
@@ -322,14 +345,17 @@ final class Bootstrap
      */
     private function boolish(mixed $value): bool
     {
+        // Preserve boolean values as-is.
         if (is_bool($value)) {
             return $value;
         }
 
+        // Numeric values use non-zero truth semantics.
         if (is_int($value) || is_float($value)) {
             return (int) $value !== 0;
         }
 
+        // Non-string/non-numeric scalars are treated as false.
         if (!is_string($value)) {
             return false;
         }
@@ -342,21 +368,26 @@ final class Bootstrap
      */
     private function normalizeTableSuffixes(mixed $raw): ?array
     {
+        // Empty/falsey table declarations normalize to an empty list.
         if ($raw === null || $raw === false || $raw === '') {
             return [];
         }
 
+        // Table declarations must be array lists.
         if (!is_array($raw)) {
             return null;
         }
 
         $suffixes = [];
+        // Normalize, validate, and deduplicate table suffix declarations.
         foreach ($raw as $value) {
+            // Reject non-scalar values in table suffix lists.
             if (!is_scalar($value)) {
                 return null;
             }
 
             $suffix = strtolower(trim((string) $value));
+            // Enforce safe SQL suffix naming constraints.
             if ($suffix === '' || preg_match('/^[a-z0-9][a-z0-9_]{0,63}$/', $suffix) !== 1) {
                 return null;
             }

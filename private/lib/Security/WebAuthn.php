@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/Security/WebAuthn.php
  * Shared WebAuthn server/runtime helpers for login and preferences flows.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -16,6 +16,7 @@ use lbuchs\WebAuthn\WebAuthn as VendorWebAuthn;
 // Load lbuchs/webauthn package handler on first use.
 (static function (): void {
     $handler = dirname(__DIR__) . '/Composer/lbuchs/webauthn.php';
+    // Load vendor bridge only when installed so the helper can degrade safely.
     if (is_file($handler)) {
         require_once $handler;
     }
@@ -36,20 +37,24 @@ final class WebAuthn
      */
     public static function createServer(string $siteName, string $siteDomain, array $server = []): ?VendorWebAuthn
     {
+        // Runtime creation requires vendor WebAuthn classes.
         if (!class_exists(VendorWebAuthn::class)) {
             return null;
         }
 
         $rpName = trim($siteName);
+        // Use fallback relying-party display name when config is blank.
         if ($rpName === '') {
             $rpName = 'Raven CMS';
         }
 
         $rpId = self::resolveRpId($siteDomain, $server);
+        // Empty rpId means host/domain normalization failed.
         if ($rpId === '') {
             return null;
         }
 
+        // Vendor construction errors are treated as unavailable WebAuthn runtime.
         try {
             // Prefer privacy-preserving attestation ("none") to avoid exposing authenticator metadata.
             return new VendorWebAuthn($rpName, $rpId, ['none'], false);
@@ -68,18 +73,22 @@ final class WebAuthn
     public static function resolveRpId(string $siteDomain, array $server = []): string
     {
         $host = strtolower(trim((string) ($server['HTTP_HOST'] ?? $server['SERVER_NAME'] ?? '')));
+        // Prefer request host when available because it reflects the active origin.
         if ($host !== '') {
+            // Strip optional port suffix before hostname validation.
             if (str_contains($host, ':')) {
                 $parts = explode(':', $host, 2);
                 $host = strtolower(trim((string) ($parts[0] ?? '')));
             }
 
+            // Return validated request host as relying-party id.
             if ($host !== '' && preg_match('/^[a-z0-9.-]+$/', $host) === 1) {
                 return trim($host, '.');
             }
         }
 
         $configuredDomain = trim($siteDomain);
+        // No configured domain and no valid request host means no rpId.
         if ($configuredDomain === '') {
             return '';
         }
@@ -91,6 +100,7 @@ final class WebAuthn
             PHP_URL_HOST
         );
         $parsedHost = strtolower(trim($parsedHost));
+        // Parsed host must pass the same host-character constraints.
         if ($parsedHost === '' || preg_match('/^[a-z0-9.-]+$/', $parsedHost) !== 1) {
             return '';
         }
@@ -106,6 +116,7 @@ final class WebAuthn
      */
     public static function authenticatorDataHasUserVerification(string $authenticatorData): bool
     {
+        // UV flag byte is unreachable when authenticator data is shorter than 33 bytes.
         if (strlen($authenticatorData) < 33) {
             return false;
         }

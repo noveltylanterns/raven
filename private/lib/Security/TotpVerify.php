@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/Security/TotpVerify.php
  * Pure TOTP code verification against a stored set of 2FA method rows.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -36,10 +36,12 @@ final class TotpVerify
     public static function verify(array $methods, string $submittedCode, string $issuer = 'Raven CMS'): bool
     {
         $submittedCode = Totp::normalizeCode($submittedCode);
+        // Reject malformed codes before scanning stored methods.
         if (!Totp::isValidCode($submittedCode)) {
             return false;
         }
 
+        // Verify against each confirmed TOTP method until one match succeeds.
         foreach ($methods as $method) {
             if (!is_array($method)) {
                 continue;
@@ -48,10 +50,12 @@ final class TotpVerify
             $type   = Login2fa::normalizeType((string) ($method['type'] ?? ''));
             $status = Login2fa::normalizeStatus((string) ($method['status'] ?? ''), $type);
             $secret = Totp::normalizeSecret((string) ($method['secret'] ?? ''));
+            // Ignore rows that are not confirmed TOTP methods with valid secrets.
             if ($type !== 'totp' || $status !== 'confirmed' || !Totp::isValidSecret($secret)) {
                 continue;
             }
 
+            // First successful code verification ends the scan.
             if (Totp::verifyCode($secret, $submittedCode, 1, $issuer)) {
                 return true;
             }

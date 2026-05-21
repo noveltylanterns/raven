@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/View/Panel/Navigation.php
  * Shared panel navigation renderer for desktop sidebar and mobile nav bar.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

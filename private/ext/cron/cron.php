@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/ext/cron/cron.php
  * Scheduled Tasks extension scheduler jobs.
- * Docs: /private/ext/AGENTS.md
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

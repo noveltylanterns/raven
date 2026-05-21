@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/Database/SqlInsert.php
  * Shared backend-aware SQL helper for INSERT statement construction.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -51,16 +51,19 @@ final class SqlInsert
         $columnList = implode(', ', $columns);
         $valuePlaceholders = implode(', ', array_map(static fn (string $column): string => ':' . $column, $columns));
 
+        // MySQL uses INSERT IGNORE for duplicate-safe inserts.
         if (strtolower(trim($driver)) === 'mysql') {
             return 'INSERT IGNORE INTO ' . $table . ' (' . $columnList . ')
                     VALUES (' . $valuePlaceholders . ')';
         }
 
+        // SQLite/PgSQL require explicit conflict columns for ON CONFLICT.
         if ($conflictColumns === []) {
             throw new RuntimeException('Conflict columns are required for non-MySQL duplicate-safe INSERT statements.');
         }
 
         $conflicts = implode(', ', $conflictColumns);
+        // SQLite uses ON CONFLICT(col1,...) without the extra space before parenthesis.
         if (strtolower(trim($driver)) === 'sqlite') {
             return 'INSERT INTO ' . $table . ' (' . $columnList . ')
                     VALUES (' . $valuePlaceholders . ')

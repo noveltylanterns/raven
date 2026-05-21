@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/sys/Debug/RequestProfiler.php
  * Request-scoped profiler collector used by query and render instrumentation.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

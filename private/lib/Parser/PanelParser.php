@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/Parser/PanelParser.php
  * Shared panel path and route-prefix normalization helpers.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

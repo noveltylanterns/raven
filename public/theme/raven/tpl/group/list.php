@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/public/theme/raven/tpl/group/list.php
  * Public group member list template.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 if (!defined('RAVEN_VIEW_RENDER_CONTEXT')) {

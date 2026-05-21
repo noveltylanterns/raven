@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/sys/Debug/OutputProfiler.php
  * Output profiler renderer/injector and response hook entrypoint.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

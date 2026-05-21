@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/View/Public/ThemeGenerator.php
  * Public-theme generator for scaffold and duplicate workflows.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -50,7 +50,7 @@ final class ThemeGenerator
             . " * RAVEN CMS\n"
             . " * ~/public/theme/" . $meta['slug'] . "/tpl/wrapper.php\n"
             . " * " . $safeNameForDoc . " theme wrapper template.\n"
-            . " * Docs: https://raven.lanterns.io\n"
+            . " * Docs: https://lanterns.io/raven\n"
             . " */\n\n"
             . "declare(strict_types=1);\n\n"
             . "if (!defined('RAVEN_VIEW_RENDER_CONTEXT')) {\n"
@@ -85,7 +85,7 @@ final class ThemeGenerator
             . " * RAVEN CMS\n"
             . " * ~/public/theme/" . $meta['slug'] . "/tpl/home.php\n"
             . " * " . $safeNameForDoc . " homepage template scaffold.\n"
-            . " * Docs: https://raven.lanterns.io\n"
+            . " * Docs: https://lanterns.io/raven\n"
             . " */\n\n"
             . "declare(strict_types=1);\n\n"
             . "if (!defined('RAVEN_VIEW_RENDER_CONTEXT')) {\n"

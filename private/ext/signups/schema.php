@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/ext/signups/schema.php
  * Signup Sheets extension schema provider.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

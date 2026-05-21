@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/sys/Router/ChannelPolicy.php
  * Route-mode normalization, separator policy, and config-backed effective-mode resolution.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

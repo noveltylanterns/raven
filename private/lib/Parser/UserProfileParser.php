@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/Parser/UserProfileParser.php
  * Profile-contact option normalization, href resolution, and social metadata helpers.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -77,6 +77,7 @@ final class UserProfileParser
     public function normalizeTypeSlug(string $type): string
     {
         $normalized = $this->input->slug($type);
+        // Invalid slug results remain empty so callers can skip the entry cleanly.
         if ($normalized === null || $normalized === '') {
             return '';
         }
@@ -106,17 +107,20 @@ final class UserProfileParser
         $normalized = [];
         $priorities = [];
 
+        // Normalize each configured option row into one deduplicated slug entry.
         foreach ($source as $key => $definition) {
             if (!is_string($key) && !is_int($key)) {
                 continue;
             }
 
             $rawSlug = $this->input->slug((string) $key);
+            // Skip option keys that do not sanitize into valid slugs.
             if ($rawSlug === null || $rawSlug === '') {
                 continue;
             }
 
             $slug = $this->normalizeTypeSlug($rawSlug);
+            // Alias normalization can still produce an unusable slug.
             if ($slug === '') {
                 continue;
             }
@@ -126,6 +130,7 @@ final class UserProfileParser
 
             $safeLabel  = $defaultLabel;
             $safePrefix = $defaultPrefix;
+            // Array-form definitions can override both label and prefix.
             if (is_array($definition)) {
                 $safeLabel  = $this->input->text((string) ($definition['label']  ?? $defaultLabel), 80);
                 $rawPrefix  = $definition['prefix'] ?? $defaultPrefix;
@@ -134,6 +139,7 @@ final class UserProfileParser
                 $safeLabel = $this->input->text((string) $definition, 80);
             }
 
+            // Labels are required because they drive panel-facing option text.
             if ($safeLabel === '') {
                 continue;
             }
@@ -142,6 +148,7 @@ final class UserProfileParser
             // Prefer the un-aliased slug when both appear (priority 1 > 0).
             $priority = $rawSlug === $slug ? 1 : 0;
             $existingPriority = $priorities[$slug] ?? -1;
+            // Keep higher-priority canonical definitions when duplicates collide.
             if ($priority < $existingPriority) {
                 continue;
             }
@@ -155,6 +162,7 @@ final class UserProfileParser
 
         // Ensure all required types are present even when the stored config omits them.
         foreach ($requiredDefaults as $requiredSlug => $requiredConfig) {
+            // Preserve explicit stored values when required keys were already provided.
             if (isset($normalized[$requiredSlug])) {
                 continue;
             }
@@ -165,6 +173,7 @@ final class UserProfileParser
             ];
         }
 
+        // Fallback to required defaults when normalization removed every provided option.
         if ($normalized === []) {
             return $requiredDefaults;
         }
@@ -180,28 +189,33 @@ final class UserProfileParser
      */
     public function normalizeSubmittedOptions(mixed $rawOptions): array
     {
+        // Submitted options must be an array payload from the panel form.
         if (!is_array($rawOptions)) {
             return [];
         }
 
         $normalized = [];
+        // Normalize submitted rows into unique option definitions by type.
         foreach ($rawOptions as $entry) {
             if (!is_array($entry)) {
                 continue;
             }
 
             $type = $this->normalizeTypeSlug((string) ($entry['type'] ?? ''));
+            // Skip rows that do not map to a recognized type slug.
             if ($type === '') {
                 continue;
             }
 
             $label = $this->input->text((string) ($entry['label'] ?? ''), 80);
+            // Label is mandatory for each option row.
             if ($label === '') {
                 continue;
             }
 
             $rawPrefix = $entry['prefix'] ?? '';
             $urlPrefix = trim($this->input->text((string) $rawPrefix, 255));
+            // Keep first definition per type to preserve submitted order.
             if (isset($normalized[$type])) {
                 continue;
             }
@@ -211,6 +225,7 @@ final class UserProfileParser
                 'prefix' => $urlPrefix,
             ];
 
+            // Hard cap prevents unbounded option growth from malformed submissions.
             if (count($normalized) >= 100) {
                 break;
             }
@@ -228,22 +243,26 @@ final class UserProfileParser
      */
     public function normalizeSubmittedProfiles(mixed $rawProfiles, array $allowedOptions): array
     {
+        // Submitted rows require both an array payload and at least one allowed option type.
         if (!is_array($rawProfiles) || $allowedOptions === []) {
             return [];
         }
 
         $normalized = [];
+        // Normalize each submitted row into a deduplicated `{type,value}` pair.
         foreach ($rawProfiles as $row) {
             if (!is_array($row)) {
                 continue;
             }
 
             $type = $this->normalizeTypeSlug((string) ($row['type'] ?? ''));
+            // Skip unknown/unsupported contact types.
             if ($type === '' || !array_key_exists($type, $allowedOptions)) {
                 continue;
             }
 
             $value = $this->input->text((string) ($row['value'] ?? ''), 255);
+            // Empty values are ignored so blank form rows do not persist.
             if ($value === '') {
                 continue;
             }
@@ -255,6 +274,7 @@ final class UserProfileParser
                 'value' => $value,
             ];
 
+            // Cap profile rows per user to prevent runaway payload sizes.
             if (count($normalized) >= 20) {
                 break;
             }
@@ -275,17 +295,20 @@ final class UserProfileParser
         $rawEntries = is_array($profile['contact'] ?? null) ? $profile['contact'] : [];
         $entries    = [];
 
+        // Normalize each stored contact row and attach label/href decorations.
         foreach ($rawEntries as $entry) {
             if (!is_array($entry)) {
                 continue;
             }
 
             $type = $this->input->slug((string) ($entry['type'] ?? ''));
+            // Entries without a valid contact type slug are ignored.
             if ($type === null || $type === '') {
                 continue;
             }
 
             $value = $this->input->text((string) ($entry['value'] ?? ''), 255);
+            // Entries without a value are dropped from decorated output.
             if ($value === '') {
                 continue;
             }
@@ -305,6 +328,7 @@ final class UserProfileParser
                 'href'  => $href,
             ];
 
+            // Keep decorated contact lists within the same row cap as submitted data.
             if (count($entries) >= 20) {
                 break;
             }
@@ -326,6 +350,7 @@ final class UserProfileParser
     public function resolveProfileContactHref(string $value, string $urlPrefix): ?string
     {
         $value = trim($value);
+        // Blank values cannot produce usable hrefs.
         if ($value === '') {
             return null;
         }
@@ -335,6 +360,7 @@ final class UserProfileParser
             return $this->allowlistedAbsoluteHref($value);
         }
 
+        // Without a prefix, only already-absolute http(s) values are accepted.
         if ($urlPrefix === '') {
             // No prefix: only accept values that already look like https?:// URLs.
             if (preg_match('#^https?://#i', $value) === 1) {
@@ -345,6 +371,7 @@ final class UserProfileParser
         }
 
         // Trailing slash means value is appended directly (strip leading @ or / from bare handles).
+        // Prefixes ending with slash are treated as base URLs for handle/value concatenation.
         if (str_ends_with($urlPrefix, '/')) {
             return $this->allowlistedAbsoluteHref($urlPrefix . ltrim($value, '@/'));
         }
@@ -361,10 +388,12 @@ final class UserProfileParser
      */
     public function twitterCreatorFromProfiles(array $profiles, array $contactOptions): string
     {
+        // Empty profile collections cannot contain an X/Twitter creator handle.
         if ($profiles === []) {
             return '';
         }
 
+        // Return the first valid Twitter/X handle discovered in profile contact rows.
         foreach ($profiles as $profile) {
             if (!is_array($profile)) {
                 continue;
@@ -372,16 +401,19 @@ final class UserProfileParser
 
             $type  = $this->input->slug((string) ($profile['type']  ?? ''));
             $value = trim((string) ($profile['value'] ?? ''));
+            // Require both normalized type and non-empty value before classification.
             if ($type === null || $type === '' || $value === '') {
                 continue;
             }
 
             $urlPrefix = trim((string) ($contactOptions[$type]['prefix'] ?? ''));
+            // Skip non-Twitter contact types when deriving twitter:creator metadata.
             if (!$this->isTwitterProfileContactType($type, $urlPrefix)) {
                 continue;
             }
 
             $creator = $this->normalizeTwitterCreatorHandle($value);
+            // First normalized creator handle wins.
             if ($creator !== '') {
                 return $creator;
             }
@@ -399,6 +431,7 @@ final class UserProfileParser
      */
     private function isTwitterProfileContactType(string $type, string $urlPrefix): bool
     {
+        // Explicit `x`/`twitter` slugs are always treated as Twitter contact types.
         if (in_array($type, ['x', 'twitter'], true)) {
             return true;
         }
@@ -418,15 +451,19 @@ final class UserProfileParser
     private function normalizeTwitterCreatorHandle(string $value): string
     {
         $raw = trim(str_replace(["\r", "\n", "\0"], '', $value));
+        // Empty or fully stripped values cannot produce valid handles.
         if ($raw === '') {
             return '';
         }
 
+        // Full URLs must belong to x.com/twitter.com before path extraction.
         if (preg_match('#^https?://#i', $raw) === 1) {
             $host = strtolower((string) parse_url($raw, PHP_URL_HOST));
+            // Accept www-prefixed hosts by normalizing to bare domain.
             if (str_starts_with($host, 'www.')) {
                 $host = substr($host, 4);
             }
+            // Only official X/Twitter domains qualify for twitter:creator extraction.
             if (!in_array($host, ['x.com', 'twitter.com'], true)) {
                 return '';
             }
@@ -436,10 +473,12 @@ final class UserProfileParser
 
         $raw = trim(preg_replace('/[?#].*$/', '', $raw) ?? '');
         $raw = ltrim($raw, '@/');
+        // For path-style values, keep only the first segment as the candidate handle.
         if (str_contains($raw, '/')) {
             $raw = (string) explode('/', $raw, 2)[0];
         }
 
+        // Enforce the canonical Twitter/X handle character and length constraints.
         if ($raw === '' || preg_match('/^[A-Za-z0-9_]{1,30}$/', $raw) !== 1) {
             return '';
         }
@@ -456,11 +495,13 @@ final class UserProfileParser
     private function allowlistedAbsoluteHref(string $href): ?string
     {
         $candidate = trim(str_replace(["\r", "\n", "\0"], '', $href));
+        // Blank hrefs are never valid output links.
         if ($candidate === '') {
             return null;
         }
 
         $scheme = strtolower((string) parse_url($candidate, PHP_URL_SCHEME));
+        // Restrict links to the explicit allowlist of supported absolute schemes.
         if (!in_array($scheme, ['http', 'https', 'mailto', 'tel', 'finger', 'fingers', 'gopher', 'gemini'], true)) {
             return null;
         }

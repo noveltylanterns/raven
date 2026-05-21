@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/View/Form2fa.php
  * Shared 2FA form normalization and view preparation helpers.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -59,22 +59,26 @@ final class Form2fa
      */
     public function normalizeSubmittedExistingIndices(mixed $rawMethods): array
     {
+        // Existing-index extraction requires array-shaped submitted method rows.
         if (!is_array($rawMethods)) {
             return [];
         }
 
         $normalized = [];
+        // Collect and deduplicate valid existing indices.
         foreach ($rawMethods as $row) {
             if (!is_array($row)) {
                 continue;
             }
 
             $existingIndex = $this->input->int($row['existing_index'] ?? null, 0, 1000);
+            // Ignore rows without a usable numeric existing index.
             if ($existingIndex === null) {
                 continue;
             }
 
             $normalized[$existingIndex] = $existingIndex;
+            // Cap index collection size for defensive bounds.
             if (count($normalized) >= 100) {
                 break;
             }
@@ -93,18 +97,21 @@ final class Form2fa
      */
     public function normalizeSubmittedMethods(mixed $rawMethods, string $fallbackEmail, string $totpIssuer): array
     {
+        // Method normalization requires array-form submitted rows.
         if (!is_array($rawMethods)) {
             return [];
         }
 
         $normalized = [];
         $numberedLabelState = $this->initializeNumberedLabelState($rawMethods);
+        // Normalize each submitted 2FA method row into one deduplicated entry.
         foreach ($rawMethods as $method) {
             if (!is_array($method)) {
                 continue;
             }
 
             $type = Login2fa::normalizeType((string) ($method['type'] ?? ''));
+            // Skip unknown/disabled placeholder types.
             if ($type === '' || $type === 'none' || !Login2fa::isKnownType($type)) {
                 continue;
             }
@@ -121,33 +128,40 @@ final class Form2fa
                 'added_at' => $this->normalizeAddedAt($method['added_at'] ?? null),
             ];
 
+            // TOTP rows require a valid secret; generate one when omitted.
             if ($type === 'totp') {
                 $secret = Totp::normalizeSecret((string) ($method['secret'] ?? ''));
+                // Generate a new secret when none was submitted.
                 if ($secret === '') {
                     $generated = Totp::generateSecret($totpIssuer);
                     $secret = is_string($generated) ? $generated : '';
                 }
 
+                // Discard TOTP rows when a valid secret is unavailable.
                 if (!Totp::isValidSecret($secret)) {
                     continue;
                 }
 
                 $row['secret'] = $secret;
+                // Unverified TOTP methods remain pending until a code check succeeds.
                 if ($row['status'] !== 'confirmed') {
                     $row['status'] = 'pending';
                 }
                 $verificationCode = Totp::normalizeCode((string) ($method['verification_code'] ?? ''));
+                // Inline verification can promote pending TOTP rows to confirmed.
                 if ($verificationCode !== '' && Totp::verifyCode($secret, $verificationCode, 1, $totpIssuer)) {
                     $row['status'] = 'confirmed';
                 }
             } elseif ($type === 'recovery') {
                 $recoveryCode = PhraseValidate::normalize((string) ($method['recovery_code'] ?? ''));
                 $recoveryHash = trim((string) ($method['recovery_hash'] ?? ''));
+                // Submitted recovery phrase can refresh/replace the stored recovery hash.
                 if (PhraseValidate::isValid($recoveryCode, 12)) {
                     $generatedHash = PhraseGenerate::hash($recoveryCode, 12);
                     $recoveryHash = is_string($generatedHash) ? $generatedHash : '';
                 }
 
+                // Recovery rows must include a valid persisted recovery hash.
                 if (!PhraseValidate::isValidHash($recoveryHash)) {
                     continue;
                 }
@@ -158,12 +172,15 @@ final class Form2fa
                 $row['reusable'] = isset($method['reusable']) && (string) ($method['reusable'] ?? '') === '1';
             } elseif ($type === 'webauthn') {
                 $credentialId = $this->sanitizeText((string) ($method['credential_id'] ?? ''), 512);
+                // Keep credential id only when present.
                 if ($credentialId !== '') {
                     $row['credential_id'] = $credentialId;
                 }
 
                 $credentialPublicKey = trim((string) ($method['credential_public_key'] ?? ''));
+                // Keep credential public key when present.
                 if ($credentialPublicKey !== '') {
+                    // Bound credential key size to prevent oversized payload persistence.
                     if (mb_strlen($credentialPublicKey) > 4096) {
                         $credentialPublicKey = mb_substr($credentialPublicKey, 0, 4096);
                     }
@@ -171,19 +188,23 @@ final class Form2fa
                 }
 
                 $signatureCounter = (int) ($method['signature_counter'] ?? 0);
+                // Signature counters are non-negative per WebAuthn semantics.
                 if ($signatureCounter < 0) {
                     $signatureCounter = 0;
                 }
                 $row['signature_counter'] = $signatureCounter;
+                // Only fully populated credential rows are considered confirmed.
                 $row['status'] = (($row['credential_id'] ?? '') !== '' && ($row['credential_public_key'] ?? '') !== '')
                     ? 'confirmed'
                     : 'stub';
                 $row['require_uv'] = isset($method['require_uv']) && (string) ($method['require_uv'] ?? '') === '1';
             } else {
                 $email = $this->sanitizeEmail((string) ($method['target_email'] ?? ''));
+                // Fall back to account email when method-specific target email is invalid.
                 if ($email === null) {
                     $email = $this->sanitizeEmail($fallbackEmail);
                 }
+                // Drop email methods when no valid destination address is available.
                 if ($email === null) {
                     continue;
                 }
@@ -196,6 +217,7 @@ final class Form2fa
             $dedupeLabel = trim((string) ($row['label'] ?? $label));
             $dedupeKey = Login2fa::dedupeKey($type, $dedupeLabel, $dedupeValue);
             $normalized[$dedupeKey] = $row;
+            // Keep at most MAX_METHODS normalized rows.
             if (count($normalized) >= self::MAX_METHODS) {
                 break;
             }
@@ -215,12 +237,14 @@ final class Form2fa
     public function prepareMethodsForView(array $methods, string $fallbackEmail, string $totpIssuer): array
     {
         $prepared = [];
+        // Normalize each stored method row into a view-ready structure.
         foreach ($methods as $method) {
             if (!is_array($method)) {
                 continue;
             }
 
             $type = Login2fa::normalizeType((string) ($method['type'] ?? ''));
+            // Ignore unrecognized method types from malformed rows.
             if (!Login2fa::isKnownType($type)) {
                 continue;
             }
@@ -233,23 +257,28 @@ final class Form2fa
                 'status' => $status,
             ];
 
+            // Build type-specific view payloads.
             if ($type === 'totp') {
                 $secret = Totp::normalizeSecret((string) ($method['secret'] ?? ''));
+                // Skip TOTP rows with invalid secrets.
                 if (!Totp::isValidSecret($secret)) {
                     continue;
                 }
 
                 $row['secret'] = $secret;
                 $provisioningUri = Totp::provisioningUri($totpIssuer, $fallbackEmail, $secret);
+                // Include provisioning URI and QR code only when URI generation succeeds.
                 if ($provisioningUri !== '') {
                     $row['provisioning_uri'] = $provisioningUri;
                     $qrDataUri = Qr::dataUriSvgBase64($provisioningUri, 220);
+                    // QR data URI is optional and omitted when SVG generation fails.
                     if ($qrDataUri !== '') {
                         $row['qr_data_uri'] = $qrDataUri;
                     }
                 }
             } elseif ($type === 'recovery') {
                 $recoveryHash = trim((string) ($method['recovery_hash'] ?? ''));
+                // Recovery rows must keep a valid persisted recovery hash.
                 if (!PhraseValidate::isValidHash($recoveryHash)) {
                     continue;
                 }
@@ -260,29 +289,35 @@ final class Form2fa
                 $row['reusable'] = (bool) ($method['reusable'] ?? false);
             } elseif ($type === 'webauthn') {
                 $credentialId = trim((string) ($method['credential_id'] ?? ''));
+                // Carry credential id when available.
                 if ($credentialId !== '') {
                     $row['credential_id'] = $credentialId;
                 }
 
                 $credentialPublicKey = trim((string) ($method['credential_public_key'] ?? ''));
+                // Carry credential public key when available.
                 if ($credentialPublicKey !== '') {
                     $row['credential_public_key'] = $credentialPublicKey;
                 }
 
                 $signatureCounter = (int) ($method['signature_counter'] ?? 0);
+                // Clamp negative counters to zero for display consistency.
                 if ($signatureCounter < 0) {
                     $signatureCounter = 0;
                 }
                 $row['signature_counter'] = $signatureCounter;
+                // WebAuthn entries are confirmed only when both credential fields exist.
                 $row['status'] = (($row['credential_id'] ?? '') !== '' && ($row['credential_public_key'] ?? '') !== '')
                     ? 'confirmed'
                     : 'stub';
                 $row['require_uv'] = (bool) ($method['require_uv'] ?? false);
             } else {
                 $email = $this->sanitizeEmail((string) ($method['email'] ?? ''));
+                // Use fallback email when method email is absent/invalid.
                 if ($email === null) {
                     $email = $this->sanitizeEmail($fallbackEmail);
                 }
+                // Drop email entries when no valid destination is available.
                 if ($email === null) {
                     continue;
                 }
@@ -293,6 +328,7 @@ final class Form2fa
 
             $row['status_label'] = Login2fa::statusLabel((string) $row['status']);
             $prepared[] = $row;
+            // Keep prepared view list within MAX_METHODS cap.
             if (count($prepared) >= self::MAX_METHODS) {
                 break;
             }
@@ -301,6 +337,7 @@ final class Form2fa
         usort($prepared, static function (array $left, array $right): int {
             $leftLabel = strtolower(trim((string) ($left['label'] ?? '')));
             $rightLabel = strtolower(trim((string) ($right['label'] ?? '')));
+            // Fill empty labels with type defaults before alphabetical comparison.
             if ($leftLabel === '' || $rightLabel === '') {
                 $leftFallback = strtolower(Login2fa::defaultLabelForType((string) ($left['type'] ?? '')));
                 $rightFallback = strtolower(Login2fa::defaultLabelForType((string) ($right['type'] ?? '')));
@@ -312,6 +349,7 @@ final class Form2fa
                 }
             }
 
+            // Primary sort by display label for stable UI ordering.
             if ($leftLabel !== $rightLabel) {
                 return $leftLabel <=> $rightLabel;
             }
@@ -345,11 +383,13 @@ final class Form2fa
     public function buildTotpSetupPayload(mixed $submittedSecret, string $accountEmail, string $totpIssuer): array
     {
         $secret = Totp::normalizeSecret((string) $submittedSecret);
+        // Generate fresh secret when submitted value is missing/invalid.
         if (!Totp::isValidSecret($secret)) {
             $generatedSecret = Totp::generateSecret($totpIssuer);
             $secret = is_string($generatedSecret) ? $generatedSecret : '';
         }
 
+        // Abort when no valid secret can be produced.
         if (!Totp::isValidSecret($secret)) {
             return ['ok' => false, 'message' => 'Unable to generate a TOTP secret.'];
         }
@@ -560,6 +600,12 @@ final class Form2fa
         return $base . ' ' . $nextNumber;
     }
 
+    /**
+     * Returns the base label text used for auto-numbered method labels.
+     *
+     * @param string $type 2FA method type.
+     * @return string Method-type-specific base label.
+     */
     private function numberedLabelBase(string $type): string
     {
         return match (Login2fa::normalizeType($type)) {
@@ -581,6 +627,12 @@ final class Form2fa
         ];
     }
 
+    /**
+     * Normalizes one `added_at` value for stable UI output.
+     *
+     * @param mixed $value Raw timestamp value from stored method payloads.
+     * @return string Non-empty timestamp string.
+     */
     private function normalizeAddedAt(mixed $value): string
     {
         $addedAt = trim((string) $value);
@@ -591,6 +643,13 @@ final class Form2fa
         return $addedAt;
     }
 
+    /**
+     * Trims, strips control bytes, and length-limits one UI text value.
+     *
+     * @param string $value Raw input text.
+     * @param int $maxLength Maximum allowed UTF-8 character length.
+     * @return string Sanitized display-safe value.
+     */
     private function sanitizeText(string $value, int $maxLength): string
     {
         $value = trim($value);
@@ -602,6 +661,12 @@ final class Form2fa
         return $value;
     }
 
+    /**
+     * Normalizes and validates one email value for 2FA method display/editing.
+     *
+     * @param string $value Raw email candidate.
+     * @return string|null Lowercased validated email, or null when invalid.
+     */
     private function sanitizeEmail(string $value): ?string
     {
         $value = strtolower($this->sanitizeText($value, 254));

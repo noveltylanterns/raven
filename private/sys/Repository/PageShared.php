@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/sys/Repository/PageShared.php
  * Stateless page-repository utility statics shared across read and write sides.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

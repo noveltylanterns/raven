@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/Security/Totp.php
  * Shared TOTP secret, code, and provisioning-URI helpers for 2FA flows.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -17,6 +17,7 @@ use RobThree\Auth\TwoFactorAuth;
 // Load robthree/twofactorauth package handler on first use.
 (static function (): void {
     $handler = dirname(__DIR__) . '/Composer/robthree/twofactorauth.php';
+    // Load vendor bridge only when present so environments without the package fail gracefully.
     if (is_file($handler)) {
         require_once $handler;
     }
@@ -91,10 +92,12 @@ final class Totp
      */
     public static function generateSecret(string $issuer = 'Raven CMS'): ?string
     {
+        // Secret generation requires the vendor TOTP library at runtime.
         if (!class_exists(TwoFactorAuth::class)) {
             return null;
         }
 
+        // Treat library/runtime failures as non-fatal generation misses.
         try {
             $totp = self::modernTotp(self::normalizeIssuer($issuer));
             $secret = self::normalizeSecret((string) $totp->createSecret(self::MODERN_SECRET_BITS));
@@ -124,14 +127,17 @@ final class Totp
     ): bool {
         $normalizedSecret = self::normalizeSecret($secret);
         $normalizedCode = self::normalizeCode($code);
+        // Both secret and code must pass format validation before verification.
         if (!self::isValidSecret($normalizedSecret) || !self::isValidCode($normalizedCode)) {
             return false;
         }
 
+        // Verification cannot proceed without the vendor TOTP implementation.
         if (!class_exists(TwoFactorAuth::class)) {
             return false;
         }
 
+        // Any runtime error in vendor verification maps to a failed auth result.
         try {
             $normalizedIssuer = self::normalizeIssuer($issuer);
             return self::modernTotp($normalizedIssuer)->verifyCode(
@@ -157,6 +163,7 @@ final class Totp
     public static function provisioningUri(string $issuer, string $accountEmail, string $secret): string
     {
         $normalizedSecret = self::normalizeSecret($secret);
+        // Provisioning URIs are emitted only for valid normalized secrets.
         if (!self::isValidSecret($normalizedSecret)) {
             return '';
         }
@@ -165,6 +172,7 @@ final class Totp
         $account = self::normalizeAccountEmail($accountEmail);
         $label = $normalizedIssuer . ':' . $account;
 
+        // Vendor URI generation failures fall back to empty output.
         try {
             return self::modernTotp($normalizedIssuer)->getQRText($label, $normalizedSecret);
         } catch (\Throwable) {
@@ -172,12 +180,24 @@ final class Totp
         }
     }
 
+    /**
+     * Normalizes one issuer label used in authenticator-app account entries.
+     *
+     * @param string $issuer Configured/site issuer name.
+     * @return string Non-empty issuer label.
+     */
     private static function normalizeIssuer(string $issuer): string
     {
         $normalized = trim($issuer);
         return $normalized !== '' ? $normalized : 'Raven CMS';
     }
 
+    /**
+     * Builds a TwoFactorAuth instance with Raven's canonical TOTP settings.
+     *
+     * @param string $issuer Issuer label shown in authenticator apps.
+     * @return TwoFactorAuth Configured TOTP helper instance.
+     */
     private static function modernTotp(string $issuer): TwoFactorAuth
     {
         return new TwoFactorAuth(
@@ -188,6 +208,12 @@ final class Totp
         );
     }
 
+    /**
+     * Normalizes one account email for otpauth label generation.
+     *
+     * @param string $accountEmail Candidate account email.
+     * @return string Validated lowercase email, or `account@local` fallback.
+     */
     private static function normalizeAccountEmail(string $accountEmail): string
     {
         $account = strtolower(trim($accountEmail));

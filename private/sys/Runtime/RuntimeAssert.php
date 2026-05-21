@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/sys/Runtime/RuntimeAssert.php
  * Shared runtime-payload callable-contract assertions for scope builders.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/sys/Debug/LocalProfiler.php
  * Local runtime-environment snapshot helper for diagnostics tooling.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

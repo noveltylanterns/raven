@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/sys/Debug/RouteProfiler.php
  * Builds normalized routing inventory rows for diagnostics and debugging views.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

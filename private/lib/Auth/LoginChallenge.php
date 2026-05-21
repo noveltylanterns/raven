@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/Auth/LoginChallenge.php
  * Interactive 2FA challenge workflow for panel and public login entrypoints.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -71,6 +71,7 @@ final class LoginChallenge
     public function buildViewState(Gatekeeper $auth, LoginUiState $uiState): array
     {
         $challenge = $this->requirePendingChallenge($auth);
+        // Return challenge error payload directly when pending state is missing/invalid.
         if (!(bool) ($challenge['ok'] ?? false)) {
             return $challenge;
         }
@@ -91,10 +92,12 @@ final class LoginChallenge
         $selectedMethodType = (string) ($flowState['selected_method_type'] ?? '');
         $selectedEmailInput = $uiState->emailInput();
         $emailCodeTargetMasked = '';
+        // Mask selected email target only for email-based verification prompts.
         if ($selectedMethodType === 'email' && $selectedEmailInput !== '') {
             $emailCodeTargetMasked = Address::mask($selectedEmailInput);
         }
 
+        // Clear forced-picker state once the picker no longer needs to be shown.
         if (!(bool) ($flowState['show_method_picker'] ?? false)) {
             $uiState->setForceMethodPicker(false);
         }
@@ -133,6 +136,7 @@ final class LoginChallenge
     public function verifyCodeChallenge(Gatekeeper $auth, LoginUiState $uiState, array $post): array
     {
         $challenge = $this->requirePendingChallenge($auth);
+        // Return challenge error payload directly when pending state is missing/invalid.
         if (!(bool) ($challenge['ok'] ?? false)) {
             return $challenge;
         }
@@ -146,10 +150,12 @@ final class LoginChallenge
         );
         $selectedMethod = $selection['method'] ?? null;
         $selectedMethodKey = trim((string) ($selection['selected_method_key'] ?? ''));
+        // Persist normalized selected method key when resolution succeeded.
         if (is_array($selectedMethod)) {
             $uiState->storeSelectedMethodKey($selectedMethodKey);
         }
 
+        // Code verification cannot proceed without one resolved method row.
         if (!is_array($selectedMethod)) {
             return [
                 'ok' => false,
@@ -164,8 +170,10 @@ final class LoginChallenge
             512
         );
 
+        // TOTP methods require one numeric verification code.
         if ($selectedMethodType === 'totp') {
             $totpCode = preg_replace('/\D+/', '', $verificationValue) ?? '';
+            // Reject empty TOTP submissions.
             if ($totpCode === '') {
                 return [
                     'ok' => false,
@@ -174,6 +182,7 @@ final class LoginChallenge
                 ];
             }
 
+            // Reject invalid TOTP codes against pending challenge state.
             if (!$auth->verifyPendingTotpCode($totpCode)) {
                 return [
                     'ok' => false,
@@ -182,6 +191,7 @@ final class LoginChallenge
                 ];
             }
         } elseif ($selectedMethodType === 'recovery') {
+            // Recovery verification requires non-empty phrase input.
             if (trim($verificationValue) === '') {
                 return [
                     'ok' => false,
@@ -191,10 +201,12 @@ final class LoginChallenge
             }
 
             $selectedRecoveryKey = (string) ($selectedMethod['key'] ?? '');
+            // Recovery pool keys are normalized to empty for verifier fallback selection.
             if (Login2fa::isRecoveryPool($selectedRecoveryKey)) {
                 $selectedRecoveryKey = '';
             }
 
+            // Reject invalid recovery phrase submissions.
             if (!$auth->verifyPendingRecoveryCode($verificationValue, $selectedRecoveryKey)) {
                 return [
                     'ok' => false,
@@ -210,9 +222,11 @@ final class LoginChallenge
             $sendRequested = $emailAction === 'send_code' || ($emailAction === '' && $emailCode === '');
             $verifyRequested = $emailAction === 'verify_code' || ($emailAction === '' && $emailCode !== '');
 
+            // Email send path issues one challenge and attempts delivery.
             if ($sendRequested) {
                 $selectedEmailKey = (string) ($selectedMethod['key'] ?? '');
                 $issueResult = $auth->issuePendingEmailCodeChallenge($selectedEmailKey, $emailInput);
+                // Deliver only when challenge issue succeeded and dispatch is requested.
                 if ((bool) ($issueResult['ok'] ?? false) && (bool) ($issueResult['sent'] ?? false)) {
                     $emailCodeTarget = (string) ($issueResult['email'] ?? '');
                     $delivery = $this->loginEmail->sendCode(
@@ -222,6 +236,7 @@ final class LoginChallenge
                         $this->postmaster
                     );
 
+                    // Clear pending email challenge when outbound delivery fails.
                     if (!(bool) ($delivery['ok'] ?? false)) {
                         $auth->clearPendingEmailCodeChallenge((string) ($issueResult['method_key'] ?? ''));
                     }
@@ -234,6 +249,7 @@ final class LoginChallenge
                 ];
             }
 
+            // Verify path requires an explicit code payload.
             if (!$verifyRequested || $emailCode === '') {
                 return [
                     'ok' => false,
@@ -242,6 +258,7 @@ final class LoginChallenge
                 ];
             }
 
+            // Reject invalid or expired email verification codes.
             if (!$auth->verifyPendingEmailCode($emailCode, (string) ($selectedMethod['key'] ?? ''), $emailInput)) {
                 return [
                     'ok' => false,
@@ -281,6 +298,7 @@ final class LoginChallenge
     public function selectMethod(Gatekeeper $auth, LoginUiState $uiState, array $post): array
     {
         $challenge = $this->requirePendingChallenge($auth);
+        // Return challenge error payload directly when pending state is missing/invalid.
         if (!(bool) ($challenge['ok'] ?? false)) {
             return $challenge;
         }
@@ -289,8 +307,10 @@ final class LoginChallenge
             ? $challenge['pending_methods']
             : [];
         $showMethodPicker = (string) ($post['show_method_picker'] ?? '') === '1';
+        // Explicit picker-open requests clear per-method transient state.
         if ($showMethodPicker) {
             $uiState->clearTwoFactorState();
+            // Force picker only when there is an actual alternative to choose.
             if (count($pendingMethods) > 1) {
                 $uiState->setForceMethodPicker(true);
             }
@@ -304,6 +324,7 @@ final class LoginChallenge
 
         $methodKey = $this->input->text((string) ($post['method_key'] ?? ''), 200);
         $selectedMethod = $this->resolveSelectedMethod($pendingMethods, $methodKey);
+        // Reject unknown method selections.
         if ($selectedMethod === null) {
             return [
                 'ok' => false,
@@ -314,9 +335,11 @@ final class LoginChallenge
 
         $uiState->setForceMethodPicker(false);
         $uiState->storeSelectedMethodKey((string) ($selectedMethod['key'] ?? ''));
+        // Switching away from WebAuthn clears stale WebAuthn failure flags.
         if (strtolower(trim((string) ($selectedMethod['type'] ?? ''))) !== 'webauthn') {
             $uiState->clearWebauthnFailed();
         }
+        // Switching away from email clears stale email-input state.
         if (strtolower(trim((string) ($selectedMethod['type'] ?? ''))) !== 'email') {
             $uiState->clearEmailInput();
         }
@@ -342,6 +365,7 @@ final class LoginChallenge
     public function webauthnOptions(Gatekeeper $auth, LoginUiState $uiState, array $server): array
     {
         $challenge = $this->requirePendingChallenge($auth);
+        // Expired challenge state yields an auth-expired response.
         if (!(bool) ($challenge['ok'] ?? false)) {
             return [
                 'ok' => false,
@@ -360,6 +384,7 @@ final class LoginChallenge
             $pendingMethods,
             $uiState->selectedMethodKey()
         );
+        // Abort when WebAuthn options context cannot be prepared.
         if (!(bool) ($context['ok'] ?? false)) {
             return [
                 'ok' => false,
@@ -371,6 +396,7 @@ final class LoginChallenge
 
         $selectedCredentialIdB64 = (string) ($context['credential_id_b64'] ?? '');
         $credentialIdBinary = base64_decode($selectedCredentialIdB64, true);
+        // Abort when credential id cannot be decoded into binary form.
         if (!is_string($credentialIdBinary) || $credentialIdBinary === '') {
             return [
                 'ok' => false,
@@ -387,6 +413,7 @@ final class LoginChallenge
             (string) $this->config->get('site.domain', ''),
             $server
         );
+        // Abort when WebAuthn runtime/server cannot be constructed.
         if ($webAuthn === null) {
             return [
                 'ok' => false,
@@ -396,6 +423,7 @@ final class LoginChallenge
             ];
         }
 
+        // Build assertion options and persist challenge material for verification.
         try {
             $options = $webAuthn->getGetArgs(
                 [$credentialIdBinary],
@@ -446,6 +474,7 @@ final class LoginChallenge
         array $server
     ): array {
         $challenge = $this->requirePendingChallenge($auth);
+        // Expired challenge state yields an auth-expired response.
         if (!(bool) ($challenge['ok'] ?? false)) {
             return [
                 'ok' => false,
@@ -456,6 +485,7 @@ final class LoginChallenge
         }
 
         $challengeBinary = $uiState->webauthnChallenge();
+        // Verification requires previously-issued WebAuthn challenge bytes.
         if ($challengeBinary === '') {
             return [
                 'ok' => false,
@@ -470,7 +500,9 @@ final class LoginChallenge
             (int) ($challenge['pending_user_id'] ?? 0),
             $post
         );
+        // Abort when assertion payload context cannot be prepared.
         if (!(bool) ($context['ok'] ?? false)) {
+            // Mark WebAuthn as failed when context requests fallback behavior.
             if (!empty($context['mark_webauthn_failed'])) {
                 $uiState->markWebauthnFailed();
             }
@@ -488,6 +520,7 @@ final class LoginChallenge
             (string) $this->config->get('site.domain', ''),
             $server
         );
+        // Abort when WebAuthn runtime/server cannot be constructed.
         if ($webAuthn === null) {
             return [
                 'ok' => false,
@@ -497,6 +530,7 @@ final class LoginChallenge
             ];
         }
 
+        // Verify assertion payload and complete 2FA session on success.
         try {
             $webAuthn->processGet(
                 (string) ($context['client_data_json'] ?? ''),
@@ -509,6 +543,7 @@ final class LoginChallenge
             );
 
             $signatureCounter = $webAuthn->getSignatureCounter();
+            // Persist signature counter when the authenticator returned a valid counter.
             if (is_int($signatureCounter) && $signatureCounter >= 0) {
                 $auth->updateWebauthnSignatureCounter(
                     (int) ($challenge['pending_user_id'] ?? 0),
@@ -551,23 +586,28 @@ final class LoginChallenge
      */
     public static function preferredMethodKeyForChallenge(array $interactiveMethods): ?string
     {
+        // Prefer the first WebAuthn method for auto-selection when available.
         foreach ($interactiveMethods as $method) {
             if (!is_array($method)) {
                 continue;
             }
 
+            // Skip non-WebAuthn methods when computing the preferred auto-selection.
             if (strtolower(trim((string) ($method['type'] ?? ''))) !== 'webauthn') {
                 continue;
             }
 
             $methodKey = trim((string) ($method['key'] ?? ''));
+            // Return the first usable WebAuthn key for auto-selection.
             if ($methodKey !== '') {
                 return $methodKey;
             }
         }
 
+        // Fall back to single-method auto-select only when exactly one method exists.
         if (count($interactiveMethods) === 1) {
             $singleKey = trim((string) ($interactiveMethods[0]['key'] ?? ''));
+            // Only auto-select when the sole method has a non-empty key.
             if ($singleKey !== '') {
                 return $singleKey;
             }
@@ -610,11 +650,13 @@ final class LoginChallenge
     ): array {
         $pooledCodeMethods = $this->pooledCodeMethods($pendingMethods);
         $selectedMethod = $this->findByKey($pendingMethods, trim($selectedMethodKey));
+        // Resolve selection from pooled method keys when direct key lookup fails.
         if ($selectedMethod === null) {
             $selectedMethod = $this->findByKey($pooledCodeMethods, trim($selectedMethodKey));
         }
         $webauthnMethods = $this->filterByType($pendingMethods, 'webauthn');
         $hasWebauthn = $webauthnMethods !== [];
+        // Auto-select the sole code method when WebAuthn is unavailable.
         if ($selectedMethod === null && !$hasWebauthn && count($pooledCodeMethods) === 1) {
             $selectedMethod = $pooledCodeMethods[0];
         }
@@ -624,6 +666,7 @@ final class LoginChallenge
         $showMethodPicker = false;
         $showTotpForm = false;
         $showWebauthn = false;
+        // Forced picker mode overrides auto form/prompt selection when alternatives exist.
         if ($forceMethodPicker && count($pendingMethods) > 1) {
             $showMethodPicker = true;
         } else {
@@ -665,13 +708,16 @@ final class LoginChallenge
     private function resolveCodeMethodForVerification(array $pendingMethods, string $selectedMethodKey): array
     {
         $selectedMethod = $this->findByKey($pendingMethods, trim($selectedMethodKey));
+        // Resolve selection from pooled method keys when direct key lookup fails.
         if ($selectedMethod === null) {
             $pooledCodeMethods = $this->pooledCodeMethods($pendingMethods);
             $selectedMethod = $this->findByKey($pooledCodeMethods, trim($selectedMethodKey));
         }
 
+        // Auto-select the sole code method when nothing was explicitly selected.
         if ($selectedMethod === null) {
             $codeMethods = $this->pooledCodeMethods($pendingMethods);
+            // Single code-method accounts can bypass explicit method selection.
             if (count($codeMethods) === 1) {
                 $selectedMethod = $codeMethods[0];
                 $selectedMethodKey = (string) ($selectedMethod['key'] ?? '');
@@ -695,6 +741,7 @@ final class LoginChallenge
     {
         $methodKey = trim($methodKey);
         $selected = $this->findByKey($pendingMethods, $methodKey);
+        // Return direct key matches first.
         if ($selected !== null) {
             return $selected;
         }
@@ -726,13 +773,16 @@ final class LoginChallenge
     private function resolveWebauthnMethodForOptions(array $pendingMethods, string $selectedMethodKey): ?array
     {
         $selectedMethod = $this->findByKey($pendingMethods, trim($selectedMethodKey));
+        // Fall back to first WebAuthn method when current selection is not WebAuthn.
         if ($selectedMethod === null || strtolower(trim((string) ($selectedMethod['type'] ?? ''))) !== 'webauthn') {
             $pendingWebauthn = $this->filterByType($pendingMethods, 'webauthn');
+            // Use the first pending WebAuthn method when one exists.
             if ($pendingWebauthn !== []) {
                 $selectedMethod = $pendingWebauthn[0];
             }
         }
 
+        // Return null when no usable WebAuthn method is available.
         if ($selectedMethod === null || strtolower(trim((string) ($selectedMethod['type'] ?? ''))) !== 'webauthn') {
             return null;
         }
@@ -753,15 +803,18 @@ final class LoginChallenge
     private function resolveRegisteredWebauthnMethod(array $storedMethods, string $selectedCredentialIdB64): ?array
     {
         $selectedCredentialIdB64 = trim($selectedCredentialIdB64);
+        // Empty credential identifiers can never match stored methods.
         if ($selectedCredentialIdB64 === '') {
             return null;
         }
 
+        // Match one confirmed WebAuthn method with full credential payload.
         foreach ($storedMethods as $method) {
             if (!is_array($method)) {
                 continue;
             }
 
+            // Only confirmed WebAuthn rows can satisfy credential-based resolution.
             if (
                 strtolower(trim((string) ($method['type'] ?? ''))) !== 'webauthn'
                 || strtolower(trim((string) ($method['status'] ?? ''))) !== 'confirmed'
@@ -771,10 +824,12 @@ final class LoginChallenge
 
             $credentialIdB64 = trim((string) ($method['credential_id'] ?? ''));
             $credentialPublicKey = trim((string) ($method['credential_public_key'] ?? ''));
+            // Skip methods missing required credential payloads.
             if ($credentialIdB64 === '' || $credentialPublicKey === '') {
                 continue;
             }
 
+            // Skip non-matching credential ids.
             if ($credentialIdB64 !== $selectedCredentialIdB64) {
                 continue;
             }
@@ -797,6 +852,7 @@ final class LoginChallenge
     private function selectedWebauthnCredentialId(array $method): string
     {
         $credentialId = trim((string) ($method['credential_id'] ?? ''));
+        // Prefer explicit credential_id field when present.
         if ($credentialId !== '') {
             return $credentialId;
         }
@@ -817,12 +873,15 @@ final class LoginChallenge
     {
         $selectedKey = trim((string) ($selectedMethod['key'] ?? ''));
         $fallback = [];
+        // Include pooled code methods except the currently selected method key.
         foreach ($this->pooledCodeMethods($pendingMethods) as $method) {
             $methodKey = trim((string) ($method['key'] ?? ''));
+            // Ignore pooled rows that still do not expose a valid key.
             if ($methodKey === '') {
                 continue;
             }
 
+            // Skip the currently selected method from fallback alternatives.
             if ($selectedKey !== '' && $methodKey === $selectedKey) {
                 continue;
             }
@@ -843,15 +902,18 @@ final class LoginChallenge
     private function findByKey(array $methods, string $methodKey): ?array
     {
         $methodKey = trim($methodKey);
+        // Blank keys cannot resolve to one method row.
         if ($methodKey === '') {
             return null;
         }
 
+        // Return the first method row whose key matches exactly.
         foreach ($methods as $method) {
             if (!is_array($method)) {
                 continue;
             }
 
+            // Return immediately when the candidate key matches exactly.
             if (trim((string) ($method['key'] ?? '')) === $methodKey) {
                 return $method;
             }
@@ -870,16 +932,19 @@ final class LoginChallenge
     private function filterByType(array $methods, string $type): array
     {
         $type = strtolower(trim($type));
+        // Blank type filters return no rows.
         if ($type === '') {
             return [];
         }
 
         $filtered = [];
+        // Keep only rows whose normalized type matches exactly.
         foreach ($methods as $method) {
             if (!is_array($method)) {
                 continue;
             }
 
+            // Ignore rows whose normalized type does not match the filter.
             if (strtolower(trim((string) ($method['type'] ?? ''))) !== $type) {
                 continue;
             }
@@ -906,14 +971,17 @@ final class LoginChallenge
         $hasRecovery = false;
         $emailMap = [];
 
+        // Collapse raw method rows into pooled challenge code options.
         foreach ($methods as $method) {
             if (!is_array($method)) {
                 continue;
             }
 
             $type = strtolower(trim((string) ($method['type'] ?? '')));
+            // Keep TOTP methods as direct selectable entries.
             if ($type === 'totp') {
                 $methodKey = trim((string) ($method['key'] ?? ''));
+                // Discard malformed TOTP rows with no stable method key.
                 if ($methodKey === '') {
                     continue;
                 }
@@ -922,16 +990,19 @@ final class LoginChallenge
                 continue;
             }
 
+            // Presence of recovery methods produces one pooled recovery entry.
             if ($type === 'recovery') {
                 $hasRecovery = true;
                 continue;
             }
 
+            // Ignore unsupported method types for code-method pooling.
             if ($type !== 'email') {
                 continue;
             }
 
             $email = strtolower(trim((string) ($method['email'] ?? '')));
+            // Skip email methods lacking usable address values.
             if ($email === '') {
                 continue;
             }
@@ -939,6 +1010,7 @@ final class LoginChallenge
             $emailMap[$email] = true;
         }
 
+        // Append one pooled recovery option when any recovery method exists.
         if ($hasRecovery) {
             $pooled[] = [
                 'type' => 'recovery',
@@ -947,6 +1019,7 @@ final class LoginChallenge
             ];
         }
 
+        // Add pooled email entry only when one or more addresses exist.
         if ($emailMap !== []) {
             $pooled[] = [
                 'type' => 'email',
@@ -956,15 +1029,18 @@ final class LoginChallenge
             ];
         }
 
+        // Sort pooled options for stable picker ordering.
         usort($pooled, static function (array $a, array $b): int {
             $labelA = strtolower(trim((string) ($a['label'] ?? '')));
             $labelB = strtolower(trim((string) ($b['label'] ?? '')));
+            // Primary sort key: human-facing method label.
             if ($labelA !== $labelB) {
                 return $labelA <=> $labelB;
             }
 
             $typeA = strtolower(trim((string) ($a['type'] ?? '')));
             $typeB = strtolower(trim((string) ($b['type'] ?? '')));
+            // Secondary sort key: method type for deterministic ordering.
             if ($typeA !== $typeB) {
                 return $typeA <=> $typeB;
             }
@@ -1008,6 +1084,7 @@ final class LoginChallenge
         string $selectedMethodKey
     ): array {
         $selectedMethod = $this->resolveWebauthnMethodForOptions($pendingMethods, trim($selectedMethodKey));
+        // Reject requests without a valid pending WebAuthn method selection.
         if (!is_array($selectedMethod)) {
             return [
                 'ok' => false,
@@ -1016,6 +1093,7 @@ final class LoginChallenge
             ];
         }
 
+        // Guard against stale/non-WebAuthn selections before issuing options.
         if (strtolower(trim((string) ($selectedMethod['type'] ?? ''))) !== 'webauthn') {
             return [
                 'ok' => false,
@@ -1025,6 +1103,7 @@ final class LoginChallenge
         }
 
         $selectedCredentialIdB64 = $this->selectedWebauthnCredentialId($selectedMethod);
+        // Credential id is required to locate the registered key material.
         if ($selectedCredentialIdB64 === '') {
             return [
                 'ok' => false,
@@ -1034,6 +1113,7 @@ final class LoginChallenge
         }
 
         $preferences = $auth->userPreferences($userId);
+        // Stop early when preferences cannot be loaded for this user.
         if (!is_array($preferences)) {
             return [
                 'ok' => false,
@@ -1046,6 +1126,7 @@ final class LoginChallenge
             (array) ($preferences['two_factor'] ?? []),
             $selectedCredentialIdB64
         );
+        // Selected credential must resolve to a confirmed stored WebAuthn method.
         if (!is_array($resolvedMethod)) {
             return [
                 'ok' => false,
@@ -1055,6 +1136,7 @@ final class LoginChallenge
         }
 
         $credentialIdBinary = base64_decode($selectedCredentialIdB64, true);
+        // Ensure selected credential id decodes into non-empty binary form.
         if (!is_string($credentialIdBinary) || $credentialIdBinary === '') {
             return [
                 'ok' => false,
@@ -1104,6 +1186,7 @@ final class LoginChallenge
         $signature = base64_decode((string) ($post['signature'] ?? ''), true);
         $credentialIdB64 = is_string($credentialIdBinary) ? base64_encode($credentialIdBinary) : '';
 
+        // All required assertion fields must decode successfully.
         if (
             !is_string($credentialIdBinary) || $credentialIdBinary === ''
             || !is_string($clientDataJSON) || $clientDataJSON === ''
@@ -1118,6 +1201,7 @@ final class LoginChallenge
         }
 
         $preferences = $auth->userPreferences($userId);
+        // Verification requires stored credential metadata from user preferences.
         if (!is_array($preferences)) {
             return [
                 'ok' => false,
@@ -1129,11 +1213,14 @@ final class LoginChallenge
         $credentialPublicKey = '';
         $requiresUserVerification = false;
         $previousSignatureCounter = 0;
+        // Locate the confirmed stored WebAuthn credential that matches the submitted id.
         foreach ((array) ($preferences['two_factor'] ?? []) as $method) {
+            // Skip malformed entries in the stored two-factor array.
             if (!is_array($method)) {
                 continue;
             }
 
+            // Only confirmed WebAuthn methods are eligible for assertion verification.
             if (
                 strtolower(trim((string) ($method['type'] ?? ''))) !== 'webauthn'
                 || strtolower(trim((string) ($method['status'] ?? ''))) !== 'confirmed'
@@ -1141,6 +1228,7 @@ final class LoginChallenge
                 continue;
             }
 
+            // Continue until the credential id matches the submitted assertion id.
             if (trim((string) ($method['credential_id'] ?? '')) !== $credentialIdB64) {
                 continue;
             }
@@ -1152,6 +1240,7 @@ final class LoginChallenge
             break;
         }
 
+        // Reject assertions for credentials not registered on this account.
         if ($credentialPublicKey === '') {
             return [
                 'ok' => false,
@@ -1161,6 +1250,7 @@ final class LoginChallenge
             ];
         }
 
+        // Enforce UV requirements for methods configured to require PIN/biometric checks.
         if ($requiresUserVerification && !WebAuthn::authenticatorDataHasUserVerification($authenticatorData)) {
             return [
                 'ok' => false,
@@ -1200,6 +1290,7 @@ final class LoginChallenge
     {
         $userId = $auth->userId();
         $pendingUserId = $auth->pendingTwoFactorUserId();
+        // Pending challenge must belong to the active session user.
         if ($userId === null || $pendingUserId === null || $userId !== $pendingUserId) {
             return [
                 'ok' => false,

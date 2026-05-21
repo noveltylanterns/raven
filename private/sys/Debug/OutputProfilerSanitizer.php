@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/sys/Debug/OutputProfilerSanitizer.php
  * Output profiler request and environment payload sanitizer.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/Auth/LoginIdentifier.php
  * Login identifier mode resolution and normalization helpers.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -35,6 +35,7 @@ final class LoginIdentifier
     public function modeFromConfig(Config $config): string
     {
         $mode = strtolower(trim((string) $config->get('user.auth.method', 'email')));
+        // Fall back to email mode when config contains an unsupported value.
         if (!in_array($mode, ['email', 'username'], true)) {
             return 'email';
         }
@@ -56,10 +57,12 @@ final class LoginIdentifier
     public function normalizeForMode(InputSanitizer $input, string $mode, string $rawIdentifier): ?string
     {
         $normalizedText = $input->text($rawIdentifier, 254);
+        // Empty normalized identifiers are always invalid.
         if ($normalizedText === '') {
             return null;
         }
 
+        // Email mode requires a valid normalized email identifier.
         if ($mode === 'email') {
             $normalizedEmail = $input->email($normalizedText);
             return ($normalizedEmail !== null && $normalizedEmail !== '') ? $normalizedEmail : null;
@@ -81,16 +84,19 @@ final class LoginIdentifier
     public function normalizeUsernameOrEmail(InputSanitizer $input, string $rawValue): ?string
     {
         $normalizedText = $input->text($rawValue, 254);
+        // Reject blank identifiers after text normalization.
         if ($normalizedText === '') {
             return null;
         }
 
         $normalizedUsername = $input->username($normalizedText);
+        // Prefer username interpretation when the value satisfies username rules.
         if ($normalizedUsername !== null && $normalizedUsername !== '') {
             return $normalizedUsername;
         }
 
         $normalizedEmail = $input->email($normalizedText);
+        // Fall back to email interpretation when username normalization fails.
         if ($normalizedEmail !== null && $normalizedEmail !== '') {
             return $normalizedEmail;
         }

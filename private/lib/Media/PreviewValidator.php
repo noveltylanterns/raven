@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/Media/PreviewValidator.php
  * Validation policy wrapper for preview/icon image uploads.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/View/Panel/EditorPage.php
  * Panel page body-block helpers for editor submissions and block menus.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

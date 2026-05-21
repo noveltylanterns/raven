@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/sys/Router/Public/PageRouter.php
  * Public homepage, page-route, and embedded-form route registration.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/sys/Schema/SchemaIntrospector.php
  * Cross-driver schema introspection and DDL safety helpers.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

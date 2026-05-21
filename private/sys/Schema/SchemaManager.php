@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/sys/Schema/SchemaManager.php
  * Runtime schema ensure entrypoint; gates the bootstrap pipeline behind mtime-based state tracking.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

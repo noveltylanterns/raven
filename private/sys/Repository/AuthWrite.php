@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/sys/Repository/AuthWrite.php
  * Write-side repository for auth-user preference and two-factor fields.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

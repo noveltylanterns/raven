@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/sys/Controller/Public/SharedController.php
  * Shared request context for split public sub-controllers.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

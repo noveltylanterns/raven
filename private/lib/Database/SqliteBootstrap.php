@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/Database/SqliteBootstrap.php
  * SQLite filesystem and pragma initialization helpers.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -38,10 +38,12 @@ final class SqliteBootstrap
     public function ensureDir(string $path): void
     {
         $directory = dirname($path);
+        // No-op when the target parent directory already exists.
         if (is_dir($directory)) {
             return;
         }
 
+        // Create directory recursively; verify result to avoid silent mkdir failures.
         if (!@mkdir($directory, 0775, true) && !is_dir($directory)) {
             throw new RuntimeException('Failed to create SQLite data directory: ' . $directory);
         }

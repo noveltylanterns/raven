@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/Parser/PageBlockParser.php
  * Shared page body-block parsing and normalization helpers.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -58,6 +58,7 @@ final class PageBlockParser
     public function normalizeType(string $value, array $definitions): string
     {
         $type = strtolower(trim($value));
+        // Empty type input falls back to the default rich-text block type.
         if ($type === '') {
             return 'tinymce';
         }
@@ -75,6 +76,7 @@ final class PageBlockParser
     public function editorMode(string $type, array $definitions): string
     {
         $normalized = strtolower(trim($type));
+        // Empty type keys default to the baseline editor mode.
         if ($normalized === '') {
             return 'tinymce';
         }
@@ -97,12 +99,14 @@ final class PageBlockParser
     {
         $definitions = $existing;
 
+        // Convert each extension-provided field descriptor into a persisted block definition entry.
         foreach ($fields as $entry) {
             if (!is_array($entry)) {
                 continue;
             }
 
             $slug = $this->input->slug((string) ($entry['slug'] ?? ''));
+            // Skip entries without a valid slug because they cannot map to stable block type keys.
             if ($slug === null || $slug === '') {
                 continue;
             }
@@ -110,12 +114,14 @@ final class PageBlockParser
             $normalizedSlug = str_replace('-', '_', strtolower($slug));
             $normalizedExtension = str_replace('-', '_', strtolower($extensionName));
             $type = 'content_' . $normalizedExtension . '_' . $normalizedSlug;
+            // Ignore duplicate or syntactically invalid generated type identifiers.
             if (isset($definitions[$type]) || preg_match('/^[a-z0-9_]{1,120}$/', $type) !== 1) {
                 continue;
             }
 
             $label = $this->input->text((string) ($entry['label'] ?? ''), 120);
             $editor = strtolower(trim((string) ($entry['editor'] ?? 'tinymce')));
+            // Only keep entries with both a non-empty label and supported editor mode.
             if ($label === '' || !in_array($editor, ['tinymce', 'plaintext', 'autobr', 'markdown', 'markdown_file'], true)) {
                 continue;
             }
@@ -138,6 +144,7 @@ final class PageBlockParser
     public function normalizePersistedType(string $value): string
     {
         $type = strtolower(trim($value));
+        // Preserve built-in persisted types exactly as provided when recognized.
         if (in_array($type, ['tinymce', 'plaintext', 'autobr', 'markdown', 'markdown_file', 'image_gallery'], true)) {
             return $type;
         }
@@ -155,16 +162,19 @@ final class PageBlockParser
      */
     public function normalizeCssId(mixed $value): string
     {
+        // CSS ids must originate from scalar-like values; arrays/objects are rejected.
         if (!is_scalar($value) && $value !== null) {
             return '';
         }
 
         $id = str_replace("\0", '', trim((string) ($value ?? '')));
         $id = ltrim($id, '#');
+        // Empty ids after cleanup are stored as blank.
         if ($id === '') {
             return '';
         }
 
+        // Truncate long ids to match configured maximum token length.
         if (mb_strlen($id) > 120) {
             $id = mb_substr($id, 0, 120);
         }
@@ -182,19 +192,23 @@ final class PageBlockParser
      */
     public function normalizeCssClassList(mixed $value): string
     {
+        // CSS class input must be scalar-like to be tokenized safely.
         if (!is_scalar($value) && $value !== null) {
             return '';
         }
 
         $raw = str_replace("\0", '', trim((string) ($value ?? '')));
+        // Empty class strings normalize to blank output.
         if ($raw === '') {
             return '';
         }
 
         $classMap = [];
         $classes = [];
+        // Tokenize on whitespace/commas, then sanitize and deduplicate class names.
         foreach (preg_split('/[\s,]+/', $raw) ?: [] as $token) {
             $token = ltrim(trim((string) $token), '.');
+            // Skip empty or invalid CSS class tokens.
             if ($token === '' || preg_match('/^[a-zA-Z0-9_-]{1,80}$/', $token) !== 1) {
                 continue;
             }
@@ -208,6 +222,7 @@ final class PageBlockParser
 
             $classMap[$key] = true;
             $classes[] = $token;
+            // Enforce an upper bound to keep stored class lists concise and predictable.
             if (count($classes) >= 12) {
                 break;
             }
@@ -224,13 +239,16 @@ final class PageBlockParser
      */
     public function normalizeStoredBlocks(mixed $raw): array
     {
+        // Non-array payloads cannot represent structured block rows.
         if (!is_array($raw)) {
             return [];
         }
 
         $blocks = [];
+        // Normalize each entry independently so malformed rows can be skipped safely.
         foreach ($raw as $entry) {
             $normalized = $this->normalizeStoredBlockEntry($entry);
+            // Null signals an unusable entry that should be dropped.
             if ($normalized === null) {
                 continue;
             }
@@ -250,11 +268,13 @@ final class PageBlockParser
     public function decodeStoredBlocks(string $raw): array
     {
         $trimmed = trim($raw);
+        // Empty stored content means there are no blocks to decode.
         if ($trimmed === '') {
             return [];
         }
 
         $decoded = json_decode($trimmed, true);
+        // Non-JSON legacy content is preserved as one tinymce-style block.
         if (!is_array($decoded)) {
             // Legacy single-string page bodies remain readable so older content
             // does not break when block storage is introduced or re-saved.
@@ -277,6 +297,7 @@ final class PageBlockParser
      */
     public function encodeStoredBlocks(array $blocks): string
     {
+        // Empty block arrays store as blank content to preserve legacy expectations.
         if ($blocks === []) {
             return '';
         }
@@ -294,6 +315,7 @@ final class PageBlockParser
      */
     public function hasGalleryBlock(array $blocks, callable $editorModeResolver): bool
     {
+        // One gallery-mode block is enough to trigger gallery-dependent behavior.
         foreach ($blocks as $block) {
             if ((string) $editorModeResolver((string) ($block['type'] ?? '')) === 'gallery') {
                 return true;
@@ -316,17 +338,20 @@ final class PageBlockParser
         $cssId = '';
         $cssClass = '';
 
+        // Array entries are parsed as structured block rows with optional style metadata.
         if (is_array($entry)) {
             $type = $this->normalizePersistedType((string) ($entry['type'] ?? 'tinymce'));
             $value = $entry['content'] ?? '';
             $cssId = $this->normalizeCssId($entry['css_id'] ?? null);
             $cssClass = $this->normalizeCssClassList($entry['css_class'] ?? null);
+            // Reject non-scalar content payloads to avoid nested structures in storage.
             if (!is_scalar($value) && $value !== null) {
                 return null;
             }
 
             $content = str_replace("\0", '', (string) ($value ?? ''));
         } else {
+            // Scalar legacy entries are treated as plain block content.
             if (!is_scalar($entry) && $entry !== null) {
                 return null;
             }
@@ -334,10 +359,12 @@ final class PageBlockParser
             $content = str_replace("\0", '', (string) ($entry ?? ''));
         }
 
+        // Markdown-file blocks store a path-like payload and should trim surrounding whitespace.
         if ($type === 'markdown_file') {
             $content = trim($content);
         }
 
+        // Gallery blocks persist without freeform content text.
         if ($type === 'image_gallery') {
             return [
                 'type' => 'image_gallery',
@@ -347,6 +374,7 @@ final class PageBlockParser
             ];
         }
 
+        // Empty content blocks are discarded from persisted payloads.
         if (trim($content) === '') {
             return null;
         }

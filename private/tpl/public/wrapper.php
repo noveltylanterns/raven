@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/tpl/public/wrapper.php
  * Shared layout template for rendered views.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 if (!defined('RAVEN_VIEW_RENDER_CONTEXT')) {

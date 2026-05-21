@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/Security/PhraseGenerate.php
  * Recovery-phrase generation and password-hashing helpers.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -43,15 +43,18 @@ final class PhraseGenerate
         $wordCount = max(1, $wordCount);
         $pool = self::wordPool();
         $poolCount = count($pool);
+        // Cannot generate unique selections when the loaded pool is smaller than requested count.
         if ($poolCount < $wordCount) {
             return null;
         }
 
         $words = [];
+        // CSPRNG failures or invalid pool entries abort generation.
         try {
             for ($i = 0; $i < $wordCount; $i++) {
                 $index = random_int(0, $poolCount - 1);
                 $word = trim((string) ($pool[$index] ?? ''));
+                // Defensive guard against malformed/empty pool entries.
                 if ($word === '') {
                     return null;
                 }
@@ -62,6 +65,7 @@ final class PhraseGenerate
         }
 
         $phrase = implode(' ', $words);
+        // Re-validate generated phrase against canonical validator before returning.
         if (!PhraseValidate::isValid($phrase, $wordCount)) {
             return null;
         }
@@ -82,6 +86,7 @@ final class PhraseGenerate
     public static function hash(string $phrase, int $wordCount = 12): ?string
     {
         $normalized = PhraseValidate::normalize($phrase);
+        // Only valid phrases are accepted for hashing.
         if (!PhraseValidate::isValid($normalized, $wordCount)) {
             return null;
         }
@@ -92,6 +97,7 @@ final class PhraseGenerate
             : self::HASH_BCRYPT_OPTIONS;
 
         $hashed = password_hash($normalized, $algorithm, $options);
+        // Hash generation must produce a non-empty string to be persisted.
         if (!is_string($hashed) || trim($hashed) === '') {
             return null;
         }
@@ -105,19 +111,23 @@ final class PhraseGenerate
     private static function wordPool(): array
     {
         static $pool = null;
+        // Cache loaded word pool for repeated calls within the request lifecycle.
         if (is_array($pool)) {
             return $pool;
         }
 
         $lines = @file(self::WORD_LIST_PATH, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+        // Missing/unreadable word list yields an empty pool.
         if (!is_array($lines)) {
             $pool = [];
             return $pool;
         }
 
         $loaded = [];
+        // Normalize and validate each candidate word from the BIP39 source file.
         foreach ($lines as $line) {
             $word = strtolower(trim((string) $line));
+            // Skip invalid word tokens outside allowed alpha/length constraints.
             if ($word === '' || preg_match('/^[a-z]{2,20}$/', $word) !== 1) {
                 continue;
             }

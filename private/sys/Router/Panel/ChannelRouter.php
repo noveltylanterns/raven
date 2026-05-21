@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/sys/Router/Panel/ChannelRouter.php
  * Panel channel-route registration.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

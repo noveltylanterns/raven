@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/ext/cron/tpl/panel_index.php
  * Scheduled Tasks extension panel index view.
- * Docs: /private/ext/AGENTS.md
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

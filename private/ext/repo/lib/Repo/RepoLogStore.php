@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/ext/repo/lib/Repo/RepoLogStore.php
  * JSON log store for repository sync and admin events.
- * Docs: /private/ext/repo/AGENTS.md
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

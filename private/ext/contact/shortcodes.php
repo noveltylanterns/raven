@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/ext/contact/shortcodes.php
  * Contact Forms shortcode provider.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/Auth/Public/SessionGuard.php
  * Public-route availability guard for site visibility modes.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -39,7 +39,9 @@ final class SessionGuard
         $mode = $this->normalizeVisibilityMode($visibilityMode);
         $isLoggedIn = $auth->isLoggedIn();
 
+        // Disabled mode only allows authenticated users with disabled-site permission.
         if ($mode === 'disabled') {
+            // Allow request when authenticated user is explicitly permitted.
             if ($isLoggedIn && $auth->publicService()->canViewDisabledSite()) {
                 return true;
             }
@@ -48,7 +50,9 @@ final class SessionGuard
             return false;
         }
 
+        // Private mode allows only authenticated users with private-site permission.
         if ($mode === 'private') {
+            // Allow request when authenticated user is explicitly permitted.
             if ($isLoggedIn && $auth->publicService()->canViewPrivateSite()) {
                 return true;
             }
@@ -57,6 +61,7 @@ final class SessionGuard
             return false;
         }
 
+        // Public mode still enforces guest/authenticated public-site visibility permission.
         if (!$auth->publicService()->canViewPublicSite()) {
             $renderDenied();
             return false;
@@ -74,6 +79,7 @@ final class SessionGuard
     private function normalizeVisibilityMode(string $mode): string
     {
         $normalizedMode = strtolower(trim($mode));
+        // Keep only supported visibility values; default invalid values to public.
         if (in_array($normalizedMode, ['public', 'private', 'disabled'], true)) {
             return $normalizedMode;
         }

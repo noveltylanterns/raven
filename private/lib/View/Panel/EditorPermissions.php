@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/View/Panel/EditorPermissions.php
  * Builds panel permission-definition rows from stock and extension sources for group edit UI.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

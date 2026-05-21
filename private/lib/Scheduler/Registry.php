@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/Scheduler/Registry.php
  * System-wide scheduler registry for core and extension background jobs.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -75,6 +75,7 @@ final class Registry
      */
     public function registerJob(string $owner, string $name, int $interval, callable $run): void
     {
+        // Intervals below one second are invalid and ignored.
         if ($interval < 1) {
             return;
         }
@@ -101,6 +102,7 @@ final class Registry
      */
     public function addExtensionSource(string $directoryName): void
     {
+        // Deduplicate extension sources so each cron.php is loaded at most once per cycle.
         if (!in_array($directoryName, $this->pendingExtensions, true)) {
             $this->pendingExtensions[] = $directoryName;
             // Adding new sources invalidates the "all loaded" flag.
@@ -140,6 +142,7 @@ final class Registry
         $results = [];
         $now = time();
 
+        // Evaluate due-state and execution for each registered scheduler job.
         foreach ($this->jobs as $key => $job) {
             $owner = $job['owner'];
             $name = $job['name'];
@@ -152,6 +155,7 @@ final class Registry
                 continue;
             }
 
+            // Isolate each job run so one failure does not block other due jobs.
             try {
                 ($job['run'])($context);
                 $this->setLastRunTime($owner, $name, $now);
@@ -188,6 +192,7 @@ final class Registry
         $status = [];
         $now = time();
 
+        // Compute next-due and overdue flags for every registered job.
         foreach ($this->jobs as $key => $job) {
             $lastRun = $this->getLastRunTime($job['owner'], $job['name']);
             $nextDue = $lastRun !== null ? $lastRun + $job['interval'] : null;
@@ -216,11 +221,13 @@ final class Registry
     public function getLastRunTime(string $owner, string $name): ?int
     {
         $path = $this->timestampPath($owner, $name);
+        // Missing timestamp files mean the job has never run successfully.
         if (!is_file($path)) {
             return null;
         }
 
         $raw = file_get_contents($path);
+        // Empty/failed reads are treated as missing timestamps.
         if ($raw === false || trim($raw) === '') {
             return null;
         }
@@ -238,10 +245,12 @@ final class Registry
      */
     private function ensureExtensionJobsLoaded(): void
     {
+        // Avoid repeated filesystem scans once pending extension jobs are loaded.
         if ($this->extensionJobsLoaded) {
             return;
         }
 
+        // Load every pending extension source exactly once for this cycle.
         foreach ($this->pendingExtensions as $directoryName) {
             $this->loadExtensionCronFile($directoryName);
         }
@@ -266,10 +275,12 @@ final class Registry
     {
         $extensionRoot = $this->root . '/private/ext/' . $directoryName;
         $cronPath = \Raven\Lib\Extension\Resolver::providerPath($extensionRoot, 'cron.php');
+        // Extensions without a cron provider simply contribute no jobs.
         if ($cronPath === null) {
             return;
         }
 
+        // Provider load errors are isolated to the failing extension.
         try {
             /** @var mixed $raw */
             $raw = require $cronPath;
@@ -281,26 +292,31 @@ final class Registry
             return;
         }
 
+        // cron.php must return a job-definition array.
         if (!is_array($raw)) {
             return;
         }
 
+        // Normalize and register each extension job definition.
         foreach ($raw as $entry) {
             if (!is_array($entry)) {
                 continue;
             }
 
             $name = trim((string) ($entry['name'] ?? ''));
+            // Names must match Raven's scheduler slug contract.
             if ($name === '' || preg_match('/^[a-z0-9][a-z0-9_-]{0,63}$/', $name) !== 1) {
                 continue;
             }
 
             $interval = (int) ($entry['interval'] ?? 0);
+            // Non-positive intervals are invalid.
             if ($interval < 1) {
                 continue;
             }
 
             $run = $entry['run'] ?? null;
+            // Job handler must be callable before registration.
             if (!is_callable($run)) {
                 continue;
             }
@@ -322,6 +338,7 @@ final class Registry
     private function setLastRunTime(string $owner, string $name, int $time): void
     {
         $dir = $this->root . '/.tmp/cron/' . $owner;
+        // Best-effort timestamp persistence; skip when directory creation fails.
         if (!is_dir($dir) && !mkdir($dir, 0775, true) && !is_dir($dir)) {
             return;
         }

@@ -1,5 +1,12 @@
 <?php
 
+/**
+ * RAVEN CMS
+ * ~/private/sys/Logger.php
+ * Core runtime event log persistence and query service.
+ * Docs: https://lanterns.io/raven
+ */
+
 declare(strict_types=1);
 
 namespace Raven\Core;

@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/tpl/public/auth/register.php
  * Public registration template.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 if (!defined('RAVEN_VIEW_RENDER_CONTEXT')) {

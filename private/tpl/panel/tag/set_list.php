@@ -1,5 +1,12 @@
 <?php
 
+/**
+ * RAVEN CMS
+ * ~/private/tpl/panel/tag/set_list.php
+ * Admin panel tag-set list template.
+ * Docs: https://lanterns.io/raven
+ */
+
 declare(strict_types=1);
 
 /** @var array<string, string> $site */

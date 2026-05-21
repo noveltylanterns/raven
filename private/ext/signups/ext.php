@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/ext/signups/ext.php
  * Signup Sheets extension service provider for bootstrap container wiring.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

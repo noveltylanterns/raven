@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/View/Public/ThemeTemplate.php
  * Theme-aware public template lookup and render orchestration.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/sys/Controller/Public/FeedController.php
  * Split public feed controller for feed routes.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

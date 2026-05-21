@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/Format/Json.php
  * Canonical JSON encode/decode and file read/write helpers.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -25,10 +25,12 @@ final class Json
      */
     public static function decode(string $json, int $maxDepth = 64): ?array
     {
+        // Empty/whitespace payloads are treated as missing JSON.
         if (trim($json) === '') {
             return null;
         }
 
+        // Decode with exceptions so malformed JSON maps to null cleanly.
         try {
             /** @var mixed $decoded */
             $decoded = json_decode($json, true, max(1, $maxDepth), JSON_THROW_ON_ERROR);
@@ -48,6 +50,7 @@ final class Json
      */
     public static function encode(mixed $value, int $flags = JSON_UNESCAPED_SLASHES): ?string
     {
+        // Encode with exceptions so failures map to null consistently.
         try {
             return json_encode($value, $flags | JSON_THROW_ON_ERROR);
         } catch (\Throwable) {
@@ -65,11 +68,13 @@ final class Json
      */
     public static function decodeFile(string $path, int $maxBytes = 10485760, int $maxDepth = 64): ?array
     {
+        // File path must be non-empty, existing, and readable.
         if ($path === '' || !is_file($path) || !is_readable($path)) {
             return null;
         }
 
         $raw = @file_get_contents($path, false, null, 0, max(1, $maxBytes));
+        // Read failures are treated as invalid JSON payloads.
         if (!is_string($raw)) {
             return null;
         }
@@ -87,21 +92,25 @@ final class Json
      */
     public static function writeFile(string $path, mixed $value, int $flags = JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT): bool
     {
+        // Target path must be non-empty.
         if ($path === '') {
             return false;
         }
 
         $encoded = self::encode($value, $flags);
+        // Abort when value cannot be encoded as JSON.
         if (!is_string($encoded)) {
             return false;
         }
 
         $tmpPath = $path . '.tmp.' . str_replace('.', '', uniqid('', true));
+        // Write via temp file first to preserve atomic replacement semantics.
         if (@file_put_contents($tmpPath, $encoded, LOCK_EX) === false) {
             @unlink($tmpPath);
             return false;
         }
 
+        // Atomically replace destination file with temp payload.
         if (!@rename($tmpPath, $path)) {
             @unlink($tmpPath);
             return false;

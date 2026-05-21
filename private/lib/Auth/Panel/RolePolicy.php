@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/Auth/Panel/RolePolicy.php
  * Group role slug validation and stock-role permission constraint helpers.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -36,6 +36,7 @@ final class RolePolicy
     public function normalizeSlug(string $value): string
     {
         $value = strtolower(trim($value));
+        // Empty input normalizes to an empty slug.
         if ($value === '') {
             return '';
         }
@@ -88,6 +89,7 @@ final class RolePolicy
         $resolvedRoute = $routeEnabled > 0 ? 1 : 0;
         $resolvedMask = $mask;
 
+        // Banned role is a hard deny regardless of incoming values.
         if ($normalizedSlug === 'banned') {
             $resolvedRoute = 0;
             $resolvedMask = 0;

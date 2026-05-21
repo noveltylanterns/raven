@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/public/install.php
  * One-time installer for initial Raven CMS setup.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 // Inline note: This script is intentionally standalone so first-run setup works before full app bootstrap.
@@ -41,7 +41,7 @@ function installer_write_config(string $path, array $config): void
     $content .= " * RAVEN CMS\n";
     $content .= " * ~/private/dat/config.php\n";
     $content .= " * Runtime configuration values for Raven CMS.\n";
-    $content .= " * Docs: https://raven.lanterns.io\n";
+    $content .= " * Docs: https://lanterns.io/raven\n";
     $content .= " */\n\n";
     $content .= "// Inline note: Keep site/database defaults explicit so panel config editing stays predictable.\n\n";
     $content .= "declare(strict_types=1);\n\n";

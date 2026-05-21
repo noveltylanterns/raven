@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/Auth/Public/PermissionBase.php
  * Canonical public-route permission bitmask helpers for site-visibility access checks.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

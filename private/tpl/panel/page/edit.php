@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/tpl/panel/page/edit.php
  * Admin panel page editor with content/meta/media tabs.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 // Inline note: This view keeps editor UX logic in-template while controller handles all persistence.

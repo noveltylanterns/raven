@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/ext/repo/tpl/panel_settings.php
  * Repositories extension global settings view.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

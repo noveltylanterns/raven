@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/ext/repo/tpl/panel_index.php
  * Repositories extension panel list view.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

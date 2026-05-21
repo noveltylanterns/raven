@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/Extension/Public/FormRuntime.php
  * Contract for extension-owned embedded form shortcode runtimes.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

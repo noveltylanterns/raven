@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/Media/ImageVariantProcessor.php
  * Shared variant-dimension resolver for page and taxonomy image pipelines.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -63,14 +63,17 @@ final class ImageVariantProcessor
         int $maxWidth,
         int $maxHeight
     ): array {
+        // Guard against invalid source dimensions so callers always get positive sizes back.
         if ($sourceWidth < 1 || $sourceHeight < 1) {
             return ['width' => 1, 'height' => 1];
         }
 
+        // No bounds means keep original dimensions unchanged.
         if ($maxWidth <= 0 && $maxHeight <= 0) {
             return ['width' => $sourceWidth, 'height' => $sourceHeight];
         }
 
+        // Resolve scale from whichever axes have active limits.
         if ($maxWidth <= 0) {
             $scale = min(1.0, $maxHeight / $sourceHeight);
         } elseif ($maxHeight <= 0) {
@@ -86,6 +89,7 @@ final class ImageVariantProcessor
         if ($maxWidth > 0) {
             $targetWidth = min($targetWidth, $maxWidth);
         }
+        // Height clamp remains independent so one-axis autos still respect explicit height limits.
         if ($maxHeight > 0) {
             $targetHeight = min($targetHeight, $maxHeight);
         }

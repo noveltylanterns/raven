@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/Raven.php
  * Shared Raven bootstrap container and service wiring.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

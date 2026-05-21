@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/View/Public/PageBlocks.php
  * Public page body-block rendering helpers for normalized public output.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

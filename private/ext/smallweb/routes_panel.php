@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/ext/smallweb/routes_panel.php
  * Smallweb extension panel route registrar.
- * docs: /private/ext/AGENTS.md
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

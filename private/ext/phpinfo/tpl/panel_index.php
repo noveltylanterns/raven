@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/ext/phpinfo/tpl/panel_index.php
  * PHP Info extension panel index view.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 // Inline note: Generated extension scaffold view.

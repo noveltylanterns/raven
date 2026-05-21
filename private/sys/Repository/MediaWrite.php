@@ -3,7 +3,7 @@
  * RAVEN CMS
  * ~/private/sys/Repository/MediaWrite.php
  * Write-side data access for page-scoped media rows and their size variants.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

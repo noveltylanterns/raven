@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/View/Qr.php
  * Shared QR-code SVG data-URI renderer for panel and public view payloads.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

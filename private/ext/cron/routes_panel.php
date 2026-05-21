@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/ext/cron/routes_panel.php
  * Scheduled Tasks extension panel route registration.
- * Docs: /private/ext/AGENTS.md
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

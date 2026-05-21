@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/ext/repo/shortcodes.php
  * Repositories extension shortcode provider.
- * Docs: /private/ext/repo/AGENTS.md
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

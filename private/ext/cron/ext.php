@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/ext/cron/ext.php
  * Scheduled Tasks extension service bootstrap provider.
- * Docs: /private/ext/AGENTS.md
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

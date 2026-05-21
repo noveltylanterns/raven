@@ -15,6 +15,7 @@ When we run through this checklist, make a temporary copy of it to save our prog
   - `rg --files private public panel scripts -g '*.php' | while read -r f; do php -l "$f"; done`
 - [ ] Run all available smoke/diagnostic scripts and confirm each reports `PASS`:
   - `php debug/util/check-config-sync.php`
+  - `php build/docs/rvn-docs.php --check`
   - `php debug/smoke/cli.php`
   - `php debug/smoke/contact-workflow.php`
   - `php debug/smoke/debug-toolbar.php`

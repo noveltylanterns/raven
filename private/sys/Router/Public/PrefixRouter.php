@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/sys/Router/Public/PrefixRouter.php
  * Shared public route builder for configurable-prefix slug-listing routes with pagination.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

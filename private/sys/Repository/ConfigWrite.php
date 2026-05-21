@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/sys/Repository/ConfigWrite.php
  * Handles nested config writes and on-disk persistence for Raven config files.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -98,7 +98,7 @@ final class ConfigWrite
  * RAVEN CMS
  * ~/private/dat/config.php
  * Runtime configuration values for Raven CMS.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 // Inline note: Keep site/database defaults explicit so panel config editing stays predictable.

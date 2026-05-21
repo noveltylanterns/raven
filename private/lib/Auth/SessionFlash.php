@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/Auth/SessionFlash.php
  * Session-backed flash-message store shared by panel and public route controllers.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -78,12 +78,15 @@ final class SessionFlash
         $store = &$this->sessionStore();
         $value = $store[$key] ?? null;
         unset($store[$key]);
+        // Only array payloads are valid for list-based flash entries.
         if (!is_array($value)) {
             return null;
         }
 
         $normalized = [];
+        // Keep only string entries when normalizing pulled flash lists.
         foreach ($value as $item) {
+            // Skip non-string list members.
             if (is_string($item)) {
                 $normalized[] = $item;
             }
@@ -94,6 +97,7 @@ final class SessionFlash
 
     private function &sessionStore(): array
     {
+        // Initialize missing/malformed flash store to an empty array bucket.
         if (!isset($_SESSION[$this->sessionKey]) || !is_array($_SESSION[$this->sessionKey])) {
             $_SESSION[$this->sessionKey] = [];
         }

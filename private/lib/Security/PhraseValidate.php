@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/Security/PhraseValidate.php
  * Recovery-phrase normalization, validation, hashing-check, and method-matching helpers.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -49,20 +49,24 @@ final class PhraseValidate
     {
         $wordCount = max(1, $wordCount);
         $phrase = self::normalize($phrase);
+        // Empty normalized phrases are invalid by definition.
         if ($phrase === '') {
             return false;
         }
 
         $words = explode(' ', $phrase);
+        // Phrase must contain exactly the expected number of words.
         if (count($words) !== $wordCount) {
             return false;
         }
 
         $wordLookup = self::wordPoolLookup();
+        // Validation cannot proceed if the word lookup failed to load.
         if ($wordLookup === []) {
             return false;
         }
 
+        // Every word must exist in the BIP39 lookup set.
         foreach ($words as $word) {
             if (!isset($wordLookup[$word])) {
                 return false;
@@ -81,6 +85,7 @@ final class PhraseValidate
     public static function isValidHash(string $hash): bool
     {
         $hash = trim($hash);
+        // Empty hash strings are never valid.
         if ($hash === '') {
             return false;
         }
@@ -103,6 +108,7 @@ final class PhraseValidate
     public static function verify(string $submittedPhrase, string $hash, int $wordCount = 12): bool
     {
         $normalizedPhrase = self::normalize($submittedPhrase);
+        // Reject invalid phrases or hashes before password_verify.
         if (!self::isValid($normalizedPhrase, $wordCount) || !self::isValidHash($hash)) {
             return false;
         }
@@ -128,12 +134,14 @@ final class PhraseValidate
         string $selectedMethodKey = ''
     ): ?array {
         $normalizedSubmittedPhrase = self::normalize($submittedPhrase);
+        // Submitted phrase must pass canonical recovery validation first.
         if (!self::isValid($normalizedSubmittedPhrase, 12)) {
             return null;
         }
 
         $selectedMethodKey = trim($selectedMethodKey);
 
+        // Scan confirmed recovery methods for the first matching hash.
         foreach ($methods as $index => $method) {
             if (!is_array($method)) {
                 continue;
@@ -141,11 +149,13 @@ final class PhraseValidate
 
             $type   = Login2fa::normalizeType((string) ($method['type'] ?? ''));
             $status = Login2fa::normalizeStatus((string) ($method['status'] ?? ''), $type);
+            // Only confirmed recovery rows can satisfy a phrase match.
             if ($type !== 'recovery' || $status !== 'confirmed') {
                 continue;
             }
 
             $recoveryHash = trim((string) ($method['recovery_hash'] ?? ''));
+            // Skip rows with malformed/unusable hash payloads.
             if (!self::isValidHash($recoveryHash)) {
                 continue;
             }
@@ -159,6 +169,7 @@ final class PhraseValidate
                 continue;
             }
 
+            // Verify submitted phrase against the candidate recovery hash.
             if (!self::verify($normalizedSubmittedPhrase, $recoveryHash, 12)) {
                 continue;
             }
@@ -178,19 +189,23 @@ final class PhraseValidate
     private static function wordPool(): array
     {
         static $pool = null;
+        // Cache loaded pool for repeat validations in one request.
         if (is_array($pool)) {
             return $pool;
         }
 
         $lines = @file(self::WORD_LIST_PATH, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+        // Missing word list results in an empty pool and failed validation.
         if (!is_array($lines)) {
             $pool = [];
             return $pool;
         }
 
         $loaded = [];
+        // Normalize each raw line into a validated BIP39 word token.
         foreach ($lines as $line) {
             $word = strtolower(trim((string) $line));
+            // Ignore malformed/empty tokens.
             if ($word === '' || preg_match('/^[a-z]{2,20}$/', $word) !== 1) {
                 continue;
             }
@@ -207,11 +222,13 @@ final class PhraseValidate
     private static function wordPoolLookup(): array
     {
         static $lookup = null;
+        // Cache lookup map to avoid rebuilding for each validation call.
         if (is_array($lookup)) {
             return $lookup;
         }
 
         $lookup = [];
+        // Populate hash-set style lookup for O(1) word membership checks.
         foreach (self::wordPool() as $word) {
             $lookup[$word] = true;
         }

@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/View/Public/ThemeCatalog.php
  * Shared catalog, inheritance, and slug-policy helpers for public themes.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

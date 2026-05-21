@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/ext/repo/cron.php
  * Repositories extension scheduler jobs.
- * Docs: /private/ext/repo/AGENTS.md
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

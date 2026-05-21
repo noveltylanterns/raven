@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/Extension/ValidateProvider.php
  * Validates extension provider files (shortcodes.php, fields.php).
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -43,6 +43,7 @@ final class ValidateProvider
      */
     public function validateShortcodesProvider(string $root, string $directoryName, array $context = []): array
     {
+        // Reject unsafe extension directory names before provider loading.
         if (!$this->manifestValidator->isSafeDirectoryName($directoryName)) {
             return [
                 'valid' => false,
@@ -53,6 +54,7 @@ final class ValidateProvider
 
         $extensionRoot = rtrim($root, '/') . '/private/ext/' . $directoryName;
         $providerPath = Resolver::providerPath($extensionRoot, 'shortcodes.php');
+        // Missing provider is valid and yields an empty shortcode list.
         if ($providerPath === null) {
             return [
                 'valid' => true,
@@ -62,6 +64,7 @@ final class ValidateProvider
         }
 
         /** @var mixed $provider */
+        // Isolate provider include errors into validation failures.
         try {
             $provider = require $providerPath;
         } catch (\Throwable) {
@@ -72,15 +75,19 @@ final class ValidateProvider
             ];
         }
 
+        // Callable providers are executed to obtain their runtime shortcode rows.
         if (is_callable($provider)) {
             $context['extension'] = $directoryName;
+            // Provide default forms callback when caller did not supply one.
             if (!isset($context['forms']) || !is_callable($context['forms'])) {
                 $context['forms'] = static fn (string $tableName): array => [];
             }
 
+            // Prefer context-aware callable signature, then fall back to zero-arg form.
             try {
                 $provider = $provider($context);
             } catch (\ArgumentCountError) {
+                // Back-compat fallback for legacy zero-argument provider callables.
                 try {
                     $provider = $provider();
                 } catch (\Throwable) {
@@ -99,6 +106,7 @@ final class ValidateProvider
             }
         }
 
+        // Provider output must be an array of shortcode rows.
         if (!is_array($provider)) {
             return [
                 'valid' => false,
@@ -108,7 +116,9 @@ final class ValidateProvider
         }
 
         $items = [];
+        // Validate and normalize each shortcode definition row.
         foreach ($provider as $entry) {
+            // Each row must be object-like associative data.
             if (!is_array($entry)) {
                 return [
                     'valid' => false,
@@ -120,6 +130,7 @@ final class ValidateProvider
             $label = trim((string) ($entry['label'] ?? ''));
             $shortcode = trim((string) ($entry['shortcode'] ?? ''));
             $shortcode = str_replace(["\r", "\n", "\0"], '', $shortcode);
+            // Label and shortcode token are both required.
             if ($label === '' || $shortcode === '') {
                 return [
                     'valid' => false,
@@ -128,6 +139,7 @@ final class ValidateProvider
                 ];
             }
 
+            // Shortcode token must use bracketed shortcode syntax.
             if (!str_starts_with($shortcode, '[') || !str_ends_with($shortcode, ']')) {
                 return [
                     'valid' => false,
@@ -162,6 +174,7 @@ final class ValidateProvider
      */
     public function validateFieldsProvider(string $root, string $directoryName, array $context = []): array
     {
+        // Reject unsafe extension directory names before provider loading.
         if (!$this->manifestValidator->isSafeDirectoryName($directoryName)) {
             return [
                 'valid' => false,
@@ -172,6 +185,7 @@ final class ValidateProvider
 
         $extensionRoot = rtrim($root, '/') . '/private/ext/' . $directoryName;
         $providerPath = Resolver::providerPath($extensionRoot, 'fields.php');
+        // Missing provider is valid and yields an empty fields list.
         if ($providerPath === null) {
             return [
                 'valid' => true,
@@ -181,6 +195,7 @@ final class ValidateProvider
         }
 
         /** @var mixed $provider */
+        // Isolate provider include errors into validation failures.
         try {
             $provider = require $providerPath;
         } catch (\Throwable) {
@@ -191,12 +206,15 @@ final class ValidateProvider
             ];
         }
 
+        // Callable providers are executed to obtain their runtime fields rows.
         if (is_callable($provider)) {
             $context['extension'] = $directoryName;
 
+            // Prefer context-aware callable signature, then fall back to zero-arg form.
             try {
                 $provider = $provider($context);
             } catch (\ArgumentCountError) {
+                // Back-compat fallback for legacy zero-argument provider callables.
                 try {
                     $provider = $provider();
                 } catch (\Throwable) {
@@ -215,6 +233,7 @@ final class ValidateProvider
             }
         }
 
+        // Provider output must be an array of field rows.
         if (!is_array($provider)) {
             return [
                 'valid' => false,
@@ -226,7 +245,9 @@ final class ValidateProvider
         $allowedEditors = ['tinymce', 'plaintext', 'autobr', 'markdown', 'markdown_file'];
         $items = [];
         $seenSlugs = [];
+        // Validate and normalize each field definition row.
         foreach ($provider as $entry) {
+            // Each row must be object-like associative data.
             if (!is_array($entry)) {
                 return [
                     'valid' => false,
@@ -239,6 +260,7 @@ final class ValidateProvider
             $label = trim((string) ($entry['label'] ?? ''));
             $editor = strtolower(trim((string) ($entry['editor'] ?? '')));
 
+            // Slug/label/editor are required for each field row.
             if ($slug === '' || $label === '' || $editor === '') {
                 return [
                     'valid' => false,
@@ -246,6 +268,7 @@ final class ValidateProvider
                     'items' => [],
                 ];
             }
+            // Slug must follow extension field slug constraints.
             if (preg_match('/^[a-z0-9][a-z0-9_-]{0,119}$/', $slug) !== 1) {
                 return [
                     'valid' => false,
@@ -253,6 +276,7 @@ final class ValidateProvider
                     'items' => [],
                 ];
             }
+            // Editor token must be one of the supported editor identifiers.
             if (!in_array($editor, $allowedEditors, true)) {
                 return [
                     'valid' => false,
@@ -260,6 +284,7 @@ final class ValidateProvider
                     'items' => [],
                 ];
             }
+            // Slugs must be unique within one provider payload.
             if (isset($seenSlugs[$slug])) {
                 return [
                     'valid' => false,

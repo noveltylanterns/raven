@@ -3,8 +3,8 @@
 /**
  * RAVEN CMS
  * ~/private/tpl/panel/group/edit.php
- * Admin panel view template for this screen.
- * Docs: https://raven.lanterns.io
+ * Admin panel group edit/create template.
+ * Docs: https://lanterns.io/raven
  */
 
 // Inline note: Template expects controller-provided data and keeps business logic out of views.

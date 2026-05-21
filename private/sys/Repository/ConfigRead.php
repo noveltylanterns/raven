@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/sys/Repository/ConfigRead.php
  * Lightweight config-reading and scalar type-coercion helpers.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/Media/CoverValidator.php
  * Validation policy wrapper for cover-image uploads.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/View/Public/ThemeValidator.php
  * Public-theme manifest validation and normalization helper.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -54,6 +54,12 @@ final class ThemeValidator
         ];
     }
 
+    /**
+     * Coerces loose manifest boolean values into strict booleans.
+     *
+     * @param mixed $value Raw manifest field value.
+     * @return bool Coerced boolean value.
+     */
     private function toBool(mixed $value): bool
     {
         if (is_bool($value)) {

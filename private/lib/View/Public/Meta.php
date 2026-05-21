@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/View/Public/Meta.php
  * Public site metadata payload builder and social-image URL resolver.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
 */
 
 declare(strict_types=1);
@@ -186,6 +186,14 @@ final class Meta
         return $scheme . '://' . $host . $path;
     }
 
+    /**
+     * Resolves the configured global meta-image value into an absolute URL.
+     *
+     * @param Config $config Runtime config reader.
+     * @param string $configuredDomain Configured site domain.
+     * @param string $configuredProtocol Configured preferred protocol.
+     * @return string Absolute URL, or empty string when unset/invalid.
+     */
     private function resolvedConfiguredMetaImageUrl(
         Config $config,
         string $configuredDomain,

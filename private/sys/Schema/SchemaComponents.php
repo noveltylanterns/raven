@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/sys/Schema/SchemaComponents.php
  * Lazy schema component wiring for bootstrap pipelines.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

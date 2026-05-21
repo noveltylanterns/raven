@@ -3,7 +3,7 @@
  * RAVEN CMS
  * ~/private/sys/Repository/GroupRead.php
  * Read-only data access for user-group records, membership assignments, and public route resolution.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

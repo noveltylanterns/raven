@@ -3,7 +3,7 @@
  * RAVEN CMS
  * ~/private/sys/Repository/SetRead.php
  * Read-only data access for filesystem-backed taxonomy set records.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

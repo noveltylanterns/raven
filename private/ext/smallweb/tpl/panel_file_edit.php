@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/ext/smallweb/tpl/panel_file_edit.php
  * Smallweb extension file create/edit template (protocol-generic).
- * docs: /private/ext/AGENTS.md
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

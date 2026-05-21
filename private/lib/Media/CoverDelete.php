@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/Media/CoverDelete.php
  * Filesystem deletion helper for user cover image files.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -46,10 +46,12 @@ final class CoverDelete
     public function deleteFile(string $storedPath): void
     {
         $normalized = trim($storedPath);
+        // Ignore blank values and external URLs because no local filesystem delete is required.
         if ($normalized === '' || preg_match('#^https?://#i', $normalized) === 1) {
             return;
         }
 
+        // Path-style values belong to current storage layout under public/.
         if (str_contains($normalized, '/')) {
             // Path-based value: resolve directly from the public root.
             $absolute = $this->projectRoot . '/public/' . ltrim($normalized, '/');
@@ -68,6 +70,7 @@ final class CoverDelete
 
         $legacyDir = $this->projectRoot . '/public/uploads/user/cover';
         $path = $legacyDir . '/' . $safeName;
+        // Keep legacy cleanup for rows written before per-user cover directories.
         if (is_file($path)) {
             @unlink($path);
         }

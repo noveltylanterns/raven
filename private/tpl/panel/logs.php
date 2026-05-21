@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/tpl/panel/logs.php
  * Admin panel view template for the Event Log viewer.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 // Inline note: Filters are submitted as a GET form so bookmarkable/shareable filter URLs work naturally.

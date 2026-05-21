@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/sys/Debug/RequestProfilerOutput.php
  * Contract for custom request-profiler output renderers.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

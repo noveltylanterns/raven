@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/Parser/FeedParser.php
  * Feed-content configuration parser helpers.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -47,22 +47,27 @@ final class FeedParser
     public function feedChannels(): array
     {
         $rawChannels = $this->config->get('feed.channels', null);
+        // Non-array config values fallback to all-channel behavior for backward compatibility.
         if (!is_array($rawChannels)) {
             $rawChannels = ['all'];
         }
 
         $normalizedChannels = [];
+        // Normalize and deduplicate each configured channel token.
         foreach ($rawChannels as $rawChannel) {
             $channel = strtolower(trim((string) $rawChannel));
+            // Ignore blank entries from malformed lists.
             if ($channel === '') {
                 continue;
             }
 
+            // `all` short-circuits to include every channel regardless of other entries.
             if ($channel === 'all') {
                 return ['all'];
             }
 
             $normalized = $channel === 'root' ? 'root' : $this->input->slug($channel);
+            // Skip tokens that do not sanitize into valid slug values.
             if ($normalized === null || $normalized === '') {
                 continue;
             }

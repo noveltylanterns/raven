@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/tpl/panel/extensions.php
  * Admin panel extensions manager for scaffolding, upload, and lifecycle controls.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 // Inline note: This view is intentionally minimal; it reserves UX space for future extension capabilities.
@@ -28,7 +28,7 @@ declare(strict_types=1);
  *   description: string,
  *   author: string,
  *   homepage: string,
- *   docs: string,
+ *   Docs: https://lanterns.io/raven
  *   valid: bool,
  *   invalid_reason: string,
  *   enabled: bool,

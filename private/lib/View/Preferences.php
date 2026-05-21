@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/View/Preferences.php
  * User-preferences helpers for form normalization, validation, and persistence.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

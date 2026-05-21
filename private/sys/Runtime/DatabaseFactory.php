@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/sys/Runtime/DatabaseFactory.php
  * Database connection factory; wires driver config into profiled PDO connections.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

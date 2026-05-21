@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/Archive/Extract.php
  * Archive extraction forwarder for Raven's supported container and single-file formats.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -307,35 +307,42 @@ final class Extract
     public function manifestSlug(string $archivePath, string $manifestFilename, int $maxSlugLength): ?string
     {
         $type = $this->packageType($archivePath);
+        // ZIP already exposes a direct manifest helper with equivalent rules.
         if ($type === 'zip') {
             return $this->zip->manifestSlug($archivePath, $manifestFilename, $maxSlugLength);
         }
 
         $manifestFile = strtolower(trim($manifestFilename));
+        // Empty manifest basenames cannot be matched in archive entries.
         if ($manifestFile === '') {
             return null;
         }
 
         $slugPattern = '/^[a-z0-9][a-z0-9_-]{0,' . max(0, $maxSlugLength) . '}$/';
 
+        // Probe root-first candidate manifest entries until one valid slug is found.
         foreach ($this->manifestPaths($archivePath, $manifestFile) as $entryName) {
             $tmpManifestPath = $this->tempPath('.json');
 
+            // Always cleanup the temporary extracted manifest file.
             try {
                 $this->extractFile($archivePath, $entryName, $tmpManifestPath);
 
                 $raw = @file_get_contents($tmpManifestPath);
+                // Skip empty/failed manifest reads and continue scanning.
                 if (!is_string($raw) || trim($raw) === '') {
                     continue;
                 }
 
                 /** @var mixed $decoded */
                 $decoded = json_decode($raw, true);
+                // Ignore non-object/invalid manifest payloads.
                 if (!is_array($decoded)) {
                     continue;
                 }
 
                 $slug = strtolower(trim((string) ($decoded['slug'] ?? '')));
+                // Return immediately when one candidate manifest yields a valid slug.
                 if ($slug !== '' && preg_match($slugPattern, $slug) === 1) {
                     return $slug;
                 }
@@ -362,18 +369,22 @@ final class Extract
         $rootEntries = [];
         $wrappedEntries = [];
 
+        // Keep only root and one-wrapper-level manifest matches.
         foreach ($this->listEntries($archivePath) as $entryName) {
             $normalized = trim(str_replace('\\', '/', $entryName), '/');
+            // Filter entries that do not match the requested manifest basename.
             if ($normalized === '' || strtolower((string) pathinfo($normalized, PATHINFO_BASENAME)) !== $manifestFilename) {
                 continue;
             }
 
             $directory = trim((string) pathinfo($normalized, PATHINFO_DIRNAME), '.');
             $depth = $directory === '' ? 0 : substr_count($directory, '/') + 1;
+            // Ignore manifests nested deeper than one wrapper directory.
             if ($depth > 1) {
                 continue;
             }
 
+            // Preserve root manifests before wrapped manifests in final ordering.
             if ($depth === 0) {
                 $rootEntries[] = $normalized;
             } else {
@@ -399,6 +410,7 @@ final class Extract
     {
         $temporaryTarPath = $this->tempPath('.tar');
 
+        // Always cleanup temporary tar state even when decompression/handler fails.
         try {
             match ($compressionType) {
                 'gz' => $this->gz->decompress($archivePath, $temporaryTarPath),
@@ -423,10 +435,12 @@ final class Extract
     private function detectPackageType(string $archivePath): ?string
     {
         $filename = strtolower(trim((string) pathinfo($archivePath, PATHINFO_BASENAME)));
+        // Empty basenames cannot be matched against archive suffixes.
         if ($filename === '') {
             return null;
         }
 
+        // Match package suffixes in order and return the first canonical type key.
         foreach ([
             '.tar.gz' => 'tar.gz',
             '.tgz' => 'tar.gz',
@@ -440,6 +454,7 @@ final class Extract
             '.zip' => 'zip',
             '.tar' => 'tar',
         ] as $suffix => $type) {
+            // Return on first matching suffix.
             if (str_ends_with($filename, $suffix)) {
                 return $type;
             }
@@ -458,6 +473,7 @@ final class Extract
     private function packageType(string $archivePath): string
     {
         $type = $this->detectPackageType($archivePath);
+        // Unsupported suffixes fail fast with a consistent archive-type error.
         if ($type === null) {
             throw new RuntimeException('Unsupported archive type: ' . $archivePath);
         }
@@ -478,21 +494,25 @@ final class Extract
     private function detectType(string $archivePath): ?string
     {
         $packageType = $this->detectPackageType($archivePath);
+        // Package/container types are valid generic extraction types.
         if ($packageType !== null) {
             return $packageType;
         }
 
         $filename = strtolower(trim((string) pathinfo($archivePath, PATHINFO_BASENAME)));
+        // Empty basenames cannot be matched against compression suffixes.
         if ($filename === '') {
             return null;
         }
 
+        // Fall back to single-file compression suffix detection.
         foreach ([
             '.gz' => 'gz',
             '.bz2' => 'bz2',
             '.xz' => 'xz',
             '.zst' => 'zst',
         ] as $suffix => $type) {
+            // Return on first matching suffix.
             if (str_ends_with($filename, $suffix)) {
                 return $type;
             }
@@ -511,6 +531,7 @@ final class Extract
     private function type(string $archivePath): string
     {
         $type = $this->detectType($archivePath);
+        // Unsupported suffixes fail fast with a consistent archive-type error.
         if ($type === null) {
             throw new RuntimeException('Unsupported archive type: ' . $archivePath);
         }
@@ -527,17 +548,21 @@ final class Extract
      */
     private function tempPath(string $suffix = ''): string
     {
+        // Try each writable temp root until one reservation succeeds.
         foreach ($this->tempRoots() as $directory) {
             $path = @tempnam($directory, 'rvn-archive-');
+            // Skip roots where a temporary reservation could not be created.
             if (!is_string($path) || $path === '') {
                 continue;
             }
 
+            // Return immediately when no suffix rewrite is required.
             if ($suffix === '') {
                 return $path;
             }
 
             $suffixedPath = $path . $suffix;
+            // Prefer atomic rename when attaching a stable suffix.
             if (@rename($path, $suffixedPath)) {
                 return $suffixedPath;
             }
@@ -563,15 +588,19 @@ final class Extract
         ];
         $directories = [];
 
+        // Keep only writable directories; create missing project-local candidates as needed.
         foreach ($candidates as $candidate) {
+            // Ignore empty candidate roots from environment lookups.
             if ($candidate === '') {
                 continue;
             }
 
+            // Lazily create missing temp roots before writability checks.
             if (!is_dir($candidate) && !@mkdir($candidate, 0775, true) && !is_dir($candidate)) {
                 continue;
             }
 
+            // Skip roots that are not writable by the current runtime user.
             if (!is_writable($candidate)) {
                 continue;
             }
@@ -597,15 +626,18 @@ final class Extract
     private function singleFileTarget(string $archivePath, string $targetPath, string $suffix): string
     {
         $treatAsDirectory = is_dir($targetPath) || preg_match('#[\\\\/]$#', $targetPath) === 1;
+        // Direct file targets bypass directory/name derivation logic.
         if (!$treatAsDirectory) {
             return $targetPath;
         }
 
         $directory = rtrim($targetPath, '/\\');
+        // Resolve empty target directories to current working directory.
         if ($directory === '') {
             $directory = '.';
         }
 
+        // Create missing output directories before writing extracted files.
         if (!is_dir($directory) && !mkdir($directory, 0775, true) && !is_dir($directory)) {
             throw new RuntimeException('Failed to create single-file extraction directory: ' . $directory);
         }
@@ -623,6 +655,7 @@ final class Extract
     private function singleFileName(string $archivePath, string $suffix): string
     {
         $basename = (string) pathinfo($archivePath, PATHINFO_BASENAME);
+        // Strip the known compression suffix when present to recover source filename.
         if (str_ends_with(strtolower($basename), strtolower($suffix))) {
             return substr($basename, 0, -strlen($suffix));
         }

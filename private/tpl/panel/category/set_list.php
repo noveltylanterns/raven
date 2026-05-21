@@ -1,5 +1,12 @@
 <?php
 
+/**
+ * RAVEN CMS
+ * ~/private/tpl/panel/category/set_list.php
+ * Admin panel category-set list template.
+ * Docs: https://lanterns.io/raven
+ */
+
 declare(strict_types=1);
 
 /** @var array<string, string> $site */

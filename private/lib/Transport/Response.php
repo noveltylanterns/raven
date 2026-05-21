@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/Transport/Response.php
  * Thin shared response helper for JSON and common cache headers.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -38,10 +38,12 @@ final class Response
     {
         http_response_code($status);
         header('Content-Type: application/json; charset=UTF-8');
+        // Sensitive payloads can opt out of caches via shared no-store headers.
         if ($noStore) {
             self::applyNoStoreHeaders();
         }
 
+        // JSON encoding errors fall back to an empty object payload.
         try {
             $encoded = json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
             echo is_string($encoded) ? $encoded : '{}';

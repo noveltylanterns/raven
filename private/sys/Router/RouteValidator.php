@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/sys/Router/RouteValidator.php
  * Shared route-param validation guards for public/panel registrars.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

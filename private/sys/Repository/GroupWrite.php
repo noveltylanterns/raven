@@ -3,7 +3,7 @@
  * RAVEN CMS
  * ~/private/sys/Repository/GroupWrite.php
  * Write-side data access for user-group records (INSERT, UPDATE, DELETE).
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

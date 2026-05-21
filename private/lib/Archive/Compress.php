@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/Archive/Compress.php
  * Archive compression forwarder for Raven's supported container and single-file formats.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -158,6 +158,7 @@ final class Compress
      */
     public function compressDir(string $sourceDir, string $archiveRoot, string $outputPath): void
     {
+        // Directory-only wrapper rejects non-directory sources before delegating.
         if (!is_dir($sourceDir)) {
             throw new RuntimeException('Directory archive compression requires a directory source: ' . $sourceDir);
         }
@@ -233,10 +234,12 @@ final class Compress
     private function detectDirType(string $archivePath): ?string
     {
         $filename = strtolower(trim((string) pathinfo($archivePath, PATHINFO_BASENAME)));
+        // Empty basenames cannot be matched against archive suffixes.
         if ($filename === '') {
             return null;
         }
 
+        // Match the longest known suffix map first to resolve canonical type keys.
         foreach ([
             '.tar.gz' => 'tar.gz',
             '.tgz' => 'tar.gz',
@@ -250,6 +253,7 @@ final class Compress
             '.zip' => 'zip',
             '.tar' => 'tar',
         ] as $suffix => $type) {
+            // Return on first matching suffix.
             if (str_ends_with($filename, $suffix)) {
                 return $type;
             }
@@ -267,21 +271,25 @@ final class Compress
     private function detectType(string $archivePath): ?string
     {
         $directoryType = $this->detectDirType($archivePath);
+        // Directory-capable types are also valid generic archive types.
         if ($directoryType !== null) {
             return $directoryType;
         }
 
         $filename = strtolower(trim((string) pathinfo($archivePath, PATHINFO_BASENAME)));
+        // Empty basenames cannot be matched against archive suffixes.
         if ($filename === '') {
             return null;
         }
 
+        // Fall back to single-file compression suffix detection.
         foreach ([
             '.gz' => 'gz',
             '.bz2' => 'bz2',
             '.xz' => 'xz',
             '.zst' => 'zst',
         ] as $suffix => $type) {
+            // Return on first matching suffix.
             if (str_ends_with($filename, $suffix)) {
                 return $type;
             }
@@ -300,6 +308,7 @@ final class Compress
     private function dirType(string $archivePath): string
     {
         $type = $this->detectDirType($archivePath);
+        // Unsupported suffixes fail fast with a consistent archive-type error.
         if ($type === null) {
             throw new RuntimeException('Unsupported archive type: ' . $archivePath);
         }
@@ -317,6 +326,7 @@ final class Compress
     private function type(string $archivePath): string
     {
         $type = $this->detectType($archivePath);
+        // Unsupported suffixes fail fast with a consistent archive-type error.
         if ($type === null) {
             throw new RuntimeException('Unsupported archive type: ' . $archivePath);
         }
@@ -334,6 +344,7 @@ final class Compress
     private function containerEntry(string $sourcePath, string $archiveRoot): string
     {
         $root = trim(str_replace('\\', '/', $archiveRoot), '/');
+        // Explicit archive roots take precedence when provided by callers.
         if ($root !== '') {
             return $root;
         }
@@ -354,10 +365,12 @@ final class Compress
     private function tarEntry(string $sourcePath, string $archiveRoot): ?string
     {
         $root = trim(str_replace('\\', '/', $archiveRoot), '/');
+        // Explicit archive roots take precedence when provided by callers.
         if ($root !== '') {
             return $root;
         }
 
+        // Directory TAR exports default to bare contents without an extra wrapper folder.
         if (is_dir($sourcePath)) {
             return null;
         }
@@ -375,6 +388,7 @@ final class Compress
      */
     private function fileSource(string $sourcePath, string $type): string
     {
+        // File-only compression formats reject directory inputs.
         if (!is_file($sourcePath)) {
             throw new RuntimeException(strtoupper($type) . ' compression requires a file source: ' . $sourcePath);
         }
@@ -399,7 +413,9 @@ final class Compress
     {
         $temporaryTarPath = $this->tempPath('.tar');
 
+        // Always clean temporary tar state even when mutation/compression fails.
         try {
+            // Existing compressed TAR archives must be decompressed before mutation.
             if (is_file($archivePath)) {
                 match ($compressionType) {
                     'gz' => $this->gz->decompress($archivePath, $temporaryTarPath),
@@ -435,17 +451,21 @@ final class Compress
      */
     private function tempPath(string $suffix = ''): string
     {
+        // Try each writable temp root until one reservation succeeds.
         foreach ($this->tempRoots() as $directory) {
             $path = @tempnam($directory, 'rvn-archive-');
+            // Skip roots where a temporary reservation could not be created.
             if (!is_string($path) || $path === '') {
                 continue;
             }
 
+            // Return immediately when no suffix rewrite is required.
             if ($suffix === '') {
                 return $path;
             }
 
             $suffixedPath = $path . $suffix;
+            // Prefer atomic rename when attaching a stable suffix.
             if (@rename($path, $suffixedPath)) {
                 return $suffixedPath;
             }
@@ -471,15 +491,19 @@ final class Compress
         ];
         $directories = [];
 
+        // Keep only writable directories; create missing project-local candidates as needed.
         foreach ($candidates as $candidate) {
+            // Ignore empty candidate roots from environment lookups.
             if ($candidate === '') {
                 continue;
             }
 
+            // Lazily create missing temp roots before writability checks.
             if (!is_dir($candidate) && !@mkdir($candidate, 0775, true) && !is_dir($candidate)) {
                 continue;
             }
 
+            // Skip roots that are not writable by the current runtime user.
             if (!is_writable($candidate)) {
                 continue;
             }

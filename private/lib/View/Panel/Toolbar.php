@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/View/Panel/Toolbar.php
  * Shared panel action-row renderer for mirrored button toolbars.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

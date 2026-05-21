@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/Media/ImageImagickProcessor.php
  * Shared ImageMagick load/normalize helpers for media upload pipelines.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -35,11 +35,13 @@ final class ImageImagickProcessor
     ): void {
         $exif->autoOrient($image);
 
+        // Strip metadata when policy requires privacy-preserving outputs.
         if ($stripExif) {
             $image->stripImage();
         }
 
         $image->setImageFormat($canonicalExtension === 'jpg' ? 'jpeg' : $canonicalExtension);
+        // JPEG outputs get explicit quality tuning to balance fidelity and size.
         if ($canonicalExtension === 'jpg') {
             // Keep JPEG quality high while still reducing payload size.
             $image->setImageCompressionQuality(85);

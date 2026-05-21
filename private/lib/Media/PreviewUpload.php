@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/Media/PreviewUpload.php
  * Preview/icon upload record payload helper.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -41,6 +41,7 @@ final class PreviewUpload
      */
     public function recordPayload(string $entityType, string $filename, array $paths): array
     {
+        // Filename-storage entities persist only one slot filename column.
         if (PreviewConfig::supportsFilenameStorage($entityType)) {
             return [$this->slot . '_image' => $filename];
         }

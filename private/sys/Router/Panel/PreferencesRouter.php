@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/sys/Router/Panel/PreferencesRouter.php
  * Panel preferences-route registration.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

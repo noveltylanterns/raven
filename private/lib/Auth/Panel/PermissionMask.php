@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/Auth/Panel/PermissionMask.php
  * Panel permission-mask composition and per-request cache for authenticated users.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -30,11 +30,13 @@ final class PermissionMask
      */
     public function maskForUser(int $userId, array $groups): int
     {
+        // Reuse cached combined mask when already resolved for this user id.
         if ($userId > 0 && array_key_exists($userId, $this->permissionMaskForUserCache)) {
             return $this->permissionMaskForUserCache[$userId];
         }
 
         $mask = 0;
+        // Combine each membership's permission bits into one aggregate mask.
         foreach ($groups as $group) {
             // Banned membership always overrides all positive grants.
             if (strtolower(trim((string) ($group['slug'] ?? ''))) === 'banned') {
@@ -47,6 +49,7 @@ final class PermissionMask
             $mask |= (int) ($group['permissions'] ?? 0);
         }
 
+        // Cache resolved masks for valid positive user ids.
         if ($userId > 0) {
             $this->permissionMaskForUserCache[$userId] = $mask;
         }
@@ -72,6 +75,7 @@ final class PermissionMask
      */
     public function invalidateUser(int $userId): void
     {
+        // Ignore invalid/non-positive ids for targeted cache invalidation.
         if ($userId <= 0) {
             return;
         }

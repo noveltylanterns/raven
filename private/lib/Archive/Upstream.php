@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/Archive/Upstream.php
  * Normalizes and validates update-source settings for the Raven updater.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -91,19 +91,23 @@ final class Upstream
         $errors = [];
         $mode = $source['mode'];
 
+        // Reject unsupported source modes before any field-specific validation.
         if (!in_array($mode, ['github_mirror', 'github_custom', 'repo_custom'], true)) {
             $errors[] = 'Update source mode is invalid.';
             return $errors;
         }
 
+        // GitHub modes require a valid owner/repo identifier.
         if (($mode === 'github_mirror' || $mode === 'github_custom') && !$this->validateGithubRepo($source['github_repo'])) {
             $errors[] = 'GitHub source must use the form owner/repo.';
         }
 
+        // Custom-repo mode requires a URL that matches supported git remote formats.
         if ($mode === 'repo_custom' && !$this->validateCustomRepo($source['repo_url'])) {
             $errors[] = 'Custom repo must be a valid git URL.';
         }
 
+        // Resolved source URL must never be blank after normalization.
         if ($source['source_url'] === '') {
             $errors[] = 'Resolved update source URL is empty.';
         }
@@ -130,10 +134,12 @@ final class Upstream
 
         $sourceUrl = '';
         $sourceLabel = '';
+        // Custom repo mode resolves URL/label directly from repo_url input.
         if ($mode === 'repo_custom') {
             $sourceUrl = $customUrl;
             $sourceLabel = $customUrl;
         } else {
+            // GitHub modes derive canonical .git URL from owner/repo.
             $sourceUrl = $githubRepo !== '' ? 'https://github.com/' . $githubRepo . '.git' : '';
             $sourceLabel = $githubRepo;
         }
@@ -156,6 +162,7 @@ final class Upstream
     private function normalizeMode(string $mode): string
     {
         $normalized = strtolower(trim($mode));
+        // Unknown modes are coerced to the safest default source policy.
         if (!in_array($normalized, ['github_mirror', 'github_custom', 'repo_custom'], true)) {
             return 'github_mirror';
         }
@@ -172,6 +179,7 @@ final class Upstream
     private function normalizeGithubRepo(string $repo): string
     {
         $value = trim($this->input->text($repo, 255));
+        // Empty repo input remains empty for downstream validation.
         if ($value === '') {
             return '';
         }
@@ -183,6 +191,7 @@ final class Upstream
 
         $value = trim($value, "/ \t\n\r\0\x0B");
         $value = preg_replace('/\.git$/i', '', $value) ?? $value;
+        // Enforce strict owner/repo slug format after normalization.
         if (preg_match('/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/', $value) !== 1) {
             return '';
         }
@@ -211,10 +220,12 @@ final class Upstream
      */
     private function validateCustomRepo(string $url): bool
     {
+        // Empty URL input is always invalid for custom repo mode.
         if ($url === '') {
             return false;
         }
 
+        // Accept explicit protocol-based git remotes.
         if (preg_match('/^(https?|ssh|git):\/\//i', $url) === 1) {
             return true;
         }
@@ -233,6 +244,7 @@ final class Upstream
      */
     private function validateGithubRepo(string $repo): bool
     {
+        // Empty repo identifiers are invalid after normalization.
         if ($repo === '') {
             return false;
         }

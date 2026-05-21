@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/Media/PreviewConfig.php
  * Preview/icon and shared taxonomy image config/path helpers.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -39,17 +39,21 @@ final class PreviewConfig
     public function allowedImageExtensions(): array
     {
         $raw = strtolower(trim((string) $this->config->get('media.allowed_extensions', 'gif,jpg,jpeg,png')));
+        // Empty config disables uploads for preview slots.
         if ($raw === '') {
             return [];
         }
 
         $parts = array_map('trim', explode(',', $raw));
         $allowed = [];
+        // Normalize configured extension tokens into a deduplicated allowlist.
         foreach ($parts as $part) {
+            // Canonicalize jpeg to jpg so extension handling stays consistent project-wide.
             if ($part === 'jpeg') {
                 $part = 'jpg';
             }
 
+            // Skip empty or invalid extension tokens from malformed config strings.
             if ($part === '' || preg_match('/^[a-z0-9]+$/', $part) !== 1) {
                 continue;
             }
@@ -79,6 +83,7 @@ final class PreviewConfig
     public function maxImageFilesizeKb(): ?int
     {
         $bytes = $this->resolveMediaMaxFilesizeBytes('images', 10485760);
+        // Null signals "unlimited" to callers when byte limit is zero or negative.
         if ($bytes <= 0) {
             return null;
         }
@@ -137,6 +142,7 @@ final class PreviewConfig
      */
     public static function storagePayloadFromRecord(string $taxonomyType, ?array $record): array
     {
+        // Filename-storage entities persist only source filenames instead of full path variants.
         if (self::supportsFilenameStorage($taxonomyType)) {
             return [
                 'cover_image' => self::normalizeFilename($record['cover_image'] ?? null),
@@ -146,6 +152,7 @@ final class PreviewConfig
         }
 
         $paths = [];
+        // Path-storage entities keep explicit fields for each image variant path.
         foreach ([
             'cover_image_path',
             'cover_image_sm_path',
@@ -181,8 +188,10 @@ final class PreviewConfig
      */
     public static function pathsFromStoragePayload(string $taxonomyType, int $taxonomyId, array $storage): array
     {
+        // Path-storage entities already provide normalized path columns.
         if (!self::supportsFilenameStorage($taxonomyType)) {
             $paths = [];
+            // Copy all declared path keys through normalizePath for output consistency.
             foreach ([
                 'cover_image_path',
                 'cover_image_sm_path',
@@ -200,10 +209,12 @@ final class PreviewConfig
         }
 
         $paths = [];
+        // Filename-storage entities derive every slot path from one stored filename token.
         foreach (['cover', 'preview', 'icon'] as $slot) {
             $fileKey = $slot . '_image';
             $filename = self::normalizeFilename($storage[$fileKey] ?? null);
             $slotPaths = self::pathsForSlot($taxonomyType, $taxonomyId, $slot, $filename);
+            // Merge generated slot path keys into the aggregate payload.
             foreach ($slotPaths as $key => $value) {
                 $paths[$key] = $value;
             }
@@ -217,6 +228,7 @@ final class PreviewConfig
      */
     public static function storageKeysForSlot(string $taxonomyType, string $slot): array
     {
+        // Filename-storage entities map each slot to a single filename column.
         if (self::supportsFilenameStorage($taxonomyType)) {
             return [$slot . '_image'];
         }
@@ -229,6 +241,7 @@ final class PreviewConfig
      */
     public static function imageKeysForSlot(string $slot): array
     {
+        // Cover slot exposes the four cover-image path columns.
         if ($slot === 'cover') {
             return [
                 'cover_image_path',
@@ -238,6 +251,7 @@ final class PreviewConfig
             ];
         }
 
+        // Icon slot mirrors cover/preview with icon-specific path keys.
         if ($slot === 'icon') {
             return [
                 'icon_image_path',
@@ -263,16 +277,20 @@ final class PreviewConfig
     public static function removedPaths(array $currentPaths, array $nextPaths): array
     {
         $nextLookup = [];
+        // Build a lookup of next-state paths so removals can be diffed in O(1) per path.
         foreach ($nextPaths as $path) {
             $normalized = trim((string) $path);
+            // Only non-empty normalized paths participate in the keep-set.
             if ($normalized !== '') {
                 $nextLookup[$normalized] = true;
             }
         }
 
         $removed = [];
+        // Collect current paths that are no longer present in the next-state lookup.
         foreach ($currentPaths as $path) {
             $normalized = trim((string) $path);
+            // Ignore blanks and paths that still exist after update.
             if ($normalized === '' || isset($nextLookup[$normalized])) {
                 continue;
             }
@@ -305,8 +323,10 @@ final class PreviewConfig
     {
         $config = $this->config->all();
 
+        // Preview image uploads currently share the base `media.max_filesize_kb` policy.
         if ($target === 'images') {
             $kb = (int) ($config['media']['max_filesize_kb'] ?? -1);
+            // Non-negative values indicate explicit config, including 0 for unlimited.
             if ($kb >= 0) {
                 return $kb === 0 ? 0 : max(1, $kb * 1024);
             }
@@ -334,16 +354,19 @@ final class PreviewConfig
         $paths = [];
         $originalKey = self::pathKeyForSlot($slot);
         $paths[$originalKey] = null;
+        // Initialize all variant keys so callers always receive a complete slot payload.
         foreach (['sm', 'md', 'lg'] as $variant) {
             $paths[$slot . '_image_' . $variant . '_path'] = null;
         }
 
+        // Without a valid filename and taxonomy id, all slot paths remain null.
         if ($filename === null || $taxonomyId < 1) {
             return $paths;
         }
 
         $relativeDirectory = 'uploads/' . $taxonomyType . '/' . $taxonomyId;
         $paths[$originalKey] = $relativeDirectory . '/' . $filename;
+        // Derive each variant filename/path from the same source filename stem.
         foreach (['sm', 'md', 'lg'] as $variant) {
             $variantFilename = self::variantFilename($filename, $variant);
             $paths[$slot . '_image_' . $variant . '_path'] = $variantFilename !== null
@@ -365,6 +388,7 @@ final class PreviewConfig
     {
         $extension = strtolower((string) pathinfo($filename, PATHINFO_EXTENSION));
         $basename = (string) pathinfo($filename, PATHINFO_FILENAME);
+        // Variant names require both a basename and extension to be reconstructable.
         if ($basename === '' || $extension === '') {
             return null;
         }
@@ -381,11 +405,13 @@ final class PreviewConfig
     private static function normalizeFilename(mixed $value): ?string
     {
         $raw = trim((string) $value);
+        // Reject empty and null-byte-containing tokens before basename normalization.
         if ($raw === '' || str_contains($raw, "\0")) {
             return null;
         }
 
         $filename = basename(str_replace('\\\\', '/', $raw));
+        // Reject basename edge markers that are not usable filenames.
         if ($filename === '' || $filename === '.' || $filename === '..') {
             return null;
         }

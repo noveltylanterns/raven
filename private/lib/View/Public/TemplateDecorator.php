@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/View/Public/TemplateDecorator.php
  * Public-template payload decoration helpers for public views.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
 */
 
 declare(strict_types=1);
@@ -435,6 +435,12 @@ final class TemplateDecorator
         return $data;
     }
 
+    /**
+     * Normalizes one meta canonical URL by trimming trailing root slashes.
+     *
+     * @param string $url Candidate absolute URL.
+     * @return string Normalized URL string.
+     */
     private function normalizedMetaUrl(string $url): string
     {
         $url = trim($url);
@@ -496,6 +502,12 @@ final class TemplateDecorator
         return $this->avatarConfig->templateData($avatarPath);
     }
 
+    /**
+     * Returns the template-facing username when username auth mode is enabled.
+     *
+     * @param string $username Raw username value.
+     * @return string Username for templates, or empty when hidden by auth mode.
+     */
     private function publicTemplateUsername(string $username): string
     {
         $normalized = trim($username);
@@ -506,6 +518,11 @@ final class TemplateDecorator
         return $this->publicUsernamesEnabled() ? $normalized : '';
     }
 
+    /**
+     * Returns whether public templates should expose username values.
+     *
+     * @return bool True when user auth mode supports usernames.
+     */
     private function publicUsernamesEnabled(): bool
     {
         $mode = strtolower(trim((string) $this->config->get('user.auth.method', 'email')));

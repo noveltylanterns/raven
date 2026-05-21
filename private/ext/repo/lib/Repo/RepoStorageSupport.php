@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/ext/repo/lib/Repo/RepoStorageSupport.php
  * Shared file persistence helpers for the Repo extension.
- * Docs: /private/ext/repo/AGENTS.md
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

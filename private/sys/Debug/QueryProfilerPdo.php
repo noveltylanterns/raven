@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/sys/Debug/QueryProfilerPdo.php
  * PDO subclass that records every query through an optional QueryProfiler.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

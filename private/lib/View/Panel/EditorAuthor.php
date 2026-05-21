@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/View/Panel/EditorAuthor.php
  * Panel page-editor author option normalization helper.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/ext/repo/tpl/public_repo.php
  * Repositories public repo browser view.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

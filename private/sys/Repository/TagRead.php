@@ -3,7 +3,7 @@
  * RAVEN CMS
  * ~/private/sys/Repository/TagRead.php
  * Read-only data access for page tag records and taxonomy set assignments.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

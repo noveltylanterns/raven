@@ -37,8 +37,8 @@ NOTE: All paths relative to project root. (../ from the perspective of this dire
 	- Reuse the existing topmost heading when it already matches today's date; only create a new heading when the date changes
 - Keep release notes concise and implementation-accurate.
 - Include the standard AI-generated notice block in `docs/*.md`.
-- Appendix reference files (`docs/appendix/Libraries.md`, `docs/appendix/ConfigKeys.md`, `docs/appendix/Database.md`) and `docs/cli.md` are generator-owned — do not hand-edit them. They are produced by `private/bin/rvn-docs`.
-- Until `private/bin/rvn-docs` exists: when public repository methods are added, removed, or renamed, leave a note in the relevant commit message so the generator pass can catch them. Do not attempt to manually maintain these files in the interim.
+- Appendix reference files (`docs/appendix/Libraries.md`, `docs/appendix/ConfigKeys.md`, `docs/appendix/Database.md`) and `docs/cli.md` are generator-owned — do not hand-edit them. They are produced by `php build/docs/rvn-docs.php`.
+- When public repository methods are added, removed, or renamed, include enough context in the commit message so the generator pass can be verified quickly.
 - Hand-authored docs (`docs/api.md`, `docs/intro.md`, narrative docs, `docs/extensions/`) are fair game to edit directly and should be kept in sync with codebase changes as normal.
 
 ## AGENTS Governance Rules for Build Mode
@@ -67,7 +67,7 @@ are the primary mechanism for achieving this. They also serve a second, equally 
 orienting future agents when context windows are collapsing mid-session. Most AI-generated codebases
 are dense, uncommented spaghetti that requires an AI tool to navigate. Raven must never become that.
 
-Inline comments and PHPDoc blocks are also the source material for `private/bin/rvn-docs`, the
+Inline comments and PHPDoc blocks are also the source material for `php build/docs/rvn-docs.php`, the
 doc generator that produces `docs/appendix/Libraries.md`, `docs/appendix/Database.md`, and other
 reference files served on the live docs site. If the comments are thin or wrong, the generated docs
 are thin or wrong.

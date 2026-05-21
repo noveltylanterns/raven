@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/sys/Runtime/Panel/RuntimeBuilder.php
  * Panel runtime assembly on top of the shared core bootstrap.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

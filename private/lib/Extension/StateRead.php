@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/Extension/StateRead.php
  * Read-side loader for extension enablement state.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -63,10 +63,12 @@ final class StateRead
      */
     public function ensureDirectory(): void
     {
+        // No-op when the extension install directory already exists.
         if (is_dir($this->extensionsBasePath)) {
             return;
         }
 
+        // Create directory recursively and verify success.
         if (!mkdir($this->extensionsBasePath, 0775, true) && !is_dir($this->extensionsBasePath)) {
             throw new \RuntimeException('Failed to create private/ext directory.');
         }
@@ -100,17 +102,20 @@ final class StateRead
     public function loadStateData(): array
     {
         $statePath = $this->stateFilePath();
+        // Missing state file yields default empty state maps.
         if (!is_file($statePath)) {
             return $this->defaultStateData();
         }
 
         clearstatcache(true, $statePath);
+        // Invalidate OPcache copy so reads see the latest state write.
         if (function_exists('opcache_invalidate')) {
             @opcache_invalidate($statePath, true);
         }
 
         /** @var mixed $loaded */
         $loaded = require $statePath;
+        // Non-array state payloads are treated as invalid and reset to defaults.
         if (!is_array($loaded)) {
             return $this->defaultStateData();
         }
@@ -208,6 +213,7 @@ final class StateRead
     public function saveState(array $enabledMap, array $permissionMap, array $permissionBitsMap = []): void
     {
         $currentState = $this->loadStateData();
+        // Preserve currently stored permission bits when caller omits them.
         if ($permissionBitsMap === []) {
             $permissionBitsMap = $currentState['permission_bits'];
         }
@@ -219,6 +225,12 @@ final class StateRead
         );
     }
 
+    /**
+     * Validates one extension directory name before filesystem reads.
+     *
+     * @param string $name Extension directory name candidate.
+     * @return bool True when the name matches Raven's safe slug pattern.
+     */
     private function isSafeDirectoryName(string $name): bool
     {
         return (bool) preg_match('/^[A-Za-z0-9][A-Za-z0-9_-]{0,119}$/', $name);
@@ -247,8 +259,10 @@ final class StateRead
     private function normalizeEnabledMap(array $enabledMap): array
     {
         $normalized = [];
+        // Keep only safe extension slugs with truthy enabled flags.
         foreach ($enabledMap as $name => $isEnabled) {
             $directory = (string) $name;
+            // Ignore unsafe slugs and disabled entries.
             if ($this->isSafeDirectoryName($directory) && (bool) $isEnabled) {
                 $normalized[$directory] = true;
             }
@@ -265,9 +279,11 @@ final class StateRead
     private function normalizePermissionMap(array $permissionMap): array
     {
         $normalized = [];
+        // Keep only safe extension slugs with positive permission bits.
         foreach ($permissionMap as $name => $rawBit) {
             $directory = (string) $name;
             $bit = (int) $rawBit;
+            // Ignore unsafe slugs and non-positive bits.
             if ($this->isSafeDirectoryName($directory) && $bit > 0) {
                 $normalized[$directory] = $bit;
             }
@@ -284,21 +300,26 @@ final class StateRead
     private function normalizePermissionBitsMap(array $permissionBitsMap): array
     {
         $normalized = [];
+        // Normalize per-extension level-to-bit maps.
         foreach ($permissionBitsMap as $name => $levelsRaw) {
             $directory = (string) $name;
+            // Skip unsafe extension slugs or malformed level maps.
             if (!$this->isSafeDirectoryName($directory) || !is_array($levelsRaw)) {
                 continue;
             }
 
             $normalizedLevels = [];
+            // Keep only safe level keys mapped to positive bit values.
             foreach ($levelsRaw as $levelKey => $rawBit) {
                 $level = strtolower(trim((string) $levelKey));
                 $bit = (int) $rawBit;
+                // Ignore malformed level keys or non-positive bits.
                 if (preg_match('/^[a-z0-9][a-z0-9_-]{0,63}$/', $level) === 1 && $bit > 0) {
                     $normalizedLevels[$level] = $bit;
                 }
             }
 
+            // Keep extension entry only when at least one normalized level survived.
             if ($normalizedLevels !== []) {
                 ksort($normalizedLevels);
                 $normalized[$directory] = $normalizedLevels;

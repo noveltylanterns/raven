@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/View/Pagination.php
  * Shared pagination state and panel/public pagination payload decorators.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

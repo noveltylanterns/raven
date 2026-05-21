@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/tpl/panel/routing.php
  * Admin panel routing inventory for public page/channel/redirect URL paths.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 // Inline note: This screen is read-only and exists to surface effective public route paths and collisions.

@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/sys/Controller/Public/ChannelController.php
  * Split public channel controller for single-segment channel routes.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

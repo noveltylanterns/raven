@@ -1,289 +1,112 @@
-# Raven CMS Pages
+# Raven Pages Guide
 
-***Note: This document was generated with ChatGPT Codex. I have not been able to personally verify every detail within matches the actual script. I do not plan on hammering these `docs/` files down until later releases, so use them with caution!***
+This guide covers page authoring, storage flow, and public rendering behavior.
 
-This document explains Raven's Page system for both panel users and developers/agents.
+## 1) Panel Page Workflows
 
-Maintenance note: keep this file updated whenever page structure, page-related routes, or Page panel views change (`private/tpl/panel/page/*`, page controller/repository/media flows, or page public-render behavior).
+Primary panel routes:
 
-## 1) Panel Guide (Create And Edit Pages)
-
-### Where To Go
-
-- Open panel sidebar: `Content` -> `List Pages` or `Create Page`.
-
-### Page List (`/page`)
-
-What you can do:
-
-- `Create Page` (top and bottom action bars): opens create form.
-- `Delete Selected` (top and bottom action bars): deletes checked rows after confirmation.
-- `Search` filter: filters rows by title, slug, channel, or status as you type.
-- `Sort by Status` dropdown: `All Statuses`, `Published`, `Draft`.
-- `Sort by Channel` dropdown: `All Channels` plus currently available channel values.
-- Row checkbox: marks a page for bulk delete.
-- Clickable table headers (`ID`, `Title`, `Slug`, `Channel`, `Status`): client-side sort.
-- Row `Edit` button (pencil icon): opens page editor.
-- Row `Delete` button (trash icon): deletes one page after confirmation.
-
-Columns shown:
-
-- `ID`
-- `Title`
-- `Slug`
-- `Channel` (`<none>` when using the stock root scope)
-- `Status` (`Published` or `Draft`)
-- `Actions`
-
-### Page Editor (`/page/edit` and `/page/edit/{id}`)
-
-Top and bottom action bars (same controls in both places):
-
-- `Save Page`
-- `Back to Pages`
-- `Delete Page` (existing pages only)
-
-Extra header behavior:
-
-- Title shows `Create New Page` or `Edit Page: '...'`.
-- If page is published and has a slug, editor shows a clickable public URL.
-
-Tabs:
-
-- `Content`
-- `Meta`
-- `Media`
-- Tab content uses card-like surface styling directly (without an extra card wrapper around the tab panes).
-
-#### Content Tab
-
-Fields:
-
-- `Title` (required)
-- `Body` (TinyMCE)
-- `Extended Blocks` (optional, repeatable body blocks)
-- `Add Text Block` button (appends a block using the channel/site default editor)
-- `Add Body Block` dropdown (choose block type: `Rich Text Area`, `Plaintext Field`, `Code Field`, `Markdown Field`, `Markdown File`, plus any extension-registered types)
-- drag-and-drop row ordering for Extended Blocks (order is saved)
-
-TinyMCE custom insert buttons (Body + every Extended block):
-
-- gallery insert button uses the TinyMCE image icon and inserts from the page gallery.
-- `Extensions`: insert available extension shortcodes from a dropdown.
-  If no extension shortcodes are available, this button is hidden.
-- Utility/formatting tools include `Paste as text`, `Horizontal line`, `Underline`, `Strikethrough`, `Subscript`, `Superscript`, and `Clear formatting`.
-
-#### Meta Tab
-
-Fields/options:
-
-- `Status`: `Published` or `Draft`
-- `Publish At` (datetime-local; when reached, status auto-changes to Published; blank = no scheduled publish)
-- `Expire At` (datetime-local; when reached, status auto-changes to Draft; blank = no auto-expiry)
-- `Slug`
-- `Description`
-- `Channel`: dropdown with `<none>` + available channels
-- `Categories`:
-  - existing category chips (remove with `x`)
-  - `Add Category` dropdown
-- `Tags`:
-  - existing tag chips (remove with `x`)
-  - `Add Tag` dropdown
-
-#### Media Tab
-
-If page is not saved yet:
-
-- Informational notice: save first before managing gallery.
-
-If page already exists:
-
-Global media controls:
-
-- `Display gallery on public page` checkbox (`gallery_enabled`)
-- `Upload Image(s)` button (multipart upload)
-- `Clear Queue` button
-- drag/drop upload zone and multi-file picker
-- selection note and client-side validation errors
-
-Bulk media controls (top and bottom of image list):
-
-- `Select All`
-- `Clear All`
-- `Delete Selected`
-
-Per-image controls:
-
-- selection checkbox (`Select`) for bulk delete
-- metadata fields:
-  - `Alt Text`
-  - `Title`
-  - `Caption`
-  - `Credit`
-  - `License`
-  - `Sort Order`
-  - `Focal X (%)`
-  - `Focal Y (%)`
-- flags:
-  - `Use as cover image` (single-select across page)
-  - `Include in gallery`
-- `Delete Image` button
-
-Behavior notes:
-
-- Cover selection is single-choice in the UI.
-- If older data has duplicates, UI normalizes to a single checked value.
-
-## 2) Developer And Agent Internals
-
-### Key Files
-
-- Panel views:
-  - `private/tpl/panel/page/list.php`
-  - `private/tpl/panel/page/edit.php`
-- Panel controller:
-  - `private/sys/Controller/Panel/PageController.php`
-- Public controller:
-  - `private/sys/Controller/Public/PageController.php`
-  - `private/sys/Controller/Public/ChannelController.php`
-- Page persistence:
-  - `private/sys/Repository/PageRepository.php`
-- Gallery persistence:
-  - `private/sys/Repository/MediaRead.php`
-  - `private/sys/Repository/MediaWrite.php`
-- Gallery processing:
-  - `private/lib/Media/Panel/MediaManager.php`
-
-### Panel Routes
-
-Declared in `panel/index.php`:
-
-- `GET /page` -> list
+- `GET /page` -> list pages
 - `GET /page/edit` -> create form
 - `GET /page/edit/{id}` -> edit form
 - `POST /page/save` -> create/update
-- `POST /page/gallery/upload` -> gallery upload
-- `POST /page/gallery/delete` -> gallery delete (single or bulk)
-- `POST /page/delete` -> page delete (single or bulk)
+- `POST /page/delete` -> single/bulk delete
+- `POST /page/gallery/upload` -> upload gallery images
+- `POST /page/gallery/delete` -> remove gallery images
 
-All state-changing routes use CSRF validation.
+Primary implementation files:
 
-### Save Flow (Page + Taxonomy + Media)
+- `private/sys/Controller/Panel/PageListController.php`
+- `private/sys/Controller/Panel/PageEditController.php`
+- `private/tpl/panel/page/list.php`
+- `private/tpl/panel/page/edit.php`
+- `private/sys/Router/Panel/PageRouter.php`
 
-Root-scope note:
+All mutating routes are login/permission/CSRF guarded.
 
-- Pages no longer persist with `channel_id = NULL`.
-- Raven now maps root-level pages to the stock `<root>` channel id `0`, while the editor still exposes that as `<none>` so URLs remain rooted at `/slug`.
+## 2) Page Editor Surface
 
-`PageController::pageSave()` pipeline:
+The page editor is split into three main areas:
 
-1. Requires login + `Manage Content` permission.
-2. Validates CSRF.
-3. Sanitizes all inputs via `InputSanitizer`.
-4. Normalizes category/tag ids against current valid ids.
-5. Normalizes gallery metadata payload (`normalizeGalleryImageUpdates`).
-6. Saves page row via `PageRepository::save(...)`.
-7. Saves media-tab metadata + gallery toggle via `MediaWrite::updateGalleryForPage(...)`.
+- Content:
+  - title/body editing
+  - optional block-based content sections
+- Meta:
+  - status, slug, scheduling
+  - channel/category/tag assignments
+  - page-level metadata fields
+- Media:
+  - gallery upload/delete and metadata
+  - cover-image and gallery inclusion controls
 
-Important media-flag behavior:
+New pages must be saved before gallery operations are available.
 
-- Cover flags are canonicalized so only one cover remains.
-- Write-side persistence performs an additional integrity pass over all page images to enforce this even when posted payload is partial or malformed.
+## 3) Page Storage Model
 
-### Page Data Model
+Core page persistence:
 
-Core page fields live in `pages` table, with related tables:
+- Read side: `private/sys/Repository/PageRead.php`
+- Write side: `private/sys/Repository/PageWrite.php`
 
-- `page_categories` (many-to-many)
-- `page_tags` (many-to-many)
-- `media`
-- `media_variants`
+Related persistence seams:
 
-Content blocks persistence model:
+- taxonomy links (`page_categories`, `page_tags`) managed by page write flow
+- gallery/image records through `MediaRead`/`MediaWrite`
 
-- panel posts `content_blocks[]` (0..n items)
-- repository stores the array as JSON in `pages.content`
-- read hydration exposes `content_blocks` (array) for downstream page rendering/decorators, and public template decoration then maps rendered body rows to `page:content`
+Root-scope pages use channel id `0` (root channel scope), while editor UX may present that as `<none>` for route clarity.
 
-`PageRepository::save(...)` details:
+## 4) Public Page Rendering
 
-- Supports create/update in one method.
-- Enforces path uniqueness scoped to `(channel_id, slug)`.
-- Replaces category/tag links as a deterministic replace-all operation.
-- Runs inside a DB transaction.
+Primary public route handlers:
 
-### Gallery Upload/Delete Model
+- `private/sys/Controller/Public/PageController.php`
+- `private/sys/Controller/Public/ChannelController.php`
+- `private/sys/Router/Public/PageRouter.php`
+- `private/sys/Router/Public/ChannelRouter.php`
 
-`MediaManager::uploadForPage(...)`:
+Core public page seams:
 
-- requires Imagick
-- validates upload, MIME, extension allowlist, filesize
-- blocks duplicate source hashes per page
-- auto-orients image
-- optionally strips EXIF (`media.images.strip_exif`)
-- writes source image + `sm`/`md`/`lg` variants
-- stores rows in `media` + `media_variants` through `MediaWrite`
+- homepage (`/`)
+- channel landing/root fallback (`/{slug}`)
+- channel-scoped pages (`/{channel}/{slug}`)
 
-`MediaManager::deleteImageForPage(...)` and `deleteAllForPage(...)`:
+Template resolution and fallback behavior are documented in:
 
-- remove DB rows through `MediaWrite`
-- remove files from `public/uploads/pages/{page_id}/...`
-- clean up empty page image directory
+- `docs/appendix/templates/public.md`
 
-### Public Rendering Behavior
+## 5) Scheduling And Visibility
 
-Main page rendering path in `PageController`:
+Page publication/expiry behavior is driven by page status and schedule fields. Runtime and scheduled checks cooperate so pages can transition between published/draft visibility by configured timestamps.
 
-- homepage: `findHomepage()` with slug priority `home` -> `index`
-- channel landing: `findChannelHomepage()` with same `home` -> `index` priority
-- normal page: `findPublicPage(pageSlug, channelSlug?)`
-- rendered templates support EE-style brace tags (`{site:name}`, `{if ...}`, `{each ...}`) in both `public/theme/*/tpl/*` and fallback `private/tpl/*`
+For broader routing and availability policy context:
 
-Page media on public output:
+- `docs/routing.md`
+- `docs/configuration.md`
 
-- page gallery block renders only when `gallery_enabled = 1`
-- public gallery list uses ready images and respects `include_in_gallery`
+## 6) Media And Gallery Behavior
 
-Meta image behavior:
+Gallery operations use the media subsystem and repository write seams to keep file and database state aligned.
 
-- the wrapper emits both `og:image` and `twitter:image` from shared `meta:image`
-- site defaults come from config, collapsed to one effective runtime meta image
-- page views override only when one ready page image is marked `is_cover`
-- page-level override uses that cover image's `lg` variant URL
-- runtime normalizes the final shared meta image URL to safe absolute HTTP(S) form
+Canonical media references:
 
-### Security/Validation Expectations
+- `private/lib/Media/MediaUpload.php`
+- `private/sys/Repository/MediaRead.php`
+- `private/sys/Repository/MediaWrite.php`
 
-- Permission gate: `Manage Content` for panel page operations.
-- CSRF on all POST actions.
-- Sanitization via centralized `InputSanitizer`.
-- Repository queries use prepared statements.
-- Upload validation does not trust filename extension alone.
+Panel editor media hydration helpers are under:
 
-### Update Discipline
+- `private/lib/View/Panel/EditorMedia.php`
 
-When page behavior changes, update this document in the same task. That includes:
+## 7) Security Expectations
 
-- Page list/editor UI controls or tab structure
-- page routes and save/delete semantics
-- taxonomy assignment behavior
-- gallery upload/metadata/cover-image behavior
-- page public rendering or page-driven meta tag behavior
+- Panel page operations require content-management permission.
+- POST routes require valid CSRF tokens.
+- Inputs are normalized/sanitized before persistence.
+- Upload processing validates file constraints before storage writes.
 
-### UI Labels Reference
+## 8) Related References
 
-- `Add Body Block`
-- `Add Text Block`
-- `Body Blocks`
-- `Rich Text Area`
-- `Plaintext Field`
-- `Code Field`
-- `Markdown Field`
-- `Markdown File`
-- `Image Gallery`
-- `Alt / Title`
-- `Display title?`
-- `Author`
-- `Apply Color`
-- `Next`
-- `Previous`
+- `docs/appendix/core/controller.md`
+- `docs/appendix/core/repository.md`
+- `docs/appendix/templates/public.md`
+- `docs/appendix/database.md`

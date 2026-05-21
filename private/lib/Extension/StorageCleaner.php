@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/Extension/StorageCleaner.php
  * Deletes extension-owned storage directories and database tables during uninstall.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -76,15 +76,19 @@ final class StorageCleaner
      */
     public function deleteStorageByContract(string $directoryName, array $storage): void
     {
+        // Storage cleanup requires a safe extension directory slug.
         if (!$this->manifestValidator->isSafeDirectoryName($directoryName)) {
             throw new RuntimeException('Invalid extension directory name for storage cleanup.');
         }
 
+        // Remove extension-local data directory when requested by contract.
         if (!empty($storage['local'])) {
             $this->deleteDirectory($this->projectRoot . '/private/dat/ext/' . $directoryName, 'private/dat/ext/' . $directoryName);
         }
 
+        // Remove each declared auxiliary directory.
         foreach ((array) ($storage['aux'] ?? []) as $auxDirectory) {
+            // Skip malformed/unsafe aux directory declarations.
             if (!is_string($auxDirectory) || preg_match('/^[a-z0-9][a-z0-9_-]{0,119}$/', $auxDirectory) !== 1) {
                 continue;
             }
@@ -92,18 +96,22 @@ final class StorageCleaner
             $this->deleteDirectory($this->projectRoot . '/' . $auxDirectory, 'aux/' . $auxDirectory);
         }
 
+        // Remove panel asset directory when requested by contract.
         if (!empty($storage['panel'])) {
             $this->deleteDirectory($this->projectRoot . '/panel/ext/' . $directoryName, 'panel/ext/' . $directoryName);
         }
 
+        // Remove public uploads directory when requested by contract.
         if (!empty($storage['public'])) {
             $this->deleteDirectory($this->projectRoot . '/public/uploads/ext/' . $directoryName, 'public/uploads/ext/' . $directoryName);
         }
 
+        // Remove bin symlink aliases when bin storage was requested.
         if (!empty($storage['bin'])) {
             $this->removeBinSymlinks($directoryName);
         }
 
+        // Drop extension-owned tables when table storage was requested.
         if (!empty($storage['table']) || !empty($storage['tables'])) {
             $this->dropDatabaseTables($directoryName);
         }
@@ -122,17 +130,21 @@ final class StorageCleaner
         $targetBin = $this->projectRoot . '/private/bin';
         $extensionBin = $this->projectRoot . '/private/ext/' . $directoryName . '/bin';
 
+        // No-op when the central private/bin directory does not exist.
         if (!is_dir($targetBin)) {
             return;
         }
 
         $iterator = new \DirectoryIterator($targetBin);
+        // Scan private/bin entries and remove only extension-owned symlink aliases.
         foreach ($iterator as $item) {
+            // Skip dot entries and non-symlink files.
             if ($item->isDot() || !$item->isLink()) {
                 continue;
             }
 
             $realTarget = realpath($item->getPathname());
+            // Resolve dangling links by raw target string instead of realpath().
             if ($realTarget === false) {
                 // Dangling symlink — check by reading the link target string instead.
                 $linkTarget = (string) readlink($item->getPathname());
@@ -158,11 +170,13 @@ final class StorageCleaner
      */
     private function deleteDirectory(string $path, string $label): void
     {
+        // Missing directories are already effectively cleaned.
         if (!is_dir($path)) {
             return;
         }
 
         $this->directoryTreeService->removeTree($path);
+        // Treat remaining directory presence as deletion failure.
         if (is_dir($path)) {
             throw new RuntimeException('Failed to delete ' . $label . ' directory.');
         }
@@ -182,18 +196,22 @@ final class StorageCleaner
     {
         $stem = $this->physicalTableStem($directoryName);
         $tables = $this->matchingTables($stem);
+        // No matching tables means there is nothing to drop.
         if ($tables === []) {
             return;
         }
 
         usort($tables, static fn (string $a, string $b): int => strlen($b) <=> strlen($a));
 
+        // Drop longest names first to avoid prefix-related dependency edge cases.
         foreach ($tables as $table) {
+            // Drop only safe SQL identifiers.
             if (preg_match('/^[A-Za-z0-9_]+$/', $table) !== 1) {
                 continue;
             }
 
             $sql = 'DROP TABLE IF EXISTS ' . $this->quoteIdentifier($table);
+            // PostgreSQL may require CASCADE for dependent objects.
             if ($this->driver === 'pgsql') {
                 $sql .= ' CASCADE';
             }
@@ -209,6 +227,7 @@ final class StorageCleaner
     {
         $pattern = $this->likePrefix($stem) . '\\_%';
 
+        // SQLite catalogs tables in sqlite_master.
         if ($this->driver === 'sqlite') {
             $stmt = $this->db->prepare(
                 'SELECT name
@@ -229,6 +248,7 @@ final class StorageCleaner
             ), static fn (string $value): bool => $value !== ''));
         }
 
+        // MySQL catalogs tables via information_schema.tables + DATABASE().
         if ($this->driver === 'mysql') {
             $stmt = $this->db->prepare(
                 'SELECT table_name

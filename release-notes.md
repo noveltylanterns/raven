@@ -2,6 +2,35 @@
 
 *The machine is supposed to be logging patches & mods to this file. Sometimes it does, sometimes it doesn't. It might be useful for historical architectural context to your Agent at one point.*
 
+### May 20, 2026 — docs prep header normalization + docgen regeneration
+
+- Completed a prep normalization sweep across all PHP files under `private/`, `public/`, and `panel/` so each file now starts with `<?php` and carries the Raven header intro with `Docs: https://lanterns.io/raven`.
+- Patched remaining outlier files in panel templates, `private/dat/*` PHP payload files, `private/sys/Logger.php`, and `private/lib/Composer/*` loader wrappers.
+- Added `build/docs/prep-audit.php` to baseline docs-prep status (`header`, `symbols`, `control`) before regeneration and to keep prep progress measurable.
+- Replaced remaining generic intro description placeholders in panel templates with route-specific descriptions.
+- Added missing class/function docblocks across `private/lib/*` and `private/sys/*` (including CLI command functions in `private/sys/Shell.php`), bringing prep-audit symbol gaps to zero (`missing_class_doc=0`, `missing_method_doc=0`).
+- Added targeted control-flow intent comments (`if`/`foreach`/`try`) across high-density prep files: `private/sys/Shell.php`, `private/sys/Controller/Panel/ConfigController.php`, `private/lib/Archive/Compress.php`, and `private/lib/Archive/Extract.php`; prep-audit control gap reduced from `4798` to `4600`.
+- Continued the control-flow comment sweep in `private/lib/Archive/Folder.php`, `private/lib/Archive/Install.php`, and remaining `private/lib/Archive/Extract.php` branches; prep-audit control gap reduced further to `4568`.
+- Continued the control-flow comment sweep in `private/lib/Archive/Package.php` and `private/lib/Archive/Update.php`; prep-audit control gap reduced further to `4540`.
+- Re-ran doc generation after prep with `php build/docs/rvn-docs.php --all` and verified idempotence with `php build/docs/rvn-docs.php --check` (all targets up to date).
+
+### May 20, 2026 — docs appendix API index added
+
+- Added `docs/appendix/api.md` as the developer-surface index page linking the major implementation surfaces and their appendices: core runtime, config/database, CLI, extensions, libraries, templates/theming, and bootstrap.
+- Added `docs/intro.md` as a first-pass project overview page covering philosophy, runtime snapshot, quick-start, customization boundaries, and developer-reference entry points.
+- Moved the canonical filetree map to `docs/appendix/filetree.md` and left `docs/filetree.md` as a compatibility pointer so existing references keep working.
+- Updated `docs/readme.md` link paths to lowercase real filenames and added start links for Introduction, Filetree, and Developer API.
+- Added `docs/appendix/architecture.md` as a first-pass architecture rationale covering layering boundaries, entrypoint ownership, data boundaries, update-survivability strategy, and extension/theme contracts.
+- Added `docs/screenshots/README.md` to scaffold operator-doc screenshot coverage with a planned capture set and hygiene notes.
+- Rewrote `docs/routing.md` first-pass against current route architecture (`PublicRouter`/`PanelRouter`), route-family ordering, extension route seams, and routing-table implementation files.
+- Rewrote `docs/configuration.md` first-pass against current configuration architecture (`ConfigController`/`ConfigRouter`), panel save workflow, key ownership boundaries, and `docs/appendix/config.md` reference linkage.
+- Rewrote `docs/pages.md` first-pass against split page controller architecture (`PageListController`/`PageEditController`), page/media repository seams, and current public page route handlers.
+- Updated `build/todo.md` to mark the `docs/appendix/api.md` hand-authored docs task complete.
+- Updated `build/todo.md` to mark the `docs/intro.md` hand-authored docs task complete.
+- Updated `build/todo.md` to mark the `docs/filetree.md` move-to-appendix task complete.
+- Updated `build/todo.md` to mark the `docs/appendix/architecture.md` hand-authored docs task complete.
+- Updated `build/todo.md` to mark the `docs/screenshots/` folder setup task complete.
+
 ### May 11, 2026 — PHPDoc completion sweep + merge/flatten audit
 
 - **PHPDoc gaps closed** — 12 public/protected methods across `lib/` and `sys/` were missing PHPDoc entirely; added full blocks to `ImageVariantProcessor::__construct`, `Renderer::__construct`, and all 10 public methods on `RavenCliContext` in `Shell.php`. Fixed 8 incomplete docblocks missing `@return` tags: `MediaUpload::deleteImageForPage`, `AvatarUpload::storeSanitizedUpload` and `storeSanitizedImageUpload`, `Scheduler/Registry::getLastRunTime`, `Gatekeeper::isLoggedIn`, `userId`, `isTwoFactorVerifiedForUser`, and `verifyPendingRecoveryCode`. All public and protected methods in `lib/` and `sys/` now have complete PHPDoc blocks.

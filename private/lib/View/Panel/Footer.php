@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/View/Panel/Footer.php
  * Shared panel footer renderer and route-asset collector.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

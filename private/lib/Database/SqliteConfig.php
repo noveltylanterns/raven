@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/Database/SqliteConfig.php
  * Extracts configured SQLite base paths and resolves canonical DB file paths.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -31,6 +31,7 @@ final class SqliteConfig
     {
         $sqlite = (array) ($config['sqlite'] ?? []);
         $basePath = rtrim((string) ($sqlite['path'] ?? ''), '/');
+        // SQLite base path is mandatory for path resolution.
         if ($basePath === '') {
             throw new RuntimeException('Missing SQLite base path configuration.');
         }
@@ -67,13 +68,20 @@ final class SqliteConfig
         };
     }
 
+    /**
+     * Resolves the canonical SQLite file path from configured base-path input.
+     *
+     * @return string Absolute SQLite file path.
+     */
     private function corePath(): string
     {
+        // Respect explicit file paths as-is.
         if ($this->looksLikeFilePath($this->configuredPath)) {
             return $this->configuredPath;
         }
 
         $directory = $this->configuredPath;
+        // Legacy `/db` directories map to sibling `db.sqlite`.
         if (basename($directory) === 'db') {
             return dirname($directory) . '/db.sqlite';
         }
@@ -81,6 +89,12 @@ final class SqliteConfig
         return $directory . '/db.sqlite';
     }
 
+    /**
+     * Returns true when one configured path already points to a SQLite file.
+     *
+     * @param string $path Candidate configured path.
+     * @return bool True when the path ends with `.db` or `.sqlite`.
+     */
     private function looksLikeFilePath(string $path): bool
     {
         $extension = strtolower(pathinfo($path, PATHINFO_EXTENSION));

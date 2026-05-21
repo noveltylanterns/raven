@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/tpl/panel/status/denied.php
  * Panel-wrapped permission-denied status template.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 // Inline note: Rendered inside the panel wrapper so authenticated users see

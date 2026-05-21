@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/Scheduler/Cron.php
  * Shared fallback scheduler trigger for web entrypoints.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -30,23 +30,28 @@ final class Cron
      */
     public static function runIfDue(array $rvn, string $root, bool $shouldRun, ?callable $prepareRuntime = null): void
     {
+        // Caller scope can suppress scheduler execution for this request entirely.
         if (!$shouldRun) {
             return;
         }
 
         $scheduler = $rvn['scheduler'] ?? null;
+        // Runtime must expose the scheduler registry service to continue.
         if (!$scheduler instanceof Registry) {
             return;
         }
 
         $schedulerStampFile = $root . '/private/dat/scheduler_last_run';
         $lastRun = is_file($schedulerStampFile) ? (int) @file_get_contents($schedulerStampFile) : 0;
+        // Throttle fallback scheduler invocations to once per minute.
         if (time() - $lastRun < 60) {
             return;
         }
 
+        // Optional runtime preparation can inject extra context/services before jobs run.
         if ($prepareRuntime !== null) {
             $preparedRuntime = $prepareRuntime($rvn);
+            // Only array payloads replace the runtime container.
             if (is_array($preparedRuntime)) {
                 $rvn = $preparedRuntime;
                 $scheduler = $rvn['scheduler'] ?? $scheduler;
@@ -55,6 +60,7 @@ final class Cron
 
         @file_put_contents($schedulerStampFile, (string) time());
 
+        // Flush response early when available so background jobs do not block request latency.
         if (function_exists('fastcgi_finish_request')) {
             fastcgi_finish_request();
         }

@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/Security/EmailGenerate.php
  * Secure generation helpers for email-code 2FA challenges.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

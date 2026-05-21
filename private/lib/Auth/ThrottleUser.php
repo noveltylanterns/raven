@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/Auth/ThrottleUser.php
  * DB-layer persistence for auth-throttle buckets.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -156,6 +156,7 @@ final class ThrottleUser
      */
     private function upsertConflictClause(): string
     {
+        // MySQL requires ON DUPLICATE KEY syntax for upsert behavior.
         if ($this->driver === 'mysql') {
             return 'ON DUPLICATE KEY UPDATE
                     user = VALUES(user),

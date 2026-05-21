@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/Extension/Panel/Content.php
  * Panel-side extension body-block and insertable shortcode catalog for the page editor.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -56,17 +56,21 @@ final class Content
         callable $manifestReader
     ): array {
         $definitions = [];
+        // Scan enabled extensions and collect body-block providers from valid manifests.
         foreach ($enabledMap as $extensionName => $enabled) {
+            // Skip extensions that are currently disabled in state.
             if (!$enabled) {
                 continue;
             }
 
             $extensionPath = rtrim($extensionsBasePath, '/\\') . '/' . $extensionName;
+            // Ignore stale map entries whose extension directory is missing.
             if (!is_dir($extensionPath)) {
                 continue;
             }
 
             $manifest = $manifestReader($extensionPath);
+            // Include only valid content/module extension manifests in block picker.
             if (
                 !($manifest['valid'] ?? false)
                 || !in_array((string) ($manifest['type'] ?? ''), ['content', 'module'], true)
@@ -81,6 +85,7 @@ final class Content
                     'extension' => (string) $extensionName,
                 ]
             );
+            // Skip extensions that do not provide fields.php block definitions.
             if ($fields === null) {
                 continue;
             }
@@ -121,7 +126,9 @@ final class Content
         Config $config
     ): array {
         $items = [];
+        // Scan enabled extensions and collect insertable shortcode menu entries.
         foreach ($enabledMap as $extensionName => $enabled) {
+            // Skip extensions that are currently disabled in state.
             if (!$enabled) {
                 continue;
             }
@@ -130,6 +137,7 @@ final class Content
             $manifest = $manifestReader($extensionPath);
             $type = strtolower(trim((string) ($manifest['type'] ?? 'content')));
             $isSystemType = $type === 'system' || !empty($manifest['system_extension']);
+            // Include only valid non-system content/module manifests.
             if (
                 !($manifest['valid'] ?? false)
                 || $isSystemType
@@ -147,13 +155,16 @@ final class Content
                     'config' => $config,
                 ]
             );
+            // Skip extensions that do not provide shortcodes.php entries.
             if ($shortcodes === null) {
                 continue;
             }
 
+            // Normalize each shortcode menu row and discard incomplete entries.
             foreach ($shortcodes as $entry) {
                 $label = $this->input->text((string) ($entry['label'] ?? ''), 180);
                 $shortcode = trim((string) ($entry['shortcode'] ?? ''));
+                // Both label and shortcode token are required for insertable rows.
                 if ($label === '' || $shortcode === '') {
                     continue;
                 }
@@ -171,8 +182,10 @@ final class Content
         });
 
         $deduped = [];
+        // Deduplicate by normalized shortcode token so picker rows stay unique.
         foreach ($items as $item) {
             $key = strtolower(trim((string) ($item['shortcode'] ?? '')));
+            // Skip empty tokens and already-seen shortcode keys.
             if ($key === '' || isset($deduped[$key])) {
                 continue;
             }

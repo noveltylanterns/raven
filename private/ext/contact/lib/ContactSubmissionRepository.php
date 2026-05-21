@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/ext/contact/lib/ContactSubmissionRepository.php
  * Repository for contact submission persistence and panel management queries.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 // Inline note: Keep contact-submission storage logic centralized so public/panel flows stay consistent.

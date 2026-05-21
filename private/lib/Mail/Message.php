@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/Mail/Message.php
  * Immutable outgoing mail message value object.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

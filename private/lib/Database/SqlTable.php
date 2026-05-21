@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/Database/SqlTable.php
  * Resolves prefixed table names for SQL query contexts.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/Archive/Folder.php
  * Directory creation, existence, and removal helpers for install and cleanup flows.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -28,6 +28,7 @@ final class Folder
      */
     public function ensure(string $directory, int $mode = 0775): bool
     {
+        // Create the directory recursively when it does not already exist.
         if (!is_dir($directory) && !@mkdir($directory, $mode, true) && !is_dir($directory)) {
             return false;
         }
@@ -45,10 +46,12 @@ final class Folder
      */
     public function create(string $directory, int $mode = 0775): bool
     {
+        // Refuse to create when a file/dir already occupies the target path.
         if (is_dir($directory) || is_file($directory)) {
             return false;
         }
 
+        // Create exactly one directory level for this explicit child create helper.
         if (!@mkdir($directory, $mode, false)) {
             return false;
         }
@@ -65,15 +68,18 @@ final class Folder
      */
     public function removeEmpty(string $directory): bool
     {
+        // Missing directories are treated as already-removed for idempotence.
         if (!is_dir($directory)) {
             return true;
         }
 
         $entries = @scandir($directory);
+        // Fail when the directory cannot be enumerated safely.
         if ($entries === false) {
             return false;
         }
 
+        // Reject removal when any non-dot entry exists.
         foreach ($entries as $entry) {
             if ($entry !== '.' && $entry !== '..') {
                 return false;
@@ -94,6 +100,7 @@ final class Folder
      */
     public function removeTree(string $directory): void
     {
+        // Missing directories are treated as no-op for idempotence.
         if (!is_dir($directory)) {
             return;
         }
@@ -104,6 +111,7 @@ final class Folder
             \RecursiveIteratorIterator::CHILD_FIRST
         );
 
+        // Remove children before parent directories to satisfy filesystem constraints.
         foreach ($iterator as $item) {
             $item->isDir() ? @rmdir($item->getPathname()) : @unlink($item->getPathname());
         }

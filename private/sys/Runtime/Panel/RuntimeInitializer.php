@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/sys/Runtime/Panel/RuntimeInitializer.php
  * Panel runtime initialization closure wiring extracted from panel runtime builder.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

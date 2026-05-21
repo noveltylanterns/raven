@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/Auth/Panel/Service.php
  * Panel authorization service for permission checks, group membership, and permission-mask orchestration.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -49,6 +49,7 @@ final class Service
     public function canAccessPanel(?int $userId = null): bool
     {
         $mask = $this->resolveUserMask($userId);
+        // Unresolved users never receive panel access.
         if ($mask === null) {
             return false;
         }
@@ -65,20 +66,24 @@ final class Service
      */
     public function hasPanelPermissionBit(int $bit, ?int $userId = null): bool
     {
+        // Non-positive values are invalid permission-bit identifiers.
         if ($bit <= 0) {
             return false;
         }
 
         $userId = $this->resolveUserId($userId);
+        // Permission checks require one resolved authenticated user id.
         if ($userId === null) {
             return false;
         }
 
         $mask = $this->permissionMaskForUser($userId);
+        // Deny action checks when user cannot log into the panel at all.
         if (!PermissionBase::canLoginPanel($mask)) {
             return false;
         }
 
+        // Admin users bypass route-level bit checks.
         if ($this->isAdmin($userId)) {
             return true;
         }
@@ -95,6 +100,7 @@ final class Service
     public function panelPermissionMask(?int $userId = null): int
     {
         $userId = $this->resolveUserId($userId);
+        // Unresolved users get a zeroed permission mask.
         if ($userId === null) {
             return 0;
         }
@@ -112,15 +118,18 @@ final class Service
     public function hasAnyPanelPermissionBit(array $bits, ?int $userId = null): bool
     {
         $userId = $this->resolveUserId($userId);
+        // Permission checks require one resolved authenticated user id.
         if ($userId === null) {
             return false;
         }
 
         $mask = $this->permissionMaskForUser($userId);
+        // Deny action checks when user cannot log into the panel at all.
         if (!PermissionBase::canLoginPanel($mask)) {
             return false;
         }
 
+        // Admin users satisfy any panel permission-bit query.
         if ($this->isAdmin($userId)) {
             return true;
         }
@@ -137,6 +146,7 @@ final class Service
     public function canManageUsers(?int $userId = null): bool
     {
         $mask = $this->resolveUserMask($userId);
+        // Unresolved users cannot manage users.
         if ($mask === null) {
             return false;
         }
@@ -153,6 +163,7 @@ final class Service
     public function canManageGroups(?int $userId = null): bool
     {
         $mask = $this->resolveUserMask($userId);
+        // Unresolved users cannot manage groups.
         if ($mask === null) {
             return false;
         }
@@ -169,6 +180,7 @@ final class Service
     public function canManageContent(?int $userId = null): bool
     {
         $mask = $this->resolveUserMask($userId);
+        // Unresolved users cannot manage content.
         if ($mask === null) {
             return false;
         }
@@ -185,6 +197,7 @@ final class Service
     public function canManageConfiguration(?int $userId = null): bool
     {
         $mask = $this->resolveUserMask($userId);
+        // Unresolved users cannot manage configuration.
         if ($mask === null) {
             return false;
         }
@@ -201,6 +214,7 @@ final class Service
     public function canManageTaxonomy(?int $userId = null): bool
     {
         $mask = $this->resolveUserMask($userId);
+        // Unresolved users cannot manage taxonomy.
         if ($mask === null) {
             return false;
         }
@@ -217,10 +231,12 @@ final class Service
     public function isAdmin(?int $userId = null): bool
     {
         $userId = $this->resolveUserId($userId);
+        // Unresolved users are never treated as admins.
         if ($userId === null) {
             return false;
         }
 
+        // Admin status is determined by membership in canonical group id 1.
         foreach ($this->groupsForUser($userId) as $group) {
             if ((int) ($group['id'] ?? 0) === 1) {
                 return true;
@@ -284,6 +300,7 @@ final class Service
      */
     public function invalidateUser(int $userId): void
     {
+        // Ignore invalid user ids for targeted cache invalidation.
         if ($userId <= 0) {
             return;
         }
@@ -300,6 +317,7 @@ final class Service
      */
     private function resolveUserId(?int $userId): ?int
     {
+        // Use explicit user id overrides when present and valid.
         if ($userId !== null && $userId > 0) {
             return $userId;
         }
@@ -317,6 +335,7 @@ final class Service
     private function resolveUserMask(?int $userId): ?int
     {
         $resolvedUserId = $this->resolveUserId($userId);
+        // Propagate unresolved-user state to callers performing permission checks.
         if ($resolvedUserId === null) {
             return null;
         }

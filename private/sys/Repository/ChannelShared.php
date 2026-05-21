@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/sys/Repository/ChannelShared.php
  * Low-level channel constants and static normalization primitives shared by channel repositories.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

@@ -3,7 +3,7 @@
  * RAVEN CMS
  * ~/private/sys/Repository/ChannelRead.php
  * Read-only data access for filesystem-backed channel metadata.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

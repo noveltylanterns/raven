@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/Extension/Public/Shortcodes.php
  * Contract for extension-owned general-purpose shortcode content runtimes.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

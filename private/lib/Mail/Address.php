@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/Mail/Address.php
  * Static email address utilities shared across all outgoing mail paths.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -25,9 +25,10 @@ final class Address
      * @param string $email Raw email address from user input or config.
      * @return string|null Normalized lowercase address, or null when validation fails.
      */
-    public static function normalize(string $email): ?string
+        public static function normalize(string $email): ?string
     {
         $email = strtolower(trim($email));
+        // Reject blanks and invalid mailbox syntax in one branch for caller simplicity.
         if ($email === '' || filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
             return null;
         }
@@ -48,6 +49,7 @@ final class Address
     public static function mask(string $email): string
     {
         $normalized = self::normalize($email);
+        // Keep masking pure: invalid addresses yield an empty string, never partial output.
         if ($normalized === null) {
             return '';
         }
@@ -55,6 +57,7 @@ final class Address
         $parts  = explode('@', $normalized, 2);
         $local  = (string) ($parts[0] ?? '');
         $domain = (string) ($parts[1] ?? '');
+        // Defensive split guard: malformed addresses should not produce partial masks.
         if ($local === '' || $domain === '') {
             return '';
         }
@@ -88,6 +91,7 @@ final class Address
     {
         $siteDomain = strtolower(trim($siteDomain));
         $host = '';
+        // Parse host only when the input is non-empty; empty values fall through to default host.
         if ($siteDomain !== '') {
             // parse_url needs a scheme-prefixed value to extract the host correctly
             // when the input is a bare domain without a protocol.
@@ -99,6 +103,7 @@ final class Address
 
         $host = preg_replace('/[^a-z0-9.-]+/i', '', $host) ?? '';
         $host = trim($host, '.-');
+        // Message-ID domains must look DNS-like; fallback keeps outbound mail standards-compliant.
         if ($host === '' || !str_contains($host, '.')) {
             $host = 'localhost.localdomain';
         }

@@ -12,43 +12,7 @@ This is the secondary Build Mode backlog file. If the user asks about long-term 
 
 
 ## Documentation Rewrite
-We need to generate better documentation. This is going to be a whole project.
-
-### Prep Work
-- [ ] The top of *EVERY* .php file within private/public/panel should begin with <?php, followed by the standard 6-line PHPDoc intro (update Docs: url to https://lanterns.io/raven) and if applicable the declare declaration, namespace declaration, and alphabetized use maps (not all files have these) in that order, with no blank lines in between these elements. Leave an empty line BETWEEN this intro block and whatever follows.
-- [ ] The description line in *EVERY* .php file's PHPDoc intro needs to be double-checked for accuracy.
-- [ ] EVERY class and EVERY function in sys/lib needs a detailed inline comment describing what it does, it is missing in some of them. The existing ones need to be double-checked for accuracy.
-- [ ] EVERY if/try/foreach in sys/lib needs a quick inline comment describing what it does, it is missing in some of them. The existing ones need to be double-checked for accuracy.
-
-### Doc Generator Script
-Build a single fast CLI command that auto-generates all reference appendix files from the codebase.
-Pure PHP — Reflection API + lightweight PHPDoc regex, no extra composer deps. Run at release time.
-- [ ] Store generator as `build/docgen.(php or sh?)`
-Targets (generator owns these files — do not hand-edit them):
-- [ ] `docs/appendix/bootstrap.md` - reflect on where bootstrap is injected into the templates, how to manually generate compiled css from bootstrap sass files, and a quick rundown of all the basic bootstrap css variables & how to declare them in a custom sass file so the end user can work cleanly with the stock variables instead of creating new css classes.
-- [ ] `docs/appendix/cli/{command group, ie: cat, chan, conf, cron, etc}.md` — shell each `private/bin/rvn-*` with `--help` and format output as markdown; replaces current hand-written content
-- [ ] `docs/appendix/config.md` — parse `private/dat/config.php.dist` key tree + reflect on `Controller/Panel/ConfigController` for descriptions and defaults
-- [ ] `docs/appendix/core/{class group, ie: controller, repository, runtime, etc}.md` — reflect on all sys/* classes & functions; pull `@param`/`@return`/first docline per function; group by service key in `context['rvn']` if applicable.
-- [ ] `docs/appendix/database.md` — reflect on `SchemaBuilder`/`AuthSchemaBuilder` method names + annotations to enumerate tables and columns; include column purposes and the full chain of variables/routes/forms that map to each column
-- [ ] `docs/appendix/extensions/{extension slug}.md` — per-extension docs for bundled stock extensions (contact, signups, database, etc.)
-- [ ] `docs/appendix/libraries/{class group, ie: auth, format, parser, scribe, etc}.md` — reflect on all lib/* classes & functions; pull `@param`/`@return`/first docline per function; group by service key in `context['rvn']`
-- [ ] `docs/appendix/templates/{public|panel}.md` - reflect on all base tpl/* templates that form the foundation of our template fallback chain, and the routes they are used on.
-- [ ] Wire `docgen` into maintenance checklist once generator is built
-
-### Hand-Authored Docs & Cleanup
-A lot of these I will have to write myself, but generate examples I can work with as a starting point:
-- [ ] `docs/intro.md` — project overview, philosophy, and quick-start
-- [ ] `docs/filetree.md` - This one should be mostly up to date already. Doublecheck & move to `docs/appendix/`
-- [ ] `docs/appendix/architecture.md` - Finer details of why Raven is structured the way that it is, and what this structure enables.
-- [ ] `docs/appendix/api.md` — index linking all developer-facing surfaces (Extensions, Libraries, CLI, Theming); summary paragraph per surface; grows to link more appendix pages over time
-- [ ] Narrative docs (`pages.md`, `routing.md`, `configuration.md`, etc.) — AI-authored drafts exist but are unverified Codex/Claude output; needs full accuracy sweep and rewrite pass against actual codebase
-- [ ] `docs/screenshots/` folder — UI screenshots for operator-facing docs
-- [ ] Do a proper human proofreading sweep once narrative docs are rewritten; replace this section with final authoring task list
-
-### Delivery Architecture Notes
-- `docs/` is the single source of truth for both the GitHub repo and the live Raven docs site
-- Docs site: Raven instance on lanterns.io, dedicated /raven/ channel for Raven docs. Master Raven git repo mirrored into `private/dat/` with Repositories extension, so Raven can embed always-current docs via the markdown content block
-- Raven's per-page title-display flag lets embedded markdown files use their own `#` headings natively
+The documentation project has been moved to `build/todo.md` (2026-05-20) so it can be tracked with active build work and current execution batches.
 
 
 ## Finish Updater

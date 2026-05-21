@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/Security/CsrfToken.php
  * Token storage contract used by the shared CSRF helper.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

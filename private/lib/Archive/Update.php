@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/Archive/Update.php
  * Compares, plans, and applies package updates from a git source.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -74,6 +74,7 @@ final class Update
      */
     public function compare(array $source): array
     {
+        // Wrap source/local state probes so failures return normalized error payloads.
         try {
             $local = $this->localState();
             $remote = $this->remoteState($source);
@@ -109,10 +110,13 @@ final class Update
      */
     public function dryRun(array $source, bool $allowOverwrite = false): array
     {
+        // Wrap workspace prep and planning so failures return normalized error payloads.
         try {
             $workspace = $this->prepareWorkspace($source, true);
+            // Always clean temporary workspace state after dry-run planning.
             try {
                 $plan = $this->buildPlan($workspace, true);
+                // Surface a distinct warning when local managed-file changes block overwrite.
                 $message = $plan['summary']['blocked_count'] > 0 && !$allowOverwrite
                     ? 'Dry run found local managed-file changes that would require overwrite.'
                     : 'Dry run complete.';
@@ -151,11 +155,14 @@ final class Update
      */
     public function update(array $source, bool $allowOverwrite = false): array
     {
+        // Wrap workspace prep, planning, and apply so failures return normalized error payloads.
         try {
             $workspace = $this->prepareWorkspace($source, true);
+            // Always clean temporary workspace state after update attempts.
             try {
                 $plan = $this->buildPlan($workspace, true);
 
+                // Block apply operations when overwrite is disabled and local changes conflict.
                 if ($plan['summary']['blocked_count'] > 0 && !$allowOverwrite) {
                     return [
                         'ok' => false,
@@ -172,6 +179,7 @@ final class Update
 
                 $appliedCount = $this->applyPlan($plan['actions'], (string) $workspace['source_tree']);
                 $this->syncToSource((string) $source['source_url'], (string) $workspace['remote']['branch']);
+                // Invalidate schema ensure cache when any file changes were applied.
                 if ($appliedCount > 0) {
                     $this->schemaEnsureStateStore()->invalidate();
                 }
@@ -256,6 +264,7 @@ final class Update
     {
         $local = $this->localState();
         $remote = $this->remoteState($source);
+        // Comparison-only callers can skip worktree clone and return revision state directly.
         if (!$withWorkTree) {
             return [
                 'local' => $local,
@@ -267,6 +276,7 @@ final class Update
 
         $tempDir = $this->tempPath();
 
+        // Clone and compare in an isolated temporary workspace.
         try {
             $this->git->mustRun([
                 'clone',
@@ -304,6 +314,7 @@ final class Update
 
             $comparisonState = 'up_to_date';
             $comparisonLabel = 'Up To Date';
+            // Mark divergent/ahead/behind states using rev-list ahead/behind counters.
             if ($localAhead > 0 && $remoteAhead > 0) {
                 $comparisonState = 'diverged';
                 $comparisonLabel = 'Diverged';
@@ -328,6 +339,7 @@ final class Update
                 'source_tree' => $sourceTree,
             ];
         } catch (RuntimeException $exception) {
+            // Cleanup temporary workspace before rethrowing workspace preparation failures.
             $this->deleteTree($tempDir);
             throw $exception;
         }
@@ -346,6 +358,7 @@ final class Update
     private function buildPlan(array $workspace, bool $preserveWorkspace): array
     {
         $sourceTree = (string) ($workspace['source_tree'] ?? '');
+        // Plan building requires a checked-out source tree to diff against local files.
         if ($sourceTree === '' || !is_dir($sourceTree)) {
             throw new RuntimeException('Temporary source checkout is unavailable.');
         }
@@ -372,21 +385,25 @@ final class Update
         $dirtyPaths = $this->dirtyPaths();
 
         $actions = [];
+        // Walk source files first to generate create/update/skip actions.
         foreach ($sourceFiles as $relativePath => $sourcePath) {
             $protectedReason = $this->protectedPathReason($relativePath, $ignoredPaths, $customThemeRoots, $customExtensionRoots, $extensionBinAliases);
             $localPath = $localFiles[$relativePath] ?? null;
             $localModified = isset($dirtyPaths[$relativePath]);
 
+            // Protected paths are always skipped regardless of source/local diffs.
             if ($protectedReason !== null) {
                 $actions[] = $this->planAction($relativePath, 'skip', $protectedReason, false, false);
                 continue;
             }
 
+            // Missing local managed files are staged as creates.
             if (!is_string($localPath)) {
                 $actions[] = $this->planAction($relativePath, 'create', 'New file from source.', false, false);
                 continue;
             }
 
+            // Identical files produce no action row.
             if ($this->filesMatch($sourcePath, $localPath)) {
                 continue;
             }
@@ -400,13 +417,16 @@ final class Update
             );
         }
 
+        // Walk local-only managed files to generate delete/skip actions.
         foreach ($localFiles as $relativePath => $localPath) {
+            // Source-present paths were already handled in the first loop.
             if (isset($sourceFiles[$relativePath])) {
                 continue;
             }
 
             $protectedReason = $this->protectedPathReason($relativePath, $ignoredPaths, $customThemeRoots, $customExtensionRoots, $extensionBinAliases);
             $localModified = isset($dirtyPaths[$relativePath]);
+            // Protected paths are always skipped from delete planning.
             if ($protectedReason !== null) {
                 $actions[] = $this->planAction($relativePath, 'skip', $protectedReason, false, false);
                 continue;
@@ -426,19 +446,24 @@ final class Update
         });
 
         $summary = $this->emptySummary();
+        // Aggregate action counts for UI summaries and overwrite warnings.
         foreach ($actions as $action) {
             $operation = (string) ($action['operation'] ?? 'skip');
+            // Count each operation type when the matching summary key exists.
             if (isset($summary[$operation . '_count'])) {
                 $summary[$operation . '_count']++;
             }
+            // Track local modifications that would be overwritten/deleted.
             if (!empty($action['local_modified'])) {
                 $summary['overwrite_count']++;
             }
+            // Track blocked actions requiring overwrite override.
             if (!empty($action['blocked'])) {
                 $summary['blocked_count']++;
             }
         }
 
+        // Optional cleanup for callers that do not need to preserve the workspace.
         if (!$preserveWorkspace) {
             $this->deleteTree((string) ($workspace['temp_dir'] ?? ''));
         }
@@ -462,13 +487,16 @@ final class Update
         $appliedCount = 0;
         $deletedDirectories = [];
 
+        // Apply planned actions in sorted order to keep file operations deterministic.
         foreach ($actions as $action) {
             $operation = (string) ($action['operation'] ?? '');
+            // Skip actions are informational only.
             if ($operation === 'skip') {
                 continue;
             }
 
             $relativePath = (string) ($action['path'] ?? '');
+            // Ignore malformed action rows missing a target path.
             if ($relativePath === '') {
                 continue;
             }
@@ -476,7 +504,9 @@ final class Update
             $targetPath = $this->root . '/' . $relativePath;
             $sourcePath = $sourceTree . '/' . $relativePath;
 
+            // Delete operations remove the local file and remember parent dirs for pruning.
             if ($operation === 'delete') {
+                // Throw when a managed file delete fails.
                 if (is_file($targetPath) && !unlink($targetPath)) {
                     throw new RuntimeException('Failed to delete ' . $relativePath . '.');
                 }
@@ -485,19 +515,23 @@ final class Update
                 continue;
             }
 
+            // Create/update operations require the source file to exist.
             if (!is_file($sourcePath)) {
                 throw new RuntimeException('Source file missing for ' . $relativePath . '.');
             }
 
+            // Abort when a target directory conflicts with the file path.
             if (is_dir($targetPath)) {
                 throw new RuntimeException('Update path conflict: target directory exists for ' . $relativePath . '.');
             }
 
             $targetDirectory = dirname($targetPath);
+            // Ensure parent directories exist before copying files in.
             if (!is_dir($targetDirectory) && !mkdir($targetDirectory, 0775, true) && !is_dir($targetDirectory)) {
                 throw new RuntimeException('Failed to create directory for ' . $relativePath . '.');
             }
 
+            // Throw when file copy fails to keep apply state explicit.
             if (!copy($sourcePath, $targetPath)) {
                 throw new RuntimeException('Failed to write ' . $relativePath . '.');
             }
@@ -508,6 +542,7 @@ final class Update
 
         rsort($deletedDirectories);
         $deletedDirectories = array_values(array_unique($deletedDirectories));
+        // Prune empty parent directories left behind by deletes.
         foreach ($deletedDirectories as $directory) {
             $this->pruneEmptyDirs($directory);
         }
@@ -524,6 +559,7 @@ final class Update
     private function localState(): array
     {
         $insideWorkTree = $this->git->mustRun(['rev-parse', '--is-inside-work-tree'], $this->root);
+        // Local updates require running inside a valid git working tree.
         if (strtolower(trim((string) $insideWorkTree['stdout'])) !== 'true') {
             throw new RuntimeException('Local install is not inside a git working tree.');
         }
@@ -531,6 +567,7 @@ final class Update
         $revision = $this->git->mustRun(['rev-parse', 'HEAD'], $this->root);
         $branch = $this->git->run(['branch', '--show-current'], $this->root);
         $branchName = trim((string) $branch['stdout']);
+        // Detached HEAD states use a synthetic branch label for UI output.
         if ($branchName === '') {
             $branchName = 'detached';
         }
@@ -554,6 +591,7 @@ final class Update
     private function remoteState(array $source): array
     {
         $sourceUrl = trim((string) ($source['source_url'] ?? ''));
+        // Source URL is mandatory for remote revision checks.
         if ($sourceUrl === '') {
             throw new RuntimeException('Resolved update source URL is empty.');
         }
@@ -562,26 +600,32 @@ final class Update
         $branchName = '';
         $revision = '';
 
+        // Parse ls-remote output to resolve HEAD branch and revision.
         foreach (preg_split("/\r?\n/", (string) $head['stdout']) ?: [] as $line) {
             $trimmed = trim($line);
+            // Skip blank ls-remote lines.
             if ($trimmed === '') {
                 continue;
             }
 
+            // Capture symbolic HEAD branch target.
             if (preg_match('/^ref:\s+refs\/heads\/([^\s]+)\s+HEAD$/', $trimmed, $matches) === 1) {
                 $branchName = (string) ($matches[1] ?? '');
                 continue;
             }
 
+            // Capture concrete HEAD revision hash.
             if (preg_match('/^([0-9a-f]{40})\s+HEAD$/i', $trimmed, $matches) === 1) {
                 $revision = strtolower((string) ($matches[1] ?? ''));
             }
         }
 
+        // Branch name is required to fetch exact source state later.
         if ($branchName === '') {
             throw new RuntimeException('Failed to resolve source default branch.');
         }
 
+        // Revision hash is required to compare local/remote heads.
         if ($revision === '') {
             throw new RuntimeException('Failed to resolve source revision.');
         }
@@ -603,7 +647,9 @@ final class Update
     private function remoteRevisionTimestamp(string $sourceUrl, string $branchName): string
     {
         $tempDir = $this->tempPath();
+        // Use a shallow temporary repo to read remote commit timestamp deterministically.
         try {
+            // Create temp workspace directory for git metadata operations.
             if (!mkdir($tempDir, 0775, true) && !is_dir($tempDir)) {
                 throw new RuntimeException('Failed to initialize temporary update metadata directory.');
             }
@@ -640,6 +686,7 @@ final class Update
         $localRevision = strtolower(trim((string) ($local['revision'] ?? '')));
         $remoteRevision = strtolower(trim((string) ($remote['revision'] ?? '')));
 
+        // Matching hashes mean local tree is already up to date.
         if ($localRevision !== '' && $remoteRevision !== '' && $localRevision === $remoteRevision) {
             return [
                 'state' => 'up_to_date',
@@ -666,19 +713,23 @@ final class Update
      */
     private function ignoredPaths(array $paths): array
     {
+        // No candidate paths means no ignored-path checks are necessary.
         if ($paths === []) {
             return [];
         }
 
         $stdin = implode("\n", $paths) . "\n";
         $result = $this->git->run(['check-ignore', '--no-index', '--stdin'], $this->root, $stdin);
+        // Exit code 1 means "no ignored paths"; other non-zero codes are real errors.
         if (!$result['ok'] && (int) $result['exit_code'] !== 1) {
             throw new RuntimeException($result['stderr'] !== '' ? $result['stderr'] : 'Failed to evaluate .gitignore paths.');
         }
 
         $ignored = [];
+        // Normalize each ignored path into the canonical relative-path map.
         foreach (preg_split("/\r?\n/", (string) $result['stdout']) ?: [] as $path) {
             $normalized = $this->normalizeRelativePath($path);
+            // Keep only non-empty normalized relative paths.
             if ($normalized !== '') {
                 $ignored[$normalized] = true;
             }
@@ -696,6 +747,7 @@ final class Update
     {
         $result = $this->git->mustRun(['status', '--porcelain', '-z', '--untracked-files=all', '--ignored=no'], $this->root);
         $raw = (string) ($result['stdout'] ?? '');
+        // Empty porcelain output means no dirty paths.
         if ($raw === '') {
             return [];
         }
@@ -704,19 +756,23 @@ final class Update
         $dirty = [];
         for ($index = 0; $index < count($entries); $index++) {
             $entry = (string) ($entries[$index] ?? '');
+            // Skip malformed/empty porcelain records.
             if ($entry === '' || strlen($entry) < 4) {
                 continue;
             }
 
             $status = substr($entry, 0, 2);
             $path = $this->normalizeRelativePath(substr($entry, 3));
+            // Track the visible current path for this status entry.
             if ($path !== '') {
                 $dirty[$path] = true;
             }
 
+            // Rename/copy records include a second "from" path token; track it too.
             if (str_contains($status, 'R') || str_contains($status, 'C')) {
                 $index++;
                 $renamedFrom = $this->normalizeRelativePath((string) ($entries[$index] ?? ''));
+                // Record the source path when it is present and non-empty.
                 if ($renamedFrom !== '') {
                     $dirty[$renamedFrom] = true;
                 }
@@ -735,6 +791,7 @@ final class Update
      */
     private function collectFiles(string $basePath, array $excludePrefixes = ['.git']): array
     {
+        // Missing base directories produce an empty file map.
         if (!is_dir($basePath)) {
             return [];
         }
@@ -742,8 +799,10 @@ final class Update
         $files = [];
         $basePath = rtrim(str_replace('\\', '/', $basePath), '/');
         $normalizedExcludes = [];
+        // Normalize exclusion prefixes once before traversal.
         foreach ($excludePrefixes as $prefix) {
             $normalized = $this->normalizeRelativePath((string) $prefix);
+            // Keep only non-empty normalized exclusion prefixes.
             if ($normalized !== '') {
                 $normalizedExcludes[] = $normalized;
             }
@@ -753,6 +812,7 @@ final class Update
         $filter = new RecursiveCallbackFilterIterator(
             $directoryIterator,
             function ($current) use ($basePath, $normalizedExcludes): bool {
+                // Non-fileinfo entries are ignored by the filter callback.
                 if (!$current instanceof \SplFileInfo) {
                     return true;
                 }
@@ -760,10 +820,12 @@ final class Update
                 $fullPath = str_replace('\\', '/', $current->getPathname());
                 $relative = ltrim(substr($fullPath, strlen($basePath)), '/');
                 $relative = $this->normalizeRelativePath($relative);
+                // Keep the iterator alive at the root path.
                 if ($relative === '') {
                     return true;
                 }
 
+                // Reject excluded prefixes from traversal.
                 foreach ($normalizedExcludes as $prefix) {
                     if ($relative === $prefix || str_starts_with($relative, $prefix . '/')) {
                         return false;
@@ -778,6 +840,7 @@ final class Update
             RecursiveIteratorIterator::SELF_FIRST
         );
 
+        // Collect only files; directories are handled implicitly by traversal.
         foreach ($iterator as $item) {
             if (!$item->isFile()) {
                 continue;
@@ -786,6 +849,7 @@ final class Update
             $fullPath = str_replace('\\', '/', $item->getPathname());
             $relative = ltrim(substr($fullPath, strlen($basePath)), '/');
             $relative = $this->normalizeRelativePath($relative);
+            // Skip entries that do not normalize to a relative file path.
             if ($relative === '') {
                 continue;
             }
@@ -806,18 +870,22 @@ final class Update
     {
         $result = $this->git->mustRun(['ls-files', '-z', '--cached', '--others', '--exclude-standard'], $this->root);
         $raw = (string) ($result['stdout'] ?? '');
+        // Empty ls-files output means there are no managed files to plan.
         if ($raw === '') {
             return [];
         }
 
         $files = [];
+        // Normalize each ls-files entry into a relative => absolute map.
         foreach (explode("\0", $raw) as $path) {
             $relative = $this->normalizeRelativePath($path);
+            // Skip blank paths emitted by split terminators or malformed records.
             if ($relative === '') {
                 continue;
             }
 
             $fullPath = $this->root . '/' . $relative;
+            // Ignore paths that no longer resolve to regular files.
             if (!is_file($fullPath)) {
                 continue;
             }
@@ -842,22 +910,26 @@ final class Update
      */
     private function customProtectedRoots(string $absoluteBase, string $relativeBase, array $stockNames): array
     {
+        // Missing base directories produce no custom protected roots.
         if (!is_dir($absoluteBase)) {
             return [];
         }
 
         $roots = [];
         $entries = scandir($absoluteBase) ?: [];
+        // Keep only non-hidden directory names not present in stock lists.
         foreach ($entries as $entry) {
             if ($entry === '.' || $entry === '..' || str_starts_with($entry, '.')) {
                 continue;
             }
 
             $fullPath = $absoluteBase . '/' . $entry;
+            // Ignore non-directory entries.
             if (!is_dir($fullPath)) {
                 continue;
             }
 
+            // Stock roots are managed by update plan and are not custom-protected.
             if (in_array(strtolower($entry), $stockNames, true)) {
                 continue;
             }
@@ -882,12 +954,14 @@ final class Update
      */
     private function extensionBinAliases(string $absoluteBinDir, string $relativeBinDir): array
     {
+        // Missing bin directories produce no alias map.
         if (!is_dir($absoluteBinDir)) {
             return [];
         }
 
         $aliases = [];
         $entries = scandir($absoluteBinDir) ?: [];
+        // Keep only symlink entries because extension aliases are provisioned symlinks.
         foreach ($entries as $entry) {
             if ($entry === '.' || $entry === '..') {
                 continue;
@@ -899,6 +973,7 @@ final class Update
             }
 
             $relative = $this->normalizeRelativePath($relativeBinDir . '/' . $entry);
+            // Keep only non-empty normalized alias paths.
             if ($relative !== '') {
                 $aliases[$relative] = true;
             }
@@ -924,22 +999,26 @@ final class Update
         array $customExtensionRoots,
         array $extensionBinAliases
     ): ?string {
+        // .gitignore wins first: ignored paths are never touched by updater actions.
         if (isset($ignoredPaths[$path])) {
             return 'Protected by .gitignore.';
         }
 
+        // Protect custom theme trees from core updater deletes/replacements.
         foreach ($customThemeRoots as $root) {
             if ($path === $root || str_starts_with($path, $root . '/')) {
                 return 'Protected custom theme path.';
             }
         }
 
+        // Protect custom extension trees from core updater deletes/replacements.
         foreach ($customExtensionRoots as $root) {
             if ($path === $root || str_starts_with($path, $root . '/')) {
                 return 'Protected custom extension path.';
             }
         }
 
+        // Protect extension-provisioned bin symlink aliases.
         if (isset($extensionBinAliases[$path])) {
             return 'Protected extension bin alias.';
         }
@@ -982,10 +1061,12 @@ final class Update
      */
     private function filesMatch(string $leftPath, string $rightPath): bool
     {
+        // Both sides must exist as regular files to compare content.
         if (!is_file($leftPath) || !is_file($rightPath)) {
             return false;
         }
 
+        // Size mismatch is a quick inequality short-circuit.
         if (filesize($leftPath) !== filesize($rightPath)) {
             return false;
         }
@@ -1014,10 +1095,12 @@ final class Update
     private function tempPath(): string
     {
         $updatesRoot = $this->root . '/.tmp/update';
+        // Ensure workspace root exists before creating per-run temp directories.
         if (!is_dir($updatesRoot) && !mkdir($updatesRoot, 0775, true) && !is_dir($updatesRoot)) {
             throw new RuntimeException('Failed to initialize Raven update workspace at .tmp/update.');
         }
 
+        // Workspace root must be writable for update clone/check operations.
         if (!is_writable($updatesRoot)) {
             throw new RuntimeException('Raven update workspace .tmp/update is not writable.');
         }
@@ -1035,7 +1118,9 @@ final class Update
     {
         $normalizedRoot = $this->root;
         $current = rtrim(str_replace('\\', '/', $directory), '/');
+        // Walk upward, pruning only empty directories under the project root.
         while ($current !== '' && $current !== $normalizedRoot && str_starts_with($current, $normalizedRoot . '/')) {
+            // Skip missing directories and continue upward.
             if (!is_dir($current)) {
                 $current = dirname($current);
                 $current = rtrim(str_replace('\\', '/', $current), '/');
@@ -1043,6 +1128,7 @@ final class Update
             }
 
             $entries = scandir($current);
+            // Stop when directory is non-empty or unreadable.
             if (!is_array($entries) || count($entries) > 2) {
                 break;
             }
@@ -1061,6 +1147,7 @@ final class Update
      */
     private function deleteTree(string $directory): void
     {
+        // Missing/blank directories are treated as already cleaned.
         if ($directory === '' || !is_dir($directory)) {
             return;
         }
@@ -1070,8 +1157,10 @@ final class Update
             new RecursiveDirectoryIterator($directory, FilesystemIterator::SKIP_DOTS),
             RecursiveIteratorIterator::CHILD_FIRST
         );
+        // Remove children before parents to satisfy filesystem constraints.
         foreach ($iterator as $item) {
             $path = $item->getPathname();
+            // Remove directory nodes with rmdir and file nodes with unlink.
             if ($item->isDir()) {
                 @rmdir($path);
             } else {

@@ -5,7 +5,7 @@
  * ~/private/sys/Router/RouteRequest.php
  * Immutable routing dispatch contract — method + normalized path passed to the router.
  * Not to be confused with Raven\Lib\Transport\Request, which reads HTTP server environment.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

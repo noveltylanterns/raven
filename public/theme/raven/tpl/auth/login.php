@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/public/theme/raven/tpl/auth/login.php
  * Public login helper template.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 if (!defined('RAVEN_VIEW_RENDER_CONTEXT')) {

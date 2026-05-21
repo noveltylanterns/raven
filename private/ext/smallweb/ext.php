@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/ext/smallweb/ext.php
  * Smallweb extension service bootstrap provider.
- * docs: /private/ext/AGENTS.md
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

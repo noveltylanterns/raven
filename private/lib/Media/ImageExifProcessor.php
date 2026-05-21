@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/Media/ImageExifProcessor.php
  * EXIF-orientation normalizer for image write pipelines.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

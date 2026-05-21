@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/Media/MediaStorage.php
  * Shared page-media path layout helpers for upload and cleanup workflows.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -84,15 +84,18 @@ final class MediaStorage
     {
         $normalized = ltrim($storedPath, '/');
 
+        // Reject empty and traversal-like inputs before resolving absolute filesystem paths.
         if ($normalized === '' || str_contains($normalized, '..')) {
             return;
         }
 
+        // Only page-gallery paths are owned by this storage helper.
         if (!str_starts_with($normalized, 'uploads/pages/')) {
             return;
         }
 
         $absolutePath = $this->absolutePublicPath($normalized);
+        // Deletion is best-effort and only applies to regular files.
         if (is_file($absolutePath)) {
             @unlink($absolutePath);
         }

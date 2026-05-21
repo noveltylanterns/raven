@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/Database/DbDriver.php
  * Normalizes shared database driver + prefix config values.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
 */
 
 declare(strict_types=1);
@@ -28,6 +28,7 @@ final class DbDriver
     public function driver(array $config): string
     {
         $driver = strtolower((string) ($config['driver'] ?? 'sqlite'));
+        // Accept only drivers supported by Raven's DB layer.
         if (!in_array($driver, ['sqlite', 'mysql', 'pgsql'], true)) {
             throw new RuntimeException('Unsupported database driver: ' . $driver);
         }

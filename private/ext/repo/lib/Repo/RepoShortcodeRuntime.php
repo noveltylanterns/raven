@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/ext/repo/lib/Repo/RepoShortcodeRuntime.php
  * Shortcode runtime for read-only repository embeds.
- * Docs: /private/ext/repo/AGENTS.md
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

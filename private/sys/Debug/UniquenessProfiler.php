@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/sys/Debug/UniquenessProfiler.php
  * Shared (slug, channel) path-scope uniqueness lookup helper.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

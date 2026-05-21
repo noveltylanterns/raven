@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/Security/PublicCaptchaFlow.php
  * Request-scoped public captcha validation + markup helper for form-enabled routes.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

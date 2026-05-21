@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/sys/Runtime/Public/RuntimeContract.php
  * Required public runtime factory-key contract for entry orchestration.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

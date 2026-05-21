@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/ext/signups/lib/SignupPublicFormRuntime.php
  * Signup Sheets embedded-form runtime and submit handling.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

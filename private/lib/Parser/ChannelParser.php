@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/Parser/ChannelParser.php
  * Channel slug resolution helpers shared by write-side repository classes.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -40,12 +40,14 @@ final class ChannelParser
         string $missingMessage = 'Selected channel does not exist.'
     ): ?int {
         $normalized = strtolower(trim((string) ($slug ?? '')));
+        // Empty slugs intentionally map to null so callers can treat channel as optional.
         if ($normalized === '') {
             return null;
         }
 
         $resolved = $idBySlugResolver($normalized);
         $id = $resolved !== null ? (int) $resolved : null;
+        // Non-positive/unknown ids are treated as missing channel selections.
         if ($id === null || $id < 1) {
             throw new RuntimeException($missingMessage);
         }

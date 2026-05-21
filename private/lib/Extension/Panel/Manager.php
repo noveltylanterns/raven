@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/Extension/Panel/Manager.php
  * Extension catalog and manifest validation service for panel extension management.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -80,7 +80,7 @@ final class Manager
      *   description: string,
      *   author: string,
      *   homepage: string,
-     *   docs: string,
+     *   Docs: https://lanterns.io/raven
      *   valid: bool,
      *   invalid_reason: string,
      *   enabled: bool,
@@ -102,16 +102,20 @@ final class Manager
         $entries = scandir($this->stateStore->basePath()) ?: [];
         $extensions = [];
 
+        // Walk extension directories on disk and assemble panel catalog entries.
         foreach ($entries as $entry) {
+            // Skip filesystem pseudo-entries and hidden directories.
             if ($entry === '.' || $entry === '..' || str_starts_with($entry, '.')) {
                 continue;
             }
 
+            // Ignore unsafe extension directory names.
             if (!$this->isSafeDirectoryName($entry)) {
                 continue;
             }
 
             $extensionPath = $this->stateStore->basePath() . '/' . $entry;
+            // Skip non-directory entries under the extension base path.
             if (!is_dir($extensionPath)) {
                 continue;
             }
@@ -123,6 +127,7 @@ final class Manager
             $isStock = $this->isStockExtensionDirectory($entry);
             $canUninstall = !$isEnabled;
             $uninstallBlockReason = '';
+            // Enabled extensions must be disabled before uninstall is allowed.
             if ($isEnabled) {
                 $uninstallBlockReason = 'Disable extension before uninstalling.';
             }
@@ -161,6 +166,7 @@ final class Manager
         $cleanedEnabledMap = array_intersect_key($enabledMap, $activeKeyMap);
         $cleanedPermissionMap = array_intersect_key($permissionMap, $activeKeyMap);
         $cleanedPermissionBitsMap = array_intersect_key($permissionBitsMap, $activeKeyMap);
+        // Persist state-map cleanup only when stale keys were actually removed.
         if (
             $cleanedEnabledMap !== $enabledMap
             || $cleanedPermissionMap !== $permissionMap
@@ -191,7 +197,7 @@ final class Manager
      *   description: string,
      *   author: string,
      *   homepage: string,
-     *   docs: string,
+     *   Docs: https://lanterns.io/raven
      *   permission_levels: array<int, array{key: string, label: string}>,
      *   default_permission_level: string
      * }
@@ -201,11 +207,13 @@ final class Manager
         $defaultPermissionLevels = $this->defaultPermissionLevels('Extension');
         $defaultPermissionLevel = (string) ($defaultPermissionLevels[0]['key'] ?? 'access');
         $directorySlug = trim((string) basename($extensionPath));
+        // Reject unsafe directory slugs before using them in resolver calls.
         if (!$this->isSafeDirectoryName($directorySlug)) {
             $directorySlug = '';
         }
 
         $manifestPath = rtrim($extensionPath, '/') . '/ext.json';
+        // ext.json is required for every extension entry.
         if (!is_file($manifestPath)) {
             return [
                 'valid' => false,
@@ -224,6 +232,7 @@ final class Manager
         }
 
         $raw = file_get_contents($manifestPath);
+        // Reject missing or empty manifest payloads.
         if ($raw === false || trim($raw) === '') {
             return [
                 'valid' => false,
@@ -243,6 +252,7 @@ final class Manager
 
         /** @var mixed $decoded */
         $decoded = json_decode($raw, true);
+        // Manifest must decode to a JSON object/associative array.
         if (!is_array($decoded)) {
             return [
                 'valid' => false,
@@ -261,6 +271,7 @@ final class Manager
         }
 
         $name = $this->input->text((string) ($decoded['name'] ?? ''), 120);
+        // Name is mandatory for panel display and manifest validity.
         if ($name === '') {
             return [
                 'valid' => false,
@@ -279,6 +290,7 @@ final class Manager
         }
 
         $manifestSlug = strtolower(trim((string) ($decoded['slug'] ?? '')));
+        // Slug must satisfy the extension directory naming contract.
         if ($manifestSlug === '' || preg_match('/^[a-z0-9][a-z0-9_-]{0,119}$/', $manifestSlug) !== 1) {
             return [
                 'valid' => false,
@@ -303,22 +315,27 @@ final class Manager
         $author = $this->input->text((string) ($decoded['author'] ?? ''), 120);
         $homepageRaw = trim((string) ($decoded['homepage'] ?? ''));
         $homepage = '';
+        // Accept homepage only when it is a valid HTTP(S) URL.
         if ($homepageRaw !== '' && filter_var($homepageRaw, FILTER_VALIDATE_URL) !== false) {
             $scheme = strtolower((string) parse_url($homepageRaw, PHP_URL_SCHEME));
+            // Restrict homepage scheme to web-safe protocols.
             if (in_array($scheme, ['http', 'https'], true)) {
                 $homepage = $homepageRaw;
             }
         }
         $docsRaw = trim((string) ($decoded['docs'] ?? ''));
         $docs = '';
+        // Accept docs link only when it is a valid HTTP(S) URL.
         if ($docsRaw !== '' && filter_var($docsRaw, FILTER_VALIDATE_URL) !== false) {
             $scheme = strtolower((string) parse_url($docsRaw, PHP_URL_SCHEME));
+            // Restrict docs scheme to web-safe protocols.
             if (in_array($scheme, ['http', 'https'], true)) {
                 $docs = $docsRaw;
             }
         }
 
         $typeContractError = $this->extensionTypeContractError($extensionPath, $type);
+        // Surface extension-type contract violations as invalid manifest entries.
         if ($typeContractError !== null) {
             return [
                 'valid' => false,
@@ -336,10 +353,12 @@ final class Manager
             ];
         }
 
+        // Validate ext.php bootstrap contract when a safe directory slug is available.
         if ($directorySlug !== '') {
             $bootstrapContract = $this->bootstrapContractResolver->resolve($this->projectRoot, $directorySlug, [
                 'type' => $type,
             ]);
+            // Reject invalid ext.php provider contracts with a clear error message.
             if (!$bootstrapContract['valid']) {
                 return [
                     'valid' => false,
@@ -358,6 +377,7 @@ final class Manager
             }
         }
 
+        // Validate shortcodes/fields providers only when a safe directory slug is available.
         if ($directorySlug !== '') {
             $shortcodesError = Registry::shortcodesValidationError(
                 $this->projectRoot,
@@ -368,6 +388,7 @@ final class Manager
                     'config' => $this->config,
                 ]
             );
+            // Reject invalid shortcodes.php provider contracts.
             if ($shortcodesError !== null) {
                 return [
                     'valid' => false,
@@ -392,6 +413,7 @@ final class Manager
                     'extension' => $directorySlug,
                 ]
             );
+            // Reject invalid fields.php provider contracts.
             if ($fieldsError !== null) {
                 return [
                     'valid' => false,
@@ -520,6 +542,7 @@ final class Manager
         $base = preg_replace('/[^a-z0-9_-]+/', '-', $base) ?? '';
         $base = trim($base, '-_');
 
+        // Return null when normalized filename slug is empty or unsafe.
         if ($base === '' || !$this->isSafeDirectoryName($base)) {
             return null;
         }

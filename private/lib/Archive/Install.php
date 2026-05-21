@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/Archive/Install.php
  * Shared package-upload workflow helpers for theme and extension installs.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -58,6 +58,7 @@ final class Install
             'empty_error' => 'Uploaded archive appears empty.',
             'too_large_error' => $packageLabel . ' exceeds the 50MB upload limit.',
         ]);
+        // Abort early when upload normalization/validation failed.
         if (($validatedUpload['ok'] ?? false) !== true) {
             return ['ok' => false, 'error' => (string) ($validatedUpload['error'] ?? 'Archive upload failed.')];
         }
@@ -66,6 +67,7 @@ final class Install
         $upload = $validatedUpload['upload'] ?? [];
         $tmpPath = (string) ($upload['tmp_name'] ?? '');
         $archiveName = $this->input->text((string) ($upload['name'] ?? 'package.zip'), 255);
+        // Enforce supported archive formats before install-name resolution.
         if (!$this->archives->supports($archiveName)) {
             return [
                 'ok' => false,
@@ -114,8 +116,10 @@ final class Install
         $name = strtolower(trim($requestedName));
         $manualNameProvided = $name !== '';
 
+        // Auto-derive a name from archive metadata when no manual name was provided.
         if ($name === '') {
             $derivedName = $deriveFromArchive($archiveName);
+            // Abort when archive metadata cannot produce a usable name.
             if (!is_string($derivedName) || trim($derivedName) === '') {
                 return [
                     'ok' => false,
@@ -126,10 +130,12 @@ final class Install
             $name = strtolower(trim($derivedName));
         }
 
+        // Reject names that violate collection safety constraints.
         if (!$isSafeName($name)) {
             return ['ok' => false, 'error' => $safeNameRequirement];
         }
 
+        // Manual names may not override stock/reserved directory names.
         if ($manualNameProvided && $isReservedName($name)) {
             return [
                 'ok' => false,
@@ -138,6 +144,7 @@ final class Install
         }
 
         $initialName = $name;
+        // Resolve collisions by auto-renaming only when the name was auto-derived.
         if ($pathExists($name)) {
             if ($manualNameProvided) {
                 return [
@@ -147,6 +154,7 @@ final class Install
             }
 
             $resolvedName = $nextAvailableName($name);
+            // Abort when no free collision-safe name can be allocated.
             if (!is_string($resolvedName) || $resolvedName === '') {
                 return [
                     'ok' => false,
@@ -176,6 +184,7 @@ final class Install
      */
     public function extractTo(string $tmpPath, string $targetDirectory, callable $cleanup, string $entityLabel): ?string
     {
+        // Convert extraction failures into one user-facing install error.
         try {
             $this->archives->extractUpload($tmpPath, $targetDirectory);
         } catch (\Throwable $exception) {
@@ -183,6 +192,7 @@ final class Install
             return $exception->getMessage() !== '' ? $exception->getMessage() : ucfirst($entityLabel) . ' upload failed.';
         }
 
+        // Empty extraction results are treated as invalid package uploads.
         if (!$this->archives->hasFiles($targetDirectory)) {
             $cleanup($targetDirectory);
             return 'Extracted ' . strtolower($entityLabel) . ' directory is empty.';
@@ -200,36 +210,44 @@ final class Install
     public function flattenRoot(string $targetDirectory): ?string
     {
         $entries = $this->entries($targetDirectory);
+        // Abort when the extraction target cannot be enumerated.
         if ($entries === null) {
             return 'Failed to inspect extracted package.';
         }
 
+        // Flattening applies only to single-wrapper archives.
         if (count($entries) !== 1) {
             return null;
         }
 
         $innerRoot = $targetDirectory . '/' . $entries[0];
+        // Flattening applies only when the sole top-level entry is a directory.
         if (!is_dir($innerRoot)) {
             return null;
         }
 
         $innerEntries = $this->entries($innerRoot);
+        // Abort when the wrapper directory cannot be enumerated.
         if ($innerEntries === null) {
             return 'Failed to inspect extracted package root directory.';
         }
 
+        // Move each wrapped entry up one level into the final install directory.
         foreach ($innerEntries as $entry) {
             $sourcePath = $innerRoot . '/' . $entry;
             $destinationPath = $targetDirectory . '/' . $entry;
+            // Abort flattening when a destination path already exists.
             if (file_exists($destinationPath)) {
                 return 'Extracted package contains conflicting file paths.';
             }
 
+            // Abort flattening when any move operation fails.
             if (!@rename($sourcePath, $destinationPath)) {
                 return 'Failed to normalize extracted package structure.';
             }
         }
 
+        // Remove the now-empty wrapper directory to finalize normalized layout.
         if (!@rmdir($innerRoot)) {
             return 'Failed to finalize extracted package structure.';
         }
@@ -272,6 +290,7 @@ final class Install
     private function entries(string $path): ?array
     {
         $entries = scandir($path);
+        // Return null when directory enumeration fails.
         if (!is_array($entries)) {
             return null;
         }

@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/sys/Controller/Public/AuthController.php
  * Split public auth controller for login, 2FA, and registration routes.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -811,11 +811,6 @@ final class AuthController
     }
 
     /**
-     * Returns whether public registration is temporarily locked for this client.
-     *
-     * @return bool True when registration is temporarily locked.
-     */
-    /**
      * Returns the normalized user registration mode from site config.
      *
      * @return string One of 'open', 'invite', or 'closed'.
@@ -826,6 +821,11 @@ final class AuthController
         return in_array($mode, ['open', 'invite', 'closed'], true) ? $mode : 'closed';
     }
 
+    /**
+     * Returns whether public registration is temporarily locked for this client.
+     *
+     * @return bool True when registration is temporarily locked.
+     */
     private function isRegistrationTemporarilyLocked(): bool
     {
         return $this->context->auth()->isLoginTemporarilyLocked(

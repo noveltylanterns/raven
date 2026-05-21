@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/Security/OutputEncoder.php
  * HTML output-encoding helper for safe template rendering.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

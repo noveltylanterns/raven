@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/sys/Debug/OutputProfilerPolicy.php
  * Output profiler config flag resolver.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

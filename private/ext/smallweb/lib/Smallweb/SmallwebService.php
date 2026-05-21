@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/ext/smallweb/lib/Smallweb/SmallwebService.php
  * Smallweb settings I/O and protocol file CRUD service.
- * docs: /private/ext/AGENTS.md
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

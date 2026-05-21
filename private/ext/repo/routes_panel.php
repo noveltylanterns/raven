@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/ext/repo/routes_panel.php
  * Repositories extension panel route registration.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

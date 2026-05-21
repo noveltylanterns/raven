@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/sys/Router/Public/GroupRouter.php
  * Public group-route registration.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

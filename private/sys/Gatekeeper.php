@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/sys/Gatekeeper.php
  * Authentication and authorization core component.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -685,6 +685,12 @@ final class Gatekeeper
         $this->userPreferencesCache = [];
     }
 
+    /**
+     * Returns true when a user has at least one interactive 2FA method configured.
+     *
+     * @param int $userId User id to inspect.
+     * @return bool True when one TOTP, WebAuthn, or email method is available.
+     */
     private function hasInteractiveTwoFactorMethod(int $userId): bool
     {
         return $this->interactiveTwoFactorMethodsForUser($userId) !== [];

@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/Auth/Public/PermissionMask.php
  * Public permission-mask lookup and per-request cache for anonymous visitors.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -42,6 +42,7 @@ final class PermissionMask
      */
     public function maskForGuest(): int
     {
+        // Reuse cached guest mask for repeat checks in the same request.
         if ($this->permissionMaskForGuestCache !== null) {
             return $this->permissionMaskForGuestCache;
         }

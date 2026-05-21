@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/tpl/public/status/denied.php
  * Public-facing permission-denied status template fallback.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 if (!defined('RAVEN_VIEW_RENDER_CONTEXT')) {

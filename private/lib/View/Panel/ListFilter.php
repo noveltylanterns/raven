@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/View/Panel/ListFilter.php
  * Generic SQL filter-clause helper for panel list queries.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

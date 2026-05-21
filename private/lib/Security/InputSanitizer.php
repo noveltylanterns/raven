@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/Security/InputSanitizer.php
  * Shared input sanitization and validation helpers for controller and lib use.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -30,6 +30,7 @@ final class InputSanitizer
 
         $value = preg_replace('/[\x00-\x1F\x7F]/u', '', $value) ?? '';
 
+        // Enforce max text length after control-character stripping.
         if (mb_strlen($value) > $maxLength) {
             $value = mb_substr($value, 0, $maxLength);
         }
@@ -51,6 +52,7 @@ final class InputSanitizer
         $value ??= '';
         $value = str_replace("\0", '', $value);
 
+        // Cap rich-text payload size without stripping tags/content structure.
         if (mb_strlen($value) > $maxLength) {
             $value = mb_substr($value, 0, $maxLength);
         }
@@ -70,10 +72,12 @@ final class InputSanitizer
     {
         $value = strtolower($this->text($value, 160));
 
+        // Empty strings do not map to valid slug values.
         if ($value === '') {
             return null;
         }
 
+        // Slugs must be lowercase alphanumerics separated by single hyphens.
         if (!preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/', $value)) {
             return null;
         }
@@ -91,10 +95,12 @@ final class InputSanitizer
     {
         $value = strtolower($this->text($value, 254));
 
+        // Empty values are treated as absent emails.
         if ($value === '') {
             return null;
         }
 
+        // Use PHP email validation as the canonical syntax gate.
         if (!filter_var($value, FILTER_VALIDATE_EMAIL)) {
             return null;
         }
@@ -115,10 +121,12 @@ final class InputSanitizer
     {
         $value = strtolower($this->text($value, 50));
 
+        // Empty values are treated as absent usernames.
         if ($value === '') {
             return null;
         }
 
+        // Enforce Raven username syntax and length constraints.
         if (!preg_match('/^[a-z0-9][a-z0-9_.-]{2,49}$/', $value)) {
             return null;
         }
@@ -136,15 +144,18 @@ final class InputSanitizer
      */
     public function int(mixed $value, int $min = 1, int $max = PHP_INT_MAX): ?int
     {
+        // Treat blank strings as absent values instead of zero-like input.
         if (is_string($value) && trim($value) === '') {
             return null;
         }
 
         $intValue = filter_var($value, FILTER_VALIDATE_INT);
+        // Reject non-integer scalar representations.
         if ($intValue === false) {
             return null;
         }
 
+        // Enforce caller-supplied inclusive bounds.
         if ($intValue < $min || $intValue > $max) {
             return null;
         }

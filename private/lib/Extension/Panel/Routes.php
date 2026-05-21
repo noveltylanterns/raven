@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/Extension/Panel/Routes.php
  * Reusable panel extension-route registration primitives.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -48,6 +48,7 @@ final class Routes
         string $internalPath,
         callable $renderPublicNotFound
     ): void {
+        // Skip route registration entirely when no extensions are enabled.
         if ($enabledExtensions === []) {
             return;
         }
@@ -81,6 +82,7 @@ final class Routes
          */
         $isGuestPanelLoginEntryInternalPath = static function () use ($internalPath): bool {
             $path = '/' . ltrim($internalPath, '/');
+            // Trim trailing slash on non-root paths for stable matching.
             if ($path !== '/') {
                 $path = rtrim($path, '/');
             }
@@ -127,6 +129,7 @@ final class Routes
         $currentUserTheme = static function () use ($rvn, $defaultPanelTheme, $panelTheme): string {
             $defaultTheme = $defaultPanelTheme();
             $userId = $rvn['auth']->userId();
+            // Anonymous requests fall back to the configured default theme.
             if ($userId === null) {
                 return $defaultTheme;
             }
@@ -144,20 +147,24 @@ final class Routes
             return $rvn['auth']->panelService()->hasPanelPermissionBit($bit);
         };
 
+        // Register each enabled extension that exposes a panel-routes provider.
         foreach (array_keys($enabledExtensions) as $extensionName) {
             $extensionRoot = $rvn['root'] . '/private/ext/' . $extensionName;
             $routesFile = Resolver::providerPath($extensionRoot, 'routes_panel.php');
+            // Skip extensions that do not provide routes_panel.php.
             if ($routesFile === null) {
                 continue;
             }
 
             /** @var mixed $registrar */
             $registrar = require $routesFile;
+            // Provider file must return a callable route registrar.
             if (!is_callable($registrar)) {
                 continue;
             }
 
             $manifest = $enabledExtensionManifests[$extensionName] ?? null;
+            // Fall back to a safe default manifest shape when missing.
             if (!is_array($manifest)) {
                 $manifest = [
                     'type' => 'plugin',
@@ -165,6 +172,7 @@ final class Routes
                 ];
             }
             $type = strtolower(trim((string) ($manifest['type'] ?? 'plugin')));
+            // Normalize unknown manifest types to plugin.
             if (!in_array($type, ['helper', 'content', 'plugin', 'module', 'system'], true)) {
                 $type = 'plugin';
             }
@@ -176,46 +184,56 @@ final class Routes
             $extensionPermissionBits = [];
             $extensionPermissionOptions = [];
             $requiredPermissionBit = 0;
+            // Normalize extension permission-level metadata into bit/label maps.
             foreach ($levelRows as $levelRow) {
+                // Skip malformed permission-level rows.
                 if (!is_array($levelRow)) {
                     continue;
                 }
 
                 $levelKey = strtolower(trim((string) ($levelRow['key'] ?? '')));
+                // Skip levels without a key.
                 if ($levelKey === '') {
                     continue;
                 }
 
                 $levelBit = (int) ($levelRow['bit'] ?? 0);
+                // Skip levels without a positive permission bit.
                 if ($levelBit <= 0) {
                     continue;
                 }
 
                 $levelLabel = trim((string) ($levelRow['label'] ?? ''));
+                // Default missing labels from a humanized level key.
                 if ($levelLabel === '') {
                     $levelLabel = ucfirst(str_replace(['-', '_'], ' ', $levelKey));
                 }
 
                 $extensionPermissionBits[$levelKey] = $levelBit;
                 $extensionPermissionOptions[$levelBit] = $levelLabel;
+                // Use explicit default level when present, else first valid level bit.
                 if ($requiredPermissionBit <= 0 && ($defaultLevel === '' || $levelKey === $defaultLevel)) {
                     $requiredPermissionBit = $levelBit;
                 }
             }
+            // Fall back to first available level bit when default did not resolve.
             if ($requiredPermissionBit <= 0 && $extensionPermissionBits !== []) {
                 $requiredPermissionBit = (int) reset($extensionPermissionBits);
             }
 
             $extensionRequirePanelAccess = $requirePanelLoginForExtension;
+            // System extensions require core configuration-view capability.
             if ($isSystemType) {
                 $extensionRequirePanelAccess = static function () use ($requirePanelLoginForExtension, $rvn, $renderPublicNotFound): void {
                     $requirePanelLoginForExtension();
+                    // Deny access when configuration-view permission is missing.
                     if (!$rvn['auth']->panelService()->hasPanelPermissionBit(PanelAccess::CONFIGURATION_VIEW)) {
                         $renderPublicNotFound();
                         exit;
                     }
                 };
             } else {
+                // Non-system extensions enforce their resolved default permission bit.
                 $extensionRequirePanelAccess = static function () use (
                     $requirePanelLoginForExtension,
                     $hasPanelPermissionBit,
@@ -223,6 +241,7 @@ final class Routes
                     $renderPublicNotFound
                 ): void {
                     $requirePanelLoginForExtension();
+                    // Deny access when required extension permission bit is absent.
                     if ($requiredPermissionBit <= 0 || !$hasPanelPermissionBit($requiredPermissionBit)) {
                         $renderPublicNotFound();
                         exit;
@@ -241,12 +260,15 @@ final class Routes
 
                 $resolvedLevel = strtolower(trim((string) ($levelKey ?? '')));
                 $targetBit = 0;
+                // Resolve explicit level key to its bit when available.
                 if ($resolvedLevel !== '' && isset($extensionPermissionBits[$resolvedLevel])) {
                     $targetBit = (int) $extensionPermissionBits[$resolvedLevel];
                 } else {
+                    // Otherwise fall back to the extension default required bit.
                     $targetBit = (int) $requiredPermissionBit;
                 }
 
+                // Deny access when no target bit resolves or caller lacks it.
                 if ($targetBit <= 0 || !$hasPanelPermissionBit($targetBit)) {
                     $renderPublicNotFound();
                     exit;

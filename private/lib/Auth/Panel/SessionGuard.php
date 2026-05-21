@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/Auth/Panel/SessionGuard.php
  * Panel login gate and session-identity synchronizer.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -38,7 +38,9 @@ final class SessionGuard
         string $twoFactorUrl,
         callable $renderPublicNotFound
     ): void {
+        // Unauthenticated requests either redirect to login entry or receive a public 404.
         if (!$auth->isLoggedIn()) {
+            // Guest entry routes redirect to login instead of rendering not-found.
             if ($isGuestLoginEntryRequest) {
                 Redirect::redirect($loginUrl);
             }
@@ -47,8 +49,10 @@ final class SessionGuard
             exit;
         }
 
+        // Logged-in users without panel capability are logged out and denied.
         if (!$auth->panelService()->canAccessPanel()) {
             $auth->logout();
+            // Preserve login-entry UX by redirecting to login where appropriate.
             if ($isGuestLoginEntryRequest) {
                 Redirect::redirect($loginUrl);
             }
@@ -58,12 +62,15 @@ final class SessionGuard
         }
 
         $userId = $auth->userId();
+        // Enforce completed 2FA before allowing panel requests to proceed.
         if ($userId !== null && !$auth->isTwoFactorVerifiedForUser($userId)) {
+            // Continue an existing pending challenge for the same authenticated user.
             if ($auth->pendingTwoFactorUserId() === $userId) {
                 Redirect::redirect($twoFactorUrl);
             }
 
             $auth->logout();
+            // Redirect login-entry requests back to login after forced logout.
             if ($isGuestLoginEntryRequest) {
                 Redirect::redirect($loginUrl);
             }
@@ -87,12 +94,14 @@ final class SessionGuard
     {
         $requestUri = (string) ($server['REQUEST_URI'] ?? '/');
         $requestPath = (string) parse_url($requestUri, PHP_URL_PATH);
+        // Missing/empty parsed paths normalize to root.
         if ($requestPath === '') {
             $requestPath = '/';
         }
 
         $normalize = static function (string $path): string {
             $path = '/' . trim($path, '/');
+            // Normalize root-equivalent variants to a single slash.
             if ($path === '/' || $path === '//') {
                 return '/';
             }
@@ -122,6 +131,7 @@ final class SessionGuard
     public function syncPanelIdentityInSession(Gatekeeper $auth): void
     {
         $userId = $auth->userId();
+        // Clear cached panel identity/capabilities when no user is authenticated.
         if ($userId === null) {
             unset($_SESSION['rvn-panel-identity']);
             unset($_SESSION['_raven_can_manage_content']);
@@ -133,6 +143,7 @@ final class SessionGuard
         }
 
         $preferences = $auth->userPreferences($userId);
+        // Clear cached panel identity/capabilities when profile preferences are unavailable.
         if ($preferences === null) {
             unset($_SESSION['rvn-panel-identity']);
             unset($_SESSION['_raven_can_manage_content']);
@@ -163,6 +174,7 @@ final class SessionGuard
      */
     public function panelIdentityFromSession(mixed $raw): array
     {
+        // Non-array session payloads normalize to an empty identity structure.
         if (!is_array($raw)) {
             return [
                 'display_name' => '',

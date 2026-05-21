@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/View/Panel/EditorMDE.php
  * EasyMDE (Markdown editor) PHP helpers for the panel page body editor.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

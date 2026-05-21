@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/sys/Debug/RequestProfilerAdapter.php
  * Query-profiler adapter that forwards database events into RequestProfiler.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

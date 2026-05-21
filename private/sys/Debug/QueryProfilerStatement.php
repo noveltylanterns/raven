@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/sys/Debug/QueryProfilerStatement.php
  * PDOStatement subclass that records bind values and execution timing through QueryProfiler.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

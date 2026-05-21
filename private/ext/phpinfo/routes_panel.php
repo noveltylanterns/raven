@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/ext/phpinfo/routes_panel.php
  * PHP Info extension panel route registration.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 // Inline note: Generated extension scaffold route registrar.

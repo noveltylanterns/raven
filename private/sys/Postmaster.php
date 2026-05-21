@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/sys/Postmaster.php
  * Shared outgoing mail delivery service for core and extensions.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

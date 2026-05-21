@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/sys/Renderer.php
  * Core framework component used by Raven CMS.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 // Inline note: Core utilities are shared by both public and panel runtime flows.

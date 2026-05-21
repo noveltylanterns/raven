@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/Format/Gz.php
  * Gzip single-file compression and decompression handler.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -40,6 +40,7 @@ final class Gz
      */
     public function compress(string $sourcePath, string $targetPath, int $level = 6): void
     {
+        // Source path must point to an existing regular file.
         if (!is_file($sourcePath)) {
             throw new RuntimeException('GZ source file not found: ' . $sourcePath);
         }
@@ -47,28 +48,34 @@ final class Gz
         $level = max(1, min(9, $level));
 
         $dir = dirname($targetPath);
+        // Ensure destination directory exists before opening output stream.
         if (!is_dir($dir) && !mkdir($dir, 0775, true) && !is_dir($dir)) {
             throw new RuntimeException('Failed to create directory for GZ output: ' . $dir);
         }
 
         $input = fopen($sourcePath, 'rb');
+        // Source stream must open successfully for chunked reads.
         if (!is_resource($input)) {
             throw new RuntimeException('Failed to open source file for GZ compression: ' . $sourcePath);
         }
 
         $output = gzopen($targetPath, 'wb' . $level);
+        // Destination gzip stream must open successfully for chunked writes.
         if (!is_resource($output)) {
             fclose($input);
             throw new RuntimeException('Failed to open GZ output file for writing: ' . $targetPath);
         }
 
+        // Stream source bytes into gzip output in fixed-size chunks.
         try {
             while (!feof($input)) {
                 $chunk = fread($input, self::CHUNK_SIZE);
+                // Abort when source read operation fails.
                 if ($chunk === false) {
                     throw new RuntimeException('Failed to read from source file during GZ compression.');
                 }
 
+                // Abort when compressed write operation fails.
                 if (gzwrite($output, $chunk) === false) {
                     throw new RuntimeException('Failed to write compressed data to GZ output file.');
                 }
@@ -97,33 +104,40 @@ final class Gz
      */
     public function decompress(string $sourcePath, string $targetPath): void
     {
+        // Source path must point to an existing regular file.
         if (!is_file($sourcePath)) {
             throw new RuntimeException('GZ source file not found: ' . $sourcePath);
         }
 
         $dir = dirname($targetPath);
+        // Ensure destination directory exists before opening output stream.
         if (!is_dir($dir) && !mkdir($dir, 0775, true) && !is_dir($dir)) {
             throw new RuntimeException('Failed to create directory for GZ decompression output: ' . $dir);
         }
 
         $input = gzopen($sourcePath, 'rb');
+        // Source gzip stream must open successfully for chunked reads.
         if (!is_resource($input)) {
             throw new RuntimeException('Failed to open GZ file for reading: ' . $sourcePath);
         }
 
         $output = fopen($targetPath, 'wb');
+        // Destination stream must open successfully for chunked writes.
         if (!is_resource($output)) {
             gzclose($input);
             throw new RuntimeException('Failed to open output file for GZ decompression: ' . $targetPath);
         }
 
+        // Stream decompressed bytes from gzip input into output.
         try {
             while (!gzeof($input)) {
                 $chunk = gzread($input, self::CHUNK_SIZE);
+                // Abort when compressed read operation fails.
                 if ($chunk === false) {
                     throw new RuntimeException('Failed to read compressed data during GZ decompression.');
                 }
 
+                // Abort when output write operation fails.
                 if (fwrite($output, $chunk) === false) {
                     throw new RuntimeException('Failed to write decompressed data during GZ decompression.');
                 }

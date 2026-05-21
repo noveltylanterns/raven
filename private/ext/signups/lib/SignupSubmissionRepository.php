@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/ext/signups/lib/SignupSubmissionRepository.php
  * Repository for signup submission persistence and panel management queries.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 // Inline note: Keep signup submission storage logic centralized so panel/public flows stay consistent.

@@ -3,7 +3,7 @@
  * RAVEN CMS
  * ~/private/sys/Repository/RedirectRead.php
  * Read-only data access for URL redirect records.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

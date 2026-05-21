@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/ext/database/tpl/panel_index.php
  * Database Manager extension page template for launch and diagnostics.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 // Inline note: This extension template stays read-only and only links into Adminer runtime.

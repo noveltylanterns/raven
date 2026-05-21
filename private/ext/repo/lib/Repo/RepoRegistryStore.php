@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/ext/repo/lib/Repo/RepoRegistryStore.php
  * File-backed repository registry store for the Repo extension.
- * Docs: /private/ext/repo/AGENTS.md
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

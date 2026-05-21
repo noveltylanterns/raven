@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/Format/Szip.php
  * 7-Zip archive handler via the system `7z` binary.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -55,10 +55,12 @@ final class Szip
      */
     public function extractTo(string $archivePath, string $targetDir): void
     {
+        // Archive source must point to an existing regular file.
         if (!is_file($archivePath)) {
             throw new RuntimeException('7Z archive not found: ' . $archivePath);
         }
 
+        // Ensure extraction target directory exists before running 7z.
         if (!is_dir($targetDir) && !mkdir($targetDir, 0775, true) && !is_dir($targetDir)) {
             throw new RuntimeException('Failed to create 7Z extraction target directory: ' . $targetDir);
         }
@@ -73,6 +75,7 @@ final class Szip
             $archivePath,
         ]);
 
+        // Non-zero 7z exit status is surfaced as a runtime exception.
         if (!$result['ok']) {
             throw new RuntimeException(
                 '7Z extraction failed: ' . ($result['stderr'] !== '' ? $result['stderr'] : $result['stdout'])
@@ -94,21 +97,26 @@ final class Szip
         $entry = $this->normalizeEntryName($entryName);
         $temporaryDirectory = $this->tempDir();
 
+        // Use temporary extraction directory and always clean it up.
         try {
             $this->extractEntries($archivePath, [$entry], $temporaryDirectory);
 
             $extractedPath = $temporaryDirectory . '/' . $entry;
+            // Requested entry must exist after extraction.
             if (!is_file($extractedPath)) {
                 throw new RuntimeException('Entry "' . $entry . '" not found in 7Z archive.');
             }
 
             $targetDirectory = dirname($targetPath);
+            // Ensure destination directory exists before moving/copying file.
             if (!is_dir($targetDirectory) && !mkdir($targetDirectory, 0775, true) && !is_dir($targetDirectory)) {
                 throw new RuntimeException('Failed to create directory for extracted 7Z entry.');
             }
 
+            // Prefer rename; fall back to copy when cross-device rename fails.
             if (!@rename($extractedPath, $targetPath)) {
                 $contents = @file_get_contents($extractedPath);
+                // Abort when fallback read/write copy path fails.
                 if (!is_string($contents) || @file_put_contents($targetPath, $contents) === false) {
                     throw new RuntimeException('Failed to write extracted 7Z entry to target path.');
                 }
@@ -131,16 +139,20 @@ final class Szip
     {
         $directory = $this->normalizeDirEntry($entryName);
         $matches = $this->dirEntries($archivePath, $directory);
+        // Requested directory prefix must resolve to at least one archive entry.
         if ($matches === []) {
             throw new RuntimeException('Directory "' . trim($directory, '/') . '" not found in 7Z archive.');
         }
 
+        // Ensure destination directory exists before extracting directory entries.
         if (!is_dir($targetDir) && !mkdir($targetDir, 0775, true) && !is_dir($targetDir)) {
             throw new RuntimeException('Failed to create 7Z extraction directory: ' . $targetDir);
         }
 
+        // Materialize directory entries and file entries under the target directory.
         foreach ($matches as $match) {
             $relative = ltrim(substr($match, strlen($directory)), '/');
+            // Skip the directory root marker itself.
             if ($relative === '') {
                 continue;
             }
@@ -150,6 +162,7 @@ final class Szip
             // Directory entries do not carry data, but keeping them explicit
             // preserves empty folders when the archive records them directly.
             if (str_ends_with($match, '/')) {
+                // Ensure empty directory entries are created.
                 if (!is_dir($targetPath) && !mkdir($targetPath, 0775, true) && !is_dir($targetPath)) {
                     throw new RuntimeException('Failed to create extracted 7Z directory path.');
                 }
@@ -169,11 +182,13 @@ final class Szip
      */
     public function listEntries(string $archivePath): array
     {
+        // Archive source must point to an existing regular file.
         if (!is_file($archivePath)) {
             throw new RuntimeException('7Z archive not found: ' . $archivePath);
         }
 
         $result = $this->runBinary(['l', '-slt', '-bb0', '-bd', '--', $archivePath]);
+        // Non-zero 7z exit status is surfaced as a runtime exception.
         if (!$result['ok']) {
             throw new RuntimeException(
                 '7Z listing failed: ' . ($result['stderr'] !== '' ? $result['stderr'] : $result['stdout'])
@@ -183,23 +198,28 @@ final class Szip
         $entries = [];
         $inEntries = false;
 
+        // Parse machine-readable listing output and keep safe entry paths only.
         foreach (preg_split("/\\r?\\n/", $result['stdout']) ?: [] as $line) {
             $trimmed = trim($line);
+            // Entry separator marks beginning of entry payload section.
             if ($trimmed === '----------') {
                 $inEntries = true;
                 continue;
             }
 
+            // Keep only path lines after entries section starts.
             if (!$inEntries || !str_starts_with($trimmed, 'Path = ')) {
                 continue;
             }
 
             $entry = trim(substr($trimmed, 7));
+            // Skip empty path values emitted by 7z listing output.
             if ($entry === '') {
                 continue;
             }
 
             $normalized = str_replace('\\', '/', $entry);
+            // Keep only extraction-safe normalized entry paths.
             if ($this->isSafeEntryPath($normalized)) {
                 $entries[] = $normalized;
             }
@@ -219,6 +239,7 @@ final class Szip
      */
     public function compressPath(string $sourcePath, string $outputPath, ?string $entryName = null): void
     {
+        // Source path must exist before staging/compression.
         if (!file_exists($sourcePath)) {
             throw new RuntimeException('7Z source path not found: ' . $sourcePath);
         }
@@ -227,6 +248,7 @@ final class Szip
 
         $stagingDirectory = $this->stagePath($sourcePath, $entryName);
 
+        // Build archive from staging tree and always clean up staging directory.
         try {
             $relativeEntry = $this->stagedTarget($sourcePath, $entryName);
             $result = $this->runBinary([
@@ -240,6 +262,7 @@ final class Szip
                 $relativeEntry,
             ], $stagingDirectory);
 
+            // Non-zero 7z exit status is surfaced as a runtime exception.
             if (!$result['ok']) {
                 @unlink($outputPath);
                 throw new RuntimeException(
@@ -262,12 +285,14 @@ final class Szip
      */
     public function addPath(string $archivePath, string $sourcePath, ?string $entryName = null): void
     {
+        // Source path must exist before staging/archive update.
         if (!file_exists($sourcePath)) {
             throw new RuntimeException('7Z source path not found: ' . $sourcePath);
         }
 
         $stagingDirectory = $this->stagePath($sourcePath, $entryName);
 
+        // Update archive from staging tree and always clean up staging directory.
         try {
             $relativeEntry = $this->stagedTarget($sourcePath, $entryName);
             $result = $this->runBinary([
@@ -280,6 +305,7 @@ final class Szip
                 $relativeEntry,
             ], $stagingDirectory);
 
+            // Non-zero 7z exit status is surfaced as a runtime exception.
             if (!$result['ok']) {
                 throw new RuntimeException(
                     '7Z archive update failed: ' . ($result['stderr'] !== '' ? $result['stderr'] : $result['stdout'])
@@ -299,14 +325,17 @@ final class Szip
     public function isSafeEntryPath(string $entryName): bool
     {
         $path = str_replace('\\', '/', trim($entryName));
+        // Reject empty, absolute, or drive-prefixed entry paths.
         if ($path === '' || str_starts_with($path, '/') || preg_match('/^[A-Za-z]:\//', $path)) {
             return false;
         }
 
+        // Reject null-byte paths.
         if (str_contains($path, "\0")) {
             return false;
         }
 
+        // Reject dot-segment traversal path components.
         foreach (explode('/', $path) as $segment) {
             if ($segment === '.' || $segment === '..') {
                 return false;
@@ -337,11 +366,13 @@ final class Szip
             $archivePath,
         ];
 
+        // Append requested entries to the base extraction command.
         foreach ($entries as $entry) {
             $command[] = $entry;
         }
 
         $result = $this->runBinary($command);
+        // Non-zero 7z exit status is surfaced as a runtime exception.
         if (!$result['ok']) {
             throw new RuntimeException(
                 '7Z extraction failed: ' . ($result['stderr'] !== '' ? $result['stderr'] : $result['stdout'])
@@ -360,13 +391,16 @@ final class Szip
     {
         $matches = [];
 
+        // Keep entries that match the exact directory marker or its descendants.
         foreach ($this->listEntries($archivePath) as $entry) {
             $normalized = rtrim(str_replace('\\', '/', $entry), '/');
+            // Preserve explicit directory marker entries with trailing slash.
             if ($normalized === trim($directory, '/')) {
                 $matches[] = $normalized . '/';
                 continue;
             }
 
+            // Keep descendant entries under the requested directory prefix.
             if (str_starts_with($entry, $directory)) {
                 $matches[] = $entry;
             }
@@ -394,15 +428,19 @@ final class Szip
         $destinationPath = $stagingDirectory . '/' . $stagedEntryPath;
 
         $destinationDirectory = dirname($destinationPath);
+        // Ensure staging destination parent directory exists.
         if (!is_dir($destinationDirectory) && !mkdir($destinationDirectory, 0775, true) && !is_dir($destinationDirectory)) {
             $this->deleteTree($stagingDirectory);
             throw new RuntimeException('Failed to prepare 7Z staging directory.');
         }
 
+        // Copy source payload into staging tree and clean up on failure.
         try {
+            // Directories are staged recursively.
             if (is_dir($sourcePath)) {
                 $this->copyTree($sourcePath, $destinationPath);
             } else {
+                // Files are staged via single-file copy.
                 if (!@copy($sourcePath, $destinationPath)) {
                     throw new RuntimeException('Failed to copy file into 7Z staging directory.');
                 }
@@ -424,6 +462,7 @@ final class Szip
      */
     private function stagedPath(string $sourcePath, ?string $entryName): string
     {
+        // Use explicit archive entry name when caller supplied one.
         if (is_string($entryName) && trim($entryName) !== '') {
             return $this->normalizeEntryName($entryName);
         }
@@ -459,6 +498,7 @@ final class Szip
     private function normalizeEntryName(string $entryName): string
     {
         $normalized = trim(str_replace('\\', '/', $entryName), '/');
+        // Reject unsafe normalized entry paths.
         if (!$this->isSafeEntryPath($normalized)) {
             throw new RuntimeException('Unsafe 7Z entry path: ' . $entryName);
         }
@@ -486,13 +526,16 @@ final class Szip
      */
     private function tempDir(): string
     {
+        // Probe writable temp roots and retry random names per root.
         foreach ($this->tempRoots() as $directory) {
             for ($attempt = 0; $attempt < 5; $attempt++) {
                 $path = $directory . '/rvn-7z-' . bin2hex(random_bytes(6));
+                // Return newly created temp directory path on success.
                 if (mkdir($path, 0775, true)) {
                     return $path;
                 }
 
+                // Directory may already exist from race; accept it when present.
                 if (is_dir($path)) {
                     return $path;
                 }
@@ -521,15 +564,19 @@ final class Szip
         ];
         $directories = [];
 
+        // Keep only writable temp roots, creating missing ones when possible.
         foreach ($candidates as $candidate) {
+            // Skip empty candidate values.
             if ($candidate === '') {
                 continue;
             }
 
+            // Attempt to create candidate directory when missing.
             if (!is_dir($candidate) && !@mkdir($candidate, 0775, true) && !is_dir($candidate)) {
                 continue;
             }
 
+            // Skip non-writable candidates.
             if (!is_writable($candidate)) {
                 continue;
             }
@@ -550,6 +597,7 @@ final class Szip
      */
     private function copyTree(string $sourceDir, string $targetDir): void
     {
+        // Ensure destination root exists before recursive copy.
         if (!is_dir($targetDir) && !mkdir($targetDir, 0775, true) && !is_dir($targetDir)) {
             throw new RuntimeException('Failed to create 7Z staging subdirectory.');
         }
@@ -559,19 +607,23 @@ final class Szip
             \RecursiveIteratorIterator::SELF_FIRST
         );
 
+        // Recursively copy files/directories while skipping symlink nodes.
         foreach ($iterator as $item) {
             /** @var \SplFileInfo $item */
+            // Skip symlinks to avoid copying external link targets.
             if ($item->isLink()) {
                 continue;
             }
 
             $absolutePath = $item->getPathname();
             $relativePath = ltrim(substr($absolutePath, strlen($sourceDir)), DIRECTORY_SEPARATOR);
+            // Ignore root pseudo-entry with empty relative path.
             if ($relativePath === '') {
                 continue;
             }
 
             $destinationPath = $targetDir . '/' . str_replace('\\', '/', $relativePath);
+            // Ensure destination directory nodes exist before file copy.
             if ($item->isDir()) {
                 if (!is_dir($destinationPath) && !mkdir($destinationPath, 0775, true) && !is_dir($destinationPath)) {
                     throw new RuntimeException('Failed to create 7Z staging directory path.');
@@ -580,10 +632,12 @@ final class Szip
             }
 
             $destinationDirectory = dirname($destinationPath);
+            // Ensure parent directory exists before copying file payload.
             if (!is_dir($destinationDirectory) && !mkdir($destinationDirectory, 0775, true) && !is_dir($destinationDirectory)) {
                 throw new RuntimeException('Failed to create 7Z staging parent directory.');
             }
 
+            // Copy file payload into staging tree.
             if (!@copy($absolutePath, $destinationPath)) {
                 throw new RuntimeException('Failed to copy file into 7Z staging directory.');
             }
@@ -598,6 +652,7 @@ final class Szip
      */
     private function deleteTree(string $directory): void
     {
+        // Missing/blank directory paths are treated as already cleaned.
         if ($directory === '' || !is_dir($directory)) {
             return;
         }
@@ -607,6 +662,7 @@ final class Szip
             \RecursiveIteratorIterator::CHILD_FIRST
         );
 
+        // Remove children first so parent directories can be deleted safely.
         foreach ($iterator as $item) {
             /** @var \SplFileInfo $item */
             if ($item->isDir()) {
@@ -642,6 +698,7 @@ final class Szip
             $workingDirectory
         );
 
+        // Process start failure returns a structured non-ok result.
         if (!is_resource($process)) {
             return [
                 'ok' => false,
@@ -654,16 +711,20 @@ final class Szip
         $stdout = '';
         $stderr = '';
 
+        // Capture output pipes and always close process in finally.
         try {
+            // Close stdin pipe immediately (no stdin payload needed).
             if (isset($pipes[0]) && is_resource($pipes[0])) {
                 fclose($pipes[0]);
             }
 
+            // Read and close stdout pipe when available.
             if (isset($pipes[1]) && is_resource($pipes[1])) {
                 $stdout = (string) stream_get_contents($pipes[1]);
                 fclose($pipes[1]);
             }
 
+            // Read and close stderr pipe when available.
             if (isset($pipes[2]) && is_resource($pipes[2])) {
                 $stderr = (string) stream_get_contents($pipes[2]);
                 fclose($pipes[2]);

@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/Parser/RedirectParser.php
  * Static redirect target validation helpers.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -28,14 +28,17 @@ final class RedirectParser
      */
     public static function isAllowedHttpOrRootPath(string $targetUrl): bool
     {
+        // Reject blanks and whitespace-containing targets to prevent malformed Location headers.
         if ($targetUrl === '' || str_contains($targetUrl, ' ')) {
             return false;
         }
 
+        // Root-relative redirects are allowed, except protocol-relative forms like //example.com.
         if (str_starts_with($targetUrl, '/')) {
             return !str_starts_with($targetUrl, '//');
         }
 
+        // Non-relative targets must parse as full URLs before scheme checks.
         if (filter_var($targetUrl, FILTER_VALIDATE_URL) === false) {
             return false;
         }

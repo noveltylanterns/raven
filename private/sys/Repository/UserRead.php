@@ -3,7 +3,7 @@
  * RAVEN CMS
  * ~/private/sys/Repository/UserRead.php
  * Read-only data access for user accounts, group memberships, public profiles, and routing payloads.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

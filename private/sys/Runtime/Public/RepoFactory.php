@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/sys/Runtime/Public/RepoFactory.php
  * Public repository and parser factory wiring extracted from public runtime builder.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/Extension/Panel/Permissions.php
  * Extension panel-permission catalog: discovery, normalization, and stable bit allocation.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -63,27 +63,34 @@ final class Permissions
     public function normalizePermissionLevels(mixed $rawLevels, string $extensionName): array
     {
         $normalized = [];
+        // Parse custom permission levels only when manifest data is an array.
         if (is_array($rawLevels)) {
+            // Normalize list/object-style entries into key/label records.
             foreach ($rawLevels as $key => $entry) {
                 $levelKey = '';
                 $label = '';
+                // Array entries may explicitly define key/label fields.
                 if (is_array($entry)) {
                     $levelKey = strtolower(trim((string) ($entry['key'] ?? '')));
                     $label = trim((string) ($entry['label'] ?? ''));
+                // Associative string-key entries map key => label.
                 } elseif (is_string($key)) {
                     $levelKey = strtolower(trim($key));
                     $label = trim((string) $entry);
                 }
 
+                // Keep only safe permission-level keys.
                 if ($levelKey === '' || preg_match('/^[a-z0-9][a-z0-9_-]{0,63}$/', $levelKey) !== 1) {
                     continue;
                 }
 
+                // Default blank labels from a humanized key fallback.
                 if ($label === '') {
                     $label = ucwords(str_replace(['-', '_'], ' ', $levelKey));
                 }
 
                 $label = $this->input->text($label, 80);
+                // Skip levels whose label sanitizes to empty.
                 if ($label === '') {
                     continue;
                 }
@@ -92,12 +99,14 @@ final class Permissions
                     'key' => $levelKey,
                     'label' => $label,
                 ];
+                // Cap custom levels to keep bit allocation bounded.
                 if (count($normalized) >= 16) {
                     break;
                 }
             }
         }
 
+        // Fall back to a single default level when no valid custom levels remain.
         if ($normalized === []) {
             return $this->defaultPermissionLevels($extensionName);
         }
@@ -123,15 +132,19 @@ final class Permissions
         $bitMap = $this->ensurePermissionBits($catalog);
         $result = [];
 
+        // Attach stable bit assignments to each catalog level.
         foreach ($catalog as $directory => $meta) {
             $levels = [];
+            // Keep only levels with valid keys and allocated bits.
             foreach ($meta['levels'] as $level) {
                 $levelKey = (string) ($level['key'] ?? '');
+                // Ignore malformed level rows missing a key.
                 if ($levelKey === '') {
                     continue;
                 }
 
                 $bit = (int) (($bitMap[$directory][$levelKey] ?? 0));
+                // Ignore levels without a positive assigned bit.
                 if ($bit <= 0) {
                     continue;
                 }
@@ -143,6 +156,7 @@ final class Permissions
                 ];
             }
 
+            // Skip extension entries that ended up with no usable levels.
             if ($levels === []) {
                 continue;
             }
@@ -178,8 +192,10 @@ final class Permissions
     {
         $this->stateStore->ensureDirectory();
         $filter = [];
+        // Normalize caller-supplied directory filter to safe lowercase slugs.
         foreach ($directoryFilter as $directory) {
             $normalized = strtolower(trim((string) $directory));
+            // Keep only safe directory names in the filter map.
             if ($this->isSafeDirectoryName($normalized)) {
                 $filter[$normalized] = true;
             }
@@ -187,29 +203,36 @@ final class Permissions
 
         $entries = scandir($this->stateStore->basePath()) ?: [];
         $catalog = [];
+        // Walk extension directories and collect eligible panel permission metadata.
         foreach ($entries as $entry) {
+            // Skip pseudo entries and hidden directories.
             if ($entry === '.' || $entry === '..' || str_starts_with($entry, '.')) {
                 continue;
             }
+            // Ignore unsafe directory names.
             if (!$this->isSafeDirectoryName($entry)) {
                 continue;
             }
+            // Apply optional caller filter when present.
             if ($filter !== [] && !isset($filter[$entry])) {
                 continue;
             }
 
             $extensionPath = $this->stateStore->basePath() . '/' . $entry;
+            // Include only real extension dirs that expose panel routes.
             if (!is_dir($extensionPath) || !Resolver::hasProvider($extensionPath, 'routes_panel.php')) {
                 continue;
             }
 
             $manifest = $manifestReader($extensionPath);
+            // Skip missing/invalid manifests.
             if (!is_array($manifest) || !($manifest['valid'] ?? false)) {
                 continue;
             }
 
             $type = strtolower(trim((string) ($manifest['type'] ?? 'content')));
             $isSystemType = $type === 'system' || !empty($manifest['system_extension']);
+            // Keep only non-system helper/content/module extension types.
             if ($isSystemType || !in_array($type, ['helper', 'content', 'module'], true)) {
                 continue;
             }
@@ -218,22 +241,27 @@ final class Permissions
                 ? $manifest['permission_levels']
                 : $this->defaultPermissionLevels((string) ($manifest['name'] ?? $entry));
             $normalizedLevels = [];
+            // Normalize and validate manifest-provided permission levels.
             foreach ($levels as $level) {
+                // Skip malformed level rows.
                 if (!is_array($level)) {
                     continue;
                 }
 
                 $levelKey = strtolower(trim((string) ($level['key'] ?? '')));
+                // Keep only safe level-key patterns.
                 if (preg_match('/^[a-z0-9][a-z0-9_-]{0,63}$/', $levelKey) !== 1) {
                     continue;
                 }
 
                 $label = trim((string) ($level['label'] ?? ''));
+                // Default blank labels from a humanized key fallback.
                 if ($label === '') {
                     $label = ucwords(str_replace(['-', '_'], ' ', $levelKey));
                 }
 
                 $label = $this->input->text($label, 80);
+                // Skip levels whose label sanitizes to empty.
                 if ($label === '') {
                     continue;
                 }
@@ -243,13 +271,16 @@ final class Permissions
                     'label' => $label,
                 ];
             }
+            // Fall back to default levels when custom levels normalize to empty.
             if ($normalizedLevels === []) {
+                // Re-index defaults by key for consistent downstream behavior.
                 foreach ($this->defaultPermissionLevels((string) ($manifest['name'] ?? $entry)) as $defaultLevel) {
                     $normalizedLevels[(string) $defaultLevel['key']] = $defaultLevel;
                 }
             }
 
             $defaultLevel = strtolower(trim((string) ($manifest['default_permission_level'] ?? '')));
+            // Ensure default level points at an existing normalized key.
             if ($defaultLevel === '' || !isset($normalizedLevels[$defaultLevel])) {
                 $firstLevel = array_values($normalizedLevels)[0] ?? ['key' => 'access'];
                 $defaultLevel = (string) ($firstLevel['key'] ?? 'access');
@@ -286,10 +317,13 @@ final class Permissions
         $existing = $this->stateStore->loadPermissionBitsMap();
         $normalized = [];
         $usedBits = [];
+        // Normalize persisted map: keep unique positive power-of-two assignments only.
         foreach ($existing as $directory => $levels) {
             $normalized[$directory] = [];
+            // Validate each stored level-bit pair for this directory.
             foreach ($levels as $levelKey => $bit) {
                 $candidateBit = (int) $bit;
+                // Drop invalid, duplicate, or non-power-of-two bit assignments.
                 if ($candidateBit <= 0 || !$this->isPowerOfTwo($candidateBit) || isset($usedBits[$candidateBit])) {
                     continue;
                 }
@@ -297,21 +331,26 @@ final class Permissions
                 $normalized[$directory][(string) $levelKey] = $candidateBit;
                 $usedBits[$candidateBit] = true;
             }
+            // Remove directory entries that end up with no valid assignments.
             if ($normalized[$directory] === []) {
                 unset($normalized[$directory]);
             }
         }
 
         $changed = $normalized !== $existing;
+        // Ensure every catalog level has a stable assigned bit.
         foreach ($catalog as $directory => $meta) {
             $levels = is_array($meta['levels'] ?? null) ? $meta['levels'] : [];
+            // Allocate bits only for valid normalized level keys.
             foreach ($levels as $level) {
                 $levelKey = strtolower(trim((string) ($level['key'] ?? '')));
+                // Skip malformed levels lacking a key.
                 if ($levelKey === '') {
                     continue;
                 }
 
                 $assignedBit = (int) ($normalized[$directory][$levelKey] ?? 0);
+                // Keep existing valid assigned bits without reallocation.
                 if ($assignedBit > 0 && $this->isPowerOfTwo($assignedBit) && isset($usedBits[$assignedBit])) {
                     continue;
                 }
@@ -323,6 +362,7 @@ final class Permissions
             }
         }
 
+        // Persist assignments only when normalization/allocation changed the map.
         if ($changed) {
             $this->stateStore->savePermissionBitsMap($normalized);
         }
@@ -336,7 +376,9 @@ final class Permissions
     private function nextAvailablePermissionBit(array $usedBits): int
     {
         $bit = PanelAccess::EXTENSION_PERMISSION_START;
+        // Walk powers of two until an unused bit slot is found.
         while (isset($usedBits[$bit])) {
+            // Abort when shifting would overflow the supported integer range.
             if ($bit > intdiv(PHP_INT_MAX, 2)) {
                 throw new \RuntimeException('No free extension permission bits remain.');
             }
@@ -347,8 +389,15 @@ final class Permissions
         return $bit;
     }
 
+    /**
+     * Validates that one permission-bit value is a single non-zero bit flag.
+     *
+     * @param int $bit Permission bit candidate.
+     * @return bool True when the value is an exact power-of-two flag.
+     */
     private function isPowerOfTwo(int $bit): bool
     {
+        // Non-positive values cannot represent a single-bit flag.
         if ($bit <= 0) {
             return false;
         }
@@ -356,6 +405,12 @@ final class Permissions
         return ($bit & ($bit - 1)) === 0;
     }
 
+    /**
+     * Validates one extension-directory slug for map-key and path safety.
+     *
+     * @param string $name Extension directory slug candidate.
+     * @return bool True when the slug is filesystem-safe and policy-compliant.
+     */
     private function isSafeDirectoryName(string $name): bool
     {
         return (bool) preg_match('/^[A-Za-z0-9][A-Za-z0-9_-]{0,119}$/', $name);

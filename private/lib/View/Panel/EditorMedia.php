@@ -5,7 +5,7 @@
  * ~/private/lib/View/Panel/EditorMedia.php
  * Normalizes page-editor gallery payload rows from image/variant joins, and handles
  * gallery POST payload normalization for the page editor form.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

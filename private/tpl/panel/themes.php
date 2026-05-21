@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/tpl/panel/themes.php
  * Admin panel public-theme manager for listing, activation, and scaffolding.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

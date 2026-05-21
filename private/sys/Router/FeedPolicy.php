@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/sys/Router/FeedPolicy.php
  * Atom and RSS feed routing configuration helpers.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

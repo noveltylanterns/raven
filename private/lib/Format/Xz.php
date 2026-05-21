@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/Format/Xz.php
  * XZ single-file compression and decompression handler via the xz binary.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -61,6 +61,7 @@ final class Xz
      */
     public function compress(string $sourcePath, string $targetPath, int $level = 6): void
     {
+        // Compression is file-based, so fail before spawning xz when the source is missing.
         if (!is_file($sourcePath)) {
             throw new RuntimeException('XZ source file not found: ' . $sourcePath);
         }
@@ -68,6 +69,7 @@ final class Xz
         $level = max(0, min(9, $level));
 
         $dir = dirname($targetPath);
+        // Pre-create the destination directory so xz output redirection can open its file.
         if (!is_dir($dir) && !mkdir($dir, 0775, true) && !is_dir($dir)) {
             throw new RuntimeException('Failed to create directory for XZ output: ' . $dir);
         }
@@ -78,6 +80,7 @@ final class Xz
             $targetPath
         );
 
+        // Remove partial targets on process failures to avoid publishing truncated artifacts.
         if (!$result['ok']) {
             @unlink($targetPath);
             throw new RuntimeException(
@@ -100,11 +103,13 @@ final class Xz
      */
     public function decompress(string $sourcePath, string $targetPath): void
     {
+        // Decompression also requires one real source file before launching xz.
         if (!is_file($sourcePath)) {
             throw new RuntimeException('XZ source file not found: ' . $sourcePath);
         }
 
         $dir = dirname($targetPath);
+        // Ensure destination parents exist so stdout redirection can create the output file.
         if (!is_dir($dir) && !mkdir($dir, 0775, true) && !is_dir($dir)) {
             throw new RuntimeException('Failed to create directory for XZ decompression output: ' . $dir);
         }
@@ -115,6 +120,7 @@ final class Xz
             $targetPath
         );
 
+        // Clean up incomplete decompressed files when xz exits with an error.
         if (!$result['ok']) {
             @unlink($targetPath);
             throw new RuntimeException(
@@ -150,22 +156,26 @@ final class Xz
 
         $process = @proc_open($command, $descriptors, $pipes, $cwd);
 
+        // Return a normalized failure shape when process startup fails.
         if (!is_resource($process)) {
             return ['ok' => false, 'exit_code' => -1, 'stderr' => 'Failed to start xz process.'];
         }
 
         $stderr = '';
 
+        // Close every opened pipe predictably before waiting on process exit.
         try {
             if (isset($pipes[0]) && is_resource($pipes[0])) {
                 fclose($pipes[0]);
             }
 
+            // Capture stdout only when it was piped instead of file-redirected.
             if ($outputFile === null && isset($pipes[1]) && is_resource($pipes[1])) {
                 stream_get_contents($pipes[1]);
                 fclose($pipes[1]);
             }
 
+            // stderr is always collected so callers can report binary failures clearly.
             if (isset($pipes[2]) && is_resource($pipes[2])) {
                 $stderr = (string) stream_get_contents($pipes[2]);
                 fclose($pipes[2]);

@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/public/theme/raven/tpl/profile/index.php
  * Profile-unavailable placeholder template.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 if (!defined('RAVEN_VIEW_RENDER_CONTEXT')) {

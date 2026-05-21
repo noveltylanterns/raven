@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/View/Panel/EditorMeta.php
  * Panel meta-image helper for taxonomy/group/channel file workflows.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -297,6 +297,11 @@ final class EditorMeta
         }
     }
 
+    /**
+     * Lazily resolves the shared cover-image validator instance.
+     *
+     * @return CoverValidator Initialized cover validator.
+     */
     private function coverValidator(): CoverValidator
     {
         if ($this->coverValidator instanceof CoverValidator) {
@@ -311,6 +316,11 @@ final class EditorMeta
         return $this->coverValidator;
     }
 
+    /**
+     * Lazily resolves the shared preview-image validator instance.
+     *
+     * @return PreviewValidator Initialized preview validator.
+     */
     private function previewValidator(): PreviewValidator
     {
         if ($this->previewValidator instanceof PreviewValidator) {
@@ -325,6 +335,11 @@ final class EditorMeta
         return $this->previewValidator;
     }
 
+    /**
+     * Lazily resolves the shared cover-image upload policy service.
+     *
+     * @return CoverUpload Cover-image upload policy helper.
+     */
     private function coverUpload(): CoverUpload
     {
         if ($this->coverUpload instanceof CoverUpload) {
@@ -335,6 +350,12 @@ final class EditorMeta
         return $this->coverUpload;
     }
 
+    /**
+     * Returns the upload policy service that matches one meta-image slot.
+     *
+     * @param string $slot Target slot key (`cover`, `icon`, `preview`).
+     * @return CoverUpload|PreviewUpload Slot-specific upload policy helper.
+     */
     private function uploadPolicyForSlot(string $slot): CoverUpload|PreviewUpload
     {
         if ($slot === 'cover') {

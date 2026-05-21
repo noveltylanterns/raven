@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/View/Taxonomy.php
  * Mixed taxonomy lookup service for category/tag routing inventory and page-editor payloads.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

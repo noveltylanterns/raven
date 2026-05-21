@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/tpl/panel/user/invites.php
  * Admin panel view template for registration invite tokens.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 /** @var array<string, string> $site */

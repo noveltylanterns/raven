@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/Media/MediaUpload.php
  * ImageMagick-backed service for page-scoped media upload processing.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -71,6 +71,7 @@ final class MediaUpload
      */
     public function uploadForPage(int $pageId, ?array $upload): array
     {
+        // This pipeline depends on Imagick for source normalization and variant generation.
         if (!class_exists(Imagick::class)) {
             return [
                 'ok' => false,
@@ -78,6 +79,7 @@ final class MediaUpload
             ];
         }
 
+        // Upload payload must be present before transport-level validation can run.
         if ($upload === null) {
             return [
                 'ok' => false,
@@ -90,6 +92,7 @@ final class MediaUpload
             'empty_error' => 'Image appears empty.',
             'too_large_error' => 'Image exceeds configured max filesize.',
         ]);
+        // Transport validation canonicalizes PHP upload errors and size policy failures.
         if (!(bool) ($validatedUpload['ok'] ?? false)) {
             return [
                 'ok' => false,
@@ -97,6 +100,7 @@ final class MediaUpload
             ];
         }
         $validated = $validatedUpload['upload'] ?? null;
+        // Successful validation must include a normalized upload payload array.
         if (!is_array($validated)) {
             return [
                 'ok' => false,
@@ -108,6 +112,7 @@ final class MediaUpload
         $size = (int) ($validatedUpload['size'] ?? 0);
 
         $uploadTarget = strtolower((string) $this->config->get('media.upload_target', 'local'));
+        // Current build supports only local filesystem gallery storage.
         if ($uploadTarget !== 'local') {
             return [
                 'ok' => false,
@@ -118,6 +123,7 @@ final class MediaUpload
         // Detect real MIME type from bytes, never trust extension alone.
         $finfo = finfo_open(FILEINFO_MIME_TYPE);
         $detectedMime = $finfo !== false ? (string) finfo_file($finfo, $tmpPath) : '';
+        // Always close finfo handles once MIME detection is complete.
         if ($finfo !== false) {
             finfo_close($finfo);
         }
@@ -127,6 +133,7 @@ final class MediaUpload
             'image/png' => 'png',
             'image/gif' => 'gif',
         ];
+        // Reject uploads outside the image formats Raven media gallery supports.
         if (!isset($mimeToExt[$detectedMime])) {
             return [
                 'ok' => false,
@@ -141,6 +148,7 @@ final class MediaUpload
         $originalExtension = $originalExtension === 'jpeg' ? 'jpg' : $originalExtension;
 
         $allowedExtensions = $this->allowedExtensions();
+        // Config allowlist can further restrict formats beyond base MIME support.
         if (!in_array($canonicalExtension, $allowedExtensions, true)) {
             return [
                 'ok' => false,
@@ -157,6 +165,7 @@ final class MediaUpload
         }
 
         $dimensions = @getimagesize($tmpPath);
+        // Dimension metadata must parse before variant sizing and DB fields are built.
         if (!is_array($dimensions) || !isset($dimensions[0], $dimensions[1])) {
             return [
                 'ok' => false,
@@ -165,6 +174,7 @@ final class MediaUpload
         }
 
         $hashSha256 = (string) hash_file('sha256', $tmpPath);
+        // Hashes back duplicate detection and must be non-empty to continue safely.
         if ($hashSha256 === '') {
             return [
                 'ok' => false,
@@ -172,6 +182,7 @@ final class MediaUpload
             ];
         }
 
+        // SHA-256 dedupe prevents duplicate source uploads within the same page gallery.
         if ($this->mediaRead->hasHashForPage($pageId, $hashSha256)) {
             return [
                 'ok' => false,
@@ -179,6 +190,7 @@ final class MediaUpload
             ];
         }
 
+        // Ensure the destination directory exists before any source/variant writes begin.
         if (!$this->storage->ensurePageDirectory($pageId)) {
             return [
                 'ok' => false,
@@ -194,6 +206,7 @@ final class MediaUpload
 
         $writtenPaths = [];
 
+        // Wrap processing and persistence so any mid-flight failure can clean written files.
         try {
             $source = $this->imagickProcessor->readFirstFrame($tmpPath);
             $this->imagickProcessor->prepareForWrite(
@@ -203,6 +216,7 @@ final class MediaUpload
                 $this->exifProcessor
             );
 
+            // Persist the normalized source image first; variants depend on this canonical source.
             if (!$source->writeImage($originalAbsolutePath)) {
                 throw new \RuntimeException('Failed to store processed source image.');
             }
@@ -215,6 +229,7 @@ final class MediaUpload
             $variantSpecs = $this->variantProcessor->variantSpecs();
             $variantRows = [];
 
+            // Build and persist each configured variant from the normalized source image.
             foreach ($variantSpecs as $variantKey => $spec) {
                 $variant = clone $source;
                 $target = $this->variantProcessor->resolveVariantSize(
@@ -235,6 +250,7 @@ final class MediaUpload
                     );
                 }
 
+                // Keep JPEG variant quality consistent with source output defaults.
                 if ($canonicalExtension === 'jpg') {
                     $variant->setImageCompressionQuality(85);
                 }
@@ -243,6 +259,7 @@ final class MediaUpload
                 $variantStoredPath = $this->storage->storedPathForFilename($pageId, $variantFilename);
                 $variantAbsolutePath = $this->storage->absolutePublicPath($variantStoredPath);
 
+                // Abort and trigger rollback when any variant write fails.
                 if (!$variant->writeImage($variantAbsolutePath)) {
                     throw new \RuntimeException('Failed to store generated ' . $variantKey . ' variant.');
                 }
@@ -316,6 +333,7 @@ final class MediaUpload
     public function deleteImageForPage(int $pageId, int $imageId): bool
     {
         $deleted = $this->mediaWrite->deleteImageForPage($pageId, $imageId);
+        // Null indicates no row matched this page/image pair.
         if ($deleted === null) {
             return false;
         }
@@ -338,6 +356,7 @@ final class MediaUpload
     {
         $storedPaths = $this->mediaWrite->deleteAllForPage($pageId);
 
+        // Remove each stored file path returned by persistence before pruning empty directories.
         foreach ($storedPaths as $storedPath) {
             $this->storage->deleteStoredPath($storedPath);
         }
@@ -356,11 +375,14 @@ final class MediaUpload
         $parts = array_map('trim', explode(',', $raw));
 
         $allowed = [];
+        // Normalize configured tokens into a deduplicated extension allowlist map.
         foreach ($parts as $part) {
+            // Canonicalize jpeg to jpg to match runtime MIME normalization.
             if ($part === 'jpeg') {
                 $part = 'jpg';
             }
 
+            // Ignore blanks and non-alphanumeric extension tokens from malformed config.
             if ($part === '' || preg_match('/^[a-z0-9]+$/', $part) !== 1) {
                 continue;
             }
@@ -377,6 +399,7 @@ final class MediaUpload
     private function maxUploadFilesizeBytes(): int
     {
         $kilobytes = (int) $this->config->get('media.max_filesize_kb', -1);
+        // Non-negative config values are explicit limits, with 0 meaning unlimited.
         if ($kilobytes >= 0) {
             return $kilobytes === 0 ? 0 : max(1, $kilobytes * 1024);
         }

@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/Extension/Resolver.php
  * Canonical extension filesystem layout resolver.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -38,6 +38,7 @@ final class Resolver
     public static function providerPath(string $extensionRoot, string $filename): ?string
     {
         $canonicalPath = self::canonicalProviderPath($extensionRoot, $filename);
+        // Return path only when the canonical provider file exists.
         if (is_file($canonicalPath)) {
             return $canonicalPath;
         }

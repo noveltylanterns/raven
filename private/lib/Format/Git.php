@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/Format/Git.php
  * Canonical Git command and repository handler for Raven core and extensions.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -74,6 +74,7 @@ final class Git
             ]
         );
 
+        // Process must start successfully before pipe IO can proceed.
         if (!is_resource($process)) {
             throw new RuntimeException('Failed to start git command.');
         }
@@ -81,7 +82,9 @@ final class Git
         $stdout = '';
         $stderr = '';
 
+        // Collect stdin/stdout/stderr with guaranteed process close in finally.
         try {
+            // Write optional stdin payload and close stdin pipe.
             if (isset($pipes[0]) && is_resource($pipes[0])) {
                 if ($stdin !== null && $stdin !== '') {
                     fwrite($pipes[0], $stdin);
@@ -89,11 +92,13 @@ final class Git
                 fclose($pipes[0]);
             }
 
+            // Read and close stdout pipe when available.
             if (isset($pipes[1]) && is_resource($pipes[1])) {
                 $stdout = stream_get_contents($pipes[1]) ?: '';
                 fclose($pipes[1]);
             }
 
+            // Read and close stderr pipe when available.
             if (isset($pipes[2]) && is_resource($pipes[2])) {
                 $stderr = stream_get_contents($pipes[2]) ?: '';
                 fclose($pipes[2]);
@@ -129,6 +134,7 @@ final class Git
     public function mustRun(array $arguments, ?string $cwd = null, ?string $stdin = null): array
     {
         $result = $this->run($arguments, $cwd, $stdin);
+        // Non-zero git exits are promoted to exceptions with stderr context.
         if (!$result['ok']) {
             $message = $result['stderr'] !== '' ? $result['stderr'] : 'Git command failed.';
             throw new RuntimeException($message);
@@ -165,11 +171,13 @@ final class Git
     {
         $arguments = ['clone', '--quiet'];
 
+        // Apply shallow depth only when caller requested it.
         if ($depth > 0) {
             $arguments[] = '--depth';
             $arguments[] = (string) $depth;
         }
 
+        // Apply branch pinning when caller supplied a branch name.
         if ($branch !== null && $branch !== '') {
             $arguments[] = '--branch';
             $arguments[] = $branch;
@@ -196,6 +204,7 @@ final class Git
     {
         $arguments = ['fetch', '--quiet'];
 
+        // Apply shallow depth only when caller requested it.
         if ($depth > 0) {
             $arguments[] = '--depth';
             $arguments[] = (string) $depth;
@@ -203,6 +212,7 @@ final class Git
 
         $arguments[] = $remote;
 
+        // Append explicit ref/refspec when provided.
         if ($ref !== null && $ref !== '') {
             $arguments[] = $ref;
         }
@@ -273,6 +283,7 @@ final class Git
      */
     public function extractTree(string $repoDir, string $targetDir): void
     {
+        // Ensure extraction target directory exists before checkout-index.
         if (!is_dir($targetDir) && !mkdir($targetDir, 0775, true) && !is_dir($targetDir)) {
             throw new RuntimeException('Failed to create worktree extraction target directory: ' . $targetDir);
         }
@@ -290,6 +301,7 @@ final class Git
      */
     public function init(string $dir): void
     {
+        // Ensure repository directory exists before git init.
         if (!is_dir($dir) && !mkdir($dir, 0775, true) && !is_dir($dir)) {
             throw new RuntimeException('Failed to create directory for git init: ' . $dir);
         }

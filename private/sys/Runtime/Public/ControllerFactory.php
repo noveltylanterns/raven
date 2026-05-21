@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/sys/Runtime/Public/ControllerFactory.php
  * Public controller-factory closure wiring extracted from public runtime builder.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

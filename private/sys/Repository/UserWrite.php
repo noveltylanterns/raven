@@ -3,7 +3,7 @@
  * RAVEN CMS
  * ~/private/sys/Repository/UserWrite.php
  * Write-side data access for user accounts and group memberships (INSERT, UPDATE, DELETE).
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

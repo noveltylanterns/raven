@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/tpl/panel/redirect/edit.php
  * Admin panel view template for Redirect create/edit screen.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 // Inline note: Template expects controller-provided data and keeps business logic out of views.

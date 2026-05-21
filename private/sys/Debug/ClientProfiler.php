@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/sys/Debug/ClientProfiler.php
  * Visitor network-context normalizer for request diagnostics and throttling.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

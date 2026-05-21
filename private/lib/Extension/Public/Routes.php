@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/Extension/Public/Routes.php
  * Reusable public extension-route registration primitives.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -46,6 +46,7 @@ final class Routes
             ? (array) $rvn['enabled_extension_manifests']
             : [];
 
+        // Register public routes for each enabled module extension manifest.
         foreach ($enabledPublicExtensionManifests as $extensionName => $manifest) {
             $type = strtolower(trim((string) ($manifest['type'] ?? 'plugin')));
             $isSystemType = $type === 'system' || !empty($manifest['system_extension']);
@@ -57,6 +58,7 @@ final class Routes
 
             $extensionRoot = $rvn['root'] . '/private/ext/' . $extensionName;
             $routesFile = Resolver::providerPath($extensionRoot, 'routes_public.php');
+            // Skip extensions that do not provide routes_public.php.
             if ($routesFile === null) {
                 continue;
             }

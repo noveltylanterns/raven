@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/Parser/UserContactParser.php
  * Encode, decode, and normalize helpers for the user contact-profiles JSON column.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -34,11 +34,13 @@ final class UserContactParser
      */
     public static function decode(mixed $raw): array
     {
+        // Empty/non-string column values are treated as "no profiles".
         if (!is_string($raw) || trim($raw) === '') {
             return [];
         }
 
         $decoded = Json::decode($raw, 32);
+        // Decode failures collapse to an empty set to keep callers fail-safe.
         if (!is_array($decoded)) {
             return [];
         }
@@ -56,6 +58,7 @@ final class UserContactParser
      */
     public static function encode(array $profiles): ?string
     {
+        // Persist empty profile lists as NULL to avoid storing empty JSON arrays unnecessarily.
         if ($profiles === []) {
             return null;
         }
@@ -76,6 +79,7 @@ final class UserContactParser
     {
         $normalized = [];
 
+        // Normalize each profile row into a bounded, deduplicated contact entry.
         foreach ($profiles as $profile) {
             if (!is_array($profile)) {
                 continue;
@@ -83,6 +87,7 @@ final class UserContactParser
 
             $type = strtolower(trim((string) ($profile['type'] ?? '')));
             $value = trim((string) ($profile['value'] ?? ''));
+            // Both fields are required for a usable contact profile.
             if ($type === '' || $value === '') {
                 continue;
             }
@@ -91,16 +96,20 @@ final class UserContactParser
             $type = preg_replace('/[^a-z0-9-]+/', '-', $type) ?? '';
             $type = trim($type, '-');
             $type = preg_replace('/-+/', '-', $type) ?? '';
+            // Drop entries whose type collapses to empty after slug normalization.
             if ($type === '') {
                 continue;
             }
 
+            // Bound type length to keep storage and UI labels predictable.
             if (mb_strlen($type) > 80) {
                 $type = mb_substr($type, 0, 80);
             }
+            // Bound value length to match contact-profile column expectations.
             if (mb_strlen($value) > 255) {
                 $value = mb_substr($value, 0, 255);
             }
+            // Value may become empty after truncation/trim edge cases.
             if ($value === '') {
                 continue;
             }
@@ -112,6 +121,7 @@ final class UserContactParser
                 'value' => $value,
             ];
 
+            // Enforce a hard cap to keep profile payloads small and predictable.
             if (count($normalized) >= self::MAX_PROFILES) {
                 break;
             }
@@ -123,6 +133,7 @@ final class UserContactParser
             static function (array $left, array $right): int {
                 $leftType = strtolower(trim((string) ($left['type'] ?? '')));
                 $rightType = strtolower(trim((string) ($right['type'] ?? '')));
+                // Sort primarily by type for stable grouped display ordering.
                 if ($leftType !== $rightType) {
                     return $leftType <=> $rightType;
                 }

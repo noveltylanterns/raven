@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/Parser/SetParser.php
  * Taxonomy set record normalization policy and filesystem read helpers.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -61,20 +61,24 @@ final class SetParser
      */
     public static function normalizeSetId(mixed $value, bool $allowAll = false): ?int
     {
+        // Reject non-scalar inputs early so nested payloads cannot coerce into ids.
         if (!is_scalar($value) && $value !== null) {
             return null;
         }
 
+        // Null means "no selection" and remains nullable for callers.
         if ($value === null) {
             return null;
         }
 
         $normalized = trim((string) $value);
+        // Ids must be integer-like strings.
         if ($normalized === '' || preg_match('/^-?\d+$/', $normalized) !== 1) {
             return null;
         }
 
         $id = (int) $normalized;
+        // Preserve the all-sets sentinel only when the caller explicitly allows it.
         if ($allowAll && $id === self::ALL_SET_ID) {
             return self::ALL_SET_ID;
         }
@@ -120,29 +124,35 @@ final class SetParser
         $items = is_array($value) ? $value : [$value];
         $selection = [];
 
+        // Normalize each candidate into a validated set id, preserving the all-sets shortcut.
         foreach ($items as $item) {
             if (!is_scalar($item) && $item !== null) {
                 continue;
             }
 
             $normalized = strtolower(trim((string) ($item ?? '')));
+            // Skip blank tokens from sparse request arrays.
             if ($normalized === '') {
                 continue;
             }
 
+            // String sentinel `all` short-circuits to all-sets selection.
             if ($normalized === 'all') {
                 return [self::ALL_SET_ID];
             }
 
+            // Numeric tokens only; non-numeric slugs are not valid set selectors.
             if (preg_match('/^\d+$/', $normalized) !== 1) {
                 continue;
             }
 
             $setId = (int) $normalized;
+            // Numeric zero is equivalent to the all-sets sentinel.
             if ($setId === self::ALL_SET_ID) {
                 return [self::ALL_SET_ID];
             }
 
+            // Ignore ids below the persisted default set id floor.
             if ($setId < self::DEFAULT_SET_ID) {
                 continue;
             }
@@ -150,6 +160,7 @@ final class SetParser
             $selection[$setId] = $setId;
         }
 
+        // Empty normalized selections either fallback to all-sets or remain empty by caller policy.
         if ($selection === []) {
             return $defaultAll ? [self::ALL_SET_ID] : [];
         }
@@ -166,6 +177,7 @@ final class SetParser
      */
     public static function selectionIncludesAll(array $selection): bool
     {
+        // Scan normalized values for the explicit all-sets sentinel.
         foreach ($selection as $item) {
             if (self::normalizeSetId($item, true) === self::ALL_SET_ID) {
                 return true;
@@ -216,6 +228,7 @@ final class SetParser
         usort($paths, static function (string $left, string $right): int {
             $leftId = self::filenameId($left);
             $rightId = self::filenameId($right);
+            // Primary sort key is numeric id so set ordering remains deterministic across renames.
             if ($leftId !== $rightId) {
                 return $leftId <=> $rightId;
             }
@@ -236,6 +249,7 @@ final class SetParser
     {
         $safeId = max(0, $id);
         $safeSlug = self::normalizeSlug($slug);
+        // Synthesize a deterministic slug when normalization collapses to empty.
         if ($safeSlug === '') {
             $safeSlug = 'set-' . $safeId;
         }
@@ -252,6 +266,7 @@ final class SetParser
     public function loadRawById(int $id): array
     {
         $path = $this->findPathById($id);
+        // Missing set ids resolve to an empty payload rather than throwing.
         if ($path === null) {
             return [];
         }
@@ -268,6 +283,7 @@ final class SetParser
     public function loadRawBySlug(string $slug): array
     {
         $path = $this->findPathBySlug($slug);
+        // Unknown slugs resolve to an empty payload for read-side convenience.
         if ($path === null) {
             return [];
         }
@@ -283,12 +299,14 @@ final class SetParser
      */
     public function loadRawByPath(string $path): array
     {
+        // Only existing files are executable payload candidates.
         if (!is_file($path)) {
             return [];
         }
 
         $this->invalidatePhpFileCache($path);
 
+        // Guard require-time parse/runtime errors so corrupted set files fail closed.
         try {
             /** @var mixed $raw */
             $raw = require $path;
@@ -308,11 +326,13 @@ final class SetParser
     public function loadRecordFromPath(string $path): ?array
     {
         $raw = $this->loadRawByPath($path);
+        // Empty payload means unreadable or missing record.
         if ($raw === []) {
             return null;
         }
 
         $recordId = $this->recordIdFromRaw($raw, $path);
+        // Records without resolvable ids are ignored as invalid.
         if ($recordId === null) {
             return null;
         }
@@ -331,8 +351,10 @@ final class SetParser
     public function nextAvailableId(): int
     {
         $maxId = 0;
+        // Walk persisted files to find the highest assigned id.
         foreach ($this->listSetFilePaths() as $path) {
             $id = $this->recordIdFromRaw($this->loadRawByPath($path), $path) ?? 0;
+            // Track the running maximum for next-id allocation.
             if ($id > $maxId) {
                 $maxId = $id;
             }
@@ -370,16 +392,20 @@ final class SetParser
         $normalizedId = max(0, $id);
         $paths = [];
 
+        // Fast path: canonical id-prefixed filenames.
         foreach (glob($this->setDirectory . '/' . $normalizedId . '_*.php') ?: [] as $path) {
             $paths[] = $path;
         }
 
+        // Slow path: inspect every file for embedded id values to catch legacy/misaligned names.
         foreach ($this->rawSetFilePaths() as $path) {
+            // Skip files already captured by canonical glob.
             if (in_array($path, $paths, true)) {
                 continue;
             }
 
             $raw = $this->loadRawByPath($path);
+            // Include files whose embedded id matches even when filename prefix does not.
             if (($this->recordIdFromRaw($raw, $path) ?? -1) === $normalizedId) {
                 $paths[] = $path;
             }
@@ -409,22 +435,27 @@ final class SetParser
     private function findPathBySlug(string $slug): ?string
     {
         $normalizedSlug = self::normalizeSlug($slug);
+        // Empty normalized slugs cannot match persisted records.
         if ($normalizedSlug === '') {
             return null;
         }
 
+        // Scan records and compare canonical slug derivations.
         foreach ($this->rawSetFilePaths() as $path) {
             $raw = $this->loadRawByPath($path);
+            // Ignore unreadable/invalid record payloads.
             if ($raw === []) {
                 continue;
             }
 
             $recordId = $this->recordIdFromRaw($raw, $path);
+            // Slug derivation requires a valid record id.
             if ($recordId === null) {
                 continue;
             }
 
             $recordSlug = $this->recordSlugFromRaw($raw, $recordId, basename($path, '.php'));
+            // Return first slug match in sorted path order.
             if ($recordSlug === $normalizedSlug) {
                 return $path;
             }
@@ -450,10 +481,12 @@ final class SetParser
             return self::DEFAULT_SET_ID;
         }
 
+        // Prefer explicit persisted ids over filename-derived ids when available.
         if ($rawId !== null) {
             return $rawId;
         }
 
+        // Fallback to filename-derived id when it meets the valid id floor.
         if ($filenameId >= self::DEFAULT_SET_ID) {
             return $filenameId;
         }
@@ -471,28 +504,34 @@ final class SetParser
      */
     private function recordSlugFromRaw(array $raw, int $id, string $fallback): string
     {
+        // Default set slug is fixed by contract and ignores file/raw variants.
         if ($id === self::DEFAULT_SET_ID) {
             return self::DEFAULT_SET_SLUG;
         }
 
         $slug = self::normalizeSlug((string) ($raw['slug'] ?? ''));
+        // Prefer explicit persisted slug when available.
         if ($slug !== '') {
             return $slug;
         }
 
+        // Try extracting slug portion from canonical `{id}_{slug}` fallback filenames.
         if (preg_match('/^\d+_([a-z0-9-]+)$/', $fallback, $matches) === 1) {
             $slug = self::normalizeSlug((string) ($matches[1] ?? ''));
+            // Use extracted fallback slug when it normalizes cleanly.
             if ($slug !== '') {
                 return $slug;
             }
         }
 
         $slug = self::normalizeSlug($fallback);
+        // Reject pure-numeric fallback slugs so ids are not mistaken for canonical slugs.
         if ($slug !== '' && preg_match('/^\d+$/', $slug) !== 1) {
             return $slug;
         }
 
         $nameSlug = self::normalizeSlug((string) ($raw['name'] ?? ''));
+        // Use normalized set name as a late slug fallback.
         if ($nameSlug !== '') {
             return $nameSlug;
         }
@@ -509,6 +548,7 @@ final class SetParser
     private static function filenameId(string $path): int
     {
         $basename = basename($path, '.php');
+        // Accept canonical id or id_slug filename patterns.
         if (preg_match('/^(\d+)(?:_[a-z0-9-]+)?$/', $basename, $matches) === 1) {
             return (int) ($matches[1] ?? 0);
         }
@@ -525,11 +565,13 @@ final class SetParser
     private function invalidatePhpFileCache(string $path): void
     {
         $normalized = trim($path);
+        // Ignore empty invalidation requests from defensive callers.
         if ($normalized === '') {
             return;
         }
 
         clearstatcache(true, $normalized);
+        // Invalidate OPcache entries so requires reflect just-written set file changes.
         if (function_exists('opcache_invalidate')) {
             @opcache_invalidate($normalized, true);
         }

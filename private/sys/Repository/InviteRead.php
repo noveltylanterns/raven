@@ -3,7 +3,7 @@
  * RAVEN CMS
  * ~/private/sys/Repository/InviteRead.php
  * Read-only data access and shared token utilities for invite-token records.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

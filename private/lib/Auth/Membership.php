@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/Auth/Membership.php
  * Shared user-group membership read/write helpers with request-local caching.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -49,6 +49,7 @@ final class Membership
      */
     public function groupsForUser(int $userId): array
     {
+        // Return request-local cached memberships when already loaded for this user id.
         if ($userId > 0 && array_key_exists($userId, $this->groupsForUserCache)) {
             return $this->groupsForUserCache[$userId];
         }
@@ -72,6 +73,7 @@ final class Membership
         $rows = $stmt->fetchAll();
 
         $result = [];
+        // Normalize DB row values into a stable typed membership payload.
         foreach ($rows as $row) {
             $result[] = [
                 'id' => (int) $row['id'],
@@ -82,6 +84,7 @@ final class Membership
             ];
         }
 
+        // Cache only valid positive user id lookups.
         if ($userId > 0) {
             $this->groupsForUserCache[$userId] = $result;
         }
@@ -107,10 +110,12 @@ final class Membership
         $groupStmt->execute([':name' => $groupName]);
 
         $groupId = $groupStmt->fetchColumn();
+        // Abort assignment when the target group name does not exist.
         if ($groupId === false) {
             return;
         }
 
+        // Use driver-specific UPSERT syntax to avoid duplicate memberships.
         if ($this->driver === 'sqlite') {
             $stmt = $this->rvnDb->prepare(
                 'INSERT INTO ' . $userGroupsTable . ' (user, "group")
@@ -156,6 +161,7 @@ final class Membership
      */
     public function invalidateUser(int $userId): void
     {
+        // Ignore invalid user ids when invalidating request-local cache entries.
         if ($userId <= 0) {
             return;
         }
@@ -163,6 +169,12 @@ final class Membership
         unset($this->groupsForUserCache[$userId]);
     }
 
+    /**
+     * Resolves one auth-table base name to the prefixed physical table name.
+     *
+     * @param string $base Logical auth-table base name.
+     * @return string Physical table name for SQL queries.
+     */
     private function table(string $base): string
     {
         return SqlTable::appTable($this->driver, $this->prefix, $base);

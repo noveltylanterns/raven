@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/Format/Csv.php
  * Generic CSV handler — read, write, and stream CSV data.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -45,15 +45,18 @@ final class Csv
      */
     public function read(string $filePath, bool $hasHeader = true, string $separator = ','): Generator
     {
+        // CSV read source must point to an existing regular file.
         if (!is_file($filePath)) {
             throw new RuntimeException('CSV file not found: ' . $filePath);
         }
 
         $stream = fopen($filePath, 'rb');
+        // Source stream must open successfully for row iteration.
         if (!is_resource($stream)) {
             throw new RuntimeException('Failed to open CSV file for reading: ' . $filePath);
         }
 
+        // Always close stream after row iteration completes or throws.
         try {
             yield from $this->readStream($stream, $hasHeader, $separator);
         } finally {
@@ -87,12 +90,14 @@ final class Csv
             // Cast all fields to string — fgetcsv can return int/float on numeric fields.
             $row = array_map('strval', $raw);
 
+            // Handle first-row header/BOM normalization behavior.
             if ($rowIndex === 0) {
                 // Strip UTF-8 BOM from the very first field if present.
                 if (isset($row[0]) && str_starts_with($row[0], "\xEF\xBB\xBF")) {
                     $row[0] = substr($row[0], 3);
                 }
 
+                // Consume first row as headers when header mode is enabled.
                 if ($hasHeader) {
                     $headers = $row;
                     $rowIndex++;
@@ -100,6 +105,7 @@ final class Csv
                 }
             }
 
+            // Emit associative rows when header mapping is active.
             if ($headers !== null) {
                 // Combine header keys with the current row, padding or trimming to
                 // match header count so associative access is always safe.
@@ -107,6 +113,7 @@ final class Csv
                 $padded = array_pad($row, $count, '');
                 yield array_combine($headers, array_slice($padded, 0, $count));
             } else {
+                // Without headers, emit row as a positional array.
                 yield $row;
             }
 
@@ -136,15 +143,18 @@ final class Csv
         bool $writeBom = false
     ): void {
         $dir = dirname($filePath);
+        // Ensure destination directory exists before opening output stream.
         if (!is_dir($dir) && !mkdir($dir, 0775, true) && !is_dir($dir)) {
             throw new RuntimeException('Failed to create directory for CSV output: ' . $dir);
         }
 
         $stream = fopen($filePath, 'wb');
+        // Destination stream must open successfully for CSV writes.
         if (!is_resource($stream)) {
             throw new RuntimeException('Failed to open CSV output file for writing: ' . $filePath);
         }
 
+        // Always close destination stream after write operation completes or throws.
         try {
             $this->writeStream($stream, $rows, $header, $separator, $writeBom);
         } finally {
@@ -173,14 +183,17 @@ final class Csv
     ): void {
         $sep = $separator !== '' ? $separator[0] : ',';
 
+        // Emit UTF-8 BOM when requested for spreadsheet compatibility.
         if ($writeBom) {
             fwrite($stream, "\xEF\xBB\xBF");
         }
 
+        // Emit header row before data rows when provided.
         if ($header !== null) {
             fputcsv($stream, $header, $sep);
         }
 
+        // Stream each row to CSV output with scalar fallback wrapping.
         foreach ($rows as $row) {
             fputcsv($stream, is_array($row) ? $row : [$row], $sep);
         }
@@ -211,6 +224,7 @@ final class Csv
 
         $safe = preg_replace('/[^\w\s._-]/', '-', $filename) ?? 'export.csv';
         $safe = trim($safe, '-_.');
+        // Fall back to default filename when sanitization empties it.
         if ($safe === '') {
             $safe = 'export.csv';
         }
@@ -221,6 +235,7 @@ final class Csv
         header('Pragma: no-cache');
 
         $stream = fopen('php://output', 'wb');
+        // Abort streaming cleanly when output stream cannot be opened.
         if (!is_resource($stream)) {
             http_response_code(500);
             echo 'Failed to open CSV output stream.';

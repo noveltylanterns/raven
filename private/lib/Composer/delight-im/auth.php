@@ -6,12 +6,14 @@
  * Package handler for delight-im/auth and its dependencies.
  * Registers PSR-4 autoloaders for all delight-im/* packages.
  * Call this handler once from any bootstrap path that needs the auth library.
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
 
 (static function (): void {
     static $loaded = false;
+    // Guard against duplicate autoloader registration.
     if ($loaded) {
         return;
     }
@@ -27,9 +29,12 @@ declare(strict_types=1);
     ];
 
     spl_autoload_register(static function (string $class) use ($prefixMap): void {
+        // Resolve class files from the first matching PSR-4 prefix map entry.
         foreach ($prefixMap as $prefix => $basePath) {
+            // Skip prefixes that do not match the requested class.
             if (str_starts_with($class, $prefix)) {
                 $file = $basePath . str_replace('\\', '/', substr($class, strlen($prefix))) . '.php';
+                // Require the class file only when it exists on disk.
                 if (is_file($file)) {
                     require_once $file;
                 }

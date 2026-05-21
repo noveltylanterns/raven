@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/lib/Security/Captcha.php
  * Captcha provider config, server-side verification, and widget markup helpers.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -39,6 +39,7 @@ final class Captcha
     public function provider(): string
     {
         $provider = strtolower($this->input->text((string) $this->config->get('captcha.provider', 'none'), 20));
+        // Unknown provider strings are downgraded to `none` for safe no-op behavior.
         if (!in_array($provider, ['none', 'hcaptcha', 'recaptcha2', 'recaptcha3'], true)) {
             return 'none';
         }
@@ -101,22 +102,26 @@ final class Captcha
     public function validateSubmission(array $post, ?string $remoteIp): ?string
     {
         $provider = $this->provider();
+        // Provider `none` disables captcha checks entirely.
         if ($provider === 'none') {
             return null;
         }
 
         $siteKey = $this->siteKey($provider);
         $secretKey = $this->secretKey($provider);
+        // Both keys are required for any server-side verification call.
         if ($siteKey === '' || $secretKey === '') {
             return 'Captcha is not configured right now. Please try again later.';
         }
 
         $responseField = $this->responseField($provider);
         $captchaToken = $this->input->text((string) ($post[$responseField] ?? ''), 6000);
+        // Empty tokens indicate the challenge was not completed client-side.
         if ($captchaToken === '') {
             return 'Please complete the captcha challenge.';
         }
 
+        // Reject when upstream provider does not confirm token validity.
         if (!$this->verifyToken($provider, $secretKey, $captchaToken, $remoteIp)) {
             return 'Captcha verification failed. Please try again.';
         }
@@ -136,6 +141,7 @@ final class Captcha
     public function markup(bool $scriptIncluded): array
     {
         $provider = $this->provider();
+        // No provider means no widget markup is emitted.
         if ($provider === 'none') {
             return [
                 'markup' => '',
@@ -144,6 +150,7 @@ final class Captcha
         }
 
         $siteKey = $this->siteKey($provider);
+        // Missing public keys show a warning instead of rendering a broken widget.
         if ($siteKey === '') {
             return [
                 'markup' => '<div class="col-12"><div class="alert alert-warning mb-0" role="alert">Captcha is currently unavailable.</div></div>',
@@ -161,10 +168,13 @@ final class Captcha
         $escapedScriptSrc = htmlspecialchars($scriptSrc, ENT_QUOTES, 'UTF-8');
 
         $scriptMarkup = '';
+        // Emit provider scripts only once per page render to avoid duplicate loader side effects.
         if (!$scriptIncluded) {
             $scriptMarkup = '<script src="' . $escapedScriptSrc . '" async defer></script>';
+            // reCAPTCHA v3 needs submit interception to fetch tokens just-in-time.
             if ($provider === 'recaptcha3') {
                 $siteKeyJson = json_encode($siteKey, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
+                // Fall back to an empty JSON string literal on encoding edge cases.
                 if (!is_string($siteKeyJson) || $siteKeyJson === '') {
                     $siteKeyJson = '""';
                 }
@@ -210,6 +220,7 @@ final class Captcha
             $scriptIncluded = true;
         }
 
+        // reCAPTCHA v3 uses a hidden field instead of a visible challenge widget.
         if ($provider === 'recaptcha3') {
             return [
                 'markup' => $scriptMarkup
@@ -228,6 +239,15 @@ final class Captcha
         ];
     }
 
+    /**
+     * Calls the upstream provider verify API for one submitted captcha token.
+     *
+     * @param string $provider Active captcha provider (`hcaptcha`, `recaptcha2`, `recaptcha3`).
+     * @param string $secretKey Provider secret key.
+     * @param string $captchaToken Submitted token from the client form.
+     * @param string|null $remoteIp Optional client IP forwarded to the provider.
+     * @return bool True when the provider reports a successful verification.
+     */
     private function verifyToken(string $provider, string $secretKey, string $captchaToken, ?string $remoteIp): bool
     {
         $endpoint = $provider === 'hcaptcha'
@@ -238,6 +258,7 @@ final class Captcha
             'secret' => $secretKey,
             'response' => $captchaToken,
         ];
+        // Forward client IP when available for provider-side risk scoring.
         if ($remoteIp !== null && $remoteIp !== '') {
             $payload['remoteip'] = $remoteIp;
         }
@@ -253,11 +274,13 @@ final class Captcha
         ]);
 
         $rawResponse = @file_get_contents($endpoint, false, $context);
+        // Empty or unreadable responses are treated as verification failure.
         if (!is_string($rawResponse) || trim($rawResponse) === '') {
             return false;
         }
 
         $decoded = json_decode($rawResponse, true);
+        // Provider responses must decode to an object-like array payload.
         if (!is_array($decoded)) {
             return false;
         }

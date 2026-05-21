@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/tpl/panel/redirect/list.php
  * Admin panel view template for Redirects list screen.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 // Inline note: Template expects controller-provided data and keeps business logic out of views.

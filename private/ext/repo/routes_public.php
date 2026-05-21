@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/ext/repo/routes_public.php
  * Repositories extension public route registration.
- * Docs: /private/ext/repo/AGENTS.md
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
