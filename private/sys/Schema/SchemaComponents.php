@@ -56,6 +56,7 @@ final class SchemaComponents
      */
     public function schemaBootstrap(): SchemaBootstrap
     {
+        // Lazily construct bootstrapper once and reuse it for all callers.
         if ($this->schemaBootstrap === null) {
             $this->schemaBootstrap = new SchemaBootstrap($this->schemaIntrospector());
         }
@@ -70,6 +71,7 @@ final class SchemaComponents
      */
     public function schemaAuth(): SchemaAuth
     {
+        // Lazily construct auth schema component once and reuse it.
         if ($this->schemaAuth === null) {
             $this->schemaAuth = new SchemaAuth($this->schemaIntrospector());
         }
@@ -84,6 +86,7 @@ final class SchemaComponents
      */
     public function schemaBuilder(): SchemaBuilder
     {
+        // Lazily construct app schema builder once and reuse it.
         if ($this->schemaBuilder === null) {
             $this->schemaBuilder = new SchemaBuilder($this->schemaIntrospector());
         }
@@ -98,6 +101,7 @@ final class SchemaComponents
      */
     public function schemaInstaller(): SchemaInstaller
     {
+        // Lazily construct installer once and reuse it.
         if ($this->schemaInstaller === null) {
             $this->schemaInstaller = new SchemaInstaller();
         }
@@ -112,6 +116,7 @@ final class SchemaComponents
      */
     public function schemaExtension(): SchemaExtension
     {
+        // Lazily construct extension schema runner once and reuse it.
         if ($this->schemaExtension === null) {
             $this->schemaExtension = new SchemaExtension();
         }
@@ -126,6 +131,7 @@ final class SchemaComponents
      */
     private function schemaIntrospector(): SchemaIntrospector
     {
+        // Lazily construct shared introspector once and reuse it everywhere.
         if ($this->schemaIntrospector === null) {
             $this->schemaIntrospector = new SchemaIntrospector();
         }

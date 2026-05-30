@@ -45,13 +45,16 @@ final class EditorMedia
     {
         /** @var mixed $rawIds */
         $rawIds = $post[$key] ?? [];
+        // Selection ids must arrive as an array payload.
         if (!is_array($rawIds)) {
             return [];
         }
 
         $ids = [];
+        // Parse each candidate id through shared integer sanitizer bounds.
         foreach ($rawIds as $rawId) {
             $parsed = $this->input->int($rawId, 1);
+            // Keep only ids that survived integer sanitization.
             if ($parsed !== null) {
                 $ids[] = $parsed;
             }
@@ -82,14 +85,17 @@ final class EditorMedia
      */
     public function normalizeGalleryImageUpdates(mixed $raw): array
     {
+        // Ignore malformed payloads so gallery update handling stays deterministic.
         if (!is_array($raw)) {
             return [];
         }
 
         $updates = [];
 
+        // Normalize each nested row independently so one bad row does not block valid updates.
         foreach ($raw as $rawImageId => $rawData) {
             $imageId = $this->input->int($rawImageId, 1);
+            // Skip rows that do not map to a valid numeric image id and field map.
             if ($imageId === null || !is_array($rawData)) {
                 continue;
             }
@@ -113,6 +119,7 @@ final class EditorMedia
 
         ksort($updates);
 
+        // Exit early when every row was rejected during normalization.
         if ($updates === []) {
             return [];
         }
@@ -121,6 +128,7 @@ final class EditorMedia
         usort($orderedImageIds, static function (int $a, int $b) use ($updates): int {
             $aSort = (int) ($updates[$a]['sort_order'] ?? 1);
             $bSort = (int) ($updates[$b]['sort_order'] ?? 1);
+            // Primary ordering follows user-provided sort order.
             if ($aSort !== $bSort) {
                 return $aSort <=> $bSort;
             }
@@ -129,8 +137,11 @@ final class EditorMedia
         });
 
         $coverWinner = null;
+        // Preserve exactly one cover flag by keeping the first cover row in final sort order.
         foreach ($orderedImageIds as $imageId) {
+            // Only rows explicitly marked as cover participate in winner selection.
             if (!empty($updates[$imageId]['is_cover'])) {
+                // Keep the first cover candidate and demote any later duplicates.
                 if ($coverWinner === null) {
                     $coverWinner = $imageId;
                 } else {
@@ -169,8 +180,10 @@ final class EditorMedia
         $successCount = 0;
         $errors = [];
 
+        // Process uploads individually so one failed file can be surfaced without aborting the batch.
         foreach ($uploads as $upload) {
             $result = $mediaUpload->uploadForPage($pageId, $upload);
+            // Successful rows increment the counter and skip error collection.
             if ((bool) ($result['ok'] ?? false)) {
                 $successCount++;
                 continue;
@@ -198,7 +211,9 @@ final class EditorMedia
         $deletedCount = 0;
         $failedCount = 0;
 
+        // Track delete successes and failures separately for a complete panel summary message.
         foreach ($imageIds as $imageId) {
+            // Count each delete result instead of stopping on the first failure.
             if ($mediaUpload->deleteImageForPage($pageId, $imageId)) {
                 $deletedCount++;
             } else {
@@ -222,15 +237,18 @@ final class EditorMedia
      */
     private function normalizeNullableFloat(mixed $value, float $min, float $max): ?float
     {
+        // Treat blank strings as an intentional "unset" signal from form inputs.
         if (is_string($value) && trim($value) === '') {
             return null;
         }
 
+        // Reject null and non-numeric values before coercing to float.
         if ($value === null || !is_numeric($value)) {
             return null;
         }
 
         $floatValue = (float) $value;
+        // Enforce the configured inclusive range to prevent invalid focal coordinates.
         if ($floatValue < $min || $floatValue > $max) {
             return null;
         }

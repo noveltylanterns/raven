@@ -48,10 +48,12 @@ final class FormCountries
     public static function list(bool $includeOther = true): array
     {
         $options = self::fromIntlResourceBundle();
+        // Country list depends on ext-intl region data; fail loudly when unavailable.
         if ($options === []) {
             throw new RuntimeException('Country options require ext-intl with ICU region data.');
         }
 
+        // Optional synthetic bucket for users whose location is not listed.
         if ($includeOther) {
             $options['other'] = 'Other';
         }
@@ -66,34 +68,41 @@ final class FormCountries
      */
     private static function fromIntlResourceBundle(): array
     {
+        // ext-intl classes gate ICU-backed country list loading.
         if (!class_exists('ResourceBundle')) {
             return [];
         }
 
         /** @var mixed $bundle */
         $bundle = \ResourceBundle::create('en', 'ICUDATA-region');
+        // Bundle creation can fail when ICU region data is missing.
         if (!$bundle instanceof \ResourceBundle) {
             return [];
         }
 
         /** @var mixed $countries */
         $countries = $bundle->get('Countries');
+        // Countries table must resolve to a traversable ResourceBundle.
         if (!$countries instanceof \ResourceBundle) {
             return [];
         }
 
         $options = [];
+        // Normalize each ICU region row into Raven country option shape.
         foreach ($countries as $rawCode => $rawName) {
             $code = strtoupper(trim((string) $rawCode));
+            // Keep only two-letter alpha country codes.
             if (!preg_match('/^[A-Z]{2}$/', $code)) {
                 continue;
             }
 
+            // Skip pseudo/global aggregate codes.
             if (in_array($code, self::EXCLUDED_REGION_CODES, true)) {
                 continue;
             }
 
             $name = trim((string) $rawName);
+            // Ignore blank display names.
             if ($name === '') {
                 continue;
             }
@@ -101,6 +110,7 @@ final class FormCountries
             $options[strtolower($code)] = $name;
         }
 
+        // Empty option sets signal an unusable ICU source table.
         if ($options === []) {
             return [];
         }

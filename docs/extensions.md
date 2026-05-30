@@ -1,7 +1,5 @@
 # Raven CMS Extensions
 
-***Note: This document was generated with ChatGPT Codex. I have not been able to personally verify every detail within matches the actual script. I do not plan on hammering these `docs/` files down until later releases, so use them with caution!***
-
 This document explains how the Raven extension system works for both human developers and AI agents.
 
 Authoritative extension contract: [private/ext/AGENTS.md](../private/ext/AGENTS.md).
@@ -26,9 +24,9 @@ At minimum, each extension needs:
 
 ## 2) How Extensions Are Loaded
 
-Core panel bootstrap (`panel/index.php`) does this:
+Core runtime bootstrap (`private/Raven.php` + extension runtime services) does this:
 
-1. Reads extension enablement state from `private/dat/ext/.state.php` (with legacy fallback from `private/ext/.state.php` on older installs).
+1. Reads extension enablement state from `private/dat/ext/.state.php`.
 2. Validates extension directory names and manifests.
 3. Builds nav items from extension directory slug and manifest type/name.
 4. Loads optional extension providers (`ext.php`, `schema.php`, route registrars) for enabled, valid extensions.

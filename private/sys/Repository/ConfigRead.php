@@ -3,7 +3,7 @@
 /**
  * RAVEN CMS
  * ~/private/sys/Repository/ConfigRead.php
- * Lightweight config-reading and scalar type-coercion helpers.
+ * Repository-style config-reading and scalar type-coercion helpers.
  * Docs: https://lanterns.io/raven
  */
 
@@ -31,10 +31,12 @@ final class ConfigRead
     public static function segments(string $key): array
     {
         $normalized = trim($key);
+        // Empty keys cannot resolve to a usable config path.
         if ($normalized === '') {
             return [];
         }
 
+        // Reuse cached segment arrays for repeated key lookups.
         if (isset(self::$pathSegmentsCache[$normalized])) {
             return self::$pathSegmentsCache[$normalized];
         }
@@ -71,7 +73,9 @@ final class ConfigRead
     {
         $cursor = $config;
 
+        // Walk each path segment and bail out to default as soon as traversal fails.
         foreach ($segments as $segment) {
+            // Missing segment or non-array cursor means the key path does not resolve.
             if (!is_array($cursor) || !array_key_exists($segment, $cursor)) {
                 return $default;
             }
@@ -91,20 +95,25 @@ final class ConfigRead
      */
     public static function bool(mixed $value, bool $default = false): bool
     {
+        // Preserve booleans exactly as provided.
         if (is_bool($value)) {
             return $value;
         }
 
+        // Numeric values normalize to true for non-zero and false for zero.
         if (is_int($value) || is_float($value)) {
             return ((int) $value) !== 0;
         }
 
+        // String values support common boolean word forms from config/forms.
         if (is_string($value)) {
             $normalized = strtolower(trim($value));
+            // Accept explicit truthy words.
             if (in_array($normalized, ['1', 'true', 'yes', 'on'], true)) {
                 return true;
             }
 
+            // Accept explicit falsy words and empty string.
             if (in_array($normalized, ['0', 'false', 'no', 'off', ''], true)) {
                 return false;
             }
@@ -125,15 +134,18 @@ final class ConfigRead
     public static function int(mixed $value, int $default, ?int $min = null, ?int $max = null): int
     {
         $parsed = $default;
+        // Numeric scalar values are cast directly to integer.
         if (is_int($value) || is_float($value)) {
             $parsed = (int) $value;
         } elseif (is_string($value) && trim($value) !== '' && is_numeric(trim($value))) {
             $parsed = (int) trim($value);
         }
 
+        // Apply optional lower bound after parsing.
         if ($min !== null && $parsed < $min) {
             $parsed = $min;
         }
+        // Apply optional upper bound after parsing.
         if ($max !== null && $parsed > $max) {
             $parsed = $max;
         }
@@ -153,15 +165,18 @@ final class ConfigRead
     public static function float(mixed $value, float $default, ?float $min = null, ?float $max = null): float
     {
         $parsed = $default;
+        // Numeric scalar values are cast directly to float.
         if (is_int($value) || is_float($value)) {
             $parsed = (float) $value;
         } elseif (is_string($value) && trim($value) !== '' && is_numeric(trim($value))) {
             $parsed = (float) trim($value);
         }
 
+        // Apply optional lower bound after parsing.
         if ($min !== null && $parsed < $min) {
             $parsed = $min;
         }
+        // Apply optional upper bound after parsing.
         if ($max !== null && $parsed > $max) {
             $parsed = $max;
         }
@@ -180,7 +195,9 @@ final class ConfigRead
     {
         $cursor = $submitted;
 
+        // Traverse each segment and return empty string as soon as path resolution fails.
         foreach ($segments as $segment) {
+            // Missing segment or non-array cursor means no submitted scalar exists at this path.
             if (!is_array($cursor) || !array_key_exists($segment, $cursor)) {
                 return '';
             }
@@ -188,10 +205,12 @@ final class ConfigRead
             $cursor = $cursor[$segment];
         }
 
+        // Preserve raw submitted strings exactly for caller-side validation.
         if (is_string($cursor)) {
             return $cursor;
         }
 
+        // Coerce scalar primitives to strings for consistent form handling.
         if (is_int($cursor) || is_float($cursor) || is_bool($cursor)) {
             return (string) $cursor;
         }
@@ -224,10 +243,12 @@ final class ConfigRead
      */
     public static function stringifyScalar(mixed $value): string
     {
+        // Encode booleans explicitly as human-readable literals for form round-trips.
         if (is_bool($value)) {
             return $value ? 'true' : 'false';
         }
 
+        // Null maps to empty field value in panel form inputs.
         if ($value === null) {
             return '';
         }

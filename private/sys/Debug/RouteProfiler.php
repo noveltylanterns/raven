@@ -83,6 +83,7 @@ final class RouteProfiler
         $buildUserRouteSegment = $context['build_user_route_segment'] ?? null;
         $slugifyGroupName = $context['slugify_group_name'] ?? null;
 
+        // Route inventory rendering depends on these builder callables being present and executable.
         if (
             !is_callable($buildPageUrl)
             || !is_callable($buildChannelLandingMap)
@@ -129,8 +130,10 @@ final class RouteProfiler
         $pagesForRouting = is_array($context['pages_for_routing'] ?? null) ? $context['pages_for_routing'] : [];
 
         $channelsById = [];
+        // Index channel metadata by id so page rows can inherit effective channel routing options.
         foreach ($channelRoutingOptions as $channelOption) {
             $channelId = (int) ($channelOption['id'] ?? 0);
+            // Ignore placeholder/invalid channel records from mixed option sources.
             if ($channelId > 0) {
                 $channelsById[$channelId] = [
                     'slug' => (string) ($channelOption['slug'] ?? ''),
@@ -140,6 +143,7 @@ final class RouteProfiler
                 ];
             }
         }
+        // Backfill channel routing fields on each page row to simplify downstream URL building.
         foreach ($pagesForRouting as &$pageForRouting) {
             $channelId = (int) ($pageForRouting['channel'] ?? 0);
             $pageForRouting['channel_slug'] = (string) ($channelsById[$channelId]['slug'] ?? '');
@@ -149,10 +153,12 @@ final class RouteProfiler
         }
         unset($pageForRouting);
         $channelLandingMap = $buildChannelLandingMap($pagesForRouting);
+        // Fallback to an empty map when custom builders return an unexpected type.
         if (!is_array($channelLandingMap)) {
             $channelLandingMap = [];
         }
 
+        // Add global RSS route row only when feed feature and RSS route are both configured.
         if ($feedEnabled && $rssFeedRoute !== '') {
             $publicUrl = '/' . $rssFeedRoute;
             $conflictKey = strtolower($publicUrl);
@@ -173,6 +179,7 @@ final class RouteProfiler
             ];
         }
 
+        // Add global Atom route row only when feed feature and Atom route are both configured.
         if ($feedEnabled && $atomFeedRoute !== '') {
             $publicUrl = '/' . $atomFeedRoute;
             $conflictKey = strtolower($publicUrl);
@@ -193,9 +200,11 @@ final class RouteProfiler
             ];
         }
 
+        // Emit one inventory row per channel, including root-channel landing diagnostics.
         foreach ($channelRoutingOptions as $channel) {
             $channelId = (int) ($channel['id'] ?? 0);
             $channelSlug = trim((string) ($channel['slug'] ?? ''));
+            // Skip invalid channel rows that cannot be represented as public routes.
             if ($channelId < 0 || $channelSlug === '') {
                 continue;
             }
@@ -215,6 +224,7 @@ final class RouteProfiler
                     ? ('Root landing resolves using slug "' . $landingSlug . '".')
                     : ('Channel landing resolves using slug "' . $landingSlug . '".'))
                 : 'No published channel landing page found (requires slug home or index).';
+            // Reserved prefixes are intentionally blocked from public routing to protect system endpoints.
             if (!$isRootChannel && in_array($channelSlug, $reservedPrefixes, true)) {
                 $notes = 'Reserved prefix; this channel route is not publicly reachable.';
             }
@@ -237,12 +247,14 @@ final class RouteProfiler
                 '_conflict_key' => $conflictKey,
             ];
 
+            // Channel-specific feeds only exist for non-root channels with feed support enabled.
             if (!$feedEnabled || $isRootChannel || !(bool) ($channel['feed_enabled'] ?? false)) {
                 continue;
             }
 
             $channelLabel = trim((string) ($channel['name'] ?? '')) !== '' ? (string) $channel['name'] : $channelSlug;
 
+            // Add channel-scoped RSS endpoint when RSS route prefix is configured.
             if ($rssFeedRoute !== '') {
                 $feedUrl = '/' . $rssFeedRoute . '/' . $channelSlug;
                 $feedConflictKey = strtolower($feedUrl);
@@ -263,6 +275,7 @@ final class RouteProfiler
                 ];
             }
 
+            // Add channel-scoped Atom endpoint when Atom route prefix is configured.
             if ($atomFeedRoute !== '') {
                 $feedUrl = '/' . $atomFeedRoute . '/' . $channelSlug;
                 $feedConflictKey = strtolower($feedUrl);
@@ -284,9 +297,11 @@ final class RouteProfiler
             }
         }
 
+        // Build page rows from effective route fields precomputed above.
         foreach ($pagesForRouting as $page) {
             $pageId = (int) ($page['id'] ?? 0);
             $pageSlug = trim((string) ($page['slug'] ?? ''));
+            // Skip draft scaffolding rows that do not have a valid route identity yet.
             if ($pageId <= 0 || $pageSlug === '') {
                 continue;
             }
@@ -305,6 +320,7 @@ final class RouteProfiler
             $statusLabel = $statusKey === 'published' ? 'Published' : 'Draft';
             $notes = '';
 
+            // Flag page routes that collide with reserved root/channel prefixes.
             if ($channelSlug === '' && in_array($pageSlug, $reservedPrefixes, true)) {
                 $notes = 'Reserved prefix; this root-level page route is not publicly reachable.';
             } elseif ($channelSlug !== '' && in_array($channelSlug, $reservedPrefixes, true)) {
@@ -329,10 +345,13 @@ final class RouteProfiler
             ];
         }
 
+        // Category route inventory is optional and only listed when category URLs are enabled.
         if ($categoryRoutesEnabled) {
+            // Emit one route row per category with a valid id/slug pair.
             foreach ($categoryRoutingOptions as $category) {
                 $categoryId = (int) ($category['id'] ?? 0);
                 $categorySlug = trim((string) ($category['slug'] ?? ''));
+                // Ignore malformed category rows that cannot map to a public URL.
                 if ($categoryId <= 0 || $categorySlug === '') {
                     continue;
                 }
@@ -359,10 +378,13 @@ final class RouteProfiler
             }
         }
 
+        // Tag route inventory is optional and only listed when tag URLs are enabled.
         if ($tagRoutesEnabled) {
+            // Emit one route row per tag with a valid id/slug pair.
             foreach ($tagRoutingOptions as $tag) {
                 $tagId = (int) ($tag['id'] ?? 0);
                 $tagSlug = trim((string) ($tag['slug'] ?? ''));
+                // Ignore malformed tag rows that cannot map to a public URL.
                 if ($tagId <= 0 || $tagSlug === '') {
                     continue;
                 }
@@ -387,27 +409,34 @@ final class RouteProfiler
             }
         }
 
+        // Group route inventory is optional and only listed when group profile URLs are enabled.
         if ($groupRoutingEnabled) {
+            // Emit route rows only for user-visible groups with route exposure enabled.
             foreach ($routingGroups as $group) {
                 $groupId = (int) ($group['id'] ?? 0);
                 $groupName = trim((string) ($group['name'] ?? ''));
+                // Skip incomplete group rows that cannot produce a stable route.
                 if ($groupId <= 0 || $groupName === '') {
                     continue;
                 }
                 $groupRoleSlug = strtolower(trim((string) ($group['slug'] ?? '')));
+                // Internal system groups do not expose public group profile routes.
                 if (in_array($groupRoleSlug, ['guest', 'validating', 'banned'], true)) {
                     continue;
                 }
 
                 $routeEnabled = (int) ($group['route'] ?? 0) === 1;
+                // Keep inventory aligned with explicit per-group route toggle.
                 if (!$routeEnabled) {
                     continue;
                 }
 
                 $groupSlug = $this->input->slug((string) ($group['slug'] ?? ''));
+                // Fall back to deterministic slugification when stored slug is missing/invalid.
                 if ($groupSlug === null || $groupSlug === '') {
                     $groupSlug = (string) $slugifyGroupName($groupName);
                 }
+                // Skip groups whose names still cannot be converted into route-safe slugs.
                 if ($groupSlug === '') {
                     continue;
                 }
@@ -435,10 +464,13 @@ final class RouteProfiler
             }
         }
 
+        // User profile route inventory is optional and only listed when profile URLs are enabled.
         if ($userRoutingEnabled) {
+            // Emit one route row per routable user account.
             foreach ($routingUsers as $user) {
                 $userId = (int) ($user['id'] ?? 0);
                 $routeSegment = $buildUserRouteSegment($user);
+                // Require both a valid user id and a non-empty route segment from the resolver.
                 if ($userId <= 0 || !is_string($routeSegment) || $routeSegment === '') {
                     continue;
                 }
@@ -448,17 +480,20 @@ final class RouteProfiler
                 $pathUsage[$conflictKey] = (int) ($pathUsage[$conflictKey] ?? 0) + 1;
 
                 $sourceLabel = trim((string) ($user['username'] ?? ''));
+                // Keep source labels readable even when usernames are missing.
                 if ($sourceLabel === '') {
                     $sourceLabel = 'User #' . $userId;
                 }
 
                 $groupStatusLabel = trim((string) ($user['groups_text'] ?? ''));
+                // Use explicit fallback label for users without group membership text.
                 if ($groupStatusLabel === '') {
                     $groupStatusLabel = 'No Groups';
                 }
 
                 $statusKey = 'groups_' . strtolower(preg_replace('/[^a-z0-9]+/i', '-', $groupStatusLabel) ?? 'none');
                 $statusKey = trim($statusKey, '-');
+                // Ensure status keys always have a deterministic non-empty fallback value.
                 if ($statusKey === '') {
                     $statusKey = 'groups_none';
                 }
@@ -479,9 +514,11 @@ final class RouteProfiler
             }
         }
 
+        // Redirect rows are always included because they can conflict with any route namespace.
         foreach ($redirectRoutingRows as $redirect) {
             $redirectId = (int) ($redirect['id'] ?? 0);
             $redirectSlug = trim((string) ($redirect['slug'] ?? ''));
+            // Skip incomplete redirect records that cannot resolve to a concrete path.
             if ($redirectId <= 0 || $redirectSlug === '') {
                 continue;
             }
@@ -495,6 +532,7 @@ final class RouteProfiler
             $statusLabel = $statusKey === 'active' ? 'Active' : 'Inactive';
             $notes = '';
 
+            // Flag redirect paths shadowed by reserved root/channel prefixes.
             if ($channelSlug === '' && in_array($redirectSlug, $reservedPrefixes, true)) {
                 $notes = 'Reserved prefix; this root-level redirect route is not publicly reachable.';
             } elseif ($channelSlug !== '' && in_array($channelSlug, $reservedPrefixes, true)) {
@@ -522,11 +560,13 @@ final class RouteProfiler
         // Second pass: mark any path that appears more than once as a conflict.
         foreach ($rows as $index => $row) {
             $conflictKey = (string) ($row['_conflict_key'] ?? '');
+            // Rows without a conflict key are temporary/malformed and cannot participate in conflict checks.
             if ($conflictKey === '') {
                 continue;
             }
 
             $usageCount = (int) ($pathUsage[$conflictKey] ?? 0);
+            // Clear temporary key when path is unique and no conflict metadata is needed.
             if ($usageCount <= 1) {
                 unset($rows[$index]['_conflict_key']);
                 continue;
@@ -541,11 +581,13 @@ final class RouteProfiler
 
         usort($rows, static function (array $a, array $b): int {
             $pathCompare = strcasecmp((string) ($a['public_url'] ?? ''), (string) ($b['public_url'] ?? ''));
+            // Primary sort groups inventory rows by public path for visual diffability.
             if ($pathCompare !== 0) {
                 return $pathCompare;
             }
 
             $typeCompare = strcasecmp((string) ($a['type_label'] ?? ''), (string) ($b['type_label'] ?? ''));
+            // Secondary sort keeps like route types grouped within identical paths.
             if ($typeCompare !== 0) {
                 return $typeCompare;
             }
@@ -570,13 +612,16 @@ final class RouteProfiler
         $bestPriority = PHP_INT_MAX;
         $bestPublishedTs = -1;
 
+        // Scan root-channel pages and keep the best landing candidate by priority/date.
         foreach ($pagesForRouting as $page) {
             $channelId = (int) ($page['channel'] ?? 0);
             $channelSlug = trim((string) ($page['channel_slug'] ?? ''));
+            // Skip non-root channels; only root pages are candidates for root landing resolution.
             if ($channelId !== ChannelShared::ROOT_CHANNEL_ID && $channelSlug !== '') {
                 continue;
             }
 
+            // Only published pages can serve as runtime landing routes.
             if (($page['status'] ?? '') !== 'published') {
                 continue;
             }
@@ -587,16 +632,19 @@ final class RouteProfiler
                 'index' => 1,
                 default => null,
             };
+            // Only home/index slugs participate in root landing selection.
             if ($priority === null) {
                 continue;
             }
 
             $publishedAt = trim((string) ($page['created'] ?? ''));
             $publishedTs = $publishedAt !== '' ? (int) strtotime($publishedAt) : 0;
+            // Normalize invalid timestamps to zero so comparisons remain deterministic.
             if ($publishedTs < 0) {
                 $publishedTs = 0;
             }
 
+            // Prefer higher-priority slug, then newest publish time within same priority bucket.
             if (
                 $bestSlug === ''
                 || $priority < $bestPriority

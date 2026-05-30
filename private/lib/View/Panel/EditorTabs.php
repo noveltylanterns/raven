@@ -47,6 +47,7 @@ final class EditorTabs
     public function normalizeEditorTab(mixed $value, array $allowed, string $default): string
     {
         $tab = strtolower($this->input->text(is_string($value) ? $value : null, 40));
+        // Fallback to default when the request tab is empty or outside the allow-list.
         if ($tab === '' || !in_array($tab, $allowed, true)) {
             return $default;
         }
@@ -78,6 +79,7 @@ final class EditorTabs
     ): string {
         $path = $basePath . ($id !== null ? '/' . $id : '');
         $suffix = $tab === $defaultTab ? $path : $path . '?tab=' . rawurlencode($tab);
+        // Hash fragments are optional and only appended for in-page anchor navigation.
         if ($fragment !== '') {
             $suffix .= '#' . $fragment;
         }

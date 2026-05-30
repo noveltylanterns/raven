@@ -34,10 +34,13 @@ final class EditorPermissions
             ['bit' => PermissionBase::PANEL_LOGIN, 'label' => 'Access Dashboard', 'section' => 'panel', 'group' => 'Panel', 'action' => 'login'],
         ];
 
+        // Expand stock route definitions into per-action permission rows for the panel UI.
         foreach (PermissionBase::stockPanelRoutePermissions() as $routeKey => $routeDefinition) {
             $groupLabel = (string) ($routeDefinition['label'] ?? ucfirst((string) $routeKey));
+            // Enumerate known CRUD-like actions in a stable display order.
             foreach (['view', 'create', 'edit', 'delete', 'uninstall'] as $action) {
                 $bit = (int) ($routeDefinition[$action] ?? 0);
+                // Skip undefined actions that do not expose a positive permission bit.
                 if ($bit <= 0) {
                     continue;
                 }
@@ -52,15 +55,19 @@ final class EditorPermissions
             }
         }
 
+        // Append extension-declared permission levels after stock core permissions.
         foreach ($this->extensionPermissionMap($extensionPermissionMapProvider) as $directory => $meta) {
             $extensionLabel = trim((string) ($meta['name'] ?? $directory));
             $levels = is_array($meta['levels'] ?? null) ? $meta['levels'] : [];
+            // Flatten extension level records into the shared row shape.
             foreach ($levels as $level) {
+                // Ignore malformed level entries that are not structured arrays.
                 if (!is_array($level)) {
                     continue;
                 }
 
                 $bit = (int) ($level['bit'] ?? 0);
+                // Permission bits must be positive integers to participate in the bitmask.
                 if ($bit <= 0) {
                     continue;
                 }
@@ -90,9 +97,12 @@ final class EditorPermissions
     {
         $mask = 0;
 
+        // OR every extension permission bit into one aggregate mask.
         foreach ($this->extensionPermissionMap($extensionPermissionMapProvider) as $meta) {
             $levels = is_array($meta['levels'] ?? null) ? $meta['levels'] : [];
+            // Iterate every declared level to collect its bit into the aggregate mask.
             foreach ($levels as $level) {
+                // Malformed level items are ignored to keep aggregation defensive.
                 if (!is_array($level)) {
                     continue;
                 }
@@ -112,6 +122,7 @@ final class EditorPermissions
      */
     private function extensionPermissionMap(callable $extensionPermissionMapProvider): array
     {
+        // Protect group-edit UI from extension provider exceptions.
         try {
             $permissionMap = $extensionPermissionMapProvider();
         } catch (\Throwable) {

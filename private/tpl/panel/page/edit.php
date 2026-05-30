@@ -3,7 +3,7 @@
 /**
  * RAVEN CMS
  * ~/private/tpl/panel/page/edit.php
- * Admin panel page editor with content/meta/media tabs.
+ * Admin panel page editor template with content/meta/media tabs.
  * Docs: https://lanterns.io/raven
  */
 

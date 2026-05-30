@@ -89,6 +89,7 @@ final class Taxonomy
             'redirect_rows' => [],
         ];
 
+        // Skip redirect query work entirely when caller does not need redirect inventory rows.
         if (!$includeRedirects) {
             return $result;
         }
@@ -100,9 +101,11 @@ final class Taxonomy
              ORDER BY id ASC'
         );
         $stmt->execute();
+        // Normalize each redirect row and attach resolved channel context.
         foreach ($stmt->fetchAll() ?: [] as $row) {
             $redirectId = (int) ($row['id'] ?? 0);
             $redirectSlug = trim((string) ($row['slug'] ?? ''));
+            // Skip rows lacking a valid id or slug.
             if ($redirectId < 1 || $redirectSlug === '') {
                 continue;
             }
@@ -150,6 +153,7 @@ final class Taxonomy
             'category_options_selected' => [],
             'tag_options_selected' => [],
         ];
+        // Return early when caller requested only channel options.
         if (!$includeCategories && !$includeTags) {
             return $result;
         }
@@ -157,6 +161,7 @@ final class Taxonomy
         $normalizedPageId = max(0, $pageId);
         $unionSelects = [];
         $params = [];
+        // Include category options and assignment flags when requested.
         if ($includeCategories) {
             $unionSelects[] =
                 'SELECT
@@ -173,6 +178,7 @@ final class Taxonomy
             $params[] = $normalizedPageId;
         }
 
+        // Include tag options and assignment flags when requested.
         if ($includeTags) {
             $unionSelects[] =
                 'SELECT
@@ -198,10 +204,12 @@ final class Taxonomy
         );
         $stmt->execute($params);
 
+        // Split combined union rows into category/tag all+selected buckets.
         foreach ($stmt->fetchAll() ?: [] as $row) {
             $optionType = strtolower(trim((string) ($row['option_type'] ?? '')));
             $id = (int) ($row['id'] ?? 0);
             $slug = (string) ($row['slug'] ?? '');
+            // Skip malformed taxonomy rows that cannot produce a valid option entry.
             if ($id <= 0 || $slug === '') {
                 continue;
             }
@@ -214,16 +222,20 @@ final class Taxonomy
             ];
             $isAssigned = (int) ($row['is_assigned'] ?? 0) === 1;
 
+            // Route category rows into category option collections.
             if ($optionType === 'category') {
                 $result['category_options_all'][] = $entry;
+                // Mirror assigned categories into selected collection.
                 if ($isAssigned) {
                     $result['category_options_selected'][] = $entry;
                 }
                 continue;
             }
 
+            // Route tag rows into tag option collections.
             if ($optionType === 'tag') {
                 $result['tag_options_all'][] = $entry;
+                // Mirror assigned tags into selected collection.
                 if ($isAssigned) {
                     $result['tag_options_selected'][] = $entry;
                 }
@@ -249,9 +261,11 @@ final class Taxonomy
 
         $rows = $stmt->fetchAll() ?: [];
         $result = [];
+        // Normalize each category row into lightweight routing option shape.
         foreach ($rows as $row) {
             $id = (int) ($row['id'] ?? 0);
             $slug = trim((string) ($row['slug'] ?? ''));
+            // Skip rows with unusable id or slug values.
             if ($id < 1 || $slug === '') {
                 continue;
             }
@@ -277,9 +291,11 @@ final class Taxonomy
 
         $rows = $stmt->fetchAll() ?: [];
         $result = [];
+        // Normalize each tag row into lightweight routing option shape.
         foreach ($rows as $row) {
             $id = (int) ($row['id'] ?? 0);
             $slug = trim((string) ($row['slug'] ?? ''));
+            // Skip rows with unusable id or slug values.
             if ($id < 1 || $slug === '') {
                 continue;
             }

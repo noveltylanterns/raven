@@ -68,6 +68,7 @@ final class ThemeController
     public function themes(): void
     {
         $this->context->requirePanelLogin();
+        // Theme manager view is permission-gated.
         if (!$this->context->requireRoutePermissionOrForbidden('themes', 'view')) {
             return;
         }
@@ -97,27 +98,32 @@ final class ThemeController
     public function themesEnable(array $post): void
     {
         $this->context->requirePanelLogin();
+        // Theme activation requires edit permission.
         if (!$this->context->requireRoutePermissionOrForbidden('themes', 'edit')) {
             return;
         }
 
+        // CSRF validation protects theme activation changes.
         if (!$this->context->csrf()->validate($post['_csrf'] ?? null)) {
             $this->context->flash('error', 'Invalid CSRF token.');
             Redirect::redirect($this->context->panelUrl('/themes'));
         }
 
         $themeSlug = strtolower(trim((string) $this->input->text($post['theme'] ?? null, 80)));
+        // Theme slug must be filesystem-safe.
         if (!$this->themeCatalog->isSafeSlug($themeSlug)) {
             $this->context->flash('error', 'Invalid theme identifier.');
             Redirect::redirect($this->context->panelUrl('/themes'));
         }
 
         $availableThemes = $this->themeCatalog->options();
+        // Activation target must exist among discovered theme options.
         if (!isset($availableThemes[$themeSlug])) {
             $this->context->flash('error', 'Theme "' . $themeSlug . '" is not available.');
             Redirect::redirect($this->context->panelUrl('/themes'));
         }
 
+        // Persisting config can fail due to IO/validation errors.
         try {
             ConfigWrite::persistValue($this->config->path(), $this->config->all(), 'site.theme', $themeSlug);
             $this->config = new Config($this->config->path());
@@ -139,34 +145,40 @@ final class ThemeController
     public function themesCreate(array $post): void
     {
         $this->context->requirePanelLogin();
+        // Theme scaffold creation requires create permission.
         if (!$this->context->requireRoutePermissionOrForbidden('themes', 'create')) {
             return;
         }
 
+        // CSRF validation protects theme scaffold generation.
         if (!$this->context->csrf()->validate($post['_csrf'] ?? null)) {
             $this->context->flash('error', 'Invalid CSRF token.');
             Redirect::redirect($this->context->panelUrl('/themes'));
         }
 
         $themeName = trim((string) $this->input->text($post['name'] ?? null, 120));
+        // Human-readable theme name is required for manifest metadata.
         if ($themeName === '') {
             $this->context->flash('error', 'Theme name is required.');
             Redirect::redirect($this->context->panelUrl('/themes'));
         }
 
         $themeSlug = strtolower(trim((string) $this->input->text($post['slug'] ?? null, 80)));
+        // New theme slug must be filesystem-safe.
         if (!$this->themeCatalog->isSafeSlug($themeSlug)) {
             $this->context->flash('error', 'Theme slug must use lowercase letters, numbers, underscores, or dashes.');
             Redirect::redirect($this->context->panelUrl('/themes'));
         }
 
         $parentTheme = strtolower(trim((string) $this->input->text($post['parent_theme'] ?? null, 80)));
+        // Optional parent slug must also be filesystem-safe.
         if ($parentTheme !== '' && !$this->themeCatalog->isSafeSlug($parentTheme)) {
             $this->context->flash('error', 'Parent theme slug is invalid.');
             Redirect::redirect($this->context->panelUrl('/themes'));
         }
 
         $cloneTheme = strtolower(trim((string) $this->input->text($post['clone_theme'] ?? null, 80)));
+        // Optional clone-source slug must also be filesystem-safe.
         if ($cloneTheme !== '' && !$this->themeCatalog->isSafeSlug($cloneTheme)) {
             $this->context->flash('error', 'Clone-source theme slug is invalid.');
             Redirect::redirect($this->context->panelUrl('/themes'));
@@ -175,14 +187,17 @@ final class ThemeController
         $themesRoot = $this->themeCatalog->root();
         $themeOptions = ThemeDiscovery::options($themesRoot);
         $themeManifests = ThemeDiscovery::manifests($themesRoot);
+        // Parent theme must exist among discovered options.
         if ($parentTheme !== '' && !isset($themeOptions[$parentTheme])) {
             $this->context->flash('error', 'Selected parent theme was not found.');
             Redirect::redirect($this->context->panelUrl('/themes'));
         }
+        // Clone-source theme must exist among discovered options.
         if ($cloneTheme !== '' && !isset($themeOptions[$cloneTheme])) {
             $this->context->flash('error', 'Selected clone-source theme was not found.');
             Redirect::redirect($this->context->panelUrl('/themes'));
         }
+        // Child theme cannot declare itself as parent.
         if ($parentTheme === $themeSlug) {
             $this->context->flash('error', 'A child theme cannot use itself as parent.');
             Redirect::redirect($this->context->panelUrl('/themes'));
@@ -193,6 +208,7 @@ final class ThemeController
         $generatePackageFile = isset($post['generate_package']) && (string) $post['generate_package'] === '1';
         $setActive = isset($post['set_active']) && (string) $post['set_active'] === '1';
         $themePath = $themesRoot . '/' . $themeSlug;
+        // Refuse creation when target theme directory already exists.
         if (file_exists($themePath)) {
             $this->context->flash('error', 'A theme directory with this slug already exists.');
             Redirect::redirect($this->context->panelUrl('/themes'));
@@ -200,10 +216,13 @@ final class ThemeController
 
         $isChildTheme = $parentTheme !== '';
         $resolvedParentTheme = $parentTheme;
+        // Infer parent metadata when cloning an existing child theme into standalone form.
         if ($cloneTheme !== '' && !$isChildTheme) {
             $cloneManifest = $themeManifests[$cloneTheme] ?? null;
+            // Clone manifests can mark child themes and declare their parent slug.
             if (is_array($cloneManifest) && !empty($cloneManifest['is_child_theme'])) {
                 $cloneParent = strtolower(trim((string) ($cloneManifest['parent_theme'] ?? '')));
+                // Preserve clone parent when it exists and does not self-reference new slug.
                 if ($cloneParent !== '' && $cloneParent !== $themeSlug && isset($themeOptions[$cloneParent])) {
                     $isChildTheme = true;
                     $resolvedParentTheme = $cloneParent;
@@ -211,6 +230,7 @@ final class ThemeController
             }
         }
 
+        // Scaffold/copy operations can fail due to filesystem or manifest writes.
         try {
             if ($cloneTheme !== '') {
                 $clonePath = $themesRoot . '/' . $cloneTheme;
@@ -247,7 +267,9 @@ final class ThemeController
             Redirect::redirect($this->context->panelUrl('/themes'));
         }
 
+        // Optionally activate newly created theme immediately after scaffold creation.
         if ($setActive) {
+            // Activation persistence can fail independently of scaffold creation.
             try {
                 ConfigWrite::persistValue($this->config->path(), $this->config->all(), 'site.theme', $themeSlug);
                 $this->config = new Config($this->config->path());
@@ -259,20 +281,25 @@ final class ThemeController
         }
 
         $message = 'Theme scaffold created at public/theme/' . $themeSlug . '/';
+        // Include clone-source context when scaffold was copied from existing theme.
         if ($cloneTheme !== '') {
             $message .= ' (cloned from "' . $cloneTheme . '")';
         }
         $message .= $setActive ? ' and activated.' : '.';
+        // Mention optional generated support files when requested.
         if ($generateAgentsFile || $generateComposerFile || $generatePackageFile) {
             $generated = [];
+            // Agent helper files and symlinks are optional.
             if ($generateAgentsFile) {
                 $generated[] = 'agents';
                 $generated[] = 'AGENTS.md -> agents';
                 $generated[] = 'CLAUDE.md -> agents';
             }
+            // Composer metadata file is optional.
             if ($generateComposerFile) {
                 $generated[] = 'composer.json';
             }
+            // Package metadata file is optional.
             if ($generatePackageFile) {
                 $generated[] = 'package.json';
             }
@@ -293,10 +320,12 @@ final class ThemeController
     public function themesUpload(array $post, array $files): void
     {
         $this->context->requirePanelLogin();
+        // Theme upload/install requires create permission.
         if (!$this->context->requireRoutePermissionOrForbidden('themes', 'create')) {
             return;
         }
 
+        // CSRF validation protects theme upload/install actions.
         if (!$this->context->csrf()->validate($post['_csrf'] ?? null)) {
             $this->context->flash('error', 'Invalid CSRF token.');
             Redirect::redirect($this->context->panelUrl('/themes'));
@@ -307,6 +336,7 @@ final class ThemeController
             'Theme archive',
             'Themes'
         );
+        // Upload validator enforces archive shape/type/size.
         if (!(bool) ($upload['ok'] ?? false)) {
             $this->context->flash('error', (string) ($upload['error'] ?? 'Theme upload failed.'));
             Redirect::redirect($this->context->panelUrl('/themes'));
@@ -327,8 +357,10 @@ final class ThemeController
             'Theme',
             'Theme slug must use lowercase letters, numbers, underscores, or dashes.'
         );
+        // Slug resolution may fail due conflicts/invalid metadata.
         if (!(bool) ($slugResult['ok'] ?? false)) {
             $slugError = (string) ($slugResult['error'] ?? 'Failed to resolve theme slug.');
+            // Provide manifest-specific guidance when no slug can be inferred.
             if (
                 trim((string) ($post['upload_slug'] ?? '')) === ''
                 && $derivedThemeSlug === null
@@ -343,12 +375,14 @@ final class ThemeController
         $themeSlug = (string) ($slugResult['name'] ?? '');
 
         $themesRoot = $this->themeCatalog->root();
+        // Ensure public/theme root exists before extraction.
         if (!is_dir($themesRoot) && !mkdir($themesRoot, 0775, true) && !is_dir($themesRoot)) {
             $this->context->flash('error', 'Failed to initialize public/theme directory.');
             Redirect::redirect($this->context->panelUrl('/themes'));
         }
 
         $targetDirectory = $themesRoot . '/' . $themeSlug;
+        // Create target install directory atomically.
         if (!mkdir($targetDirectory, 0775, true) && !is_dir($targetDirectory)) {
             $this->context->flash('error', 'Failed to create theme directory.');
             Redirect::redirect($this->context->panelUrl('/themes'));
@@ -362,12 +396,14 @@ final class ThemeController
             },
             'theme'
         );
+        // Extraction errors include malformed archives and filesystem issues.
         if (is_string($extractError)) {
             $this->context->flash('error', $extractError);
             Redirect::redirect($this->context->panelUrl('/themes'));
         }
 
         $flattenError = $this->packageInstaller()->flattenRoot($targetDirectory);
+        // Flatten nested root folders so theme files live at install root.
         if (is_string($flattenError)) {
             $this->directoryTree()->removeTree($targetDirectory);
             $this->context->flash('error', $flattenError);
@@ -375,6 +411,7 @@ final class ThemeController
         }
 
         $manifestPath = $targetDirectory . '/theme.json';
+        // theme.json is required at root for discovery/validation.
         if (!is_file($manifestPath)) {
             $this->directoryTree()->removeTree($targetDirectory);
             $this->context->flash('error', 'Theme upload failed: archive must include theme.json at archive root.');
@@ -382,6 +419,7 @@ final class ThemeController
         }
 
         $manifests = ThemeDiscovery::manifests($themesRoot);
+        // Uploaded theme must parse as a valid discovered manifest row.
         if (!isset($manifests[$themeSlug])) {
             $this->directoryTree()->removeTree($targetDirectory);
             $this->context->flash('error', 'Theme upload failed: theme.json is missing required/valid metadata.');
@@ -389,6 +427,7 @@ final class ThemeController
         }
 
         $message = 'Theme uploaded to public/theme/' . $themeSlug . '/. Enable it from the Installed Themes list when ready.';
+        // Tell operators when slug was auto-renamed to avoid conflicts.
         if ((bool) ($slugResult['renamed'] ?? false)) {
             $message .= ' Existing slug detected; upload was renamed automatically.';
         }
@@ -406,17 +445,20 @@ final class ThemeController
     public function themesExport(array $query): void
     {
         $this->context->requirePanelLogin();
+        // Theme export shares the same view permission as theme manager.
         if (!$this->context->requireRoutePermissionOrForbidden('themes', 'view')) {
             return;
         }
 
         $themeSlug = strtolower(trim((string) $this->input->text($query['theme'] ?? null, 80)));
+        // Export target slug must be filesystem-safe.
         if (!$this->themeCatalog->isSafeSlug($themeSlug)) {
             $this->context->flash('error', 'Invalid theme identifier.');
             Redirect::redirect($this->context->panelUrl('/themes'));
         }
 
         $themePath = $this->themeCatalog->root() . '/' . $themeSlug;
+        // Export only installed themes present on disk.
         if (!is_dir($themePath)) {
             $this->context->flash('error', 'Theme directory was not found on disk.');
             Redirect::redirect($this->context->panelUrl('/themes'));
@@ -424,6 +466,7 @@ final class ThemeController
 
         $format = strtolower(trim((string) $this->input->text($query['format'] ?? 'zip', 20)));
 
+        // Archive generation can fail on format or filesystem errors.
         try {
             $archive = $this->archivePackages()->exportDir($themePath, $themeSlug, $format);
         } catch (\RuntimeException $exception) {
@@ -448,38 +491,45 @@ final class ThemeController
     public function themesUninstall(array $post): void
     {
         $this->context->requirePanelLogin();
+        // Theme uninstall requires dedicated uninstall permission.
         if (!$this->context->requireRoutePermissionOrForbidden('themes', 'uninstall')) {
             return;
         }
 
+        // CSRF validation protects theme uninstall actions.
         if (!$this->context->csrf()->validate($post['_csrf'] ?? null)) {
             $this->context->flash('error', 'Invalid CSRF token.');
             Redirect::redirect($this->context->panelUrl('/themes'));
         }
 
         $themeSlug = strtolower(trim((string) $this->input->text($post['theme'] ?? null, 80)));
+        // Uninstall target slug must be filesystem-safe.
         if (!$this->themeCatalog->isSafeSlug($themeSlug)) {
             $this->context->flash('error', 'Invalid theme identifier.');
             Redirect::redirect($this->context->panelUrl('/themes'));
         }
 
+        // Bundled stock themes are protected from uninstall.
         if ($this->themeCatalog->isStockSlug($themeSlug)) {
             $this->context->flash('error', 'Stock themes cannot be uninstalled.');
             Redirect::redirect($this->context->panelUrl('/themes'));
         }
 
         $themePath = $this->themeCatalog->root() . '/' . $themeSlug;
+        // Uninstall target must exist on disk.
         if (!is_dir($themePath)) {
             $this->context->flash('error', 'Theme directory was not found on disk.');
             Redirect::redirect($this->context->panelUrl('/themes'));
         }
 
+        // Prevent removal of currently active public theme.
         if ($this->themeCatalog->activeSlugFromConfig($this->config) === $themeSlug) {
             $this->context->flash('error', 'Active theme cannot be uninstalled. Enable another theme first.');
             Redirect::redirect($this->context->panelUrl('/themes'));
         }
 
         $this->directoryTree()->removeTree($themePath);
+        // Verify deletion because recursive remove can partially fail.
         if (is_dir($themePath)) {
             $this->context->flash('error', 'Failed to uninstall theme directory from disk.');
             Redirect::redirect($this->context->panelUrl('/themes'));
@@ -494,6 +544,7 @@ final class ThemeController
      */
     private function archivePackages(): ArchivePackage
     {
+        // Lazily initialize archive helper for upload/export operations only.
         if (!$this->archivePackages instanceof ArchivePackage) {
             $this->archivePackages = new ArchivePackage($this->root);
         }
@@ -506,6 +557,7 @@ final class ThemeController
      */
     private function themeGenerator(): ThemeGenerator
     {
+        // Lazily initialize theme scaffold generator for create/clone operations.
         if (!$this->themeGenerator instanceof ThemeGenerator) {
             $this->themeGenerator = new ThemeGenerator();
         }
@@ -518,6 +570,7 @@ final class ThemeController
      */
     private function packageInstaller(): ArchiveInstall
     {
+        // Lazily initialize installer workflow for archive upload actions.
         if (!$this->packageInstaller instanceof ArchiveInstall) {
             $this->packageInstaller = new ArchiveInstall(
                 $this->input,
@@ -534,6 +587,7 @@ final class ThemeController
      */
     private function directoryTree(): ArchiveDelete
     {
+        // Lazily initialize recursive delete helper for uninstall/rollback flows.
         if (!$this->directoryTree instanceof ArchiveDelete) {
             $this->directoryTree = new ArchiveDelete();
         }

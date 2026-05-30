@@ -3,7 +3,7 @@
 /**
  * RAVEN CMS
  * ~/private/ext/repo/tpl/panel_edit.php
- * Repositories extension per-repo settings editor.
+ * Repositories extension per-repo settings editor template.
  * Docs: https://lanterns.io/raven
  */
 

@@ -171,18 +171,22 @@ class MediaRead
         $stmt->execute([':page' => $pageId]);
         $rows = $stmt->fetchAll() ?: [];
 
+        // No rows means page has no indexed images.
         if ($rows === []) {
             return [];
         }
 
         $imagesById = [];
         $orderedImageIds = [];
+        // Merge denormalized row set into one image map with nested variant rows.
         foreach ($rows as $row) {
             $imageId = (int) $row['id'];
+            // Skip malformed rows lacking a valid image id.
             if ($imageId < 1) {
                 continue;
             }
 
+            // Initialize base image payload once per image id.
             if (!isset($imagesById[$imageId])) {
                 $storedPath = (string) ($row['image_stored_path'] ?? '');
                 $imagesById[$imageId] = [
@@ -218,6 +222,7 @@ class MediaRead
             }
 
             $variantKey = trim((string) ($row['variant_key'] ?? ''));
+            // Rows without variant key only contribute base image metadata.
             if ($variantKey === '') {
                 continue;
             }
@@ -237,7 +242,9 @@ class MediaRead
         }
 
         $result = [];
+        // Preserve original image ordering captured during row merge.
         foreach ($orderedImageIds as $imageId) {
+            // Guard against sparse ordering map after malformed-row filtering.
             if (isset($imagesById[$imageId])) {
                 $result[] = $imagesById[$imageId];
             }
@@ -260,10 +267,13 @@ class MediaRead
         $images = $this->listForPage($pageId);
         $ready = [];
 
+        // Keep only display-ready images and optional gallery-enabled items.
         foreach ($images as $image) {
+            // Gallery excludes non-ready processing states.
             if ((string) ($image['status'] ?? '') !== 'ready') {
                 continue;
             }
+            // Explicit gallery opt-out excludes otherwise ready images.
             if (array_key_exists('include_in_gallery', $image) && !$image['include_in_gallery']) {
                 continue;
             }
@@ -276,12 +286,14 @@ class MediaRead
             $aCover = !empty($a['is_cover']) ? 1 : 0;
             $bCover = !empty($b['is_cover']) ? 1 : 0;
 
+            // Prioritize cover image before all non-cover images.
             if ($aCover !== $bCover) {
                 return $aCover > $bCover ? -1 : 1;
             }
 
             $aSort = (int) ($a['sort_order'] ?? 0);
             $bSort = (int) ($b['sort_order'] ?? 0);
+            // Secondary ordering respects explicit per-image sort values.
             if ($aSort !== $bSort) {
                 return $aSort <=> $bSort;
             }
@@ -305,14 +317,18 @@ class MediaRead
     public function coverLargeVariantUrlForPage(int $pageId): ?string
     {
         $images = $this->listForPage($pageId);
+        // Fast-exit when page has no images.
         if ($images === []) {
             return null;
         }
 
+        // Return first ready cover image large variant URL.
         foreach ($images as $image) {
+            // Skip non-ready images for meta cover selection.
             if ((string) ($image['status'] ?? '') !== 'ready') {
                 continue;
             }
+            // Only cover-marked image can override meta image.
             if (!empty($image['is_cover'])) {
                 $variants = is_array($image['variants'] ?? null) ? $image['variants'] : [];
                 $largeVariant = $variants['lg'] ?? null;

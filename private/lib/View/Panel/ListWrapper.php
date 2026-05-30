@@ -102,20 +102,32 @@ final class ListWrapper
         ?>
 <section class="card">
     <div class="card-body">
-        <?php if ($isEmpty): ?>
+        <?php
+        /* Render compact empty-state message when no rows exist at all. */
+        if ($isEmpty):
+        ?>
             <p class="text-muted mb-0"><?= e($emptyMessage) ?></p>
         <?php else: ?>
             <?= self::renderFilters($config) ?>
-            <?php if ($countId !== ''): ?>
+            <?php
+            /* Count label container is optional and used by client-side filtering scripts. */
+            if ($countId !== ''):
+            ?>
             <div class="small text-muted mb-2" id="<?= e($countId) ?>"></div>
             <?php endif; ?>
             <div class="table-responsive">
                 <?= $tableHtml ?>
             </div>
-            <?php if ($emptyId !== ''): ?>
+            <?php
+            /* Optional hidden empty-match container supports client-side filter UX. */
+            if ($emptyId !== ''):
+            ?>
             <p id="<?= e($emptyId) ?>" class="text-muted mb-0 mt-2 d-none"><?= e($emptyMatchMsg) ?></p>
             <?php endif; ?>
-            <?php if ($paginationData !== null): ?>
+            <?php
+            /* Pagination row is rendered only when pagination data exists. */
+            if ($paginationData !== null):
+            ?>
                 <?= self::renderPagination($paginationData) ?>
             <?php endif; ?>
         <?php endif; ?>
@@ -144,10 +156,12 @@ final class ListWrapper
         // Default search column width fills the row when there are no extra filter selects.
         $defaultSearchCol = $filters === [] ? 'col-12' : 'col-12 col-md-8';
         $searchCol = trim((string) ($config['search_col'] ?? $defaultSearchCol));
+        // Restore default column classes when templates pass a blank override.
         if ($searchCol === '') {
             $searchCol = $defaultSearchCol;
         }
 
+        // No controls are needed when both search and filter definitions are absent.
         if ($searchId === '' && $filters === []) {
             return '';
         }
@@ -155,7 +169,10 @@ final class ListWrapper
         ob_start();
         ?>
             <div class="row g-2 mb-3">
-                <?php if ($searchId !== ''): ?>
+                <?php
+                /* Render search input only when a search element id is configured. */
+                if ($searchId !== ''):
+                ?>
                 <div class="<?= e($searchCol) ?>">
                     <label class="form-label mb-1" for="<?= e($searchId) ?>">Search</label>
                     <input
@@ -166,18 +183,25 @@ final class ListWrapper
                     >
                 </div>
                 <?php endif; ?>
-                <?php foreach ($filters as $filter): ?>
+                <?php
+                /* Render each configured select filter in declaration order. */
+                foreach ($filters as $filter):
+                ?>
                     <?php
                     $filterId = (string) ($filter['id'] ?? '');
                     $filterLabel = (string) ($filter['label'] ?? '');
                     $filterCol = (string) ($filter['col'] ?? 'col-12 col-md-4');
                     $filterOptions = (string) ($filter['options_html'] ?? '');
+                    // Skip malformed filter entries that do not provide an element id.
                     if ($filterId === '') {
                         continue;
                     }
                     ?>
                     <div class="<?= e($filterCol) ?>">
-                        <?php if ($filterLabel !== ''): ?>
+                        <?php
+                        /* Label output stays optional for compact single-filter layouts. */
+                        if ($filterLabel !== ''):
+                        ?>
                         <label class="form-label mb-1" for="<?= e($filterId) ?>"><?= e($filterLabel) ?></label>
                         <?php endif; ?>
                         <select id="<?= e($filterId) ?>" class="form-select form-select-sm">
@@ -209,6 +233,7 @@ final class ListWrapper
         $label = trim((string) ($pagination['label'] ?? 'items'));
         $ariaLabel = trim((string) ($pagination['aria_label'] ?? 'Pagination'));
 
+        // Skip pagination shell when no result rows exist.
         if ($totalItems === 0) {
             return '';
         }
@@ -222,7 +247,10 @@ final class ListWrapper
                     <div class="small text-muted">
                         Page <?= $current ?> of <?= $totalPages ?> (<?= $totalItems ?> total<?= $label !== '' ? ' ' . e($label) : '' ?>)
                     </div>
-                    <?php if ($totalPages > 1): ?>
+                    <?php
+                    /* Hide pager buttons when there is only one page. */
+                    if ($totalPages > 1):
+                    ?>
                         <div class="btn-group btn-group-sm" role="group" aria-label="<?= e($ariaLabel) ?>">
                             <a class="btn btn-outline-secondary<?= $current <= 1 ? ' disabled' : '' ?>" href="<?= e($prevUrl) ?>">Previous</a>
                             <a class="btn btn-outline-secondary<?= $current >= $totalPages ? ' disabled' : '' ?>" href="<?= e($nextUrl) ?>">Next</a>
@@ -247,6 +275,7 @@ final class ListWrapper
     private static function buildPageUrl(string $basePath, array $query, int $page): string
     {
         $page = max(1, $page);
+        // Keep page parameter only for non-first pages to preserve canonical first-page URLs.
         if ($page > 1) {
             $query['page'] = (string) $page;
         } else {

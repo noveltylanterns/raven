@@ -61,7 +61,9 @@ class RedirectRead
 
         $rows = $stmt->fetchAll() ?: [];
         $channelsById = $this->channelsByIdMap();
+        // Hydrate every row with channel metadata before returning to callers.
         foreach ($rows as $index => $row) {
+            // Defensive guard for non-array rows from atypical PDO fetch behavior.
             if (!is_array($row)) {
                 continue;
             }
@@ -109,7 +111,9 @@ class RedirectRead
 
         $rows = $stmt->fetchAll() ?: [];
         $channelsById = $this->channelsByIdMap();
+        // Hydrate each paged row with channel metadata before returning.
         foreach ($rows as $index => $row) {
+            // Defensive guard for non-array rows from atypical PDO fetch behavior.
             if (!is_array($row)) {
                 continue;
             }
@@ -163,7 +167,9 @@ class RedirectRead
         $total = 0;
         $resultRows = [];
         $channelsById = $this->channelsByIdMap();
+        // Convert each row and capture the shared window total from the first record.
         foreach ($rows as $row) {
+            // Window total repeats per row; read it once on first iteration.
             if ($total === 0) {
                 $total = (int) ($row['total_rows'] ?? 0);
             }
@@ -202,6 +208,7 @@ class RedirectRead
         $stmt->execute([':id' => $id]);
 
         $row = $stmt->fetch();
+        // `fetch()` returns false when no redirect exists for the requested id.
         if ($row === false) {
             return null;
         }
@@ -229,8 +236,10 @@ class RedirectRead
                 WHERE r.slug = :slug';
         $params = [':slug' => $slug];
 
+        // Resolve string selectors by channel slug; numeric selectors use direct id scope.
         if (is_string($channel)) {
             $channelId = $this->channelRepo->idBySlug($channel);
+            // Unknown slugs cannot be mapped into a valid redirect scope.
             if ($channelId === null || $channelId < 1) {
                 return null;
             }
@@ -249,6 +258,7 @@ class RedirectRead
         $stmt->execute($params);
 
         $row = $stmt->fetch();
+        // Missing slug/channel matches return null instead of a partial row.
         if ($row === false) {
             return null;
         }
@@ -272,8 +282,10 @@ class RedirectRead
         $sql = 'SELECT r.id FROM ' . $redirects . ' r WHERE r.slug = :slug';
         $params = [':slug' => $slug];
 
+        // Accept channel selectors as slug or id while preserving root-scope default behavior.
         if (is_string($channel)) {
             $channelId = $this->channelRepo->idBySlug($channel);
+            // Unknown channel slugs should not silently match root redirects.
             if ($channelId === null || $channelId < 1) {
                 return null;
             }
@@ -322,6 +334,7 @@ class RedirectRead
             $sql .= ' AND r.channel = 0';
         } else {
             $channelId = $this->channelRepo->idBySlug($channelSlug);
+            // Channel-bound paths require a valid persisted channel id.
             if ($channelId === null || $channelId < 1) {
                 return null;
             }
@@ -335,6 +348,7 @@ class RedirectRead
         $stmt->execute($params);
 
         $row = $stmt->fetch();
+        // No active redirect for the path/channel combination yields null.
         if ($row === false) {
             return null;
         }

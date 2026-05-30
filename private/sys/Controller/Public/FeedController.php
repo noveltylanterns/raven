@@ -134,12 +134,14 @@ final class FeedController
      */
     private function renderFeed(string $format, ?string $channelSlug = null): void
     {
+        // Feed routes are disabled when feed feature flag is off.
         if (!$this->feedPolicy->feedEnabled()) {
             $this->context->notFound();
             return;
         }
 
         $routeSegment = $format === 'atom' ? $this->feedPolicy->atomRoute() : $this->feedPolicy->rssRoute();
+        // Missing route segment means this feed format is effectively disabled.
         if ($routeSegment === '') {
             $this->context->notFound();
             return;
@@ -153,14 +155,17 @@ final class FeedController
         $scopeSlug = '';
         $pages = [];
 
+        // Channel-scoped feed path: validate channel slug and channel feed availability.
         if ($channelSlug !== null) {
             $normalizedChannelSlug = strtolower(trim($channelSlug));
+            // Empty channel slug cannot resolve to a valid channel feed.
             if ($normalizedChannelSlug === '') {
                 $this->context->notFound();
                 return;
             }
 
             $channel = $this->channelRead->findBySlug($normalizedChannelSlug);
+            // Channel must exist and be feed-enabled for channel-scoped feed.
             if (!is_array($channel) || !$this->channelFeedEnabled($channel)) {
                 $this->context->notFound();
                 return;
@@ -172,6 +177,7 @@ final class FeedController
             $scopeSlug = $feedChannelSlug;
             $pages = $this->pageRead->listRecentPublished($this->feedParser->feedItems(), $feedChannelSlug);
         } else {
+            // Global feed may include all channels or a configured subset.
             if (in_array('all', $configuredFeedChannels, true)) {
                 $pages = $this->pageRead->listRecentPublished($this->feedParser->feedItems(), null);
             } else {
@@ -179,6 +185,7 @@ final class FeedController
                     $configuredFeedChannels,
                     static fn (string $configuredChannel): bool => $configuredChannel !== ''
                 ));
+                // Single configured channel collapses scope label/type to channel mode.
                 if (count($selectedFeedChannels) === 1) {
                     $feedChannelSlug = $selectedFeedChannels[0];
                     $scopeLabel = $this->channelLabel($feedChannelSlug);
@@ -195,6 +202,7 @@ final class FeedController
                 );
             }
 
+            // Any resolved channel slug means channel-scoped payload metadata.
             if ($feedChannelSlug !== '') {
                 $scopeType = 'channel';
             }
@@ -231,18 +239,21 @@ final class FeedController
      */
     private function renderTaxonomyFeed(string $format, string $taxonomyType, string $taxonomySlug): void
     {
+        // Taxonomy feed routes are disabled when feed feature flag is off.
         if (!$this->feedPolicy->feedEnabled()) {
             $this->context->notFound();
             return;
         }
 
         $routeSegment = $format === 'atom' ? $this->feedPolicy->atomRoute() : $this->feedPolicy->rssRoute();
+        // Missing route segment means this feed format is effectively disabled.
         if ($routeSegment === '') {
             $this->context->notFound();
             return;
         }
 
         $normalizedSlug = strtolower(trim($taxonomySlug));
+        // Taxonomy feed requires a non-empty normalized taxonomy slug.
         if ($normalizedSlug === '') {
             $this->context->notFound();
             return;
@@ -253,7 +264,9 @@ final class FeedController
         $routeSuffix = [];
         $pages = [];
 
+        // Category taxonomy feed branch.
         if ($taxonomyType === 'category') {
+            // Category feed branch requires category routes to be enabled.
             if (!CategoryPolicy::categoryRouteEnabled($this->context->config())) {
                 $this->context->notFound();
                 return;
@@ -261,6 +274,7 @@ final class FeedController
 
             $categoryPrefix = CategoryPolicy::categoryRoutePrefix($this->context->config(), $this->context->input());
             $category = $this->categoryRead->findBySlug($normalizedSlug);
+            // Category must exist for taxonomy feed rendering.
             if (!is_array($category)) {
                 $this->context->notFound();
                 return;
@@ -270,7 +284,9 @@ final class FeedController
             $pages = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
             $scopeLabel = $this->taxonomyLabel($category, $normalizedSlug);
             $routeSuffix = [$categoryPrefix, $normalizedSlug];
+        // Tag taxonomy feed branch.
         } elseif ($taxonomyType === 'tag') {
+            // Tag feed branch requires tag routes to be enabled.
             if (!TagPolicy::tagRouteEnabled($this->context->config())) {
                 $this->context->notFound();
                 return;
@@ -278,6 +294,7 @@ final class FeedController
 
             $tagPrefix = TagPolicy::tagRoutePrefix($this->context->config(), $this->context->input());
             $tag = $this->tagRead->findBySlug($normalizedSlug);
+            // Tag must exist for taxonomy feed rendering.
             if (!is_array($tag)) {
                 $this->context->notFound();
                 return;
@@ -332,11 +349,13 @@ final class FeedController
         string $scopeSlug = ''
     ): array {
         $feedUrl = trim((string) ($site['current_url'] ?? ''));
+        // Fall back to composed route URL when current URL is unavailable.
         if ($feedUrl === '') {
             $feedUrl = rtrim((string) ($site['url'] ?? ''), '/') . '/' . ltrim($routePath, '/');
         }
 
         $siteName = trim((string) ($site['name'] ?? 'Raven CMS'));
+        // Ensure non-empty site name for feed title/description output.
         if ($siteName === '') {
             $siteName = 'Raven CMS';
         }
@@ -344,6 +363,7 @@ final class FeedController
         $formatLabel = strtoupper($format);
         $title = $siteName . ' ' . $formatLabel . ' Feed';
         $description = 'Latest pages from ' . $siteName . '.';
+        // Scope label customizes title/description for channel/taxonomy feeds.
         if ($scopeLabel !== '') {
             $title = $siteName . ' ' . $formatLabel . ' Feed (' . $scopeLabel . ')';
             $description = 'Latest pages from ' . $scopeLabel . ' on ' . $siteName . '.';
@@ -351,6 +371,7 @@ final class FeedController
 
         $items = $this->buildFeedItems($pages, $site);
         $updatedTimestamp = time();
+        // Use newest feed-item timestamp when items are available.
         if ($items !== []) {
             $updatedTimestamp = (int) ($items[0]['timestamp'] ?? $updatedTimestamp);
         }
@@ -385,24 +406,30 @@ final class FeedController
         $siteUrl = rtrim((string) ($site['url'] ?? ''), '/');
         $result = [];
 
+        // Normalize each source page row into feed-item payload fields.
         foreach ($pages as $page) {
+            // Skip malformed source rows.
             if (!is_array($page)) {
                 continue;
             }
 
             $path = trim((string) ($page['url'] ?? ''));
+            // Missing path falls back to site root.
             if ($path === '') {
                 $path = '/';
             }
+            // Feed item path must be absolute path before concatenation.
             if (!str_starts_with($path, '/')) {
                 $path = '/' . ltrim($path, '/');
             }
 
             $absoluteUrl = $siteUrl !== '' ? $siteUrl . $path : $path;
             $title = trim((string) ($page['title'] ?? ''));
+            // Fallback feed item title to page slug when title is empty.
             if ($title === '') {
                 $title = trim((string) ($page['slug'] ?? ''));
             }
+            // Final fallback avoids empty titles in feed readers.
             if ($title === '') {
                 $title = 'Untitled';
             }
@@ -410,6 +437,7 @@ final class FeedController
             $description = trim((string) ($page['description'] ?? ''));
             $createdAt = trim((string) ($page['created'] ?? ''));
             $timestamp = strtotime($createdAt);
+            // Invalid timestamps fall back to current time for feed formatting.
             if ($timestamp === false || $timestamp < 1) {
                 $timestamp = time();
             }
@@ -435,15 +463,18 @@ final class FeedController
     private function channelLabel(string $channelSlug): string
     {
         $normalized = strtolower(trim($channelSlug));
+        // Empty channel slug indicates all-channel feed scope.
         if ($normalized === '') {
             return 'All Channels';
         }
 
+        // Root pseudo-channel gets dedicated label.
         if ($normalized === 'root') {
             return 'Root';
         }
 
         $channel = $this->channelRead->findBySlug($normalized);
+        // Unknown channels fall back to normalized slug label.
         if (!is_array($channel)) {
             return $normalized;
         }
@@ -486,8 +517,10 @@ final class FeedController
     private function feedRoutePath(string $routeSegment, array $extraSegments = []): string
     {
         $segments = [trim($routeSegment, '/')];
+        // Append non-empty suffix segments for scoped feed paths.
         foreach ($extraSegments as $extraSegment) {
             $trimmed = trim($extraSegment, '/');
+            // Skip empty suffix segments.
             if ($trimmed === '') {
                 continue;
             }
@@ -509,19 +542,23 @@ final class FeedController
      */
     private function buildPageUrls(array $pages): array
     {
+        // Build route URLs for each feed source page row.
         foreach ($pages as $index => $page) {
+            // Ignore malformed source rows.
             if (!is_array($page)) {
                 continue;
             }
 
             $slug = $this->context->input()->slug((string) ($page['slug'] ?? ''));
             $pageId = (int) ($page['id'] ?? 0);
+            // Missing/invalid slug falls back to home path placeholder.
             if ($slug === null || $slug === '') {
                 $pages[$index]['url'] = '/';
                 continue;
             }
 
             $channelSlug = $this->context->input()->slug((string) ($page['channel_slug'] ?? ''));
+            // Root-scope URL branch for pages without channel slug.
             if ($channelSlug === null || $channelSlug === '') {
                 $rootSegment = PagePolicy::buildRouteSegment($this->context->input(), 
                     $slug,

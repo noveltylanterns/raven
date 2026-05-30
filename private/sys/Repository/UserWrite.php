@@ -85,10 +85,12 @@ final class UserWrite
         $coverImage = $coverImage !== '' ? $coverImage : null;
         $stringLength = isset($data['string_length']) ? (int) $data['string_length'] : 28;
 
+        // Email is required as a stable account identifier and contact endpoint.
         if ($email === '') {
             throw new RuntimeException('Email is required.');
         }
 
+        // Legacy create flow supports missing username by mirroring email.
         if (($id === null || $id <= 0) && $username === '') {
             // Legacy create flow falls back to email-as-username when no explicit username was submitted.
             $username = $email;
@@ -98,16 +100,20 @@ final class UserWrite
         $userGroupsTable = $this->groupTable('user_groups');
         $stringLength = $this->userStringService->normalizeLength($stringLength);
 
+        // Positive ids take the update path and preserve existing account identity.
         if ($id !== null && $id > 0) {
+            // Prevent username collisions against other users during updates.
             if ($username !== '' && $this->usernameExistsForOtherUser($id, $username)) {
                 throw new RuntimeException('Username is already in use.');
             }
 
+            // Enforce unique email across all user rows.
             if ($this->emailExistsForOtherUser($id, $email)) {
                 throw new RuntimeException('Email is already in use.');
             }
 
             $userString = $this->userStringById($id);
+            // Backfill missing legacy user strings to keep profile URLs valid.
             if ($userString === null || $userString === '') {
                 $userString = $this->generateUniqueUserString($usersTable, $stringLength);
             }
@@ -137,11 +143,13 @@ final class UserWrite
                 ':primary_group_id' => $primaryGroupId > 0 ? $primaryGroupId : null,
             ];
 
+            // Password changes are optional on profile edits.
             if ($password !== null && $password !== '') {
                 $fields[] = 'password = :password';
                 $params[':password'] = password_hash($password, PASSWORD_DEFAULT);
             }
 
+            // Avatar updates are opt-in so untouched edits do not clear existing files.
             if ($setAvatar) {
                 $fields[] = 'avatar = :avatar_path';
                 $params[':avatar_path'] = $avatarPath;
@@ -159,14 +167,17 @@ final class UserWrite
             return $id;
         }
 
+        // New user creation must respect global username uniqueness.
         if ($username !== '' && $this->usernameExistsForOtherUser(0, $username)) {
             throw new RuntimeException('Username is already in use.');
         }
 
+        // New user creation must also respect global email uniqueness.
         if ($this->emailExistsForOtherUser(0, $email)) {
             throw new RuntimeException('Email is already in use.');
         }
 
+        // Create flow requires an initial password hash.
         if ($password === null || $password === '') {
             throw new RuntimeException('Password is required when creating a user.');
         }
@@ -233,18 +244,21 @@ final class UserWrite
 
         $this->rvnDb->beginTransaction();
 
+        // Membership replacement runs in one transaction to avoid partial writes.
         try {
             $delete = $this->rvnDb->prepare(
                 'DELETE FROM ' . $userGroupsTable . ' WHERE user = :user'
             );
             $delete->execute([':user' => $userId]);
 
+            // Reattach selected groups after clearing old memberships.
             foreach ($groupIds as $groupId) {
                 $this->attachUserToGroup($userId, $groupId);
             }
 
             $this->rvnDb->commit();
         } catch (\Throwable $exception) {
+            // Roll back only when transaction state is still active.
             if ($this->rvnDb->inTransaction()) {
                 $this->rvnDb->rollBack();
             }
@@ -264,6 +278,7 @@ final class UserWrite
     {
         $table = $this->groupTable('user_groups');
         $driver = strtolower(trim($this->driver));
+        // Driver-specific upsert SQL keeps inserts idempotent across supported backends.
         if ($driver === 'mysql') {
             $stmt = $this->rvnDb->prepare(
                 'INSERT IGNORE INTO ' . $table . ' (user, `group`)
@@ -293,11 +308,14 @@ final class UserWrite
      */
     private function usernameExistsForOtherUser(int $id, string $username): bool
     {
+        // Empty usernames cannot conflict and are treated as non-existent.
         if (trim($username) === '') {
             return false;
         }
 
         $usersTable = $this->authTable('users');
+        // Update mode excludes the current row from uniqueness checks.
+        // Update-mode uniqueness excludes the current row id.
         if ($id > 0) {
             $stmt = $this->authDb->prepare(
                 'SELECT 1 FROM ' . $usersTable . ' WHERE username = :username AND id <> :id LIMIT 1'
@@ -326,6 +344,7 @@ final class UserWrite
     private function emailExistsForOtherUser(int $id, string $email): bool
     {
         $usersTable = $this->authTable('users');
+        // Update-mode uniqueness excludes the current row id.
         if ($id > 0) {
             $stmt = $this->authDb->prepare(
                 'SELECT 1 FROM ' . $usersTable . ' WHERE email = :email AND id <> :id LIMIT 1'
@@ -352,6 +371,7 @@ final class UserWrite
      */
     private function userStringById(int $id): ?string
     {
+        // Non-positive ids cannot map to persisted user-string records.
         if ($id < 1) {
             return null;
         }
@@ -365,6 +385,7 @@ final class UserWrite
         $stmt->execute([':id' => $id]);
 
         $value = $stmt->fetchColumn();
+        // Missing rows return null to signal "no existing user string".
         if ($value === false) {
             return null;
         }
@@ -394,10 +415,12 @@ final class UserWrite
      */
     private function userStringExistsForOtherUser(string $usersTable, int $id, string $userString): bool
     {
+        // Empty string tokens cannot conflict and are treated as non-existent.
         if (trim($userString) === '') {
             return false;
         }
 
+        // Update-mode check excludes the current row from collision detection.
         if ($id > 0) {
             $stmt = $this->authDb->prepare(
                 'SELECT 1 FROM ' . $usersTable . ' WHERE string = :string AND id <> :id LIMIT 1'
@@ -433,6 +456,7 @@ final class UserWrite
             VALUES (:email, :password, :username, :display_name, :bio, :theme, :avatar_path, :cover_image, :string, :contact_profiles, :primary_group_id, :status, :verified, :resettable, :roles_mask, :registered, :last_login, :force_logout)';
 
         $driver = strtolower((string) $this->authDb->getAttribute(PDO::ATTR_DRIVER_NAME));
+        // PostgreSQL returns inserted id via RETURNING; others use lastInsertId().
         if ($driver === 'pgsql') {
             $stmt = $this->authDb->prepare($sql . ' RETURNING id');
             $stmt->execute($params);
@@ -443,6 +467,7 @@ final class UserWrite
             $newId = (int) $this->authDb->lastInsertId();
         }
 
+        // Guard against backend-specific insert id resolution failures.
         if ($newId < 1) {
             throw new RuntimeException('Failed to resolve inserted user id.');
         }
@@ -461,8 +486,10 @@ final class UserWrite
     private function normalizeGroupIds(array $groupIds): array
     {
         $normalized = [];
+        // Deduplicate and sanitize incoming group ids for deterministic writes.
         foreach ($groupIds as $groupId) {
             $value = (int) $groupId;
+            // Membership rows require positive integer group ids.
             if ($value > 0) {
                 $normalized[$value] = $value;
             }

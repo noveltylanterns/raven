@@ -3,7 +3,7 @@
 /**
  * RAVEN CMS
  * ~/private/sys/Repository/ChannelShared.php
- * Low-level channel constants and static normalization primitives shared by channel repositories.
+ * Shared repository primitives for channel constants and normalization helpers.
  * Docs: https://lanterns.io/raven
  */
 
@@ -94,6 +94,7 @@ final class ChannelShared
      */
     public static function normalizeNullablePath(mixed $value): ?string
     {
+        // Reject non-scalar payloads to avoid persisting arrays/objects as path strings.
         if (!is_scalar($value) && $value !== null) {
             return null;
         }
@@ -110,14 +111,17 @@ final class ChannelShared
      */
     public static function normalizeFeedEnabled(mixed $value): bool
     {
+        // Preserve booleans exactly as provided.
         if (is_bool($value)) {
             return $value;
         }
 
+        // Numeric payloads use 1 as enabled and all other values as disabled.
         if (is_int($value) || is_float($value)) {
             return (int) $value === 1;
         }
 
+        // Non-scalar payloads are invalid for boolean normalization and default to false.
         if (!is_scalar($value) && $value !== null) {
             return false;
         }

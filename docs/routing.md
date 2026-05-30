@@ -107,7 +107,7 @@ Primary implementation files:
 
 Behavior summary:
 
-- Requires panel login and taxonomy-management permission.
+- Requires panel login and routing route `view` permission.
 - Builds a merged read-only route inventory (pages, channels, redirects, feeds, taxonomy, user/group profile routes, and conflict metadata).
 - Supports filter/search/sort in UI and CSV export.
 

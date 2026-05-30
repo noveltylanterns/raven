@@ -51,6 +51,7 @@ final class RedirectListController
     public function redirectList(): void
     {
         $this->context->requirePanelLogin();
+        // Redirect list view is permission-gated.
         if (!$this->context->requireRoutePermissionOrForbidden('redirect', 'view')) {
             return;
         }
@@ -61,6 +62,7 @@ final class RedirectListController
         $totalItems = (int) ($pageResult['total'] ?? 0);
         $redirectRows = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
         $pagination = Pagination::state($totalItems, $requestedPage, $perPage);
+        // Requery with clamped offset when requested page exceeds available range.
         if ($totalItems > 0 && $pagination['current'] !== $requestedPage) {
             $pageResult = $this->redirectRead->listPage($perPage, $pagination['offset']);
             $redirectRows = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];

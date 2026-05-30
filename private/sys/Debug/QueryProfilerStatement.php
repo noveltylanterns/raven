@@ -87,6 +87,7 @@ final class QueryProfilerStatement extends \PDOStatement
         $queryString = trim((string) $this->queryString);
         $payload = $params ?? $this->boundValues;
 
+        // Guarantee one profiler record for success and failure paths with matching duration math.
         try {
             $result = parent::execute($params);
             $this->record($queryString, $payload, (microtime(true) - $startedAt) * 1000, $result, null);
@@ -109,6 +110,7 @@ final class QueryProfilerStatement extends \PDOStatement
      */
     private function record(string $sql, array $params, float $durationMs, bool $success, ?string $error): void
     {
+        // Ignore empty SQL and disabled profilers to avoid noisy/invalid debug records.
         if ($sql === '' || $this->queryProfiler === null || !$this->queryProfiler->isEnabled()) {
             return;
         }

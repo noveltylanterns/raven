@@ -194,13 +194,16 @@ final class PageEditController
     {
         $this->context->requirePanelLogin();
         $requiredAction = $id === null ? 'create' : 'edit';
+        // Page editor access is scoped by create vs edit permission.
         if (!$this->context->requireRoutePermissionOrForbidden('page', $requiredAction)) {
             return;
         }
 
         $pageNavChannel = '';
+        // Create mode optionally preselects channel from query string.
         if ($id === null) {
             $requestedChannel = $this->input->slug($_GET['channel'] ?? null);
+            // Keep channel preselection only when a non-empty slug was provided.
             if (is_string($requestedChannel) && $requestedChannel !== '') {
                 $pageNavChannel = $requestedChannel;
             }
@@ -209,8 +212,10 @@ final class PageEditController
         // Null id means create mode; numeric id means edit mode.
         $page = null;
         $galleryImages = [];
+        // Edit mode loads page row and existing gallery assets.
         if ($id !== null) {
             $editData = $this->pageRead->findByIdWithGalleryRows($id);
+            // Guard repository shape before unpacking nested page/gallery data.
             if (is_array($editData)) {
                 $page = is_array($editData['page'] ?? null) ? $editData['page'] : null;
                 $galleryImages = is_array($editData['gallery_images'] ?? null) ? $editData['gallery_images'] : [];
@@ -221,7 +226,9 @@ final class PageEditController
         // Load channel/category/tag options and page assignments in one query.
         $taxonomyOptionSets = $this->pageEditorTaxonomyOptionSets($id ?? 0, $this->categoryEnabled, $this->tagEnabled);
         $channelOptions = is_array($taxonomyOptionSets['channel_options'] ?? null) ? $taxonomyOptionSets['channel_options'] : [];
+        // Normalize each channel option row with derived routing/taxonomy metadata.
         foreach ($channelOptions as &$channelOption) {
+            // Skip malformed option rows returned from extension-modified datasets.
             if (!is_array($channelOption)) {
                 continue;
             }
@@ -240,20 +247,26 @@ final class PageEditController
             );
         }
         unset($channelOption);
+        // Honor create-mode channel preselection only when it matches available options.
         if ($id === null && $pageNavChannel !== '') {
             $channelExists = false;
+            // Confirm requested channel slug exists in normalized option rows.
             foreach ($channelOptions as $channelOption) {
+                // Ignore malformed rows while checking slug membership.
                 if (!is_array($channelOption)) {
                     continue;
                 }
 
+                // Match using case-insensitive slug comparison.
                 if (strtolower(trim((string) ($channelOption['slug'] ?? ''))) === strtolower($pageNavChannel)) {
                     $channelExists = true;
                     break;
                 }
             }
 
+            // Seed draft page payload with preselected channel when valid.
             if ($channelExists) {
+                // Create mutable page container in create mode before assigning channel.
                 if (!is_array($page)) {
                     $page = [];
                 }
@@ -326,10 +339,12 @@ final class PageEditController
         $this->context->requirePanelLogin();
         $id = $this->input->int($post['id'] ?? null, 1);
         $requiredAction = $id === null ? 'create' : 'edit';
+        // Save action permission depends on create vs edit mode.
         if (!$this->context->requireRoutePermissionOrForbidden('page', $requiredAction)) {
             return;
         }
 
+        // CSRF validation protects page create/update actions.
         if (!$this->context->csrf()->validate($post['_csrf'] ?? null)) {
             $this->context->flash('error', 'Invalid CSRF token.');
             Redirect::redirect($this->context->panelUrl('/page'));
@@ -352,10 +367,12 @@ final class PageEditController
         $galleryEnabled = $this->pageBlocks()->hasGalleryBlock($contentBlocks, $this->pageEditorBodyBlockTypeDefinitions())
             || (isset($post['gallery_enabled']) && (string) $post['gallery_enabled'] === '1');
         $authorUserId = $this->input->int($post['author_user_id'] ?? null, 1);
+        // Reject explicit author ids that no longer exist.
         if ($authorUserId !== null && $this->userRepo->findById($authorUserId) === null) {
             $this->context->flash('error', 'Selected author account was not found.');
             Redirect::redirect($this->editorTabs->panelEditorUrlWithTab(fn (string $suffix): string => $this->context->panelUrl($suffix), '/page/edit', $id, $activeTab, 'meta'));
         }
+        // Default missing author selection to current authenticated user.
         if ($authorUserId === null) {
             $authorUserId = $this->context->auth()->userId();
         }
@@ -371,18 +388,24 @@ final class PageEditController
 
         $galleryImageUpdates = $this->editorMedia()->normalizeGalleryImageUpdates($galleryImagesRaw);
 
+        // Collect category ids only when taxonomy is enabled and payload is array-shaped.
         if ($this->categoryEnabled && is_array($categoryIdsRaw)) {
+            // Parse each category id from form values.
             foreach ($categoryIdsRaw as $rawCategoryId) {
                 $parsed = $this->input->int($rawCategoryId, 1);
+                // Keep only valid positive integer ids.
                 if ($parsed !== null) {
                     $categoryIds[] = $parsed;
                 }
             }
         }
 
+        // Collect tag ids only when taxonomy is enabled and payload is array-shaped.
         if ($this->tagEnabled && is_array($tagIdsRaw)) {
+            // Parse each tag id from form values.
             foreach ($tagIdsRaw as $rawTagId) {
                 $parsed = $this->input->int($rawTagId, 1);
+                // Keep only valid positive integer ids.
                 if ($parsed !== null) {
                     $tagIds[] = $parsed;
                 }
@@ -398,9 +421,12 @@ final class PageEditController
         $allowedCategorySets = $this->allowedTaxonomySetIdsForChannel($channelRecord, 'category');
         $allowedTagSets = $this->allowedTaxonomySetIdsForChannel($channelRecord, 'tag');
 
+        // Enforce channel-specific category set restrictions when not in "all sets" mode.
         if ($this->categoryEnabled && !$this->selectionAllowsAllSets($allowedCategorySets)) {
             $categorySetIdsById = $this->categoryRepo()->setIdsByIds($categoryIds);
+            // Validate each selected category set id against channel-allowed list.
             foreach ($categorySetIdsById as $setId) {
+                // Abort save when any category selection is outside allowed sets.
                 if (!in_array($setId, $allowedCategorySets, true)) {
                     $this->context->flash('error', 'One or more selected categories are outside the allowed sets for this channel.');
                     Redirect::redirect($this->editorTabs->panelEditorUrlWithTab(fn (string $suffix): string => $this->context->panelUrl($suffix), '/page/edit', $id, $activeTab, 'meta'));
@@ -408,9 +434,12 @@ final class PageEditController
             }
         }
 
+        // Enforce channel-specific tag set restrictions when not in "all sets" mode.
         if ($this->tagEnabled && !$this->selectionAllowsAllSets($allowedTagSets)) {
             $tagSetIdsById = $this->tagRepo()->setIdsByIds($tagIds);
+            // Validate each selected tag set id against channel-allowed list.
             foreach ($tagSetIdsById as $setId) {
+                // Abort save when any tag selection is outside allowed sets.
                 if (!in_array($setId, $allowedTagSets, true)) {
                     $this->context->flash('error', 'One or more selected tags are outside the allowed sets for this channel.');
                     Redirect::redirect($this->editorTabs->panelEditorUrlWithTab(fn (string $suffix): string => $this->context->panelUrl($suffix), '/page/edit', $id, $activeTab, 'meta'));
@@ -418,11 +447,13 @@ final class PageEditController
             }
         }
 
+        // Title and slug are the minimal required identifiers for persisted pages.
         if ($title === '' || $slug === null) {
             $this->context->flash('error', 'Title and valid slug are required.');
             Redirect::redirect($this->editorTabs->panelEditorUrlWithTab(fn (string $suffix): string => $this->context->panelUrl($suffix), '/page/edit', $id, $activeTab, 'content'));
         }
 
+        // Limit status values to the two supported publication states.
         if (!in_array($status, ['published', 'draft'], true)) {
             $this->context->flash('error', 'Status must be Published or Draft.');
             Redirect::redirect($this->editorTabs->panelEditorUrlWithTab(fn (string $suffix): string => $this->context->panelUrl($suffix), '/page/edit', $id, $activeTab, 'content'));
@@ -471,16 +502,19 @@ final class PageEditController
     public function pageGalleryUpload(array $post, array $files): void
     {
         $this->context->requirePanelLogin();
+        // Gallery uploads are edit-only operations.
         if (!$this->context->requireRoutePermissionOrForbidden('page', 'edit')) {
             return;
         }
 
+        // CSRF validation protects gallery upload mutations.
         if (!$this->context->csrf()->validate($post['_csrf'] ?? null)) {
             $this->context->flash('error', 'Invalid CSRF token.');
             Redirect::redirect($this->context->panelUrl('/page'));
         }
 
         $pageId = $this->input->int($post['id'] ?? null, 1);
+        // Upload target page must exist before accepting media files.
         if ($pageId === null || !$this->mediaRead->pageExists($pageId)) {
             $this->context->flash('error', 'Save the page before uploading gallery images.');
             Redirect::redirect($this->context->panelUrl('/page'));
@@ -488,6 +522,7 @@ final class PageEditController
 
         $uploads = $this->editorMedia()->galleryUploadsFromFiles($files, $this->upload());
 
+        // Abort when no usable images were extracted from the upload payload.
         if ($uploads === []) {
             $this->context->flash('error', 'Please select one or more images to upload.');
             Redirect::redirect($this->editorTabs->panelEditorUrlWithTab(
@@ -501,6 +536,7 @@ final class PageEditController
         }
 
         $maxFilesPerUpload = max(0, (int) $this->config->get('media.max_files_per_upload', 10));
+        // Enforce configured max-per-upload guard for gallery batch uploads.
         if ($maxFilesPerUpload > 0 && count($uploads) > $maxFilesPerUpload) {
             $this->context->flash(
                 'error',
@@ -520,6 +556,7 @@ final class PageEditController
         $successCount = (int) ($batch['success_count'] ?? 0);
         $errors = is_array($batch['errors'] ?? null) ? $batch['errors'] : [];
 
+        // Report successful upload count when at least one image was stored.
         if ($successCount > 0) {
             $this->context->flash(
                 'success',
@@ -527,6 +564,7 @@ final class PageEditController
             );
         }
 
+        // Collapse and show unique batch error messages when any uploads failed.
         if ($errors !== []) {
             $this->context->flash('error', implode(' ', array_values(array_unique($errors))));
         }
@@ -553,10 +591,12 @@ final class PageEditController
     public function pageGalleryDelete(array $post): void
     {
         $this->context->requirePanelLogin();
+        // Gallery deletions are edit-only operations.
         if (!$this->context->requireRoutePermissionOrForbidden('page', 'edit')) {
             return;
         }
 
+        // CSRF validation protects gallery delete actions.
         if (!$this->context->csrf()->validate($post['_csrf'] ?? null)) {
             $this->context->flash('error', 'Invalid CSRF token.');
             Redirect::redirect($this->context->panelUrl('/page'));
@@ -566,6 +606,7 @@ final class PageEditController
         $imageId = $this->input->int($post['gallery_delete_image_id'] ?? null, 1);
         $selectedImageIds = $this->editorMedia()->selectedIdsFromPost($post, 'gallery_delete_image_ids');
 
+        // Page id is required for both single and bulk gallery delete flows.
         if ($pageId === null) {
             $this->context->flash('error', 'Invalid image delete request.');
             Redirect::redirect($this->context->panelUrl('/page'));
@@ -613,8 +654,10 @@ final class PageEditController
         $deletedCount = (int) ($batch['deleted_count'] ?? 0);
         $failedCount = (int) ($batch['failed_count'] ?? 0);
 
+        // Report delete successes and optionally include partial-failure count.
         if ($deletedCount > 0) {
             $message = 'Deleted ' . $deletedCount . ' image' . ($deletedCount === 1 ? '' : 's') . '.';
+            // Append failed count when some requested deletions did not complete.
             if ($failedCount > 0) {
                 $message .= ' Failed to delete ' . $failedCount . ' selected image' . ($failedCount === 1 ? '' : 's') . '.';
             }
@@ -645,16 +688,19 @@ final class PageEditController
     public function pageDelete(array $post): void
     {
         $this->context->requirePanelLogin();
+        // Page deletion is permission-gated due destructive behavior.
         if (!$this->context->requireRoutePermissionOrForbidden('page', 'delete')) {
             return;
         }
 
+        // CSRF validation protects single and bulk delete actions.
         if (!$this->context->csrf()->validate($post['_csrf'] ?? null)) {
             $this->context->flash('error', 'Invalid CSRF token.');
             Redirect::redirect($this->context->panelUrl('/page'));
         }
 
         $id = $this->input->int($post['id'] ?? null, 1);
+        // Handle explicit row-action delete before bulk-selection logic.
         if ($id !== null) {
             // Single-row delete path (row action button).
             try {
@@ -679,7 +725,9 @@ final class PageEditController
         $deletedCount = 0;
         $failedCount = 0;
 
+        // Attempt each selected id independently so one failure does not block others.
         foreach ($selectedIds as $selectedId) {
+            // Repository/storage delete calls may fail per record; continue processing.
             try {
                 // Keep processing all selected ids even when one delete fails.
                 $this->mediaUpload()->deleteAllForPage($selectedId);
@@ -690,8 +738,10 @@ final class PageEditController
             }
         }
 
+        // Report successful deletes and include failed count for partial outcomes.
         if ($deletedCount > 0) {
             $message = 'Deleted ' . $deletedCount . ' page' . ($deletedCount === 1 ? '' : 's') . '.';
+            // Add detail when some selected pages could not be deleted.
             if ($failedCount > 0) {
                 $message .= ' Failed to delete ' . $failedCount . ' selected page' . ($failedCount === 1 ? '' : 's') . '.';
             }
@@ -711,11 +761,13 @@ final class PageEditController
      */
     private function mediaUpload(): MediaUpload
     {
+        // Reuse cached media upload service once resolved.
         if ($this->mediaUpload instanceof MediaUpload) {
             return $this->mediaUpload;
         }
 
         $mediaUpload = ($this->mediaUploadResolver)();
+        // Resolver contract must return the media upload service.
         if (!$mediaUpload instanceof MediaUpload) {
             throw new \RuntimeException('Content controller media upload resolver returned an invalid value.');
         }
@@ -732,11 +784,13 @@ final class PageEditController
      */
     private function categoryRepo(): CategoryRead
     {
+        // Reuse cached category repository once resolved.
         if ($this->categoryRepo instanceof CategoryRead) {
             return $this->categoryRepo;
         }
 
         $categoryRepo = ($this->categoryRepoResolver)();
+        // Resolver contract must return the category read repository.
         if (!$categoryRepo instanceof CategoryRead) {
             throw new \RuntimeException('Content controller category read resolver returned an invalid value.');
         }
@@ -753,11 +807,13 @@ final class PageEditController
      */
     private function categorySetRepo(): SetRead
     {
+        // Reuse cached category-set repository once resolved.
         if ($this->categorySetRepo instanceof SetRead) {
             return $this->categorySetRepo;
         }
 
         $categorySetRepo = ($this->categorySetRepoResolver)();
+        // Resolver contract must return the category-set read repository.
         if (!$categorySetRepo instanceof SetRead) {
             throw new \RuntimeException('Content controller category-set read resolver returned an invalid value.');
         }
@@ -774,11 +830,13 @@ final class PageEditController
      */
     private function tagRepo(): TagRead
     {
+        // Reuse cached tag repository once resolved.
         if ($this->tagRepo instanceof TagRead) {
             return $this->tagRepo;
         }
 
         $tagRepo = ($this->tagRepoResolver)();
+        // Resolver contract must return the tag read repository.
         if (!$tagRepo instanceof TagRead) {
             throw new \RuntimeException('Content controller tag read resolver returned an invalid value.');
         }
@@ -795,11 +853,13 @@ final class PageEditController
      */
     private function tagSetRepo(): SetRead
     {
+        // Reuse cached tag-set repository once resolved.
         if ($this->tagSetRepo instanceof SetRead) {
             return $this->tagSetRepo;
         }
 
         $tagSetRepo = ($this->tagSetRepoResolver)();
+        // Resolver contract must return the tag-set read repository.
         if (!$tagSetRepo instanceof SetRead) {
             throw new \RuntimeException('Content controller tag-set read resolver returned an invalid value.');
         }
@@ -816,11 +876,13 @@ final class PageEditController
      */
     private function taxonomyLookupRepo(): Taxonomy
     {
+        // Reuse cached taxonomy lookup parser once resolved.
         if ($this->taxonomyLookupRepo instanceof Taxonomy) {
             return $this->taxonomyLookupRepo;
         }
 
         $taxonomyLookupRepo = ($this->taxonomyLookupRepoResolver)();
+        // Resolver contract must return taxonomy lookup parser.
         if (!$taxonomyLookupRepo instanceof Taxonomy) {
             throw new \RuntimeException('Content controller taxonomy lookup parser resolver returned an invalid value.');
         }
@@ -836,6 +898,7 @@ final class PageEditController
      */
     private function pageBlockParser(): PageBlockParser
     {
+        // Lazily create parser so non-editor routes avoid parser setup.
         if (!$this->pageBlockParser instanceof PageBlockParser) {
             $this->pageBlockParser = new PageBlockParser($this->input);
         }
@@ -850,6 +913,7 @@ final class PageEditController
      */
     private function pageBlocks(): EditorPage
     {
+        // Lazily create editor helper for routes that actually parse blocks.
         if (!$this->pageBlocks instanceof EditorPage) {
             $this->pageBlocks = new EditorPage($this->input, $this->pageBlockParser());
         }
@@ -864,6 +928,7 @@ final class PageEditController
      */
     private function upload(): Upload
     {
+        // Lazily create upload normalizer for routes that touch $_FILES payloads.
         if (!$this->upload instanceof Upload) {
             $this->upload = new Upload();
         }
@@ -878,6 +943,7 @@ final class PageEditController
      */
     private function editorMedia(): EditorMedia
     {
+        // Lazily create gallery helper for media tab operations.
         if (!$this->editorMedia instanceof EditorMedia) {
             $this->editorMedia = new EditorMedia($this->input);
         }
@@ -892,6 +958,7 @@ final class PageEditController
      */
     private function pageAuthorOptionBuilder(): EditorAuthor
     {
+        // Lazily create author option builder for editor-render routes.
         if (!$this->pageAuthorOptionBuilder instanceof EditorAuthor) {
             $this->pageAuthorOptionBuilder = new EditorAuthor();
         }
@@ -906,6 +973,7 @@ final class PageEditController
      */
     private function loginIdentifier(): LoginIdentifier
     {
+        // Lazily create login identifier helper for author normalization.
         if (!$this->loginIdentifier instanceof LoginIdentifier) {
             $this->loginIdentifier = new LoginIdentifier();
         }
@@ -930,6 +998,7 @@ final class PageEditController
      */
     private function pageEditorTaxonomyOptionSets(int $pageId, bool $categoryEnabled, bool $tagEnabled): array
     {
+        // Skip taxonomy lookup storage entirely when both taxonomy features are disabled.
         if (!$categoryEnabled && !$tagEnabled) {
             return [
                 'channel_options' => $this->channelRead->listOptions(),
@@ -969,6 +1038,7 @@ final class PageEditController
         $path = $isTag ? 'tag.set' : 'category.set';
         $repo = $isTag ? $this->tagSetRepo() : $this->categorySetRepo();
         $configuredId = $this->input->int($this->config->get($path, SetParser::DEFAULT_SET_ID), SetParser::DEFAULT_SET_ID);
+        // Fall back to default when configured id is missing or no longer exists.
         if ($configuredId === null || !$repo->existsId($configuredId)) {
             return SetParser::DEFAULT_SET_ID;
         }
@@ -989,15 +1059,18 @@ final class PageEditController
      */
     private function allowedTaxonomySetIdsForChannel(?array $channelRecord, string $kind): array
     {
+        // No channel selection falls back to configured default taxonomy set.
         if ($channelRecord === null) {
             return [$this->configuredDefaultTaxonomySetId($kind)];
         }
 
         $field = strtolower(trim($kind)) === 'tag' ? 'tag_sets' : 'category_sets';
         $selection = SetParser::normalizeSelection($channelRecord[$field] ?? [], false);
+        // Preserve explicit "all sets" channel grant as sentinel selection.
         if ($this->selectionAllowsAllSets($selection)) {
             return [SetParser::ALL_SET_ID];
         }
+        // Empty selections inherit configured default taxonomy set.
         if ($selection === []) {
             return [$this->configuredDefaultTaxonomySetId($kind)];
         }
@@ -1016,6 +1089,7 @@ final class PageEditController
      */
     private function pageEditorBodyBlockTypeDefinitions(): array
     {
+        // Reuse request-local cache so repeated editor calls avoid extension rescans.
         if (is_array($this->pageBodyBlockTypeDefinitionsCache)) {
             return $this->pageBodyBlockTypeDefinitionsCache;
         }
@@ -1084,28 +1158,34 @@ final class PageEditController
         }
 
         $formsRepository = $extensionServices['forms'] ?? null;
+        // Forms repository is optional and must expose listAll to participate.
         if (!is_object($formsRepository) || !method_exists($formsRepository, 'listAll')) {
             return [];
         }
 
         /** @var mixed $rows */
         $rows = $formsRepository->listAll();
+        // Only array-shaped row sets are normalized into insertable items.
         if (!is_array($rows)) {
             return [];
         }
 
         $items = [];
+        // Keep only enabled rows with valid slugs for editor insertion.
         foreach ($rows as $row) {
+            // Skip malformed rows and disabled form entries.
             if (!is_array($row) || empty($row['enabled'])) {
                 continue;
             }
 
             $slug = strtolower(trim((string) ($row['slug'] ?? '')));
+            // Skip malformed slugs to avoid invalid shortcode insert targets.
             if ($slug === '' || preg_match('/^[a-z0-9][a-z0-9_-]*$/', $slug) !== 1) {
                 continue;
             }
 
             $name = trim((string) ($row['name'] ?? ''));
+            // Fall back to slug when display name is missing.
             if ($name === '') {
                 $name = $slug;
             }

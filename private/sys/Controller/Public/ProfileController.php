@@ -66,12 +66,14 @@ final class ProfileController
             return;
         }
 
+        // Private profile mode requires authenticated viewer.
         if ($profileMode === 'private' && !$isLoggedIn) {
             $this->renderProfileUnavailable('permission_denied', 'private');
             return;
         }
 
         $profile = $this->findProfileBySegment(rawurldecode($username));
+        // Missing profile payload yields not-found.
         if ($profile === null) {
             $this->context->notFound();
             return;
@@ -140,8 +142,10 @@ final class ProfileController
     private function findProfileBySegment(string $routeSegment): ?array
     {
         $selector = $this->groupRouteParser->profileSelector();
+        // Numeric-id selector branch.
         if ($selector === 'id') {
             $userId = $this->context->input()->int($routeSegment, 1);
+            // Invalid numeric id cannot resolve profile.
             if ($userId === null) {
                 return null;
             }
@@ -149,8 +153,10 @@ final class ProfileController
             return $this->userRead->findProfileSummaryById($userId);
         }
 
+        // Opaque string selector branch.
         if ($selector === 'string') {
             $normalizedString = trim($routeSegment);
+            // String selector allows only non-empty alphanumeric values.
             if ($normalizedString === '' || preg_match('/^[a-zA-Z0-9]+$/', $normalizedString) !== 1) {
                 return null;
             }
@@ -159,6 +165,7 @@ final class ProfileController
         }
 
         $normalizedUsername = $this->loginIdentifier->normalizeUsernameOrEmail($this->context->input(), $routeSegment);
+        // Username/email selector must normalize successfully.
         if ($normalizedUsername === null) {
             return null;
         }

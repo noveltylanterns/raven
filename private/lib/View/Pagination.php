@@ -51,8 +51,10 @@ final class Pagination
     public static function panelViewData(string $basePath, array $pagination, array $query = []): array
     {
         $normalizedQuery = [];
+        // Preserve only non-empty scalar query values in pagination links.
         foreach ($query as $key => $value) {
             $stringValue = trim((string) ($value ?? ''));
+            // Drop empty query params from generated pagination payloads.
             if ($stringValue !== '') {
                 $normalizedQuery[$key] = $stringValue;
             }

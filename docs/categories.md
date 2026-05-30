@@ -1,7 +1,5 @@
 # Raven CMS Categories
 
-***Note: This document was generated with ChatGPT Codex. I have not been able to personally verify every detail within matches the actual script. I do not plan on hammering these `docs/` files down until later releases, so use them with caution!***
-
 This document explains Raven's Category system for both panel users and developers/agents.
 
 Maintenance note: keep this file updated whenever category structure, category routes, or Category panel views change (`private/tpl/panel/category/*`, category controller/repository behavior, or category public routing).
@@ -84,13 +82,13 @@ Delete behavior note:
   - `private/tpl/panel/category/list.php`
   - `private/tpl/panel/category/edit.php`
 - Panel controller:
-  - `private/sys/Controller/Panel/TaxonomyController.php`
+  - `private/sys/Controller/Panel/CategoryListController.php, private/sys/Controller/Panel/CategoryEditController.php`
 - Persistence:
-  - `private/sys/Repository/CategoryRepository.php`
+  - `private/sys/Repository/CategoryRead.php, private/sys/Repository/CategoryWrite.php`
 
 ### Panel Routes
 
-Declared in `panel/index.php`:
+Declared in `private/sys/Router/Panel/CategoryRouter.php`:
 
 - `GET /category` -> list
 - `GET /category/edit` -> create form
@@ -107,39 +105,43 @@ All state-changing routes use CSRF validation.
 
 ### Controller Flow
 
-`TaxonomyController` category handlers:
+Split category handlers:
 
 - `categoryList()`
-  - Requires login + `Manage Taxonomy` permission.
-  - Supports optional `?set={id}` filtering and renders set-aware rows from `CategoryRepository::listPageForPanel(...)`.
+  - Owned by `CategoryListController`.
+  - Requires login + category route `view` permission.
+  - Supports optional `?set={id}` filtering and renders set-aware rows from `CategoryRead::listPage(...)`.
 - `categoryEdit(?int $id)`
+  - Owned by `CategoryEditController`.
   - Loads existing row when id is provided.
   - Missing id row triggers flash error + redirect to `/category`.
 - `categorySave(array $post, array $files = [])`
+  - Owned by `CategoryEditController`.
   - Validates CSRF.
   - Sanitizes/normalizes `id`, `name`, `slug`, `set_id`, `description` via `InputSanitizer`.
   - Requires non-empty `name`, valid `slug`, and valid set id.
-  - Saves text fields via `CategoryRepository::save(...)`.
-  - Processes optional `cover_image` and `preview_image` uploads (single-file each), optional remove flags, and writes image-path columns via `CategoryRepository::updateImagePaths(...)`.
+  - Saves text fields via `CategoryWrite::save(...)`.
+  - Processes optional `cover_image` and `preview_image` uploads (single-file each), optional remove flags, and writes image-path columns via `CategoryWrite::updateImageFiles(...)`.
   - Upload files/variants are stored under `public/uploads/categories/{id}/` using configured `media.images.*` rules.
 - `categoryDelete(array $post)`
+  - Owned by `CategoryEditController`.
   - Validates CSRF.
   - Supports single delete (`id`) and bulk delete (`selected_ids[]`).
   - Removes associated stored cover/preview image files for deleted categories.
   - Reports deleted/failed counts for bulk operations.
-- `categorySetList()`, `categorySetEdit()`, `categorySetSave()`, `categorySetDelete()`
+- `categorySetList()` (in `CategoryListController`), `categorySetEdit()`, `categorySetSave()`, `categorySetDelete()` (in `CategoryEditController`)
   - Manage file-backed category sets under `private/dat/category-set/`.
   - Block deleting the stock `Default Category Set`, sets with assigned categories, or sets still explicitly assigned to channels.
 
 ### Data Model And Repository Behavior
 
-`CategoryRepository` behavior:
+`CategoryRead` + `CategoryWrite` behavior:
 
 - `listAll()` returns categories with page counts via `page_categories` join.
 - Category rows persist numeric `set_id` membership in the database for fast channel/page filtering.
-- `save(...)` handles create/update in one method.
-- `updateImagePaths(...)` persists cover/preview source + variant paths.
-- `deleteById(...)` runs in a transaction:
+- `CategoryWrite::save(...)` handles create/update in one method.
+- `CategoryWrite::updateImageFiles(...)` persists cover/preview source + variant paths.
+- `CategoryWrite::deleteById(...)` runs in a transaction:
   - deletes `page_categories` rows for that category
   - deletes category row
 
@@ -158,7 +160,7 @@ Storage detail:
 
 ### Security/Validation Expectations
 
-- Permission gate: `Manage Taxonomy`.
+- Permission gate: category route permissions (`view`, `create`, `edit`, `delete`).
 - CSRF on POST actions.
 - Sanitization via centralized `InputSanitizer`.
 - Repository operations use prepared statements.

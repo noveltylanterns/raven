@@ -94,6 +94,7 @@ final class Meta
         );
 
         $pageId = (int) ($page['id'] ?? 0);
+        // Without a valid page id there is no preview-image override to resolve.
         if ($pageId < 1) {
             return $site;
         }
@@ -103,6 +104,7 @@ final class Meta
             (string) ($site['domain'] ?? 'localhost'),
             (string) ($site['protocol'] ?? 'https')
         );
+        // Keep inherited meta image when page preview URL is absent or invalid.
         if ($previewImageUrl === '') {
             return $site;
         }
@@ -134,7 +136,9 @@ final class Meta
             trim((string) ($taxonomy['cover_image_sm_path'] ?? '')),
         ];
 
+        // Use the first non-empty candidate that resolves to a valid absolute URL.
         foreach ($candidates as $candidate) {
+            // Empty candidate slots are ignored.
             if ($candidate === '') {
                 continue;
             }
@@ -144,6 +148,7 @@ final class Meta
                 $configuredDomain,
                 (string) ($site['protocol'] ?? 'https')
             );
+            // Invalid/unresolvable candidates are skipped until one succeeds.
             if ($resolved === '') {
                 continue;
             }
@@ -166,14 +171,17 @@ final class Meta
     public function absoluteMetaImageUrl(string $value, string $configuredDomain, string $configuredProtocol = ''): string
     {
         $value = trim(str_replace(["\r", "\n", "\0"], '', $value));
+        // Empty strings cannot produce a usable absolute URL.
         if ($value === '') {
             return '';
         }
 
+        // Protocol-relative URLs are rejected to avoid mixed-scheme ambiguity.
         if (str_starts_with($value, '//')) {
             return '';
         }
 
+        // Absolute URLs are accepted only for explicit http/https schemes.
         if (filter_var($value, FILTER_VALIDATE_URL) !== false) {
             $scheme = strtolower((string) parse_url($value, PHP_URL_SCHEME));
             return in_array($scheme, ['http', 'https'], true) ? $value : '';
@@ -253,6 +261,7 @@ final class Meta
     private function themeUrl(string $siteUrl, string $themeCssSlug): string
     {
         $themeCssSlug = trim($themeCssSlug);
+        // Fall back to canonical theme asset folder when slug is blank.
         if ($themeCssSlug === '') {
             $themeCssSlug = 'raven';
         }
@@ -270,16 +279,19 @@ final class Meta
         $site['feed_rss_url'] = '';
         $site['feed_atom_url'] = '';
 
+        // Feed links are omitted when site URL is missing or feeds are disabled.
         if ($siteUrl === '' || !$this->feedParser->feedEnabled()) {
             return $site;
         }
 
         $rssRoute = $this->feedParser->rssRoute();
+        // Emit RSS URL only when feed policy exposes an RSS route.
         if ($rssRoute !== '') {
             $site['feed_rss_url'] = $siteUrl . '/' . ltrim($rssRoute, '/');
         }
 
         $atomRoute = $this->feedParser->atomRoute();
+        // Emit Atom URL only when feed policy exposes an Atom route.
         if ($atomRoute !== '') {
             $site['feed_atom_url'] = $siteUrl . '/' . ltrim($atomRoute, '/');
         }
@@ -300,11 +312,13 @@ final class Meta
     ): string {
         $fallback = trim($fallback);
         $authorUserId = (int) ($page['author'] ?? 0);
+        // Without a valid author id we cannot resolve profile-owned social metadata.
         if ($authorUserId < 1) {
             return $fallback;
         }
 
         $author = $authorById($authorUserId);
+        // Missing author rows preserve configured fallback creator value.
         if (!is_array($author)) {
             return $fallback;
         }

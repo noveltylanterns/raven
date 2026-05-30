@@ -31,6 +31,7 @@ final class ChannelPolicy
     public static function normalizeChannelRouteMode(string $value): string
     {
         $mode = strtolower(trim($value));
+        // Empty values fall back to inherit so global policy remains the source of truth.
         if ($mode === '' || $mode === 'inherit') {
             return 'inherit';
         }
@@ -104,6 +105,7 @@ final class ChannelPolicy
     public static function resolveSeparator(string $channelValue, string $globalValue): string
     {
         $normalizedChannel = self::normalizeChannelSeparator($channelValue);
+        // Concrete channel separators override the global fallback immediately.
         if ($normalizedChannel !== 'inherit') {
             return $normalizedChannel;
         }

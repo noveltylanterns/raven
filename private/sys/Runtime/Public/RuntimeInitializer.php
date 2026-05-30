@@ -82,6 +82,7 @@ final class RuntimeInitializer
                     'tag_enabled'      => $tagEnabled,
                 ];
 
+                // Domain is optional so templates can request local-only site metadata.
                 if ($includeDomain) {
                     $site['domain'] = (string) $rvn['config']->get('site.domain', 'localhost');
                 }

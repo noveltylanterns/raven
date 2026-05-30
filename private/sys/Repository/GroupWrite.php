@@ -68,8 +68,10 @@ final class GroupWrite
         $routeEnabled = !empty($data['route']) ? 1 : 0;
         $now = gmdate('Y-m-d H:i:s');
 
+        // Positive id selects update flow; null/zero selects create flow.
         if ($id !== null && $id > 0) {
             $existing = $this->findRawById($id);
+            // Editing requires an existing persisted group row.
             if ($existing === null) {
                 throw new RuntimeException('Group not found.');
             }
@@ -77,11 +79,13 @@ final class GroupWrite
             $isStock = $this->rolePolicy->isStockRoleSlug((string) ($existing['slug'] ?? ''));
             $existingSlug = strtolower(trim((string) ($existing['slug'] ?? '')));
 
+            // Stock roles keep immutable slugs even when display fields are updated.
             if ($isStock) {
                 // Stock groups keep their canonical slugs even when their display names change.
                 $slug = trim((string) ($existing['slug'] ?? ''));
             }
 
+            // Name is required for both stock and custom group updates.
             if ($name === '') {
                 throw new RuntimeException('Group name is required.');
             }
@@ -91,12 +95,15 @@ final class GroupWrite
             $routeEnabled = (int) ($normalizedStockRole['route'] ?? $routeEnabled);
             $mask = (int) ($normalizedStockRole['permissions'] ?? $mask);
 
+            // Re-derive slug from name when submitted slug normalizes to empty.
             if ($slug === '') {
                 $slug = $this->rolePolicy->normalizeSlug($name);
             }
+            // Empty slug after normalization is not allowed.
             if ($slug === '') {
                 throw new RuntimeException('Group slug is required.');
             }
+            // Enforce slug uniqueness across other group rows.
             if ($this->slugExistsForOtherGroup($id, $slug)) {
                 throw new RuntimeException('Group slug already exists.');
             }
@@ -125,15 +132,19 @@ final class GroupWrite
             return $id;
         }
 
+        // Create flow also requires non-empty name.
         if ($name === '') {
             throw new RuntimeException('Group name is required.');
         }
+        // Create flow requires non-empty normalized slug.
         if ($slug === '') {
             throw new RuntimeException('Group slug is required.');
         }
+        // Reserved stock slugs cannot be reused by custom groups.
         if ($this->rolePolicy->isStockRoleSlug($slug)) {
             throw new RuntimeException('Reserved stock group slugs cannot be reused.');
         }
+        // Enforce slug uniqueness before insert.
         if ($this->slugExistsForOtherGroup(0, $slug)) {
             throw new RuntimeException('Group slug already exists.');
         }
@@ -204,10 +215,12 @@ final class GroupWrite
         $userGroups = $this->table('user_groups');
 
         $group = $this->findRawById($id);
+        // Delete requests must target an existing group row.
         if ($group === null) {
             throw new RuntimeException('Group not found.');
         }
 
+        // Stock roles are immutable and cannot be removed.
         if ($this->rolePolicy->isStockRoleSlug((string) ($group['slug'] ?? ''))) {
             throw new RuntimeException('Stock groups cannot be deleted.');
         }
@@ -219,6 +232,7 @@ final class GroupWrite
 
         $this->db->beginTransaction();
 
+        // Remove membership links and group row as one transaction.
         try {
             $deleteMemberships = $this->db->prepare(
                 'DELETE FROM ' . $userGroups . ' WHERE "group" = :group_id'
@@ -230,6 +244,7 @@ final class GroupWrite
 
             $this->db->commit();
         } catch (\Throwable $exception) {
+            // Roll back only when transaction remains active after failure.
             if ($this->db->inTransaction()) {
                 $this->db->rollBack();
             }
@@ -252,6 +267,7 @@ final class GroupWrite
         );
         $stmt->execute([':min_id' => self::CUSTOM_GROUP_ID_START]);
         $maxId = $stmt->fetchColumn();
+        // Empty custom-group table starts allocation at the custom id floor.
         if ($maxId === false || $maxId === null) {
             return self::CUSTOM_GROUP_ID_START;
         }
@@ -344,6 +360,7 @@ final class GroupWrite
     private function normalizeNullableFilename(mixed $value): ?string
     {
         $raw = trim((string) $value);
+        // Empty values clear the stored image filename.
         if ($raw === '') {
             return null;
         }

@@ -41,6 +41,7 @@ final class RuntimeBuilder
      */
     public static function build(array $rvn): array
     {
+        // Skip public wiring when required bootstrap dependencies are missing.
         if (!isset($rvn['root'], $rvn['db'], $rvn['auth_db'], $rvn['driver'], $rvn['prefix'], $rvn['config'], $rvn['auth'], $rvn['input'], $rvn['csrf'])) {
             return $rvn;
         }
@@ -62,11 +63,13 @@ final class RuntimeBuilder
          */
         $resolveAuthDb = static function () use (&$rvn): PDO {
             $authDb = $rvn['auth_db'] ?? null;
+            // Resolve lazy auth DB handle exactly once on first use.
             if (is_callable($authDb)) {
                 $authDb = $authDb();
                 $rvn['auth_db'] = $authDb;
             }
 
+            // Guard against missing/miswired auth DB resolvers.
             if (!$authDb instanceof PDO) {
                 throw new RuntimeException('Public runtime auth database resolver is unavailable.');
             }
@@ -79,11 +82,13 @@ final class RuntimeBuilder
          */
         $resolveAuth = static function () use (&$rvn): Gatekeeper {
             $auth = $rvn['auth'] ?? null;
+            // Resolve lazy auth service exactly once on first use.
             if (is_callable($auth)) {
                 $auth = $auth();
                 $rvn['auth'] = $auth;
             }
 
+            // Guard against missing/miswired auth service resolvers.
             if (!$auth instanceof Gatekeeper) {
                 throw new RuntimeException('Public runtime auth service resolver is unavailable.');
             }
@@ -103,6 +108,7 @@ final class RuntimeBuilder
             $value = null;
 
             return static function () use (&$resolved, &$value, $builder): mixed {
+                // Return memoized instance after first successful build.
                 if ($resolved) {
                     return $value;
                 }
@@ -135,6 +141,7 @@ final class RuntimeBuilder
          */
         $extensionServicesProvider = static function (?string $extensionDirectory = null) use (&$extensionServices, &$rvn): array {
             $extensionDirectory = is_string($extensionDirectory) ? trim($extensionDirectory) : '';
+            // Prefer per-extension provider when caller requests one explicit extension directory.
             if (
                 $extensionDirectory !== ''
                 && is_callable($rvn['extension_services_for'] ?? null)
@@ -144,10 +151,12 @@ final class RuntimeBuilder
                 return $extensionServicesFor($extensionDirectory);
             }
 
+            // Reuse memoized extension-service map once initialized.
             if (is_array($extensionServices)) {
                 return $extensionServices;
             }
 
+            // Fallback to global extension-services provider when available.
             if (is_callable($rvn['extension_services_all'] ?? null)) {
                 /** @var callable(): array<string, array<string, mixed>> $extensionServicesAll */
                 $extensionServicesAll = $rvn['extension_services_all'];

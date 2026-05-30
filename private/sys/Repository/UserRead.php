@@ -99,6 +99,7 @@ class UserRead
         );
         $stmt->execute();
         $rows = $stmt->fetchAll() ?: [];
+        // Short-circuit when no users exist in the routing dataset.
         if ($rows === []) {
             return [];
         }
@@ -108,10 +109,12 @@ class UserRead
         $groupMap = [];
         foreach ($rows as $row) {
             $userId = (int) ($row['id'] ?? 0);
+            // Ignore malformed rows that cannot be mapped to a persisted user id.
             if ($userId < 1) {
                 continue;
             }
 
+            // Initialize one base user row, then append zero-or-more group entries.
             if (!isset($usersById[$userId])) {
                 $usersById[$userId] = [
                     'id' => $userId,
@@ -130,6 +133,7 @@ class UserRead
             }
 
             $groupName = trim((string) ($row['group_name'] ?? ''));
+            // Keep users without groups while skipping empty group labels.
             if ($groupName === '') {
                 continue;
             }
@@ -159,6 +163,7 @@ class UserRead
      */
     public function listRoutingData(bool $includeGroups, bool $includeUsers): array
     {
+        // Avoid generating UNION SQL when neither branch is requested.
         if (!$includeGroups && !$includeUsers) {
             return ['group_rows' => [], 'user_rows' => []];
         }
@@ -168,6 +173,7 @@ class UserRead
         $ugTable      = $this->groupTable('user_groups');
         $unionParts   = [];
 
+        // Group branch contributes group inventory rows with member counts.
         if ($includeGroups) {
             $unionParts[] = 'SELECT
                     \'group\' AS row_type,
@@ -195,6 +201,7 @@ class UserRead
                  ) mc ON mc.group_id = g.id';
         }
 
+        // User branch contributes user/group membership rows for hydration.
         if ($includeUsers) {
             $unionParts[] = 'SELECT
                     \'user\' AS row_type,
@@ -255,10 +262,13 @@ class UserRead
         /** @var array<int, array<int, array{name: string, permissions: int}>> $groupMap */
         $groupMap = [];
 
+        // Split combined UNION rows into dedicated group rows and user/group maps.
         foreach ($rows as $row) {
             $rowType = strtolower(trim((string) ($row['row_type'] ?? '')));
+            // Handle group rows first and continue to avoid user-only parsing.
             if ($rowType === 'group') {
                 $groupId = (int) ($row['group_id'] ?? 0);
+                // Ignore malformed group rows that lack a valid numeric id.
                 if ($groupId < 1) {
                     continue;
                 }
@@ -275,15 +285,18 @@ class UserRead
                 continue;
             }
 
+            // Ignore unknown UNION row types to keep output contracts strict.
             if ($rowType !== 'user') {
                 continue;
             }
 
             $userId = (int) ($row['user_id'] ?? 0);
+            // Skip invalid user rows that cannot map to persisted users.
             if ($userId < 1) {
                 continue;
             }
 
+            // Create one canonical user row before attaching group memberships.
             if (!isset($usersById[$userId])) {
                 $usersById[$userId] = [
                     'id'       => $userId,
@@ -297,6 +310,7 @@ class UserRead
             }
 
             $groupName = trim((string) ($row['user_group_name'] ?? ''));
+            // Users may exist without groups; skip empty group labels only.
             if ($groupName === '') {
                 continue;
             }
@@ -323,6 +337,7 @@ class UserRead
     public function count(?string $groupNameFilter = null): int
     {
         $normalizedGroupFilter = strtolower(trim((string) ($groupNameFilter ?? '')));
+        // Unfiltered counts can use the auth users table directly.
         if ($normalizedGroupFilter === '') {
             $usersTable = $this->authTable('users');
             $stmt = $this->authDb->prepare('SELECT COUNT(*) FROM ' . $usersTable);
@@ -360,6 +375,7 @@ class UserRead
         $normalizedGroupFilter = strtolower(trim((string) ($groupNameFilter ?? '')));
         $userIds = [];
 
+        // Resolve page ids from auth table unless a group-name filter is active.
         if ($normalizedGroupFilter === '') {
             $stmt = $this->authDb->prepare(
                 'SELECT id
@@ -370,8 +386,10 @@ class UserRead
             $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
             $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
             $stmt->execute();
+            // Collect only positive ids from the paged user-id query.
             foreach ($stmt->fetchAll() ?: [] as $row) {
                 $userId = (int) ($row['id'] ?? 0);
+                // Keep only valid positive user ids from the page query.
                 if ($userId > 0) {
                     $userIds[] = $userId;
                 }
@@ -390,8 +408,10 @@ class UserRead
             $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
             $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
             $stmt->execute();
+            // Collect filtered user ids returned from the group-membership query.
             foreach ($stmt->fetchAll() ?: [] as $row) {
                 $userId = (int) ($row['user_id'] ?? 0);
+                // Ignore malformed membership rows with non-positive ids.
                 if ($userId > 0) {
                     $userIds[] = $userId;
                 }
@@ -399,12 +419,14 @@ class UserRead
         }
 
         $userIds = array_values(array_unique(array_filter($userIds, static fn (int $id): bool => $id > 0)));
+        // Nothing to hydrate when no valid ids remain after normalization.
         if ($userIds === []) {
             return [];
         }
 
         $placeholders = [];
         $params = [];
+        // Build deterministic named placeholders for the IN (...) auth lookup query.
         foreach ($userIds as $index => $userId) {
             $placeholder = ':user_id_' . $index;
             $placeholders[] = $placeholder;
@@ -446,6 +468,7 @@ class UserRead
         $safeOffset = max(0, $offset);
         $total = 0;
 
+        // Use the unfiltered CTE branch when no group-name filter is requested.
         if ($normalizedGroupFilter === '') {
             // Window function keeps a single query instead of a separate COUNT pass.
             $stmt = $this->rvnDb->prepare(
@@ -541,8 +564,10 @@ class UserRead
         /** @var array<int, array<int, array{name: string, permissions: int}>> $groupMap */
         $groupMap = [];
         $groupOptionsById = [];
+        // Split each row into group option metadata and per-user hydration inputs.
         foreach ($rows as $row) {
             $groupId = (int) ($row['group_id'] ?? 0);
+            // Register each group option once so filter dropdowns are deduplicated.
             if ($groupId > 0 && !isset($groupOptionsById[$groupId])) {
                 $groupOptionsById[$groupId] = [
                     'id'          => $groupId,
@@ -554,11 +579,14 @@ class UserRead
             }
 
             $userId = (int) ($row['user_id'] ?? 0);
+            // Group-only rows do not carry a user id and are skipped for user hydration.
             if ($userId < 1) {
                 continue;
             }
 
+            // Initialize each user once and capture total_rows from first user encounter.
             if (!isset($usersById[$userId])) {
+                // Window total is repeated across rows; read it once.
                 if ($total === 0) {
                     $total = (int) ($row['total_rows'] ?? 0);
                 }
@@ -574,6 +602,7 @@ class UserRead
                 ];
             }
 
+            // Attach only positively selected group memberships for each user.
             if ($groupId > 0 && (int) ($row['group_selected'] ?? 0) === 1) {
                 $groupMap[$userId] ??= [];
                 $groupMap[$userId][] = [
@@ -595,12 +624,14 @@ class UserRead
             static function (array $a, array $b): int {
                 $aIsStock = (int) ($a['is_stock'] ?? 0);
                 $bIsStock = (int) ($b['is_stock'] ?? 0);
+                // Stock groups sort first so built-ins stay visible at the top.
                 if ($aIsStock !== $bIsStock) {
                     return $bIsStock <=> $aIsStock;
                 }
 
                 $aName = strtolower(trim((string) ($a['name'] ?? '')));
                 $bName = strtolower(trim((string) ($b['name'] ?? '')));
+                // Name order is the primary tie-break once stock ordering is applied.
                 if ($aName !== $bName) {
                     return $aName <=> $bName;
                 }
@@ -645,12 +676,14 @@ class UserRead
         $stmt->execute([':id' => $id]);
 
         $row = $stmt->fetch();
+        // Missing id lookups return null to mirror other repository finders.
         if ($row === false) {
             return null;
         }
 
         $groupIds = $this->groupIdsForUser($id);
         $primaryGroupId = (int) ($row['primary_group_id'] ?? 0);
+        // Ensure primary group points at one of the currently assigned group ids.
         if ($primaryGroupId < 1 || !in_array($primaryGroupId, $groupIds, true)) {
             $primaryGroupId = $groupIds[0] ?? 0;
         }
@@ -696,6 +729,7 @@ class UserRead
         $stmt->execute([':username' => $username]);
 
         $row = $stmt->fetch();
+        // Unknown usernames return null instead of an empty placeholder profile.
         if ($row === false) {
             return null;
         }
@@ -720,6 +754,7 @@ class UserRead
      */
     public function findProfileSummaryById(int $userId): ?array
     {
+        // Reject non-positive ids before issuing a database lookup.
         if ($userId <= 0) {
             return null;
         }
@@ -735,6 +770,7 @@ class UserRead
         $stmt->execute([':id' => $userId]);
 
         $row = $stmt->fetch();
+        // Missing ids return null for consistent profile-summary semantics.
         if ($row === false) {
             return null;
         }
@@ -760,6 +796,7 @@ class UserRead
     public function findProfileSummaryByString(string $userString): ?array
     {
         $normalized = trim($userString);
+        // Empty string tokens are invalid profile selectors.
         if ($normalized === '') {
             return null;
         }
@@ -775,6 +812,7 @@ class UserRead
         $stmt->execute([':string' => $normalized]);
 
         $row = $stmt->fetch();
+        // Unknown string tokens resolve to null rather than partial data.
         if ($row === false) {
             return null;
         }
@@ -799,6 +837,7 @@ class UserRead
      */
     public function listProfileSummariesByGroupId(int $groupId): array
     {
+        // Non-positive group ids cannot have valid memberships.
         if ($groupId <= 0) {
             return [];
         }
@@ -814,13 +853,16 @@ class UserRead
 
         $membershipRows = $membershipStmt->fetchAll() ?: [];
         $userIds = [];
+        // Collect unique positive member ids from the group-membership query.
         foreach ($membershipRows as $row) {
             $userId = (int) ($row['user_id'] ?? 0);
+            // Ignore malformed rows and keep ids unique via key assignment.
             if ($userId > 0) {
                 $userIds[$userId] = $userId;
             }
         }
 
+        // No memberships means no profile summary rows to hydrate.
         if ($userIds === []) {
             return [];
         }
@@ -829,6 +871,7 @@ class UserRead
         $placeholders = [];
         $params = [];
         $index = 0;
+        // Build deterministic placeholders for member profile lookup by id list.
         foreach (array_values($userIds) as $userId) {
             $placeholder = ':user_id_' . $index;
             $placeholders[] = $placeholder;
@@ -846,6 +889,7 @@ class UserRead
 
         $rows = $stmt->fetchAll() ?: [];
         $profiles = [];
+        // Normalize each auth row into the lightweight public profile payload.
         foreach ($rows as $row) {
             $profiles[] = [
                 'id' => (int) ($row['id'] ?? 0),
@@ -924,8 +968,10 @@ class UserRead
 
         $rows = $stmt->fetchAll() ?: [];
         $ids = [];
+        // Preserve ascending membership order while filtering out invalid ids.
         foreach ($rows as $row) {
             $gid = (int) ($row['group_id'] ?? 0);
+            // Group ids are expected to be positive integers only.
             if ($gid > 0) {
                 $ids[] = $gid;
             }
@@ -967,8 +1013,10 @@ class UserRead
 
         $where  = '';
         $params = [];
+        // Optional filter constrains group joins to one explicit user-id subset.
         if ($userIds !== []) {
             $placeholders = [];
+            // Bind each requested user id individually for portable IN (...) SQL.
             foreach ($userIds as $index => $userId) {
                 $placeholder = ':user_' . $index;
                 $placeholders[] = $placeholder;
@@ -988,6 +1036,7 @@ class UserRead
 
         $rows = $stmt->fetchAll() ?: [];
         $map  = [];
+        // Fold joined membership rows into one map keyed by user id.
         foreach ($rows as $row) {
             $userId = (int) $row['user'];
             $map[$userId] ??= [];
@@ -1010,6 +1059,7 @@ class UserRead
     private function hydrateUsersWithGroupEntries(array $users, array $groupMap): array
     {
         $result = [];
+        // Hydrate each user with computed group display fields used by panel listings.
         foreach ($users as $row) {
             $userId = (int) ($row['id'] ?? 0);
             /** @var array<int, array{name: string, permissions: int}> $groupEntries */

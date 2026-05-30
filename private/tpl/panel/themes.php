@@ -3,7 +3,7 @@
 /**
  * RAVEN CMS
  * ~/private/tpl/panel/themes.php
- * Admin panel public-theme manager for listing, activation, and scaffolding.
+ * Admin panel public-theme manager template for listing, activation, and scaffolding.
  * Docs: https://lanterns.io/raven
  */
 

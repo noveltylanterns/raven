@@ -58,6 +58,7 @@ final class LogsController
     public function logs(): void
     {
         $this->context->requirePanelLogin();
+        // Viewing log entries requires logs:view permission.
         if (!$this->context->requireRoutePermissionOrForbidden('logs', 'view')) {
             return;
         }
@@ -67,9 +68,11 @@ final class LogsController
         $search = $this->input->text($_GET['search'] ?? null, 200) ?? '';
 
         $filters = [];
+        // Apply severity filter only when explicitly selected.
         if ($severity !== '') {
             $filters['severity'] = $severity;
         }
+        // Apply free-text search filter only when user supplied input.
         if ($search !== '') {
             $filters['search'] = $search;
         }
@@ -78,15 +81,18 @@ final class LogsController
         $requestedPage = $this->input->int($_GET['page'] ?? null, 1) ?? 1;
         $totalItems = $this->logger()->count($filters);
         $pagination = Pagination::state($totalItems, $requestedPage, $perPage);
+        // Clamp out-of-range page requests to a valid pagination state.
         if ($totalItems > 0 && $pagination['current'] !== $requestedPage) {
             $requestedPage = $pagination['current'];
         }
 
         $rows = $this->logger()->query($filters, $perPage, $pagination['offset']);
         $paginationQuery = [];
+        // Preserve active severity filter across pagination links.
         if ($severity !== '') {
             $paginationQuery['severity'] = $severity;
         }
+        // Preserve active search filter across pagination links.
         if ($search !== '') {
             $paginationQuery['search'] = $search;
         }
@@ -114,6 +120,7 @@ final class LogsController
     public function logsExport(): void
     {
         $this->context->requirePanelLogin();
+        // Export uses same view permission as the log browser.
         if (!$this->context->requireRoutePermissionOrForbidden('logs', 'view')) {
             return;
         }
@@ -123,9 +130,11 @@ final class LogsController
         $search = $this->input->text($_GET['search'] ?? null, 200) ?? '';
 
         $filters = [];
+        // Apply severity filter only when explicitly selected.
         if ($severity !== '') {
             $filters['severity'] = $severity;
         }
+        // Apply free-text search filter only when user supplied input.
         if ($search !== '') {
             $filters['search'] = $search;
         }
@@ -135,6 +144,7 @@ final class LogsController
         $this->csvHandler()->streamToOutput(
             $filename,
             (static function (array $rows): \Generator {
+                // Emit one CSV row per log entry in stable column order.
                 foreach ($rows as $row) {
                     yield [
                         (string) ($row['id'] ?? ''),
@@ -158,11 +168,13 @@ final class LogsController
     public function logsClear(): void
     {
         $this->context->requirePanelLogin();
+        // Clearing logs is delete-permission gated.
         if (!$this->context->requireRoutePermissionOrForbidden('logs', 'delete')) {
             return;
         }
 
         $post = $_POST;
+        // CSRF validation protects destructive log-clear actions.
         if (!$this->context->csrf()->validate($post['_csrf'] ?? null)) {
             $this->context->flash('error', 'Invalid CSRF token.');
             Redirect::redirect($this->context->panelUrl('/logs'));
@@ -180,11 +192,13 @@ final class LogsController
      */
     private function logger(): Logger
     {
+        // Reuse cached logger instance for all controller actions in this request.
         if ($this->logger instanceof Logger) {
             return $this->logger;
         }
 
         $logger = ($this->loggerResolver)();
+        // Resolver contract must return the concrete logger service.
         if (!$logger instanceof Logger) {
             throw new \RuntimeException('Panel event logger resolver returned an invalid value.');
         }
@@ -200,6 +214,7 @@ final class LogsController
      */
     private function csvHandler(): Csv
     {
+        // Instantiate CSV helper lazily for export requests.
         if (!$this->csvHandler instanceof Csv) {
             $this->csvHandler = new Csv();
         }

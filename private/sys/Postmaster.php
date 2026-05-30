@@ -64,11 +64,13 @@ final class Postmaster
      */
     public function send(Message $message): array
     {
+        // Fail early for unsupported transport selections until additional agents are implemented.
         if ($this->mailAgent !== 'php_mail') {
             return ['ok' => false, 'message' => 'Configured mail agent is not supported yet.'];
         }
 
         $to = $message->to();
+        // A message without To recipients cannot be delivered by either transport path.
         if ($to === []) {
             return ['ok' => false, 'message' => 'No recipients specified.'];
         }
@@ -81,6 +83,7 @@ final class Postmaster
             static fn (string $e): bool => !isset($toMap[$e])
         ));
         $toAndCcMap = $toMap;
+        // Build lookup map so BCC filtering can exclude both To and CC recipients.
         foreach ($cc as $ccEmail) {
             $toAndCcMap[$ccEmail] = true;
         }
@@ -102,7 +105,9 @@ final class Postmaster
 
         $transportError = '';
         $sendmailBinary = $this->sendmailBinary();
+        // Prefer direct sendmail delivery when available for more reliable multi-recipient handling.
         if ($sendmailBinary !== null) {
+            // Stop after first successful transport attempt; no php_mail fallback needed.
             if ($this->viaSendmail($sendmailBinary, $envelopeRecipients, $to, $cc, $subject, $message->body(), $baseHeaders, $this->senderAddress, $transportError)) {
                 return ['ok' => true];
             }
@@ -113,11 +118,13 @@ final class Postmaster
         if ($cc !== []) {
             $headers[] = 'Cc: ' . implode(', ', $cc);
         }
+        // BCC stays in headers only on php_mail fallback path where envelope args are unavailable.
         if ($bcc !== []) {
             $headers[] = 'Bcc: ' . implode(', ', $bcc);
         }
         $toRecipients = implode(', ', $to);
         $ok = @\mail($toRecipients, $subject, $message->body(), implode("\r\n", $headers));
+        // Surface sendmail diagnostics when available to aid mail transport troubleshooting.
         if ($ok !== true) {
             $suffix = $transportError !== '' ? (' ' . $transportError) : '';
             return ['ok' => false, 'message' => 'Failed to send email via php_mail.' . $suffix];
@@ -161,6 +168,7 @@ final class Postmaster
     private function sendmailBinary(): ?string
     {
         $rawPath = trim((string) ini_get('sendmail_path'));
+        // Empty ini setting means sendmail transport is unavailable in this runtime.
         if ($rawPath === '') {
             return null;
         }
@@ -171,6 +179,7 @@ final class Postmaster
         }
 
         $binary = (string) ($matches[1] ?? $matches[2] ?? $matches[3] ?? '');
+        // Require an executable file path before attempting direct sendmail invocation.
         if ($binary === '' || !is_file($binary) || !is_executable($binary)) {
             return null;
         }
@@ -209,6 +218,7 @@ final class Postmaster
         string &$error
     ): bool {
         $error = '';
+        // Sendmail needs at least one envelope recipient and one visible To recipient.
         if ($envelopeRecipients === [] || $toRecipients === []) {
             $error = 'No valid recipients available for sendmail delivery.';
             return false;
@@ -223,6 +233,7 @@ final class Postmaster
             2 => ['pipe', 'w'],
         ];
         $process = @proc_open($command, $descriptorSpec, $pipes);
+        // Abort cleanly when the process cannot be started.
         if (!is_resource($process)) {
             $error = 'Could not start sendmail process.';
             return false;
@@ -232,12 +243,14 @@ final class Postmaster
         $headers = [];
         foreach ($baseHeaders as $headerLine) {
             $line = trim((string) $headerLine);
+            // Preserve only non-empty header lines after trimming user-supplied input.
             if ($line !== '') {
                 // Strip any newlines that slipped through to prevent header injection.
                 $headers[] = str_replace(["\r", "\n"], '', $line);
             }
         }
         $headers[] = 'To: ' . implode(', ', $toRecipients);
+        // Add CC header only when the deduplicated CC list is non-empty.
         if ($ccRecipients !== []) {
             $headers[] = 'Cc: ' . implode(', ', $ccRecipients);
         }
@@ -247,24 +260,28 @@ final class Postmaster
         $normalizedBody = str_replace(["\r\n", "\r"], "\n", $body);
         $fullMessage    = implode("\r\n", $headers) . "\r\n\r\n" . str_replace("\n", "\r\n", $normalizedBody);
 
+        // Write message payload only when stdin pipe is available.
         if (isset($pipes[0]) && is_resource($pipes[0])) {
             fwrite($pipes[0], $fullMessage);
             fclose($pipes[0]);
         }
 
         $stdout = '';
+        // Read and close stdout pipe when exposed by proc_open.
         if (isset($pipes[1]) && is_resource($pipes[1])) {
             $stdout = (string) stream_get_contents($pipes[1]);
             fclose($pipes[1]);
         }
 
         $stderr = '';
+        // Read and close stderr pipe when exposed by proc_open.
         if (isset($pipes[2]) && is_resource($pipes[2])) {
             $stderr = (string) stream_get_contents($pipes[2]);
             fclose($pipes[2]);
         }
 
         $exitCode = proc_close($process);
+        // Non-zero exit code means sendmail rejected or failed delivery.
         if ($exitCode !== 0) {
             $combined = trim(trim($stdout) . PHP_EOL . trim($stderr));
             $error    = $combined !== ''
@@ -295,12 +312,15 @@ final class Postmaster
             'From: ' . $fromHeader,
         ];
 
+        // Reply-To is optional and should only be emitted when explicitly configured per message.
         if ($message->replyTo() !== '') {
             $headers[] = 'Reply-To: ' . $message->replyTo();
         }
 
+        // Accept custom headers only after trimming and newline stripping to prevent injection.
         foreach ($message->customHeaders() as $customHeader) {
             $line = trim((string) $customHeader);
+            // Skip blank custom header fragments after normalization.
             if ($line !== '') {
                 $headers[] = str_replace(["\r", "\n"], '', $line);
             }
@@ -321,9 +341,11 @@ final class Postmaster
      */
     private function buildMessageId(string $siteDomain): string
     {
+        // Prefer CSPRNG entropy for message ids to avoid predictable identifiers.
         try {
             $entropy = bin2hex(random_bytes(12));
         } catch (\Throwable) {
+            // Fallback keeps message delivery functional even when CSPRNG entropy is unavailable.
             $entropy = str_replace('.', '', uniqid('fallback', true));
         }
 

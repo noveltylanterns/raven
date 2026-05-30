@@ -81,9 +81,12 @@ final class AuthController
      */
     public function showLogin(): void
     {
+        // Logged-in users with panel access should bypass login form.
         if ($this->auth->isLoggedIn() && $this->auth->panelService()->canAccessPanel()) {
             $userId = $this->auth->userId();
+            // Users pending interactive 2FA are routed to challenge screen instead of dashboard.
             if ($userId !== null && !$this->auth->isTwoFactorVerifiedForUser($userId)) {
+                // Only redirect when pending 2FA session belongs to current user.
                 if ($this->auth->pendingTwoFactorUserId() === $userId) {
                     Redirect::redirect($this->panelUrl('/login/2fa'));
                 }
@@ -119,6 +122,7 @@ final class AuthController
         $requestedPostLoginRedirect = $this->normalizePostLoginRedirect((string) ($post['redirect_to'] ?? ''));
         $this->loginUiState()->storePostLoginRedirect($requestedPostLoginRedirect);
 
+        // Reject forged form posts before authentication attempt handling.
         if (!$this->csrf->validate($post['_csrf'] ?? null)) {
             $this->flash('error', 'Invalid CSRF token.');
             Redirect::redirect($this->panelUrl('/login'));
@@ -137,10 +141,12 @@ final class AuthController
             }
         );
 
+        // Successful primary auth may still require interactive 2FA challenge.
         if (($result['status'] ?? '') === 'two_factor_required') {
             Redirect::redirect($this->panelUrl('/login/2fa'));
         }
 
+        // Fully verified sessions continue to post-login redirect target.
         if (($result['status'] ?? '') === 'verified') {
             Redirect::redirect($this->consumePostLoginRedirectOrDefault());
         }
@@ -157,12 +163,14 @@ final class AuthController
     public function showLoginTwoFactor(): void
     {
         $userId = $this->auth->userId();
+        // Missing/unauthorized user session is reset before returning to login.
         if ($userId === null || !$this->auth->panelService()->canAccessPanel($userId)) {
             $this->logoutPanelSession();
             Redirect::redirect($this->panelUrl('/login'));
         }
 
         $viewState = $this->loginChallenge()->buildViewState($this->auth, $this->loginUiState());
+        // Invalid or expired challenge state resets session and returns to login.
         if (!(bool) ($viewState['ok'] ?? false)) {
             $this->logoutPanelSession();
             Redirect::redirect($this->panelUrl('/login'));
@@ -192,23 +200,27 @@ final class AuthController
      */
     public function loginTwoFactor(array $post): void
     {
+        // Reject forged challenge posts before verification work.
         if (!$this->csrf->validate($post['_csrf'] ?? null)) {
             $this->flash('error', 'Invalid CSRF token.');
             Redirect::redirect($this->panelUrl('/login/2fa'));
         }
 
         $result = $this->loginChallenge()->verifyCodeChallenge($this->auth, $this->loginUiState(), $post);
+        // Expired login sessions are cleared before redirecting user to fresh login.
         if (($result['status'] ?? '') === 'expired') {
             $this->logoutPanelSession();
             $this->flash('error', (string) ($result['message'] ?? 'Your login session expired. Please log in again.'));
             Redirect::redirect($this->panelUrl('/login'));
         }
 
+        // Email challenge sends user back to challenge screen with success flash.
         if (($result['status'] ?? '') === 'email_sent') {
             $this->flash('success', (string) ($result['message'] ?? 'Check your email for a verification code.'));
             Redirect::redirect($this->panelUrl('/login/2fa'));
         }
 
+        // Any non-verified result remains on 2FA screen with error message.
         if (($result['status'] ?? '') !== 'verified') {
             $this->flash('error', (string) ($result['message'] ?? 'Verification failed.'));
             Redirect::redirect($this->panelUrl('/login/2fa'));
@@ -225,18 +237,21 @@ final class AuthController
      */
     public function loginTwoFactorSelect(array $post): void
     {
+        // Reject forged method-selection posts before state updates.
         if (!$this->csrf->validate($post['_csrf'] ?? null)) {
             $this->flash('error', 'Invalid CSRF token.');
             Redirect::redirect($this->panelUrl('/login/2fa'));
         }
 
         $result = $this->loginChallenge()->selectMethod($this->auth, $this->loginUiState(), $post);
+        // Expired login sessions are cleared before redirecting user to fresh login.
         if (($result['status'] ?? '') === 'expired') {
             $this->logoutPanelSession();
             $this->flash('error', (string) ($result['message'] ?? 'Your login session expired. Please log in again.'));
             Redirect::redirect($this->panelUrl('/login'));
         }
 
+        // Invalid method choice returns user to challenge form with error flash.
         if (($result['status'] ?? '') === 'invalid_method') {
             $this->flash('error', (string) ($result['message'] ?? 'Selected verification method is invalid.'));
         }
@@ -252,12 +267,14 @@ final class AuthController
      */
     public function loginTwoFactorWebauthnOptions(array $post): void
     {
+        // Reject forged WebAuthn option requests before challenge initialization.
         if (!$this->csrf->validate($post['_csrf'] ?? null)) {
             $this->jsonResponse(['ok' => false, 'message' => 'Invalid CSRF token.'], 400);
             return;
         }
 
         $result = $this->loginChallenge()->webauthnOptions($this->auth, $this->loginUiState(), $_SERVER);
+        // Forward challenge-init errors with provided status/message payload.
         if (!(bool) ($result['ok'] ?? false)) {
             $this->jsonResponse(
                 ['ok' => false, 'message' => (string) ($result['message'] ?? 'Failed to initialize WebAuthn challenge.')],
@@ -280,6 +297,7 @@ final class AuthController
      */
     public function loginTwoFactorWebauthnVerify(array $post): void
     {
+        // Reject forged WebAuthn verify requests before assertion verification.
         if (!$this->csrf->validate($post['_csrf'] ?? null)) {
             $this->jsonResponse(['ok' => false, 'message' => 'Invalid CSRF token.'], 400);
             return;
@@ -291,6 +309,7 @@ final class AuthController
             $post,
             $_SERVER
         );
+        // Forward verification failure with provided status/message payload.
         if (!(bool) ($result['ok'] ?? false)) {
             $this->jsonResponse(
                 ['ok' => false, 'message' => (string) ($result['message'] ?? 'Security key verification failed.')],
@@ -310,6 +329,7 @@ final class AuthController
      */
     public function logout(array $post): void
     {
+        // Logout requires CSRF token because it mutates authenticated session state.
         if (!$this->csrf->validate($post['_csrf'] ?? null)) {
             http_response_code(400);
             echo 'Invalid CSRF token.';
@@ -393,6 +413,7 @@ final class AuthController
     {
         $raw = $this->loginUiState()->consumePostLoginRedirect();
         $normalized = $this->normalizePostLoginRedirect($raw);
+        // Preserve explicit safe redirect target when available.
         if ($normalized !== '') {
             return $normalized;
         }
@@ -409,36 +430,44 @@ final class AuthController
     private function normalizePostLoginRedirect(string $value): string
     {
         $value = trim($value);
+        // Empty redirect candidates are treated as no-op.
         if ($value === '') {
             return '';
         }
 
+        // Only absolute-path local redirects are accepted.
         if (!str_starts_with($value, '/') || str_starts_with($value, '//')) {
             return '';
         }
 
         $parts = @parse_url($value);
+        // Reject malformed URLs that cannot be parsed safely.
         if (!is_array($parts)) {
             return '';
         }
 
+        // Reject redirects that include external URL authority/scheme components.
         if (isset($parts['scheme']) || isset($parts['host']) || isset($parts['user']) || isset($parts['pass'])) {
             return '';
         }
 
         $path = (string) ($parts['path'] ?? '/');
+        // Path must remain absolute and non-empty after parsing.
         if ($path === '' || !str_starts_with($path, '/')) {
             return '';
         }
 
+        // Reject null-byte payloads in redirect paths.
         if (str_contains($path, "\0")) {
             return '';
         }
 
         $normalized = $path;
+        // Preserve query component when present.
         if (isset($parts['query']) && $parts['query'] !== '') {
             $normalized .= '?' . (string) $parts['query'];
         }
+        // Preserve fragment component when present.
         if (isset($parts['fragment']) && $parts['fragment'] !== '') {
             $normalized .= '#' . (string) $parts['fragment'];
         }
@@ -461,6 +490,7 @@ final class AuthController
      */
     private function loginUiState(): LoginUiState
     {
+        // Lazily initialize panel-scoped login UI state once per controller instance.
         if (!$this->loginUiState instanceof LoginUiState) {
             $this->loginUiState = LoginUiState::forPanel();
         }
@@ -475,6 +505,7 @@ final class AuthController
      */
     private function loginAttempt(): LoginAttempt
     {
+        // Lazily initialize login attempt workflow once per controller instance.
         if (!$this->loginAttempt instanceof LoginAttempt) {
             $this->loginAttempt = new LoginAttempt(
                 $this->config,
@@ -507,6 +538,7 @@ final class AuthController
      */
     private function loginChallenge(): LoginChallenge
     {
+        // Lazily initialize challenge workflow with local Postmaster wiring.
         if (!$this->loginChallenge instanceof LoginChallenge) {
             $this->loginChallenge = new LoginChallenge(
                 $this->config,

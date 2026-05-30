@@ -44,6 +44,7 @@ final class UserRouter
 
         $router->add('GET', '/user/edit/{id}', static function (array $params) use ($panelUserEditController, $input, $renderNotFound): void {
             $id = RouteValidator::intOrNotFound($input, $params['id'] ?? null, 1, $renderNotFound);
+            // Validation helper already rendered not-found for invalid ids.
             if ($id === null) {
                 return;
             }

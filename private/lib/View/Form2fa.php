@@ -341,9 +341,11 @@ final class Form2fa
             if ($leftLabel === '' || $rightLabel === '') {
                 $leftFallback = strtolower(Login2fa::defaultLabelForType((string) ($left['type'] ?? '')));
                 $rightFallback = strtolower(Login2fa::defaultLabelForType((string) ($right['type'] ?? '')));
+                // Replace missing left label with its normalized type default.
                 if ($leftLabel === '') {
                     $leftLabel = $leftFallback;
                 }
+                // Replace missing right label with its normalized type default.
                 if ($rightLabel === '') {
                     $rightLabel = $rightFallback;
                 }
@@ -395,11 +397,13 @@ final class Form2fa
         }
 
         $provisioningUri = Totp::provisioningUri($totpIssuer, $accountEmail, $secret);
+        // Provisioning URI is required for QR/bootstrap setup flow.
         if ($provisioningUri === '') {
             return ['ok' => false, 'message' => 'Unable to build TOTP provisioning data.'];
         }
 
         $accountAddress = $this->input->email($accountEmail);
+        // Fall back to local placeholder when account email is invalid/missing.
         if ($accountAddress === null) {
             $accountAddress = 'account@local';
         }
@@ -422,6 +426,7 @@ final class Form2fa
     public function generateRecoveryPhrase(int $wordCount = 12): ?string
     {
         $phrase = PhraseGenerate::generate($wordCount);
+        // Reject generation output unless it passes canonical phrase validation.
         if (!is_string($phrase) || !PhraseValidate::isValid($phrase, $wordCount)) {
             return null;
         }
@@ -448,11 +453,13 @@ final class Form2fa
 
         $appendCredentialId = static function (string $credentialIdB64) use (&$excludeCredentialIds, &$seenCredentialIds): void {
             $credentialIdB64 = trim($credentialIdB64);
+            // Ignore blank or already-seen credential ids.
             if ($credentialIdB64 === '' || isset($seenCredentialIds[$credentialIdB64])) {
                 return;
             }
 
             $credentialBinary = base64_decode($credentialIdB64, true);
+            // Skip malformed base64 credential identifiers.
             if (!is_string($credentialBinary) || $credentialBinary === '') {
                 return;
             }
@@ -461,11 +468,13 @@ final class Form2fa
             $excludeCredentialIds[] = $credentialBinary;
         };
 
+        // Seed exclusion list from already-stored WebAuthn methods.
         foreach ($storedMethods as $method) {
             if (!is_array($method)) {
                 continue;
             }
 
+            // Only WebAuthn methods contribute registration exclude IDs.
             if (strtolower(trim((string) ($method['type'] ?? ''))) !== 'webauthn') {
                 continue;
             }
@@ -473,13 +482,16 @@ final class Form2fa
             $appendCredentialId((string) ($method['credential_id'] ?? ''));
         }
 
+        // Merge any client-submitted extra exclusions.
         if (is_array($submittedExcludeIds)) {
             foreach ($submittedExcludeIds as $credentialIdCandidate) {
+                // Ignore non-scalar candidates from malformed payloads.
                 if (!is_scalar($credentialIdCandidate)) {
                     continue;
                 }
 
                 $appendCredentialId((string) $credentialIdCandidate);
+                // Cap exclusion count to keep registration options bounded.
                 if (count($excludeCredentialIds) >= max(1, $maxCredentials)) {
                     break;
                 }
@@ -500,14 +512,17 @@ final class Form2fa
     public function resolveWebauthnUserIdentity(array $preferences, int $userId): array
     {
         $username = trim((string) ($preferences['username'] ?? ''));
+        // Fall back to email when username preference is blank.
         if ($username === '') {
             $username = trim((string) ($preferences['email'] ?? ''));
         }
+        // Final fallback uses deterministic user-id identifier.
         if ($username === '') {
             $username = 'user-' . $userId;
         }
 
         $displayName = trim((string) ($preferences['name'] ?? ''));
+        // Empty display names default to the resolved username.
         if ($displayName === '') {
             $displayName = $username;
         }
@@ -529,22 +544,26 @@ final class Form2fa
             'email' => [],
         ];
 
+        // Scan existing rows to reserve already-used numbered labels per type.
         foreach ($methods as $method) {
             if (!is_array($method)) {
                 continue;
             }
 
             $type = Login2fa::normalizeType((string) ($method['type'] ?? ''));
+            // Ignore types that do not participate in numbered labels.
             if (!array_key_exists($type, $state)) {
                 continue;
             }
 
             $label = $this->sanitizeText((string) ($method['label'] ?? ''), 80);
+            // Blank labels cannot contribute numbered reservations.
             if ($label === '') {
                 continue;
             }
 
             $base = $this->numberedLabelBase($type);
+            // Reserve only labels that match the "{base} {number}" pattern.
             if (preg_match('/^' . preg_quote($base, '/') . '\s+([1-9][0-9]*)$/i', $label, $matches) !== 1) {
                 continue;
             }
@@ -561,14 +580,17 @@ final class Form2fa
     private function resolveSubmittedNumberedLabel(string $rawLabel, string $type, array &$state): string
     {
         $type = Login2fa::normalizeType($type);
+        // Types without numbered-label state use standard label normalization.
         if (!array_key_exists($type, $state)) {
             return Login2fa::normalizeLabel($rawLabel, $type);
         }
 
         $label = $this->sanitizeText($rawLabel, 80);
         $base = $this->numberedLabelBase($type);
+        // Preserve explicit valid numbered labels submitted by the user.
         if (preg_match('/^' . preg_quote($base, '/') . '\s+([1-9][0-9]*)$/i', $label, $matches) === 1) {
             $number = (int) ($matches[1] ?? 0);
+            // Reserve positive numbers and return canonicalized "{base} N" label.
             if ($number > 0) {
                 $state[$type][$number] = true;
                 return $base . ' ' . $number;
@@ -578,8 +600,10 @@ final class Form2fa
         $normalizedLabel = strtolower(trim($label));
         $autoLabelCandidates = $this->numberedLabelLegacyDefaults($type);
         $shouldAuto = $normalizedLabel === '';
+        // Compare against legacy/default labels before deciding whether to auto-number.
         if (!$shouldAuto) {
             foreach ($autoLabelCandidates as $candidate) {
+                // Matching a legacy candidate flips the row into auto-numbering mode.
                 if ($normalizedLabel === strtolower(trim($candidate))) {
                     $shouldAuto = true;
                     break;
@@ -587,6 +611,7 @@ final class Form2fa
             }
         }
 
+        // Keep non-auto labels as standard normalized labels.
         if (!$shouldAuto) {
             return Login2fa::normalizeLabel($label, $type);
         }
@@ -636,6 +661,7 @@ final class Form2fa
     private function normalizeAddedAt(mixed $value): string
     {
         $addedAt = trim((string) $value);
+        // Use current UTC timestamp when no stored added-at value exists.
         if ($addedAt === '') {
             return gmdate('Y-m-d H:i:s');
         }
@@ -654,6 +680,7 @@ final class Form2fa
     {
         $value = trim($value);
         $value = preg_replace('/[\x00-\x1F\x7F]/u', '', $value) ?? '';
+        // Enforce max UI text length after control-byte stripping.
         if (mb_strlen($value) > $maxLength) {
             $value = mb_substr($value, 0, $maxLength);
         }
@@ -670,10 +697,12 @@ final class Form2fa
     private function sanitizeEmail(string $value): ?string
     {
         $value = strtolower($this->sanitizeText($value, 254));
+        // Empty strings are treated as missing email values.
         if ($value === '') {
             return null;
         }
 
+        // Require PHP email validation before accepting the address.
         if (!filter_var($value, FILTER_VALIDATE_EMAIL)) {
             return null;
         }

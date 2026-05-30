@@ -62,6 +62,7 @@ final class SetRouter
         // Set edit by ID uses min=0 because set IDs may be zero-indexed in some contexts.
         $router->add('GET', $base . '/set/edit/{id}', static function (array $params) use ($onSetEditById, $input, $renderNotFound): void {
             $id = RouteValidator::intOrNotFound($input, $params['id'] ?? null, 0, $renderNotFound);
+            // Validation helper already rendered not-found for invalid ids.
             if ($id === null) {
                 return;
             }

@@ -111,6 +111,7 @@ final class Error
         );
 
         $templateFile = $this->themeTemplate->resolveTemplateFile($template, ...$lookupRoots);
+        // Fallback to plain-text status output when themed status template is missing.
         if ($templateFile === null) {
             header('Content-Type: text/plain; charset=utf-8');
             echo $fallbackText;
@@ -121,6 +122,7 @@ final class Error
         $content = $this->themeBrace->renderFile($templateFile, ['site' => $site]);
 
         $layoutFile = $this->themeTemplate->resolveTemplateFile('wrapper', ...$lookupRoots);
+        // Render bare content when no wrapper template exists in inheritance chain.
         if ($layoutFile === null) {
             echo $content;
             return;

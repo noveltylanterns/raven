@@ -1,7 +1,5 @@
 # Raven CMS Channels
 
-***Note: This document was generated with ChatGPT Codex. I have not been able to personally verify every detail within matches the actual script. I do not plan on hammering these `docs/` files down until later releases, so use them with caution!***
-
 This document explains Raven's Channel system for both panel users and developers/agents.
 
 Maintenance note: keep this file updated whenever channel structure, channel routes, or Channel panel views change (`private/tpl/panel/channel/*`, channel controller/repository behavior, or channel public routing).
@@ -89,13 +87,14 @@ Delete behavior note:
   - `private/tpl/panel/channel/list.php`
   - `private/tpl/panel/channel/edit.php`
 - Panel controller:
-  - `private/sys/Controller/Panel/TaxonomyController.php`
+  - `private/sys/Controller/Panel/ChannelListController.php`
+  - `private/sys/Controller/Panel/ChannelEditController.php`
 - Persistence:
-  - `private/sys/Repository/ChannelRepository.php`
+  - `private/sys/Repository/ChannelRead.php, private/sys/Repository/ChannelWrite.php`
 
 ### Panel Routes
 
-Declared in `panel/index.php`:
+Declared in `private/sys/Router/Panel/ChannelRouter.php`:
 
 - `GET /channel` -> list
 - `GET /channel/edit` -> create form
@@ -107,24 +106,28 @@ All state-changing routes use CSRF validation.
 
 ### Controller Flow
 
-`TaxonomyController` channel handlers:
+Split channel handlers:
 
 - `channelList()`
-  - Requires login + `Manage Taxonomy` permission.
-  - Renders list with `ChannelRepository::listAll()`.
+  - Owned by `ChannelListController`.
+  - Requires login + channel route `view` permission.
+  - Renders list via `ChannelRead::listPage(...)`.
 - `channelEdit(?int $id)`
+  - Owned by `ChannelEditController`.
   - Loads existing row when id is provided.
   - Missing id row triggers flash error + redirect to `/channel`.
 - `channelSave(array $post, array $files = [])`
+  - Owned by `ChannelEditController`.
   - Validates CSRF.
   - Sanitizes/normalizes `id`, `name`, `slug`, `description` via `InputSanitizer`.
   - Requires non-empty `name` and valid `slug`.
   - Rejects attempts to create/edit the reserved stock `<root>` channel.
   - Persists optional `feed_enabled` when global feeds are enabled; existing channel feed flags are preserved when global feeds are disabled.
-  - Saves text fields via `ChannelRepository::save(...)`.
-  - Processes optional `cover_image` and `preview_image` uploads (single-file each), optional remove flags, and writes image-path columns via `ChannelRepository::updateImagePaths(...)`.
+  - Saves text fields via `ChannelWrite::save(...)`.
+  - Processes optional `cover_image` and `preview_image` uploads (single-file each), optional remove flags, and writes image-path columns via `ChannelWrite::updateImagePaths(...)`.
   - Upload files/variants are stored under `public/uploads/channels/{id}/` using configured `media.images.*` rules.
 - `channelDelete(array $post)`
+  - Owned by `ChannelEditController`.
   - Validates CSRF.
   - Supports single delete (`id`) and bulk delete (`selected_ids[]`).
   - Refuses to delete the stock `<root>` channel.
@@ -133,15 +136,15 @@ All state-changing routes use CSRF validation.
 
 ### Data Model And Repository Behavior
 
-`ChannelRepository` behavior:
+`ChannelRead` + `ChannelWrite` behavior:
 
 - `listAll()` returns channels with page counts and includes the stock `<root>` channel first.
 - `listOptions()` excludes the stock `<root>` channel because it is only an internal root-scope placeholder.
-- `save(...)` handles create/update in one method.
+- `ChannelWrite::save(...)` handles create/update in one method.
 - Channel records include one file-backed `feed_enabled` flag for channel-specific feed routes.
 - Channel records also include file-backed `category_sets` and `tag_sets` selections.
-- `updateImagePaths(...)` persists cover/preview source + variant paths.
-- `deleteById(...)` runs in a transaction:
+- `ChannelWrite::updateImagePaths(...)` persists cover/preview source + variant paths.
+- `ChannelWrite::deleteById(...)` runs in a transaction:
   - updates `pages.channel_id` to `0`
   - updates `redirects.channel` to `0`
   - deletes channel row
@@ -166,11 +169,11 @@ Storage detail:
 - `/{channel}/{page-id}`
 - `/{channel}/{YYYY-MM-DD}-{page-id}`
 - `/{channel}/{YYYY-MM}-{page-id}`
-- Channel landing template priority: `views/channel/{channel_slug}.php` then `views/channel/index.php`.
+- Channel landing template priority: `tpl/channel/{channel_slug}.php` then `tpl/channel/index.php`.
 
 ### Security/Validation Expectations
 
-- Permission gate: `Manage Taxonomy`.
+- Permission gate: channel route permissions (`view`, `create`, `edit`, `delete`).
 - CSRF on POST actions.
 - Sanitization via centralized `InputSanitizer`.
 - Repository operations use prepared statements.

@@ -43,6 +43,7 @@ final class RedirectRouter
 
         $router->add('GET', '/redirect/edit/{id}', static function (array $params) use ($panelRedirectEditController, $input, $renderNotFound): void {
             $id = RouteValidator::intOrNotFound($input, $params['id'] ?? null, 1, $renderNotFound);
+            // Validation helper already rendered not-found for invalid ids.
             if ($id === null) {
                 return;
             }

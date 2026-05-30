@@ -104,19 +104,23 @@ final class CategoryEditController
     public function categoryEdit(?int $id = null): void
     {
         $this->context->requirePanelLogin();
+        // Category routes are disabled entirely when taxonomy feature flag is off.
         if (!$this->categoryEnabled) {
             $this->context->renderPanelNotFound();
             return;
         }
         $requiredAction = $id === null ? 'create' : 'edit';
+        // Enforce route-level create/edit permission before loading form payloads.
         if (!$this->context->requireRoutePermissionOrForbidden('category', $requiredAction)) {
             return;
         }
 
         $category = null;
+        // Edit mode loads existing category row for the requested id.
         if ($id !== null) {
             $category = $this->categoryRead()->findById($id);
 
+            // Missing records redirect back to category list with error flash.
             if ($category === null) {
                 $this->context->flash('error', 'Category not found.');
                 Redirect::redirect($this->context->panelUrl('/category'));
@@ -150,16 +154,19 @@ final class CategoryEditController
     public function categorySave(array $post, array $files = []): void
     {
         $this->context->requirePanelLogin();
+        // Category routes are disabled entirely when taxonomy feature flag is off.
         if (!$this->categoryEnabled) {
             $this->context->renderPanelNotFound();
             return;
         }
         $id = $this->input->int($post['id'] ?? null, 1);
         $requiredAction = $id === null ? 'create' : 'edit';
+        // Enforce route-level create/edit permission before write attempts.
         if (!$this->context->requireRoutePermissionOrForbidden('category', $requiredAction)) {
             return;
         }
 
+        // Reject forged save submissions before any normalization or writes.
         if (!$this->context->csrf()->validate($post['_csrf'] ?? null)) {
             $this->context->flash('error', 'Invalid CSRF token.');
             Redirect::redirect($this->context->panelUrl('/category'));
@@ -171,6 +178,7 @@ final class CategoryEditController
         $setId = $this->input->int($post['set'] ?? null, 1);
         $description = $this->input->text($post['description'] ?? null, 2000);
 
+        // Require name, valid slug, and existing set id before save call.
         if ($name === '' || $slug === null || $setId === null || !$this->categorySetRepo()->existsId($setId)) {
             $this->context->flash('error', 'Category name, valid slug, and valid set are required.');
             Redirect::redirect($this->editorTabs->panelEditorUrlWithTab(
@@ -221,6 +229,7 @@ final class CategoryEditController
         $previewUploads = $this->upload->normalize($files['preview_image'] ?? null);
         $iconUploads = $this->upload->normalize($files['icon_image'] ?? null);
 
+        // Each slot accepts at most one uploaded file per save request.
         if (count($coverUploads) > 1 || count($previewUploads) > 1 || count($iconUploads) > 1) {
             $this->context->flash('error', 'Please upload only one image per slot.');
             Redirect::redirect($savedEditUrl);
@@ -230,24 +239,29 @@ final class CategoryEditController
         $removePreview = isset($post['remove_preview_image']) && (string) $post['remove_preview_image'] === '1';
         $removeIcon = isset($post['remove_icon_image']) && (string) $post['remove_icon_image'] === '1';
 
+        // Clear all persisted cover-image keys when remove toggle is active.
         if ($removeCover) {
             foreach ($this->taxonomyImageService->imageStorageKeysForSlot('categories', 'cover') as $key) {
                 $nextStorage[$key] = null;
             }
         }
+        // Clear all persisted preview-image keys when remove toggle is active.
         if ($removePreview) {
             foreach ($this->taxonomyImageService->imageStorageKeysForSlot('categories', 'preview') as $key) {
                 $nextStorage[$key] = null;
             }
         }
+        // Clear all persisted icon-image keys when remove toggle is active.
         if ($removeIcon) {
             foreach ($this->taxonomyImageService->imageStorageKeysForSlot('categories', 'icon') as $key) {
                 $nextStorage[$key] = null;
             }
         }
 
+        // Process optional cover upload and merge returned storage payload.
         if (isset($coverUploads[0])) {
             $coverResult = $this->editorMeta->storeMetaImageUpload('categories', $savedId, 'cover', $coverUploads[0]);
+            // Abort save flow when cover upload fails and cleanup new writes.
             if (!$coverResult['ok']) {
                 $this->editorMeta->cleanupMetaImagePathSets('categories', $savedId, $newPathSets);
                 $this->context->flash('error', (string) ($coverResult['error'] ?? 'Failed to upload cover image.'));
@@ -260,8 +274,10 @@ final class CategoryEditController
             $newPathSets[] = $coverPaths;
         }
 
+        // Process optional preview upload and merge returned storage payload.
         if (isset($previewUploads[0])) {
             $previewResult = $this->editorMeta->storeMetaImageUpload('categories', $savedId, 'preview', $previewUploads[0]);
+            // Abort save flow when preview upload fails and cleanup new writes.
             if (!$previewResult['ok']) {
                 $this->editorMeta->cleanupMetaImagePathSets('categories', $savedId, $newPathSets);
                 $this->context->flash('error', (string) ($previewResult['error'] ?? 'Failed to upload preview image.'));
@@ -274,8 +290,10 @@ final class CategoryEditController
             $newPathSets[] = $previewPaths;
         }
 
+        // Process optional icon upload and merge returned storage payload.
         if (isset($iconUploads[0])) {
             $iconResult = $this->editorMeta->storeMetaImageUpload('categories', $savedId, 'icon', $iconUploads[0]);
+            // Abort save flow when icon upload fails and cleanup new writes.
             if (!$iconResult['ok']) {
                 $this->editorMeta->cleanupMetaImagePathSets('categories', $savedId, $newPathSets);
                 $this->context->flash('error', (string) ($iconResult['error'] ?? 'Failed to upload icon image.'));
@@ -288,6 +306,7 @@ final class CategoryEditController
             $newPathSets[] = $iconPaths;
         }
 
+        // Persist resolved image storage payload after upload/remove operations.
         try {
             $this->categoryWrite()->updateImageFiles($savedId, $nextStorage);
         } catch (\Throwable) {
@@ -314,20 +333,24 @@ final class CategoryEditController
     public function categoryDelete(array $post): void
     {
         $this->context->requirePanelLogin();
+        // Category routes are disabled entirely when taxonomy feature flag is off.
         if (!$this->categoryEnabled) {
             $this->context->renderPanelNotFound();
             return;
         }
+        // Enforce delete permission before mutating category records.
         if (!$this->context->requireRoutePermissionOrForbidden('category', 'delete')) {
             return;
         }
 
+        // Reject forged delete submissions before any destructive action.
         if (!$this->context->csrf()->validate($post['_csrf'] ?? null)) {
             $this->context->flash('error', 'Invalid CSRF token.');
             Redirect::redirect($this->context->panelUrl('/category'));
         }
 
         $id = $this->input->int($post['id'] ?? null, 1);
+        // Single-row delete path runs when a concrete id is posted.
         if ($id !== null) {
             $record = $this->categoryRead()->findById($id);
             // Single-row delete path (row action button).
@@ -338,6 +361,7 @@ final class CategoryEditController
                 Redirect::redirect($this->context->panelUrl('/category'));
             }
 
+            // Remove stored category images when deleted row existed.
             if ($record !== null) {
                 $this->editorMeta->deleteMetaImageStoredPaths(
                     'categories',
@@ -360,11 +384,14 @@ final class CategoryEditController
         $deletedCount = 0;
         $failedCount = 0;
 
+        // Bulk-delete loop continues through all selected ids even on individual failures.
         foreach ($selectedIds as $selectedId) {
             $record = $this->categoryRead()->findById($selectedId);
+            // Each selected id is deleted in isolation so later ids still run on failure.
             try {
                 // Continue deleting remaining ids even if one operation throws.
                 $this->categoryWrite()->deleteById($selectedId);
+                // Remove media files for successfully deleted categories when record was loaded.
                 if ($record !== null) {
                     $this->editorMeta->deleteMetaImageStoredPaths(
                         'categories',
@@ -378,8 +405,10 @@ final class CategoryEditController
             }
         }
 
+        // Report mixed success/failure summary for bulk delete requests.
         if ($deletedCount > 0) {
             $message = 'Deleted ' . $deletedCount . ' ' . ($deletedCount === 1 ? 'category' : 'categories') . '.';
+            // Append failure details when some selected rows could not be deleted.
             if ($failedCount > 0) {
                 $message .= ' Failed to delete ' . $failedCount . ' selected ' . ($failedCount === 1 ? 'category' : 'categories') . '.';
             }
@@ -400,18 +429,22 @@ final class CategoryEditController
     public function categorySetEdit(?int $id = null): void
     {
         $this->context->requirePanelLogin();
+        // Category-set routes are disabled when taxonomy feature flag is off.
         if (!$this->categoryEnabled) {
             $this->context->renderPanelNotFound();
             return;
         }
         $requiredAction = $id === null ? 'create' : 'edit';
+        // Enforce create/edit permission before loading set form payloads.
         if (!$this->context->requireRoutePermissionOrForbidden('category', $requiredAction)) {
             return;
         }
 
         $set = null;
+        // Edit mode loads existing set row for the requested id.
         if ($id !== null) {
             $set = $this->categorySetRepo()->findById($id);
+            // Missing set id redirects back to set list with error flash.
             if ($set === null) {
                 $this->context->flash('error', 'Category set not found.');
                 Redirect::redirect($this->context->panelUrl('/category/set'));
@@ -436,6 +469,7 @@ final class CategoryEditController
     public function categorySetSave(array $post): void
     {
         $this->context->requirePanelLogin();
+        // Category-set routes are disabled when taxonomy feature flag is off.
         if (!$this->categoryEnabled) {
             $this->context->renderPanelNotFound();
             return;
@@ -443,10 +477,12 @@ final class CategoryEditController
 
         $id = $this->input->int($post['id'] ?? null, 0);
         $requiredAction = $id === null ? 'create' : 'edit';
+        // Enforce create/edit permission before mutating set records.
         if (!$this->context->requireRoutePermissionOrForbidden('category', $requiredAction)) {
             return;
         }
 
+        // Reject forged set-save submissions before normalization/writes.
         if (!$this->context->csrf()->validate($post['_csrf'] ?? null)) {
             $this->context->flash('error', 'Invalid CSRF token.');
             Redirect::redirect($this->context->panelUrl('/category/set'));
@@ -456,17 +492,20 @@ final class CategoryEditController
         $existingSet = $id !== null && $id > 0 ? $this->categorySetRepo()->findById($id) : null;
         $name = $this->input->text($post['name'] ?? null, 255);
         $slug = $this->input->slug($post['slug'] ?? null);
+        // Preserve stored slug when edit form omits slug field.
         if ($slug === null && is_array($existingSet)) {
             $persistedSlug = trim((string) ($existingSet['slug'] ?? ''));
             $slug = $persistedSlug !== '' ? $persistedSlug : null;
         }
         $description = $this->input->text($post['description'] ?? null, 2000);
 
+        // Require set name and valid slug for creates/edits.
         if ($name === '' || ($id !== 0 && $slug === null)) {
             $this->context->flash('error', 'Set name and valid slug are required.');
             Redirect::redirect($this->context->panelUrl('/category/set/edit' . ($id !== null ? '/' . $id : '')));
         }
 
+        // Persist one set row; repository surfaces uniqueness/validation failures.
         try {
             $savedId = $this->categorySetWrite()->save([
                 'id' => $id,
@@ -493,25 +532,30 @@ final class CategoryEditController
     public function categorySetDelete(array $post): void
     {
         $this->context->requirePanelLogin();
+        // Category-set routes are disabled when taxonomy feature flag is off.
         if (!$this->categoryEnabled) {
             $this->context->renderPanelNotFound();
             return;
         }
+        // Enforce delete permission before mutating set records.
         if (!$this->context->requireRoutePermissionOrForbidden('category', 'delete')) {
             return;
         }
 
+        // Reject forged set-delete submissions before destructive actions.
         if (!$this->context->csrf()->validate($post['_csrf'] ?? null)) {
             $this->context->flash('error', 'Invalid CSRF token.');
             Redirect::redirect($this->context->panelUrl('/category/set'));
         }
 
         $id = $this->input->int($post['id'] ?? null, 0);
+        // Missing set id cannot be processed for deletion.
         if ($id === null) {
             $this->context->flash('error', 'Category set not found.');
             Redirect::redirect($this->context->panelUrl('/category/set'));
         }
 
+        // Block deletion while channels still reference this set explicitly.
         if ($this->channelRead->countExplicitTaxonomySetAssignments('category', $id) > 0) {
             $this->context->flash('error', 'Cannot delete a category set that is still assigned to one or more channels.');
             Redirect::redirect($this->context->panelUrl('/category/set'));
@@ -519,10 +563,12 @@ final class CategoryEditController
 
         // Reassign any remaining categories in this set to the default set before deleting.
         $categoryCount = (int) ($this->categoryRead()->countsBySetId()[$id] ?? 0);
+        // Move categories away from soon-to-be-deleted set id.
         if ($categoryCount > 0) {
             $this->categoryWrite()->reassignSetToDefault($id, SetParser::DEFAULT_SET_ID);
         }
 
+        // Delete set row after assignment constraints have been satisfied.
         try {
             $this->categorySetWrite()->deleteById($id);
         } catch (\Throwable $exception) {
@@ -543,11 +589,13 @@ final class CategoryEditController
      */
     private function categoryRead(): CategoryRead
     {
+        // Reuse cached read repository when already resolved.
         if ($this->categoryRead instanceof CategoryRead) {
             return $this->categoryRead;
         }
 
         $repo = ($this->categoryReadResolver)();
+        // Resolver contract must return CategoryRead instance.
         if (!$repo instanceof CategoryRead) {
             throw new \RuntimeException('Panel category read resolver returned an invalid value.');
         }
@@ -564,11 +612,13 @@ final class CategoryEditController
      */
     private function categoryWrite(): CategoryWrite
     {
+        // Reuse cached write repository when already resolved.
         if ($this->categoryWrite instanceof CategoryWrite) {
             return $this->categoryWrite;
         }
 
         $repo = ($this->categoryWriteResolver)();
+        // Resolver contract must return CategoryWrite instance.
         if (!$repo instanceof CategoryWrite) {
             throw new \RuntimeException('Panel category write resolver returned an invalid value.');
         }
@@ -585,11 +635,13 @@ final class CategoryEditController
      */
     private function categorySetRepo(): SetRead
     {
+        // Reuse cached set-read repository when already resolved.
         if ($this->categorySetRepo instanceof SetRead) {
             return $this->categorySetRepo;
         }
 
         $repo = ($this->categorySetRepoResolver)();
+        // Resolver contract must return SetRead instance.
         if (!$repo instanceof SetRead) {
             throw new \RuntimeException('Panel category-set repository resolver returned an invalid value.');
         }
@@ -608,11 +660,13 @@ final class CategoryEditController
      */
     private function categorySetWrite(): SetWrite
     {
+        // Reuse cached set-write repository when already resolved.
         if ($this->categorySetWrite instanceof SetWrite) {
             return $this->categorySetWrite;
         }
 
         $repo = ($this->categorySetWriteResolver)();
+        // Resolver contract must return SetWrite instance.
         if (!$repo instanceof SetWrite) {
             throw new \RuntimeException('Panel category-set write resolver returned an invalid value.');
         }
@@ -631,13 +685,16 @@ final class CategoryEditController
     private function selectedIdsFromPost(array $post, string $key = 'selected_ids'): array
     {
         $raw = $post[$key] ?? [];
+        // Selection payload must be array-shaped for checkbox list processing.
         if (!is_array($raw)) {
             return [];
         }
 
         $selected = [];
+        // Normalize each selected id through shared integer sanitizer bounds.
         foreach ($raw as $candidate) {
             $id = $this->input->int($candidate, 1);
+            // Keep only ids that survived integer sanitization.
             if ($id !== null) {
                 $selected[$id] = $id;
             }

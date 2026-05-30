@@ -99,13 +99,16 @@ final class GroupEditController
     {
         $this->context->requirePanelLogin();
         $requiredAction = $id === null ? 'create' : 'edit';
+        // Group editor access is permission-scoped by create vs edit mode.
         if (!$this->context->requireRoutePermissionOrForbidden('group', $requiredAction)) {
             return;
         }
 
         $group = null;
+        // Edit mode loads existing group data; create mode uses defaults.
         if ($id !== null) {
             $group = $this->groupRead->findById($id);
+            // Abort when requested group record no longer exists.
             if ($group === null) {
                 $this->context->flash('error', 'Group not found.');
                 Redirect::redirect($this->context->panelUrl('/group'));
@@ -143,10 +146,12 @@ final class GroupEditController
         $this->context->requirePanelLogin();
         $id = $this->input->int($post['id'] ?? null, 1);
         $requiredAction = $id === null ? 'create' : 'edit';
+        // Group save permission is derived from whether this is create or update.
         if (!$this->context->requireRoutePermissionOrForbidden('group', $requiredAction)) {
             return;
         }
 
+        // CSRF validation protects permission and routing changes.
         if (!$this->context->csrf()->validate($post['_csrf'] ?? null)) {
             $this->context->flash('error', 'Invalid CSRF token.');
             Redirect::redirect($this->context->panelUrl('/group'));
@@ -166,8 +171,10 @@ final class GroupEditController
         $isExistingStockGroup = is_array($existingGroup) && (int) ($existingGroup['is_stock'] ?? 0) === 1;
         $slugRaw = trim($this->input->text($post['slug'] ?? null, 160));
         $slug = '';
+        // Only custom groups can define editable route slugs.
         if (!$isExistingStockGroup && $slugRaw !== '') {
             $slug = $this->input->slug($slugRaw) ?? '';
+            // Reject slugs that normalize to empty values.
             if ($slug === '') {
                 $this->context->flash('error', 'Group slug must be a valid slug.');
                 Redirect::redirect($editUrl);
@@ -185,6 +192,7 @@ final class GroupEditController
         $isBannedGroup = $roleSlug === 'banned';
         $isUserGroup = $roleSlug === 'user';
         $isAdminGroup = $isExistingStockGroup && $id === 1;
+        // Guest-like and banned stock roles are intentionally unroutable.
         if ($isGuestLikeGroup || $isBannedGroup) {
             $routeEnabled = false;
         }
@@ -194,19 +202,24 @@ final class GroupEditController
         $permissionMask = 0;
         $validBits = array_column($this->permissionDefinitions(), 'bit');
         $allValidBitsMask = 0;
+        // Build mask of all valid permission bits for admin stock role normalization.
         foreach ($validBits as $validBit) {
             $allValidBitsMask |= (int) $validBit;
         }
 
+        // Submitted permission bits are optional and may include invalid values.
         if (is_array($permissionBitsRaw)) {
+            // Keep only recognized bits from posted checkboxes.
             foreach ($permissionBitsRaw as $rawBit) {
                 $bit = $this->input->int($rawBit, 1);
+                // Ignore non-integer and unknown permission bits.
                 if ($bit !== null && in_array($bit, $validBits, true)) {
                     $permissionMask |= $bit;
                 }
             }
         }
 
+        // Normalize stock-role permission envelopes regardless of posted values.
         if ($isBannedGroup) {
             $permissionMask = 0;
         } elseif ($isGuestLikeGroup) {
@@ -222,24 +235,29 @@ final class GroupEditController
         $existingSystemBits = is_array($existingGroup)
             ? (((int) ($existingGroup['permissions'] ?? 0)) & $systemBitsMask)
             : 0;
+        // Non-admin actors cannot alter system administration capability bits.
         if (!$actorIsAdmin && $requestedSystemBits !== $existingSystemBits) {
             $this->context->flash('error', 'Only Admin users can change system administration permissions.');
             Redirect::redirect($editUrl);
         }
+        // Preserve current system bits when editor lacks admin privileges.
         if (!$actorIsAdmin) {
             $permissionMask = ($permissionMask & (~$systemBitsMask)) | $existingSystemBits;
         }
+        // Without panel login bit, strip all panel-only privileges.
         if (($permissionMask & PanelAccess::PANEL_LOGIN) !== PanelAccess::PANEL_LOGIN) {
             $permissionMask &= ~PanelAccess::allStockPanelBitsMask();
             $permissionMask &= ~$this->extensionPermissionBitsMask();
             $permissionMask &= ~PanelAccess::VIEW_DISABLED_SITE;
         }
 
+        // Group names are required when creating new records.
         if ($id === null && $name === '') {
             $this->context->flash('error', 'Group name is required.');
             Redirect::redirect($editUrl);
         }
 
+        // Persist group changes and surface repository errors.
         try {
             $savedId = $this->groupWrite->save([
                 'id' => $id,
@@ -269,6 +287,7 @@ final class GroupEditController
         $coverUploads = $this->upload->normalize($files['cover_image'] ?? null);
         $iconUploads = $this->upload->normalize($files['icon_image'] ?? null);
 
+        // Each slot supports at most one image upload per save.
         if (count($coverUploads) > 1 || count($iconUploads) > 1) {
             $this->context->flash('error', 'Please upload only one image per slot.');
             Redirect::redirect($savedEditUrl);
@@ -277,19 +296,25 @@ final class GroupEditController
         $removeCover = isset($post['remove_cover_image']) && (string) $post['remove_cover_image'] === '1';
         $removeIcon = isset($post['remove_icon_image']) && (string) $post['remove_icon_image'] === '1';
 
+        // Clearing cover removes all storage keys that map to that slot.
         if ($removeCover) {
+            // Null out every persisted size/path variant for cover assets.
             foreach ($this->taxonomyImageService->imageStorageKeysForSlot('groups', 'cover') as $key) {
                 $nextStorage[$key] = null;
             }
         }
+        // Clearing icon removes all storage keys that map to that slot.
         if ($removeIcon) {
+            // Null out every persisted size/path variant for icon assets.
             foreach ($this->taxonomyImageService->imageStorageKeysForSlot('groups', 'icon') as $key) {
                 $nextStorage[$key] = null;
             }
         }
 
+        // Save uploaded cover image and merge returned storage payload.
         if (isset($coverUploads[0])) {
             $coverResult = $this->editorMeta->storeMetaImageUpload('groups', $savedId, 'cover', $coverUploads[0]);
+            // Abort and cleanup newly written files when cover upload fails.
             if (!(bool) ($coverResult['ok'] ?? false)) {
                 $this->editorMeta->cleanupMetaImagePathSets('groups', $savedId, $newPathSets);
                 $this->context->flash('error', (string) ($coverResult['error'] ?? 'Failed to upload cover image.'));
@@ -301,8 +326,10 @@ final class GroupEditController
             $nextStorage = array_merge($nextStorage, $coverStorage);
         }
 
+        // Save uploaded icon image and merge returned storage payload.
         if (isset($iconUploads[0])) {
             $iconResult = $this->editorMeta->storeMetaImageUpload('groups', $savedId, 'icon', $iconUploads[0]);
+            // Abort and cleanup newly written files when icon upload fails.
             if (!(bool) ($iconResult['ok'] ?? false)) {
                 $this->editorMeta->cleanupMetaImagePathSets('groups', $savedId, $newPathSets);
                 $this->context->flash('error', (string) ($iconResult['error'] ?? 'Failed to upload icon image.'));
@@ -314,6 +341,7 @@ final class GroupEditController
             $nextStorage = array_merge($nextStorage, $iconStorage);
         }
 
+        // Persist image metadata and rollback temporary uploads if write fails.
         try {
             $this->groupWrite->updateImageFiles($savedId, $nextStorage);
         } catch (\Throwable) {
@@ -339,17 +367,21 @@ final class GroupEditController
     public function groupDelete(array $post): void
     {
         $this->context->requirePanelLogin();
+        // Group deletion is permission-gated due data-impacting behavior.
         if (!$this->context->requireRoutePermissionOrForbidden('group', 'delete')) {
             return;
         }
 
+        // CSRF validation protects delete operations.
         if (!$this->context->csrf()->validate($post['_csrf'] ?? null)) {
             $this->context->flash('error', 'Invalid CSRF token.');
             Redirect::redirect($this->context->panelUrl('/group'));
         }
 
         $id = $this->input->int($post['id'] ?? null, 1);
+        // Single-delete path takes precedence when explicit id is provided.
         if ($id !== null) {
+            // Repository delete may fail for stock/dependent groups.
             try {
                 $this->groupWrite->deleteById($id);
             } catch (\Throwable $exception) {
@@ -362,6 +394,7 @@ final class GroupEditController
         }
 
         $selectedIds = $this->selectedIdsFromPost($post);
+        // Bulk delete requires at least one selected group id.
         if ($selectedIds === []) {
             $this->context->flash('error', 'No groups selected.');
             Redirect::redirect($this->context->panelUrl('/group'));
@@ -369,7 +402,9 @@ final class GroupEditController
 
         $deletedCount = 0;
         $failedCount = 0;
+        // Process selected deletions independently to keep partial-success feedback.
         foreach ($selectedIds as $selectedId) {
+            // Continue on failures so remaining selections are still attempted.
             try {
                 $this->groupWrite->deleteById($selectedId);
                 $deletedCount++;
@@ -378,8 +413,10 @@ final class GroupEditController
             }
         }
 
+        // Report successes with optional failure suffix for partial results.
         if ($deletedCount > 0) {
             $message = 'Deleted ' . $deletedCount . ' group' . ($deletedCount === 1 ? '' : 's') . '.';
+            // Include failure count when some selected records were not deleted.
             if ($failedCount > 0) {
                 $message .= ' Failed to delete ' . $failedCount . ' selected group' . ($failedCount === 1 ? '' : 's') . '.';
             }
@@ -445,13 +482,16 @@ final class GroupEditController
     private function selectedIdsFromPost(array $post, string $key = 'selected_ids'): array
     {
         $raw = $post[$key] ?? [];
+        // Bulk selections must be arrays of submitted checkbox values.
         if (!is_array($raw)) {
             return [];
         }
 
         $selected = [];
+        // Normalize and deduplicate selected ids through associative index keys.
         foreach ($raw as $candidate) {
             $id = $this->input->int($candidate, 1);
+            // Keep only positive integer identifiers.
             if ($id !== null) {
                 $selected[$id] = $id;
             }

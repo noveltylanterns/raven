@@ -47,6 +47,7 @@ final class ListFilter
         string $filterKey
     ): void {
         $normalizedValue = $this->normalizePositiveId($value);
+        // Skip clause generation when the caller did not supply a usable positive id.
         if ($normalizedValue === null) {
             return;
         }
@@ -81,6 +82,7 @@ final class ListFilter
         string $filterKey
     ): void {
         $normalizedValue = $this->normalizePositiveId($value);
+        // Skip clause generation when the caller did not supply a usable positive id.
         if ($normalizedValue === null) {
             return;
         }
@@ -100,11 +102,13 @@ final class ListFilter
     private function placeholder(string $placeholderPrefix, string $filterKey): string
     {
         $placeholderPrefix = trim($placeholderPrefix);
+        // Fall back to a stable default namespace when callers pass blank prefixes.
         if ($placeholderPrefix === '') {
             $placeholderPrefix = 'filter';
         }
 
         $filterKey = trim($filterKey);
+        // Fall back to a stable key name when callers pass blank filter names.
         if ($filterKey === '') {
             $filterKey = 'value';
         }

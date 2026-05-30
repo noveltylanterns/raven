@@ -28,6 +28,7 @@ final class TagRouter
      */
     public static function registerWithDeps(RouteHandler $router, PanelPayload $deps): void
     {
+        // Skip tag route registration entirely when taxonomy is disabled.
         if (!$deps->tagEnabled) {
             return;
         }
@@ -44,6 +45,7 @@ final class TagRouter
 
         $router->add('GET', $base . '/edit/{id}', static function (array $params) use ($deps): void {
             $id = RouteValidator::intOrNotFound($deps->input, $params['id'] ?? null, 1, $deps->renderNotFound);
+            // Validation helper already rendered not-found for invalid ids.
             if ($id === null) {
                 return;
             }

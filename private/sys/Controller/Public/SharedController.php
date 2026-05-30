@@ -84,6 +84,7 @@ final class SharedController
      */
     public function auth(): Gatekeeper
     {
+        // Reuse the resolved auth service for the remainder of the request.
         if ($this->auth instanceof Gatekeeper) {
             return $this->auth;
         }
@@ -130,6 +131,7 @@ final class SharedController
      */
     private function feedParser(): FeedPolicy
     {
+        // Feed route parsing is only needed on feed/meta paths, so lazily create it.
         if (!$this->feedParser instanceof FeedPolicy) {
             $this->feedParser = new FeedPolicy($this->config, $this->input);
         }
@@ -144,6 +146,7 @@ final class SharedController
      */
     private function request(): Request
     {
+        // Keep one request helper instance so downstream helpers share normalized accessors.
         if (!$this->request instanceof Request) {
             $this->request = new Request();
         }
@@ -183,7 +186,9 @@ final class SharedController
     public function enforceSiteAvailability(): bool
     {
         $visibilityMode = (string) $this->config->get('site.visibility', 'public');
+        // Guest-only public mode can skip full auth service construction.
         if ($this->canSkipAuthAvailabilityGuard($visibilityMode)) {
+            // Fail closed when guest permission bits deny public-site viewing.
             if (!PublicPermissionBase::canViewPublicSite($this->guestPermissionMask->maskForGuest())) {
                 (new PublicError($this->config, dirname(__DIR__, 4)))->renderDenied();
                 return false;
@@ -218,6 +223,7 @@ final class SharedController
     private function canSkipAuthAvailabilityGuard(string $visibilityMode): bool
     {
         $normalizedMode = strtolower(trim($visibilityMode));
+        // Private/disabled modes depend on user policy, so they must use full auth guard logic.
         if ($normalizedMode !== 'public') {
             return false;
         }
@@ -296,6 +302,7 @@ final class SharedController
      */
     private function themeTemplate(): ThemeTemplate
     {
+        // Instantiate once because controllers may resolve multiple templates in one request.
         if (!$this->themeTemplate instanceof ThemeTemplate) {
             $this->themeTemplate = new ThemeTemplate($this->input);
         }
@@ -310,6 +317,7 @@ final class SharedController
      */
     private function templateDecorator(): TemplateDecorator
     {
+        // Reuse one decorator so all render calls use the same wrapper/meta policy.
         if (!$this->templateDecorator instanceof TemplateDecorator) {
             $this->templateDecorator = new TemplateDecorator($this->config, $this->input, dirname(__DIR__, 4));
         }
@@ -344,6 +352,7 @@ final class SharedController
      */
     private function profileParser(): UserProfileParser
     {
+        // Build contact-parser helper on demand to avoid unnecessary work per request.
         if (!$this->profileParser instanceof UserProfileParser) {
             $this->profileParser = new UserProfileParser($this->input);
         }
@@ -358,6 +367,7 @@ final class SharedController
      */
     private function metaService(): Meta
     {
+        // Compose Meta once so every route shares identical feed/profile request context.
         if (!$this->metaService instanceof Meta) {
             $this->metaService = new Meta(
                 $this->request(),
@@ -379,6 +389,7 @@ final class SharedController
     private function decorateTemplateData(array $data): array
     {
         $statusCode = http_response_code();
+        // Some SAPIs can return false here; normalize to HTTP 200 for decoration defaults.
         if (!is_int($statusCode)) {
             $statusCode = 200;
         }

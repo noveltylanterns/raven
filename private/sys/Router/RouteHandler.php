@@ -47,16 +47,20 @@ final class RouteHandler
         $normalizedMethod = $request->method();
         $normalizedPath = $request->path();
 
+        // Dispatch to the first route whose method and regex both match.
         foreach ($this->routes as $route) {
+            // Method mismatch is skipped before running regex checks.
             if ($route['method'] !== $normalizedMethod) {
                 continue;
             }
 
+            // Continue scanning until a path regex match is found.
             if (!preg_match($route['regex'], $normalizedPath, $matches)) {
                 continue;
             }
 
             $params = [];
+            // Copy named capture groups only; numeric captures are implementation detail.
             foreach ($matches as $key => $value) {
                 if (is_string($key)) {
                     $params[$key] = $value;

@@ -1,7 +1,5 @@
 # Raven CMS Preferences
 
-***Note: This document was generated with ChatGPT Codex. I have not been able to personally verify every detail within matches the actual script. I do not plan on hammering these `docs/` files down until later releases, so use them with caution!***
-
 This document explains Raven's user Preferences screen for both panel users and developers/agents.
 
 Maintenance note: keep this file updated whenever Preferences routes, validation/avatar behavior, or Preferences panel views change (`private/tpl/panel/preferences.php`, `PreferencesController::preferences*`, or `AuthService` preference persistence contracts).
@@ -73,11 +71,11 @@ Behavior notes:
 - Panel controller:
   - `private/sys/Controller/Panel/PreferencesController.php`
 - Auth service persistence:
-  - `private/sys/Core/Auth/AuthService.php`
+  - `private/sys/Gatekeeper.php`
 
 ### Panel Routes
 
-Declared in `panel/index.php`:
+Declared in `private/sys/Router/Panel/PreferencesRouter.php`:
 
 - `GET /preferences` -> form
 - `POST /preferences/save` -> save
@@ -88,7 +86,7 @@ Declared in `panel/index.php`:
 `PreferencesController::preferences()`:
 
 - Requires panel login.
-- Loads current user preference payload from `AuthService::userPreferences(...)`.
+- Loads current user preference payload from `Gatekeeper::userPreferences(...)` via `$this->context->auth()`.
 - Renders preferences form with theme options.
 
 `PreferencesController::preferencesSave()`:

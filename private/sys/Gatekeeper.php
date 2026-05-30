@@ -132,9 +132,11 @@ final class Gatekeeper
      */
     public function attemptLoginByUsername(string $username, string $password): array
     {
+        // Wrap identifier resolution + auth call to return uniform credential failure messaging.
         try {
             $email = $this->emailByUsername($username);
 
+            // Unknown usernames should follow the same generic error path as bad passwords.
             if ($email === null) {
                 return ['ok' => false, 'message' => 'Invalid credentials.'];
             }
@@ -165,6 +167,7 @@ final class Gatekeeper
      */
     public function attemptLoginByEmail(string $email, string $password): array
     {
+        // Wrap auth call to normalize backend exceptions into a user-safe failure response.
         try {
             $this->auth->login($email, $password);
             return ['ok' => true, 'message' => 'Login successful.'];
@@ -241,6 +244,7 @@ final class Gatekeeper
         $stmt->execute([':username' => $username]);
 
         $email = $stmt->fetchColumn();
+        // Treat missing/non-string/empty email values as unresolved identifiers.
         if ($email === false || !is_string($email) || $email === '') {
             return null;
         }
@@ -280,6 +284,7 @@ final class Gatekeeper
      */
     public function userId(): ?int
     {
+        // User id should only be surfaced when the auth session is currently active.
         if (!$this->isLoggedIn()) {
             return null;
         }
@@ -297,10 +302,12 @@ final class Gatekeeper
     public function isTwoFactorVerifiedForUser(?int $userId = null): bool
     {
         $userId ??= $this->userId();
+        // No authenticated user means the session cannot satisfy 2FA verification.
         if ($userId === null) {
             return false;
         }
 
+        // Users without interactive 2FA methods are considered verified by policy.
         if (!$this->hasInteractiveTwoFactorMethod($userId)) {
             return true;
         }
@@ -319,6 +326,7 @@ final class Gatekeeper
      */
     public function beginTwoFactorChallenge(int $userId, array $methods): void
     {
+        // Ignore challenge initialization for invalid user identities.
         if ($userId <= 0) {
             return;
         }
@@ -339,6 +347,7 @@ final class Gatekeeper
      */
     public function markTwoFactorVerified(int $userId): void
     {
+        // Verification state is only meaningful for positive persisted user ids.
         if ($userId <= 0) {
             return;
         }
@@ -395,6 +404,7 @@ final class Gatekeeper
     public function interactiveTwoFactorMethodsForUser(int $userId): array
     {
         $preferences = $this->userPreferences($userId);
+        // Missing preference payload means no interactive methods can be offered.
         if (!is_array($preferences)) {
             return [];
         }
@@ -449,11 +459,13 @@ final class Gatekeeper
     public function verifyPendingTotpCode(string $submittedCode): bool
     {
         $pendingUserId = $this->pendingTwoFactorUserId();
+        // TOTP verification requires an active pending challenge session.
         if ($pendingUserId === null) {
             return false;
         }
 
         $preferences = $this->userPreferences($pendingUserId);
+        // Abort when user preferences cannot be loaded for the pending challenge.
         if (!is_array($preferences)) {
             return false;
         }
@@ -477,11 +489,13 @@ final class Gatekeeper
     public function verifyPendingRecoveryCode(string $submittedPhrase, string $selectedMethodKey = ''): bool
     {
         $pendingUserId = $this->pendingTwoFactorUserId();
+        // Recovery verification requires an active pending challenge session.
         if ($pendingUserId === null) {
             return false;
         }
 
         $preferences = $this->userPreferences($pendingUserId);
+        // Abort when user preferences cannot be loaded for the pending challenge.
         if (!is_array($preferences)) {
             return false;
         }
@@ -490,15 +504,18 @@ final class Gatekeeper
             ? array_values($preferences['two_factor'])
             : [];
         $matched = PhraseValidate::matchRecoveryMethod($methods, $submittedPhrase, $selectedMethodKey);
+        // No matching method means the submitted recovery phrase is invalid.
         if (!is_array($matched)) {
             return false;
         }
 
+        // Reusable recovery methods do not need to be removed after successful verification.
         if ((bool) ($matched['reusable'] ?? false)) {
             return true;
         }
 
         $matchedIndex = (int) ($matched['index'] ?? -1);
+        // Require a valid method index before mutating stored recovery methods.
         if ($matchedIndex < 0 || !array_key_exists($matchedIndex, $methods)) {
             return false;
         }
@@ -535,11 +552,13 @@ final class Gatekeeper
      */
     public function updateWebauthnSignatureCounter(int $userId, string $credentialId, int $signatureCounter): void
     {
+        // Signature updates require a concrete user id, credential id, and non-negative counter.
         if ($userId <= 0 || $credentialId === '' || $signatureCounter < 0) {
             return;
         }
 
         $preferences = $this->userPreferences($userId);
+        // Skip updates when preferences are unavailable for the target user.
         if (!is_array($preferences)) {
             return;
         }
@@ -552,6 +571,7 @@ final class Gatekeeper
             $credentialId,
             $signatureCounter
         );
+        // Avoid redundant writes when no matching WebAuthn method was mutated.
         if (!(bool) ($mutation['updated'] ?? false)) {
             return;
         }
@@ -569,6 +589,7 @@ final class Gatekeeper
     {
         $userId = $this->userId();
 
+        // No authenticated user means there is no summary payload to return.
         if ($userId === null) {
             return null;
         }
@@ -579,6 +600,7 @@ final class Gatekeeper
         $stmt->execute([':id' => $userId]);
         $row = $stmt->fetch();
 
+        // Missing rows can happen when account data is deleted mid-session.
         if (!$row) {
             return null;
         }
@@ -609,6 +631,7 @@ final class Gatekeeper
      */
     public function userPreferences(int $userId): ?array
     {
+        // Serve cached preferences for repeat reads within the same request.
         if ($userId > 0 && array_key_exists($userId, $this->userPreferencesCache)) {
             return $this->userPreferencesCache[$userId];
         }
@@ -633,6 +656,7 @@ final class Gatekeeper
         $stmt->execute([':id' => $userId]);
 
         $row = $stmt->fetch();
+        // Cache null for missing users to avoid repeated lookup work in one request.
         if ($row === false) {
             if ($userId > 0) {
                 $this->userPreferencesCache[$userId] = null;
@@ -642,6 +666,7 @@ final class Gatekeeper
 
         $result = $this->decodeUserPreferencesRow(is_array($row) ? $row : []);
 
+        // Cache successful lookups for positive ids to avoid duplicate decode work in-request.
         if ($userId > 0) {
             $this->userPreferencesCache[$userId] = $result;
         }
@@ -759,11 +784,13 @@ final class Gatekeeper
      */
     private function decodeTwoFactorMethods(mixed $raw): array
     {
+        // Empty/non-string DB payloads represent "no methods configured".
         if (!is_string($raw) || trim($raw) === '') {
             return [];
         }
 
         $decoded = Json::decode($raw, 64);
+        // Fail closed when JSON payload cannot be decoded into an array.
         if (!is_array($decoded)) {
             return [];
         }
@@ -784,6 +811,7 @@ final class Gatekeeper
      */
     private function withUpdatedWebauthnSignatureCounter(array $methods, string $credentialId, int $signatureCounter): array
     {
+        // Guard against invalid mutation requests and return original method set unchanged.
         if ($credentialId === '' || $signatureCounter < 0) {
             return [
                 'methods' => array_values($methods),
@@ -792,11 +820,14 @@ final class Gatekeeper
         }
 
         $updated = false;
+        // Locate the matching WebAuthn method row by credential id.
         foreach ($methods as $index => $method) {
+            // Method payloads are expected to be arrays; skip malformed entries.
             if (!is_array($method)) {
                 continue;
             }
 
+            // Update only the matching WebAuthn credential to preserve other methods untouched.
             if (
                 strtolower(trim((string) ($method['type'] ?? ''))) === 'webauthn'
                 && trim((string) ($method['credential_id'] ?? '')) === $credentialId
@@ -818,12 +849,15 @@ final class Gatekeeper
      */
     private function bootstrapDelightAuth(): void
     {
+        // Hard-fail startup when bundled Delight Auth classes are unavailable.
         if (!class_exists('Delight\\Auth\\Auth')) {
             throw new RuntimeException('Delight Auth dependency is missing. Install composer dependencies before running Raven.');
         }
 
+        // Wrap runtime construction so initialization failures surface as one domain exception.
         try {
             // Bundled Delight Auth expects table prefix as the 3rd argument.
+            // Use prefixed-table constructor only when a non-empty table prefix is configured.
             if ($this->prefix !== '') {
                 $this->auth = new \Delight\Auth\Auth($this->authDb, null, $this->prefix);
             } else {

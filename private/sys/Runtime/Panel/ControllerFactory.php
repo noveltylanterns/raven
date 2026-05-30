@@ -98,6 +98,7 @@ final class ControllerFactory
             $extensionManagerFactory,
             $extensionFormsProvider
         ): array {
+            // Guest sessions never get extension permission metadata in panel context.
             if (($resolveAuth()->userId() ?? null) === null) {
                 return [];
             }
@@ -211,6 +212,7 @@ final class ControllerFactory
             $categoryEnabled,
             $tagEnabled
         ): PageListController {
+            // Reuse the memoized controller instance across route handlers in the same request.
             if ($pageListController instanceof PageListController) {
                 return $pageListController;
             }
@@ -245,6 +247,7 @@ final class ControllerFactory
             $categoryEnabled,
             $tagEnabled
         ): PageEditController {
+            // Reuse the memoized controller instance across route handlers in the same request.
             if ($pageEditController instanceof PageEditController) {
                 return $pageEditController;
             }
@@ -662,6 +665,7 @@ final class ControllerFactory
                 new Upload(),
                 static function () use (&$rvn): array {
                     $provider = $rvn['panel_permission_map_provider'] ?? null;
+                    // Permission map is optional in runtimes where extension services are unavailable.
                     if (!is_callable($provider)) {
                         return [];
                     }
@@ -768,6 +772,7 @@ final class ControllerFactory
             $extensionManagerFactory,
             $themeCatalogFactory
         ): UpdateController {
+            // Reuse the memoized controller instance across route handlers in the same request.
             if ($updateController instanceof UpdateController) {
                 return $updateController;
             }
@@ -845,6 +850,7 @@ final class ControllerFactory
             $extensionStateStoreFactory,
             $extensionManagerFactory
         ): ExtensionController {
+            // Reuse the memoized controller instance across route handlers in the same request.
             if ($extensionController instanceof ExtensionController) {
                 return $extensionController;
             }

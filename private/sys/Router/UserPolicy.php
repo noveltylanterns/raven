@@ -59,6 +59,7 @@ final class UserPolicy
     public function profileSelector(): string
     {
         $selector = strtolower(trim((string) $this->config->get('user.selector', 'id')));
+        // Unknown selector values are coerced to the safest canonical default.
         if (!in_array($selector, ['id', 'username', 'string'], true)) {
             $selector = 'id';
         }
@@ -108,6 +109,7 @@ final class UserPolicy
     private function normalizeMode(string $value, array $allowed, string $fallback, array $aliases = []): string
     {
         $mode = strtolower(trim($value));
+        // Legacy aliases are mapped before strict allowed-list validation.
         if (isset($aliases[$mode])) {
             $mode = $aliases[$mode];
         }

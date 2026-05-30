@@ -104,19 +104,23 @@ final class TagEditController
     public function tagEdit(?int $id = null): void
     {
         $this->context->requirePanelLogin();
+        // Tag UI is disabled when tag taxonomy feature is turned off.
         if (!$this->tagEnabled) {
             $this->context->renderPanelNotFound();
             return;
         }
         $requiredAction = $id === null ? 'create' : 'edit';
+        // Tag editor permission is scoped by create vs edit mode.
         if (!$this->context->requireRoutePermissionOrForbidden('tag', $requiredAction)) {
             return;
         }
 
         $tag = null;
+        // Edit mode loads existing tag record.
         if ($id !== null) {
             $tag = $this->tagRead()->findById($id);
 
+            // Abort when requested tag no longer exists.
             if ($tag === null) {
                 $this->context->flash('error', 'Tag not found.');
                 Redirect::redirect($this->context->panelUrl('/tag'));
@@ -150,16 +154,19 @@ final class TagEditController
     public function tagSave(array $post, array $files = []): void
     {
         $this->context->requirePanelLogin();
+        // Tag writes are disabled when taxonomy feature is off.
         if (!$this->tagEnabled) {
             $this->context->renderPanelNotFound();
             return;
         }
         $id = $this->input->int($post['id'] ?? null, 1);
         $requiredAction = $id === null ? 'create' : 'edit';
+        // Tag save permission is scoped by create vs edit mode.
         if (!$this->context->requireRoutePermissionOrForbidden('tag', $requiredAction)) {
             return;
         }
 
+        // CSRF validation protects tag save operations.
         if (!$this->context->csrf()->validate($post['_csrf'] ?? null)) {
             $this->context->flash('error', 'Invalid CSRF token.');
             Redirect::redirect($this->context->panelUrl('/tag'));
@@ -171,6 +178,7 @@ final class TagEditController
         $setId = $this->input->int($post['set'] ?? null, 1);
         $description = $this->input->text($post['description'] ?? null, 2000);
 
+        // Require name/slug/set and verify selected set exists.
         if ($name === '' || $slug === null || $setId === null || !$this->tagSetRepo()->existsId($setId)) {
             $this->context->flash('error', 'Tag name, valid slug, and valid set are required.');
             Redirect::redirect($this->editorTabs->panelEditorUrlWithTab(
@@ -221,6 +229,7 @@ final class TagEditController
         $previewUploads = $this->upload->normalize($files['preview_image'] ?? null);
         $iconUploads = $this->upload->normalize($files['icon_image'] ?? null);
 
+        // Each image slot accepts at most one upload per save request.
         if (count($coverUploads) > 1 || count($previewUploads) > 1 || count($iconUploads) > 1) {
             $this->context->flash('error', 'Please upload only one image per slot.');
             Redirect::redirect($savedEditUrl);
@@ -230,24 +239,31 @@ final class TagEditController
         $removePreview = isset($post['remove_preview_image']) && (string) $post['remove_preview_image'] === '1';
         $removeIcon = isset($post['remove_icon_image']) && (string) $post['remove_icon_image'] === '1';
 
+        // Remove cover variants by nulling all cover storage keys.
         if ($removeCover) {
+            // Iterate all cover slot keys emitted by taxonomy image service.
             foreach ($this->taxonomyImageService->imageStorageKeysForSlot('tags', 'cover') as $key) {
                 $nextStorage[$key] = null;
             }
         }
+        // Remove preview variants by nulling all preview storage keys.
         if ($removePreview) {
+            // Iterate all preview slot keys emitted by taxonomy image service.
             foreach ($this->taxonomyImageService->imageStorageKeysForSlot('tags', 'preview') as $key) {
                 $nextStorage[$key] = null;
             }
         }
+        // Remove icon variants by nulling all icon storage keys.
         if ($removeIcon) {
             foreach ($this->taxonomyImageService->imageStorageKeysForSlot('tags', 'icon') as $key) {
                 $nextStorage[$key] = null;
             }
         }
 
+        // Upload/merge cover image metadata when a new cover file is provided.
         if (isset($coverUploads[0])) {
             $coverResult = $this->editorMeta->storeMetaImageUpload('tags', $savedId, 'cover', $coverUploads[0]);
+            // Cleanup staged files and abort when cover upload pipeline fails.
             if (!$coverResult['ok']) {
                 $this->editorMeta->cleanupMetaImagePathSets('tags', $savedId, $newPathSets);
                 $this->context->flash('error', (string) ($coverResult['error'] ?? 'Failed to upload cover image.'));
@@ -260,8 +276,10 @@ final class TagEditController
             $newPathSets[] = $coverPaths;
         }
 
+        // Upload/merge preview image metadata when a new preview file is provided.
         if (isset($previewUploads[0])) {
             $previewResult = $this->editorMeta->storeMetaImageUpload('tags', $savedId, 'preview', $previewUploads[0]);
+            // Cleanup staged files and abort when preview upload pipeline fails.
             if (!$previewResult['ok']) {
                 $this->editorMeta->cleanupMetaImagePathSets('tags', $savedId, $newPathSets);
                 $this->context->flash('error', (string) ($previewResult['error'] ?? 'Failed to upload preview image.'));
@@ -274,8 +292,10 @@ final class TagEditController
             $newPathSets[] = $previewPaths;
         }
 
+        // Upload/merge icon image metadata when a new icon file is provided.
         if (isset($iconUploads[0])) {
             $iconResult = $this->editorMeta->storeMetaImageUpload('tags', $savedId, 'icon', $iconUploads[0]);
+            // Cleanup staged files and abort when icon upload pipeline fails.
             if (!$iconResult['ok']) {
                 $this->editorMeta->cleanupMetaImagePathSets('tags', $savedId, $newPathSets);
                 $this->context->flash('error', (string) ($iconResult['error'] ?? 'Failed to upload icon image.'));
@@ -288,6 +308,7 @@ final class TagEditController
             $newPathSets[] = $iconPaths;
         }
 
+        // Persist image metadata payload and rollback staged files on failure.
         try {
             $this->tagWrite()->updateImageFiles($savedId, $nextStorage);
         } catch (\Throwable) {
@@ -314,20 +335,24 @@ final class TagEditController
     public function tagDelete(array $post): void
     {
         $this->context->requirePanelLogin();
+        // Tag operations are unavailable when tag taxonomy feature is disabled.
         if (!$this->tagEnabled) {
             $this->context->renderPanelNotFound();
             return;
         }
+        // Tag delete action requires explicit delete permission.
         if (!$this->context->requireRoutePermissionOrForbidden('tag', 'delete')) {
             return;
         }
 
+        // CSRF validation protects destructive tag delete actions.
         if (!$this->context->csrf()->validate($post['_csrf'] ?? null)) {
             $this->context->flash('error', 'Invalid CSRF token.');
             Redirect::redirect($this->context->panelUrl('/tag'));
         }
 
         $id = $this->input->int($post['id'] ?? null, 1);
+        // Single-row delete path takes precedence when explicit id is posted.
         if ($id !== null) {
             $record = $this->tagRead()->findById($id);
             // Single-row delete path (row action button).
@@ -338,6 +363,7 @@ final class TagEditController
                 Redirect::redirect($this->context->panelUrl('/tag'));
             }
 
+            // Cleanup tag media files for successfully deleted single-row records.
             if ($record !== null) {
                 $this->editorMeta->deleteMetaImageStoredPaths(
                     'tags',
@@ -360,11 +386,13 @@ final class TagEditController
         $deletedCount = 0;
         $failedCount = 0;
 
+        // Process bulk-selected ids independently for partial-success reporting.
         foreach ($selectedIds as $selectedId) {
             $record = $this->tagRead()->findById($selectedId);
+            // Continue deleting remaining ids even if one operation throws.
             try {
-                // Continue deleting remaining ids even if one operation throws.
                 $this->tagWrite()->deleteById($selectedId);
+                // Cleanup associated media files for successfully deleted records.
                 if ($record !== null) {
                     $this->editorMeta->deleteMetaImageStoredPaths(
                         'tags',
@@ -378,8 +406,10 @@ final class TagEditController
             }
         }
 
+        // Report successful deletes and include failed count when applicable.
         if ($deletedCount > 0) {
             $message = 'Deleted ' . $deletedCount . ' tag' . ($deletedCount === 1 ? '' : 's') . '.';
+            // Append failed-count suffix for partial bulk outcomes.
             if ($failedCount > 0) {
                 $message .= ' Failed to delete ' . $failedCount . ' selected tag' . ($failedCount === 1 ? '' : 's') . '.';
             }
@@ -400,18 +430,22 @@ final class TagEditController
     public function tagSetEdit(?int $id = null): void
     {
         $this->context->requirePanelLogin();
+        // Tag-set UI is unavailable when tag taxonomy feature is disabled.
         if (!$this->tagEnabled) {
             $this->context->renderPanelNotFound();
             return;
         }
         $requiredAction = $id === null ? 'create' : 'edit';
+        // Tag-set editor permission is scoped by create vs edit mode.
         if (!$this->context->requireRoutePermissionOrForbidden('tag', $requiredAction)) {
             return;
         }
 
         $set = null;
+        // Edit mode loads existing tag-set record.
         if ($id !== null) {
             $set = $this->tagSetRepo()->findById($id);
+            // Abort when requested tag-set record no longer exists.
             if ($set === null) {
                 $this->context->flash('error', 'Tag set not found.');
                 Redirect::redirect($this->context->panelUrl('/tag/set'));
@@ -436,6 +470,7 @@ final class TagEditController
     public function tagSetSave(array $post): void
     {
         $this->context->requirePanelLogin();
+        // Tag-set writes are unavailable when tag taxonomy feature is disabled.
         if (!$this->tagEnabled) {
             $this->context->renderPanelNotFound();
             return;
@@ -443,10 +478,12 @@ final class TagEditController
 
         $id = $this->input->int($post['id'] ?? null, 0);
         $requiredAction = $id === null ? 'create' : 'edit';
+        // Tag-set save permission is scoped by create vs edit mode.
         if (!$this->context->requireRoutePermissionOrForbidden('tag', $requiredAction)) {
             return;
         }
 
+        // CSRF validation protects tag-set save operations.
         if (!$this->context->csrf()->validate($post['_csrf'] ?? null)) {
             $this->context->flash('error', 'Invalid CSRF token.');
             Redirect::redirect($this->context->panelUrl('/tag/set'));
@@ -456,11 +493,13 @@ final class TagEditController
         $slug = $this->input->slug($post['slug'] ?? null);
         $description = $this->input->text($post['description'] ?? null, 2000);
 
+        // New sets require valid name+slug; existing sets require valid name.
         if ($name === '' || ($id !== 0 && $slug === null)) {
             $this->context->flash('error', 'Set name and valid slug are required.');
             Redirect::redirect($this->context->panelUrl('/tag/set/edit' . ($id !== null ? '/' . $id : '')));
         }
 
+        // Repository save can throw on validation/uniqueness/persistence errors.
         try {
             $savedId = $this->tagSetWrite()->save([
                 'id' => $id,
@@ -487,25 +526,30 @@ final class TagEditController
     public function tagSetDelete(array $post): void
     {
         $this->context->requirePanelLogin();
+        // Tag-set operations are unavailable when tag taxonomy feature is disabled.
         if (!$this->tagEnabled) {
             $this->context->renderPanelNotFound();
             return;
         }
+        // Tag-set delete action requires explicit delete permission.
         if (!$this->context->requireRoutePermissionOrForbidden('tag', 'delete')) {
             return;
         }
 
+        // CSRF validation protects destructive tag-set delete operations.
         if (!$this->context->csrf()->validate($post['_csrf'] ?? null)) {
             $this->context->flash('error', 'Invalid CSRF token.');
             Redirect::redirect($this->context->panelUrl('/tag/set'));
         }
 
         $id = $this->input->int($post['id'] ?? null, 0);
+        // Posted set id must parse to a valid integer identifier.
         if ($id === null) {
             $this->context->flash('error', 'Tag set not found.');
             Redirect::redirect($this->context->panelUrl('/tag/set'));
         }
 
+        // Block deletion when channels still explicitly reference this set.
         if ($this->channelRead->countExplicitTaxonomySetAssignments('tag', $id) > 0) {
             $this->context->flash('error', 'Cannot delete a tag set that is still assigned to one or more channels.');
             Redirect::redirect($this->context->panelUrl('/tag/set'));
@@ -513,10 +557,12 @@ final class TagEditController
 
         // Reassign any remaining tags in this set to the default set before deleting.
         $tagCount = (int) ($this->tagRead()->countsBySetId()[$id] ?? 0);
+        // Keep tag rows valid by reassigning to default set before deletion.
         if ($tagCount > 0) {
             $this->tagWrite()->reassignSetToDefault($id, SetParser::DEFAULT_SET_ID);
         }
 
+        // Repository delete can throw on storage/persistence failures.
         try {
             $this->tagSetWrite()->deleteById($id);
         } catch (\Throwable $exception) {
@@ -537,11 +583,13 @@ final class TagEditController
      */
     private function tagRead(): TagRead
     {
+        // Reuse cached tag read repository once resolved.
         if ($this->tagRead instanceof TagRead) {
             return $this->tagRead;
         }
 
         $repo = ($this->tagReadResolver)();
+        // Resolver contract must return the tag read repository.
         if (!$repo instanceof TagRead) {
             throw new \RuntimeException('Panel tag read resolver returned an invalid value.');
         }
@@ -558,11 +606,13 @@ final class TagEditController
      */
     private function tagWrite(): TagWrite
     {
+        // Reuse cached tag write repository once resolved.
         if ($this->tagWrite instanceof TagWrite) {
             return $this->tagWrite;
         }
 
         $repo = ($this->tagWriteResolver)();
+        // Resolver contract must return the tag write repository.
         if (!$repo instanceof TagWrite) {
             throw new \RuntimeException('Panel tag write resolver returned an invalid value.');
         }
@@ -579,11 +629,13 @@ final class TagEditController
      */
     private function tagSetRepo(): SetRead
     {
+        // Reuse cached tag-set read repository once resolved.
         if ($this->tagSetRepo instanceof SetRead) {
             return $this->tagSetRepo;
         }
 
         $repo = ($this->tagSetRepoResolver)();
+        // Resolver contract must return the tag-set read repository.
         if (!$repo instanceof SetRead) {
             throw new \RuntimeException('Panel tag-set repository resolver returned an invalid value.');
         }
@@ -602,11 +654,13 @@ final class TagEditController
      */
     private function tagSetWrite(): SetWrite
     {
+        // Reuse cached tag-set write repository once resolved.
         if ($this->tagSetWrite instanceof SetWrite) {
             return $this->tagSetWrite;
         }
 
         $repo = ($this->tagSetWriteResolver)();
+        // Resolver contract must return the tag-set write repository.
         if (!$repo instanceof SetWrite) {
             throw new \RuntimeException('Panel tag-set write resolver returned an invalid value.');
         }
@@ -625,13 +679,16 @@ final class TagEditController
     private function selectedIdsFromPost(array $post, string $key = 'selected_ids'): array
     {
         $raw = $post[$key] ?? [];
+        // Selected-id payload must be array-shaped checkbox values.
         if (!is_array($raw)) {
             return [];
         }
 
         $selected = [];
+        // Normalize and deduplicate selected ids via associative map keys.
         foreach ($raw as $candidate) {
             $id = $this->input->int($candidate, 1);
+            // Keep only valid positive integer identifiers.
             if ($id !== null) {
                 $selected[$id] = $id;
             }

@@ -120,6 +120,7 @@ final class PageController
     public function home(): void
     {
         $page = $this->pageRead->findHomepage();
+        // Missing homepage record returns not-found.
         if ($page === null) {
             $this->context->notFound();
             return;
@@ -150,9 +151,12 @@ final class PageController
         $channelRouteMode = 'slug';
         $channelWordSeparator = 'inherit';
 
+        // Channel-scoped route branch.
         if ($channelSlug !== null) {
             $channel = $this->channelRead->findBySlug($channelSlug);
+            // Missing channel attempts redirect fallback before 404.
             if ($channel === null) {
+                // Redirect lookup keeps legacy channel-prefixed slugs working.
                 if ($this->tryRedirect($requestedSlug, $channelSlug)) {
                     return;
                 }
@@ -172,7 +176,9 @@ final class PageController
                 $channelRouteMode,
                 $channelWordSeparator
             );
+            // Invalid lookup targets attempt redirect fallback before 404.
             if (!is_array($lookupTarget)) {
+                // Redirect lookup keeps legacy channel-prefixed slugs working.
                 if ($this->tryRedirect($requestedSlug, $channelSlug)) {
                     return;
                 }
@@ -181,6 +187,7 @@ final class PageController
                 return;
             }
 
+            // Slug lookup type may normalize requested slug before repository read.
             if ((string) ($lookupTarget['type'] ?? '') === 'slug') {
                 $lookupSlug = (string) ($lookupTarget['slug'] ?? '');
             }
@@ -191,7 +198,9 @@ final class PageController
                 $channelRouteMode,
                 (string) $this->context->config()->get('content.separator', '-')
             );
+            // Invalid root lookup targets attempt redirect fallback before 404.
             if (!is_array($lookupTarget)) {
+                // Redirect lookup keeps legacy root slugs working.
                 if ($this->tryRedirect($requestedSlug, null)) {
                     return;
                 }
@@ -200,18 +209,21 @@ final class PageController
                 return;
             }
 
+            // Slug lookup type may normalize requested slug before repository read.
             if ((string) ($lookupTarget['type'] ?? '') === 'slug') {
                 $lookupSlug = (string) ($lookupTarget['slug'] ?? '');
             }
         }
 
         $page = null;
+        // Lookup type chooses id-based or slug-based page query.
         if (is_array($lookupTarget) && (string) ($lookupTarget['type'] ?? '') === 'id') {
             $page = $this->pageRead->findPublishedById((int) ($lookupTarget['id'] ?? 0), $channelSlug);
         } else {
             $page = $this->pageRead->findPublishedBySlug($lookupSlug, $channelSlug);
         }
 
+        // Missing page attempts redirect fallback before 404.
         if ($page === null) {
             // Redirect fallback stays ahead of 404 so legacy slugs still resolve cleanly.
             if ($this->tryRedirect($requestedSlug, $channelSlug)) {
@@ -230,7 +242,9 @@ final class PageController
             $channelWordSeparator,
             (string) $this->context->config()->get('content.separator', '-')
         );
+        // Channel-scoped canonical redirect branch.
         if ($channelSlug !== null) {
+            // Redirect to canonical segment when requested slug differs.
             if ($canonicalSegment !== '' && strcasecmp($canonicalSegment, $requestedSlug) !== 0) {
                 Redirect::redirect('/' . rawurlencode($channelSlug) . '/' . rawurlencode($canonicalSegment), 301);
             }
@@ -268,11 +282,13 @@ final class PageController
     public function submitEmbeddedForm(string $type, string $formSlug): void
     {
         $runtime = $this->formInstance()->runtime($type, $this->shortcodeRuntimes());
+        // Unknown runtime type is treated as not-found.
         if ($runtime === null) {
             $this->context->notFound();
             return;
         }
 
+        // Disabled runtimes reject submit attempts.
         if (!$this->formInstance()->isRuntimeEnabled($runtime)) {
             $this->context->notFound();
             return;
@@ -285,6 +301,7 @@ final class PageController
         }
 
         $slug = $this->context->input()->slug($formSlug);
+        // Invalid form slug normalization yields not-found.
         if ($slug === null) {
             $this->context->notFound();
             return;
@@ -292,6 +309,7 @@ final class PageController
 
         $returnPath = $this->formInstance()->sanitizeReturnPath((string) ($_POST['return_path'] ?? '/'));
 
+        // Runtime submit handler can throw from extension logic or validation.
         try {
             $runtime->submit($slug, $returnPath, fn (): ?string => $this->publicCaptchaFlow->validateSubmission($_POST, $_SERVER));
         } catch (\Throwable $exception) {
@@ -351,6 +369,7 @@ final class PageController
     private function renderPageGalleryBlockHtml(array $page): string
     {
         $pageId = (int) ($page['id'] ?? 0);
+        // Gallery rendering requires a valid persisted page id.
         if ($pageId <= 0) {
             return '';
         }
@@ -358,25 +377,31 @@ final class PageController
         $galleryImages = $this->templateDecorator()->decorateGalleryImagesForTemplate(
             $this->media->listDisplayReadyForPage($pageId)
         );
+        // Empty gallery sets yield no gallery block markup.
         if ($galleryImages === []) {
             return '';
         }
 
         $items = [];
+        // Normalize gallery rows into template-ready image item payloads.
         foreach ($galleryImages as $image) {
+            // Ignore malformed gallery rows.
             if (!is_array($image)) {
                 continue;
             }
 
             $imageUrl = trim((string) ($image['image_url'] ?? ''));
             $fullUrl = trim((string) ($image['full_url'] ?? ''));
+            // Skip rows missing both preview and full image URLs.
             if ($imageUrl === '' && $fullUrl === '') {
                 continue;
             }
 
+            // Fall back preview URL to full URL when thumbnail URL is absent.
             if ($imageUrl === '') {
                 $imageUrl = $fullUrl;
             }
+            // Fall back full URL to preview URL when full URL is absent.
             if ($fullUrl === '') {
                 $fullUrl = $imageUrl;
             }
@@ -395,6 +420,7 @@ final class PageController
                 . '</figure></div>';
         }
 
+        // No valid image items means no gallery markup should be rendered.
         if ($items === []) {
             return '';
         }
@@ -420,6 +446,7 @@ final class PageController
      */
     private function blockTypeDefinitions(): array
     {
+        // Reuse cached body-block definitions for this request.
         if (is_array($this->blockTypeDefsCache)) {
             return $this->blockTypeDefsCache;
         }
@@ -441,11 +468,13 @@ final class PageController
     private function tryRedirect(string $pageSlug, ?string $channelSlug = null): bool
     {
         $redirectRow = $this->redirectRead->findActiveByPath($pageSlug, $channelSlug);
+        // No matching redirect row means caller should continue normal routing.
         if ($redirectRow === null) {
             return false;
         }
 
         $targetUrl = trim((string) ($redirectRow['target'] ?? ''));
+        // Reject unsafe/malformed redirect targets.
         if (!RedirectParser::isAllowedHttpOrRootPath($targetUrl)) {
             return false;
         }
@@ -479,6 +508,7 @@ final class PageController
      */
     private function formInstance(): ExtensionFormInstance
     {
+        // Lazily initialize embedded-form runtime service.
         if (!$this->formInstance instanceof ExtensionFormInstance) {
             $this->formInstance = new ExtensionFormInstance(
                 $this->context->input(),
@@ -496,6 +526,7 @@ final class PageController
      */
     private function shortcodeRuntimes(): array
     {
+        // Discover shortcode runtimes once per request.
         if (!$this->shortcodeRuntimesLoaded) {
             $this->shortcodeRuntimes = $this->formInstance()->discoverRuntimes($this->extensionServices());
             $this->shortcodeRuntimesLoaded = true;
@@ -522,6 +553,7 @@ final class PageController
      */
     private function themeTemplate(): ThemeTemplate
     {
+        // Lazily initialize theme-template resolver.
         if (!$this->themeTemplate instanceof ThemeTemplate) {
             $this->themeTemplate = new ThemeTemplate($this->context->input());
         }
@@ -556,6 +588,7 @@ final class PageController
      */
     private function metaService(): Meta
     {
+        // Lazily initialize shared public meta service.
         if (!$this->metaService instanceof Meta) {
             $this->metaService = new Meta(
                 $this->request,
@@ -575,6 +608,7 @@ final class PageController
      */
     private function profileParser(): UserProfileParser
     {
+        // Lazily initialize profile-contact parser.
         if (!$this->profileParser instanceof UserProfileParser) {
             $this->profileParser = new UserProfileParser($this->context->input());
         }
@@ -589,6 +623,7 @@ final class PageController
      */
     private function templateDecorator(): TemplateDecorator
     {
+        // Lazily initialize template decorator for public view payload shaping.
         if (!$this->templateDecorator instanceof TemplateDecorator) {
             $this->templateDecorator = new TemplateDecorator(
                 $this->context->config(),
@@ -607,6 +642,7 @@ final class PageController
      */
     private function pageMarkdown(): PageMarkdown
     {
+        // Lazily initialize Markdown helper for page block rendering.
         if (!$this->pageMarkdown instanceof PageMarkdown) {
             $this->pageMarkdown = new PageMarkdown();
         }
@@ -621,6 +657,7 @@ final class PageController
      */
     private function pageBlockParser(): PageBlockParser
     {
+        // Lazily initialize page-block parser.
         if (!$this->pageBlockParser instanceof PageBlockParser) {
             $this->pageBlockParser = new PageBlockParser($this->context->input());
         }
@@ -635,6 +672,7 @@ final class PageController
      */
     private function pageBlocks(): PageBlocks
     {
+        // Lazily initialize public page-block helper.
         if (!$this->pageBlocks instanceof PageBlocks) {
             $this->pageBlocks = new PageBlocks(
                 dirname(__DIR__, 4),

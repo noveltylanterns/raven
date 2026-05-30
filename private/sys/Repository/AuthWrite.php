@@ -52,6 +52,7 @@ final class AuthWrite
      */
     public function updateTwoFactorMethods(int $userId, array $methods): array
     {
+        // Reject non-positive user ids to prevent writes against invalid accounts.
         if ($userId <= 0) {
             return ['ok' => false, 'errors' => ['Invalid user id.']];
         }
@@ -120,11 +121,13 @@ final class AuthWrite
         ];
 
         $passwordHash = is_string($data['password_hash'] ?? null) ? $data['password_hash'] : null;
+        // Update password hash only when caller intentionally provided a non-empty replacement.
         if ($passwordHash !== null && $passwordHash !== '') {
             $fields[] = 'password = :password';
             $params[':password'] = $passwordHash;
         }
 
+        // Avatar writes are optional so callers can preserve existing values by default.
         if ((bool) ($data['set_avatar'] ?? false)) {
             $fields[] = 'avatar = :avatar_path';
             $params[':avatar_path'] = $data['avatar_path'] ?? null;
@@ -158,6 +161,7 @@ final class AuthWrite
      */
     private function encodeTwoFactorMethods(array $methods): ?string
     {
+        // Persist null when no methods exist to represent "2FA disabled" explicitly.
         if ($methods === []) {
             return null;
         }

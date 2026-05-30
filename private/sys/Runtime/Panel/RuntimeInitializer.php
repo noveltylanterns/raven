@@ -56,6 +56,7 @@ final class RuntimeInitializer
             $categoryEnabled,
             $tagEnabled
         ): array {
+            // Reuse previously initialized panel runtime payload within the same request.
             if (is_array($panelRuntime)) {
                 return $rvn + $panelRuntime;
             }
@@ -76,6 +77,7 @@ final class RuntimeInitializer
                     'tag_enabled' => $tagEnabled,
                 ];
 
+                // Domain is optional so callers can omit hostnames where unnecessary.
                 if ($includeDomain) {
                     $site['domain'] = (string) $rvn['config']->get('site.domain', 'localhost');
                 }
@@ -87,6 +89,7 @@ final class RuntimeInitializer
                 ? (array) $rvn['enabled_extension_manifests']
                 : [];
             $enabledExtensions = [];
+            // Keep only enabled extensions that still exist on disk.
             foreach (array_keys($enabledExtensionManifests) as $directoryName) {
                 if (is_dir((string) $rvn['root'] . '/private/ext/' . $directoryName)) {
                     $enabledExtensions[$directoryName] = true;

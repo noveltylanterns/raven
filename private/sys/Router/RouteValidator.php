@@ -29,6 +29,7 @@ final class RouteValidator
     public static function slugOrNotFound(InputSanitizer $input, mixed $value, callable $notFound): ?string
     {
         $slug = $input->slug($value);
+        // Invalid slug params immediately trigger the caller-provided not-found flow.
         if ($slug === null) {
             $notFound();
             return null;
@@ -49,6 +50,7 @@ final class RouteValidator
     public static function intOrNotFound(InputSanitizer $input, mixed $value, int $min, callable $notFound): ?int
     {
         $number = $input->int($value, $min);
+        // Invalid numeric params immediately trigger the caller-provided not-found flow.
         if ($number === null) {
             $notFound();
             return null;
@@ -67,6 +69,7 @@ final class RouteValidator
      */
     public static function slugAllowedOrNotFound(?string $slug, array $disallowed, callable $notFound): ?string
     {
+        // Reject absent slugs and reserved slugs with one shared not-found behavior.
         if ($slug === null || in_array($slug, $disallowed, true)) {
             $notFound();
             return null;

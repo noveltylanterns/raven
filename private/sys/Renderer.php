@@ -43,6 +43,7 @@ final class Renderer
         $templateFile = $this->resolve($template);
         $content = $this->renderFile($templateFile, $data);
 
+        // Render template directly when no layout wrapper was requested.
         if ($layout === null) {
             echo $content;
             return;
@@ -64,6 +65,7 @@ final class Renderer
     {
         $path = $this->viewsPath . '/' . trim($template, '/') . '.php';
 
+        // Fail fast with a clear error when the resolved template file is missing.
         if (!is_file($path)) {
             throw new RuntimeException("View template not found: {$template}");
         }
@@ -80,6 +82,7 @@ final class Renderer
     {
         extract($data, EXTR_SKIP);
 
+        // Capture render stack frames only while request profiling is enabled.
         if (\Raven\Core\Debug\RequestProfiler::isEnabled()) {
             /** @var array<int, array<string, mixed>> $trace */
             $trace = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 80);

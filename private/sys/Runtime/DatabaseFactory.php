@@ -81,6 +81,7 @@ final class DatabaseFactory
     {
         $driver = $this->getDriver();
 
+        // SQLite mode points app reads/writes at the consolidated local core DB.
         if ($driver === 'sqlite') {
             return $this->newSqliteConnection($this->sqlitePath('core'), 'app');
         }
@@ -100,6 +101,7 @@ final class DatabaseFactory
     {
         $driver = $this->getDriver();
 
+        // SQLite mode reuses the same core DB for auth-backed user rows.
         if ($driver === 'sqlite') {
             return $this->newSqliteConnection($this->sqlitePath('core'), 'auth');
         }
@@ -133,6 +135,7 @@ final class DatabaseFactory
      */
     private function newServerConnection(string $driver, string $connectionLabel = 'app'): PDO
     {
+        // Build MySQL DSN/auth credentials path when running in mysql mode.
         if ($driver === 'mysql') {
             $mysql = MysqlConfig::fromConfig($this->config);
 
@@ -189,6 +192,7 @@ final class DatabaseFactory
      */
     private function sqlitePaths(): SqliteConfig
     {
+        // Lazily initialize sqlite path resolver once per factory instance.
         if ($this->sqlitePaths === null) {
             $this->sqlitePaths = SqliteConfig::fromConfig($this->config);
         }

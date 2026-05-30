@@ -77,15 +77,18 @@ final class ChannelWrite
         $routeMode = ChannelPolicy::normalizeChannelRouteMode((string) ($data['route_mode'] ?? 'inherit'));
         $routeSeparator = ChannelPolicy::normalizeChannelSeparator((string) ($data['route_separator'] ?? 'inherit'));
 
+        // Name and slug are the minimum required identity fields for channel persistence.
         if ($name === '' || !ChannelShared::isValidSlug($slug)) {
             throw new RuntimeException('Channel name and slug are required.');
         }
 
+        // Root channel identity is reserved and cannot be modified through generic save flow.
         if (ChannelShared::isRootChannelSlug($slug) || ($idProvided && ChannelShared::isRootChannelId($id))) {
             throw new RuntimeException('The stock <root> channel is reserved and cannot be edited.');
         }
 
         $existingBySlug = $this->read->findBySlug($slug);
+        // Enforce slug uniqueness across all non-current channel records.
         if (is_array($existingBySlug) && (int) ($existingBySlug['id'] ?? 0) !== $id) {
             throw new RuntimeException('A channel with that slug already exists.');
         }
@@ -109,6 +112,7 @@ final class ChannelWrite
             ? SetParser::normalizeSelection($data['tag_sets'], false)
             : SetParser::normalizeSelection($currentRaw['tag_sets'] ?? [], false);
         $createdAt = trim((string) ($currentRaw['created_at'] ?? ''));
+        // Preserve original created_at when available; backfill for legacy rows otherwise.
         if ($createdAt === '') {
             $createdAt = gmdate('Y-m-d H:i:s');
         }
@@ -161,11 +165,13 @@ final class ChannelWrite
     public function updateImagePaths(int $id, array $paths): void
     {
         $record = $this->read->findById($id);
+        // Updating image paths requires an existing channel record.
         if (!is_array($record)) {
             throw new RuntimeException('Channel not found.');
         }
 
         $slug = (string) ($record['slug'] ?? '');
+        // Image writes require a valid slug so the target channel file can be resolved.
         if ($slug === '') {
             throw new RuntimeException('Channel slug is invalid.');
         }
@@ -218,16 +224,19 @@ final class ChannelWrite
      */
     public function deleteById(int $id): void
     {
+        // Root channel is a required system record and cannot be deleted.
         if (ChannelShared::isRootChannelId($id)) {
             throw new RuntimeException('The stock <root> channel cannot be deleted.');
         }
 
         $record = $this->read->findById($id);
+        // Nothing to delete when channel no longer exists.
         if (!is_array($record)) {
             return;
         }
 
         $pageCounts = $this->read->pageCountsByChannelId();
+        // Refuse deletion while pages are still assigned to this channel.
         if ((int) ($pageCounts[$id] ?? 0) > 0) {
             throw new RuntimeException('Cannot delete a channel that has pages assigned to it.');
         }
@@ -236,6 +245,7 @@ final class ChannelWrite
         $redirects = $this->table('redirects');
 
         $this->db->beginTransaction();
+        // Keep detach operations atomic so partial reassignment cannot occur on failure.
         try {
             // Reassign any stray rows to root before the channel file disappears.
             $detachPages = $this->db->prepare(
@@ -256,6 +266,7 @@ final class ChannelWrite
 
             $this->db->commit();
         } catch (\Throwable $exception) {
+            // Roll back only when transaction remains active after failure.
             if ($this->db->inTransaction()) {
                 $this->db->rollBack();
             }
@@ -278,13 +289,16 @@ final class ChannelWrite
     {
         $normalizedDirectory = rtrim($channelDirectory, '/');
 
+        // Revisit every channel file and rewrite anything that is non-canonical.
         foreach (ChannelRead::rawChannelFilePathsInDirectory($normalizedDirectory) as $path) {
             $raw = ChannelRead::loadRawByPathStatic($path);
+            // Skip unreadable or empty payload files.
             if ($raw === []) {
                 continue;
             }
 
             $channelId = ChannelRead::recordIdFromRawStatic($raw, $path);
+            // Skip files whose id cannot be resolved.
             if ($channelId === null) {
                 continue;
             }
@@ -292,11 +306,13 @@ final class ChannelWrite
             $slug = ChannelRead::recordSlugFromRawStatic($raw, $channelId, basename($path, '.php'));
             $canonical = ChannelRead::canonicalizeRecordStatic($channelId, $slug, $raw);
             $targetPath = self::pathForRecord($normalizedDirectory, (int) $canonical['id'], (string) $canonical['slug']);
+            // Skip rewrite when file path and payload already match canonical output.
             if ($path === $targetPath && $canonical === $raw) {
                 continue;
             }
 
             self::writeRecordById($normalizedDirectory, (int) $canonical['id'], (string) $canonical['slug'], $canonical);
+            // Remove obsolete pre-canonical file when rewrite moved the record to a new path.
             if ($path !== $targetPath && is_file($path)) {
                 @unlink($path);
                 ChannelRead::invalidatePhpFileCacheStatic($path);
@@ -324,10 +340,12 @@ final class ChannelWrite
 
         // Write to a temp file first so the final rename is atomic.
         $tmpPath = $path . '.tmp';
+        // Failing temp write means atomic replacement cannot proceed safely.
         if (file_put_contents($tmpPath, $content, LOCK_EX) === false) {
             throw new RuntimeException('Failed to write channel file.');
         }
 
+        // Promote temp file atomically; rollback temp artifact on failure.
         if (!@rename($tmpPath, $path)) {
             @unlink($tmpPath);
             throw new RuntimeException('Failed to finalize channel file.');
@@ -338,6 +356,7 @@ final class ChannelWrite
 
         // Remove any stale files that matched the same id but had a different path.
         foreach (ChannelRead::candidatePathsForIdInDirectory($normalizedDirectory, (int) $canonical['id']) as $candidatePath) {
+            // Keep current canonical file and ignore paths already removed.
             if ($candidatePath === $path || !is_file($candidatePath)) {
                 continue;
             }
@@ -358,11 +377,14 @@ final class ChannelWrite
     public static function deleteRecordById(string $channelDirectory, int $id): void
     {
         $normalizedDirectory = rtrim($channelDirectory, '/');
+        // Attempt deletion for every file candidate mapped to this channel id.
         foreach (ChannelRead::candidatePathsForIdInDirectory($normalizedDirectory, $id) as $path) {
+            // Skip candidates already removed or never present on disk.
             if (!is_file($path)) {
                 continue;
             }
 
+            // Surface deletion failure so callers can react to filesystem permission issues.
             if (!@unlink($path)) {
                 throw new RuntimeException('Failed to delete channel file.');
             }
@@ -382,16 +404,19 @@ final class ChannelWrite
     public static function persistChannelId(string $channelDirectory, string $slug, int $id): void
     {
         $normalizedDirectory = rtrim($channelDirectory, '/');
+        // Ignore invalid id/slug combinations that cannot map to canonical channel records.
         if ($id < ChannelShared::ROOT_CHANNEL_ID || trim($slug) === '') {
             return;
         }
 
         $path = ChannelRead::findPathBySlugInDirectory($normalizedDirectory, $slug);
+        // Nothing to persist when no file currently matches the slug.
         if ($path === null) {
             return;
         }
 
         $raw = ChannelRead::loadRawByPathStatic($path);
+        // Skip rewrites when source file payload cannot be loaded.
         if ($raw === []) {
             return;
         }
@@ -407,8 +432,10 @@ final class ChannelWrite
     private function nextChannelId(): int
     {
         $maxId = 0;
+        // Scan all known channels and keep the highest assigned id.
         foreach ($this->read->listRecords() as $record) {
             $recordId = (int) ($record['id'] ?? 0);
+            // Update high-water mark only when current record id is larger.
             if ($recordId > $maxId) {
                 $maxId = $recordId;
             }
@@ -437,10 +464,12 @@ final class ChannelWrite
      */
     private static function ensureDirectory(string $channelDirectory): void
     {
+        // Existing directory satisfies storage precondition for record writes.
         if (is_dir($channelDirectory)) {
             return;
         }
 
+        // Create directory recursively; second is_dir guard covers race conditions.
         if (!@mkdir($channelDirectory, 0775, true) && !is_dir($channelDirectory)) {
             throw new RuntimeException('Failed to initialize channel directory.');
         }
@@ -458,6 +487,7 @@ final class ChannelWrite
     {
         $safeId = max(ChannelShared::ROOT_CHANNEL_ID, $id);
         $safeSlug = strtolower(trim($slug));
+        // Substitute deterministic fallback slug when provided slug is invalid.
         if (!ChannelShared::isValidSlug($safeSlug)) {
             $safeSlug = $safeId === ChannelShared::ROOT_CHANNEL_ID
                 ? ChannelShared::ROOT_CHANNEL_SLUG

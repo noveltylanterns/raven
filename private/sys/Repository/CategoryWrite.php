@@ -54,6 +54,7 @@ final class CategoryWrite
         $description = (string) ($data['description'] ?? '');
         $now = gmdate('Y-m-d H:i:s');
 
+        // Existing positive ids indicate an update path instead of an insert.
         if ($id !== null && $id > 0) {
             // Keep updates in-place so controllers can preserve existing ids and attachments.
             $stmt = $this->db->prepare(
@@ -135,6 +136,7 @@ final class CategoryWrite
      */
     public function reassignSetToDefault(int $fromSetId, int $defaultSetId): void
     {
+        // No-op when source and destination set ids are the same.
         if ($fromSetId === $defaultSetId) {
             return;
         }
@@ -161,6 +163,7 @@ final class CategoryWrite
 
         $this->db->beginTransaction();
 
+        // Delete relation rows and category row atomically so taxonomy links never dangle.
         try {
             // Detach page links first so no join-table rows survive after the taxonomy row disappears.
             $detach = $this->db->prepare(
@@ -173,6 +176,7 @@ final class CategoryWrite
 
             $this->db->commit();
         } catch (\Throwable $exception) {
+            // Roll back only when transaction is still active after a failure.
             if ($this->db->inTransaction()) {
                 $this->db->rollBack();
             }
@@ -213,6 +217,7 @@ final class CategoryWrite
     private function normalizeNullableFilename(mixed $value): ?string
     {
         $raw = trim((string) $value);
+        // Empty values clear the stored image filename.
         if ($raw === '') {
             return null;
         }

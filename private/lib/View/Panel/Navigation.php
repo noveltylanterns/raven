@@ -97,7 +97,10 @@ final class Navigation
                     >
                     <span class="rvnp-brand-text-wrap">
                         <span class="rvnp-brand-text"><?= e($brandName) ?></span>
-                        <?php if ($showPoweredBy): ?>
+                        <?php
+                        /* Optional product attribution line under the brand text. */
+                        if ($showPoweredBy):
+                        ?>
                             <small class="rvnp-brand-powered">Powered by Raven</small>
                         <?php endif; ?>
                     </span>
@@ -123,7 +126,10 @@ final class Navigation
                         <li class="nav-item">
                             <!-- Logout remains POST-only with CSRF to avoid accidental/logged URL-triggered sign-outs. -->
                             <form method="post" action="<?= e($panelBase) ?>/logout" class="m-0">
-                                <?php if ($csrfField !== null): ?>
+                                <?php
+                                /* Render CSRF field only when caller provided the trusted hidden input. */
+                                if ($csrfField !== null):
+                                ?>
                                     <?= $csrfField ?>
                                 <?php endif; ?>
                                 <button type="submit" class="nav-link text-start w-100">Logout</button>
@@ -178,7 +184,10 @@ final class Navigation
                                 >
                                 <span class="rvnp-brand-text-wrap">
                                     <span class="rvnp-brand-text"><?= e($brandName) ?></span>
-                                    <?php if ($showPoweredBy): ?>
+                                    <?php
+                                    /* Optional product attribution line under the brand text. */
+                                    if ($showPoweredBy):
+                                    ?>
                                         <small class="rvnp-brand-powered">Powered by Raven</small>
                                     <?php endif; ?>
                                 </span>
@@ -193,7 +202,10 @@ final class Navigation
                         <li class="nav-item">
                             <!-- Use POST + CSRF for logout to match mobile behavior and prevent URL-logged sign-outs. -->
                             <form method="post" action="<?= e($panelBase) ?>/logout" class="m-0">
-                                <?php if ($csrfField !== null): ?>
+                                <?php
+                                /* Render CSRF field only when caller provided the trusted hidden input. */
+                                if ($csrfField !== null):
+                                ?>
                                     <?= $csrfField ?>
                                 <?php endif; ?>
                                 <button type="submit" class="nav-link text-start w-100">Logout</button>
@@ -279,13 +291,20 @@ final class Navigation
 
         ob_start();
 
+        /* Render Content group only when content navigation is enabled. */
         if ($showContent): ?>
                     <!-- Content group for publishing entities. -->
                     <h2 class="h6 <?= e($headingClass) ?>">Content</h2>
                     <ul class="nav nav-pills flex-column gap-1 mb-3">
-                        <?php if ($showCreatePage): ?>
+                        <?php
+                        /* Show Create Page entry only when the caller enables page creation links. */
+                        if ($showCreatePage):
+                        ?>
                             <li class="nav-item">
-                                <?php if ($showCreateAccordion): ?>
+                                <?php
+                                /* Optional accordion mode expands create links per channel. */
+                                if ($showCreateAccordion):
+                                ?>
                                 <details class="rvnp-nav-subaccordion"<?= $accordionOpen ? ' open' : '' ?>>
                                     <summary class="rvnp-nav-subsummary<?= $accordionOpen ? ' active' : '' ?>">Create Page</summary>
                                     <ul class="nav nav-pills flex-column gap-1 rvnp-nav-sublist">
@@ -294,7 +313,10 @@ final class Navigation
                                                 In Root
                                             </a>
                                         </li>
-                                        <?php foreach ($channelItems as $channelItem): ?>
+                                        <?php
+                                        /* Render one channel-specific create link per configured channel item. */
+                                        foreach ($channelItems as $channelItem):
+                                        ?>
                                             <li class="nav-item">
                                                 <a
                                                     class="nav-link<?= ($section === 'page' && $pageNav === 'create' && $pageNavChannel === (string) $channelItem['slug']) ? ' active' : '' ?>"
@@ -311,16 +333,23 @@ final class Navigation
                                 <?php endif; ?>
                             </li>
                         <?php endif; ?>
-                        <?php if ($showListPages): ?>
+                        <?php
+                        /* List Pages link is optional for installs with restricted content visibility. */
+                        if ($showListPages):
+                        ?>
                             <li class="nav-item"><a class="nav-link<?= ($section === 'page' && $pageNav === 'list') ? ' active' : '' ?>" href="<?= e($panelBase) ?>/page">List Pages</a></li>
                         <?php endif; ?>
                     </ul>
         <?php endif;
 
+        /* Render Modules group only when module navigation items are enabled. */
         if ($showModules): ?>
                     <h2 class="h6 <?= e($headingClass) ?>">Modules</h2>
                     <ul class="nav nav-pills flex-column gap-1 mb-3">
-                        <?php foreach ($moduleItems as $moduleItem): ?>
+                        <?php
+                        /* Render one module link per configured module item. */
+                        foreach ($moduleItems as $moduleItem):
+                        ?>
                             <li class="nav-item">
                                 <a class="nav-link<?= $section === (string) $moduleItem['section'] ? ' active' : '' ?>" href="<?= e((string) $moduleItem['path']) ?>">
                                     <?= e((string) $moduleItem['label']) ?>
@@ -330,45 +359,72 @@ final class Navigation
                     </ul>
         <?php endif;
 
+        /* Render Accounts group only when account-management nav is enabled. */
         if ($showAccounts): ?>
                     <!-- Accounts group for user/group access controls. -->
                     <h2 class="h6 <?= e($headingClass) ?>">Accounts</h2>
                     <ul class="nav nav-pills flex-column gap-1 mb-3">
-                        <?php if ($showGroups): ?>
+                        <?php
+                        /* Groups link visibility follows caller-provided permission state. */
+                        if ($showGroups):
+                        ?>
                             <li class="nav-item"><a class="nav-link<?= $section === 'group' ? ' active' : '' ?>" href="<?= e($panelBase) ?>/group">Groups</a></li>
                         <?php endif; ?>
-                        <?php if ($showUsers): ?>
+                        <?php
+                        /* Users link visibility follows caller-provided permission state. */
+                        if ($showUsers):
+                        ?>
                             <li class="nav-item"><a class="nav-link<?= $section === 'user' ? ' active' : '' ?>" href="<?= e($panelBase) ?>/user">Users</a></li>
                         <?php endif; ?>
                     </ul>
         <?php endif;
 
+        /* Render Taxonomy group only when taxonomy navigation is enabled. */
         if ($showTaxonomy): ?>
                     <!-- Taxonomy group for content classification entities. -->
                     <h2 class="h6 <?= e($headingClass) ?>">Taxonomy</h2>
                     <ul class="nav nav-pills flex-column gap-1 mb-3">
-                        <?php if ($showCategories): ?>
+                        <?php
+                        /* Categories link visibility follows caller-provided permission state. */
+                        if ($showCategories):
+                        ?>
                         <li class="nav-item"><a class="nav-link<?= $section === 'category' ? ' active' : '' ?>" href="<?= e($panelBase) ?>/category">Categories</a></li>
                         <?php endif; ?>
-                        <?php if ($showChannels): ?>
+                        <?php
+                        /* Channels link visibility follows caller-provided permission state. */
+                        if ($showChannels):
+                        ?>
                         <li class="nav-item"><a class="nav-link<?= $section === 'channel' ? ' active' : '' ?>" href="<?= e($panelBase) ?>/channel">Channels</a></li>
                         <?php endif; ?>
-                        <?php if ($showRedirects): ?>
+                        <?php
+                        /* Redirects link visibility follows caller-provided permission state. */
+                        if ($showRedirects):
+                        ?>
                         <li class="nav-item"><a class="nav-link<?= $section === 'redirect' ? ' active' : '' ?>" href="<?= e($panelBase) ?>/redirect">Redirects</a></li>
                         <?php endif; ?>
-                        <?php if ($showRouting): ?>
+                        <?php
+                        /* Routing link visibility follows caller-provided permission state. */
+                        if ($showRouting):
+                        ?>
                         <li class="nav-item"><a class="nav-link<?= $section === 'routing' ? ' active' : '' ?>" href="<?= e($panelBase) ?>/routing">Routing Table</a></li>
                         <?php endif; ?>
-                        <?php if ($showTags): ?>
+                        <?php
+                        /* Tags link visibility follows caller-provided permission state. */
+                        if ($showTags):
+                        ?>
                         <li class="nav-item"><a class="nav-link<?= $section === 'tag' ? ' active' : '' ?>" href="<?= e($panelBase) ?>/tag">Tags</a></li>
                         <?php endif; ?>
                     </ul>
         <?php endif;
 
+        /* Render Extensions group only when extension nav items are enabled. */
         if ($showExtensions): ?>
                     <h2 class="h6 <?= e($headingClass) ?>">Extensions</h2>
                     <ul class="nav nav-pills flex-column gap-1 mb-3">
-                        <?php foreach ($extensionItems as $extensionItem): ?>
+                        <?php
+                        /* Render one extension link per configured extension nav item. */
+                        foreach ($extensionItems as $extensionItem):
+                        ?>
                             <li class="nav-item">
                                 <a class="nav-link<?= $section === (string) $extensionItem['section'] ? ' active' : '' ?>" href="<?= e((string) $extensionItem['path']) ?>">
                                     <?= e((string) $extensionItem['label']) ?>
@@ -378,11 +434,15 @@ final class Navigation
                     </ul>
         <?php endif;
 
+        /* Render System group only when system-level nav items are enabled. */
         if ($showSystem): ?>
                     <!-- System group for app-level settings and account administration. -->
                     <h2 class="h6 <?= e($headingClass) ?>">System</h2>
                     <ul class="nav nav-pills flex-column gap-1 mb-3">
-                        <?php foreach ($systemItems as $systemItem): ?>
+                        <?php
+                        /* Render one system link per configured system nav item. */
+                        foreach ($systemItems as $systemItem):
+                        ?>
                             <li class="nav-item">
                                 <a class="nav-link<?= $section === (string) $systemItem['section'] ? ' active' : '' ?>" href="<?= e((string) $systemItem['path']) ?>">
                                     <?= e((string) $systemItem['label']) ?>

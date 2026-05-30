@@ -112,20 +112,24 @@ final class ChannelEditController
     {
         $this->context->requirePanelLogin();
         $requiredAction = $id === null ? 'create' : 'edit';
+        // Enforce create/edit permission before loading channel form payloads.
         if (!$this->context->requireRoutePermissionOrForbidden('channel', $requiredAction)) {
             return;
         }
 
         $channel = null;
+        // Edit mode loads existing channel row for the requested id.
         if ($id !== null) {
             $channel = $this->channelRead->findById($id);
 
+            // Missing records redirect back to channel list with error flash.
             if ($channel === null) {
                 $this->context->flash('error', 'Channel not found.');
                 Redirect::redirect($this->context->panelUrl('/channel'));
             }
         }
 
+        // Normalize legacy stored channel payload fields for template consumption.
         if (is_array($channel)) {
             $channel['feed_enabled'] = (bool) ($channel['feed_enabled'] ?? false);
             $channel['category_sets'] = SetParser::normalizeSelection($channel['category_sets'] ?? [], false);
@@ -175,10 +179,12 @@ final class ChannelEditController
         $this->context->requirePanelLogin();
         $id = $this->input->int($post['id'] ?? null, 1);
         $requiredAction = $id === null ? 'create' : 'edit';
+        // Enforce create/edit permission before mutating channel records.
         if (!$this->context->requireRoutePermissionOrForbidden('channel', $requiredAction)) {
             return;
         }
 
+        // Reject forged save submissions before normalization/writes.
         if (!$this->context->csrf()->validate($post['_csrf'] ?? null)) {
             $this->context->flash('error', 'Invalid CSRF token.');
             Redirect::redirect($this->context->panelUrl('/channel'));
@@ -188,6 +194,7 @@ final class ChannelEditController
         $existingChannel = $id !== null ? $this->channelRead->findById($id) : null;
         $name = $this->input->text($post['name'] ?? null, 255);
         $slug = $this->input->slug($post['slug'] ?? null);
+        // Preserve stored slug when edit form omits slug field.
         if ($slug === null && is_array($existingChannel)) {
             $persistedSlug = trim((string) ($existingChannel['slug'] ?? ''));
             $slug = $persistedSlug !== '' ? $persistedSlug : null;
@@ -212,6 +219,7 @@ final class ChannelEditController
             $this->tagSetRepo()->listOptions()
         );
 
+        // Require channel name and valid slug before save call.
         if ($name === '' || $slug === null) {
             $this->context->flash('error', 'Channel name and valid slug are required.');
             Redirect::redirect($this->editorTabs->panelEditorUrlWithTab(
@@ -236,6 +244,7 @@ final class ChannelEditController
                 'route_mode' => $routeMode,
                 'route_separator' => $routeSeparator,
             ];
+            // Feed toggle is persisted only when global feed support is enabled.
             if ($feedsEnabled) {
                 $saveData['feed_enabled'] = isset($post['feed_enabled']) && (string) ($post['feed_enabled'] ?? '') === '1';
             }
@@ -271,6 +280,7 @@ final class ChannelEditController
         $coverUploads = $this->upload->normalize($files['cover_image'] ?? null);
         $previewUploads = $this->upload->normalize($files['preview_image'] ?? null);
 
+        // Each slot accepts at most one uploaded file per save request.
         if (count($coverUploads) > 1 || count($previewUploads) > 1) {
             $this->context->flash('error', 'Please upload only one cover image and one preview image.');
             Redirect::redirect($savedEditUrl);
@@ -279,19 +289,23 @@ final class ChannelEditController
         $removeCover = isset($post['remove_cover_image']) && (string) $post['remove_cover_image'] === '1';
         $removePreview = isset($post['remove_preview_image']) && (string) $post['remove_preview_image'] === '1';
 
+        // Clear all persisted cover-image keys when remove toggle is active.
         if ($removeCover) {
             foreach ($this->taxonomyImageService->imageStorageKeysForSlot('channels', 'cover') as $key) {
                 $nextStorage[$key] = null;
             }
         }
+        // Clear all persisted preview-image keys when remove toggle is active.
         if ($removePreview) {
             foreach ($this->taxonomyImageService->imageStorageKeysForSlot('channels', 'preview') as $key) {
                 $nextStorage[$key] = null;
             }
         }
 
+        // Process optional cover upload and merge returned storage payload.
         if (isset($coverUploads[0])) {
             $coverResult = $this->editorMeta->storeMetaImageUpload('channels', $savedId, 'cover', $coverUploads[0]);
+            // Abort save flow when cover upload fails and cleanup new writes.
             if (!$coverResult['ok']) {
                 $this->editorMeta->cleanupMetaImagePathSets('channels', $savedId, $newPathSets);
                 $this->context->flash('error', (string) ($coverResult['error'] ?? 'Failed to upload cover image.'));
@@ -304,8 +318,10 @@ final class ChannelEditController
             $newPathSets[] = $coverPaths;
         }
 
+        // Process optional preview upload and merge returned storage payload.
         if (isset($previewUploads[0])) {
             $previewResult = $this->editorMeta->storeMetaImageUpload('channels', $savedId, 'preview', $previewUploads[0]);
+            // Abort save flow when preview upload fails and cleanup new writes.
             if (!$previewResult['ok']) {
                 $this->editorMeta->cleanupMetaImagePathSets('channels', $savedId, $newPathSets);
                 $this->context->flash('error', (string) ($previewResult['error'] ?? 'Failed to upload preview image.'));
@@ -318,6 +334,7 @@ final class ChannelEditController
             $newPathSets[] = $previewPaths;
         }
 
+        // Persist resolved image storage payload after upload/remove operations.
         try {
             $this->channelRepo->updateImagePaths($savedId, $nextStorage);
         } catch (\Throwable) {
@@ -344,16 +361,19 @@ final class ChannelEditController
     public function channelDelete(array $post): void
     {
         $this->context->requirePanelLogin();
+        // Enforce delete permission before mutating channel records.
         if (!$this->context->requireRoutePermissionOrForbidden('channel', 'delete')) {
             return;
         }
 
+        // Reject forged delete submissions before any destructive action.
         if (!$this->context->csrf()->validate($post['_csrf'] ?? null)) {
             $this->context->flash('error', 'Invalid CSRF token.');
             Redirect::redirect($this->context->panelUrl('/channel'));
         }
 
         $id = $this->input->int($post['id'] ?? null, 1);
+        // Single-row delete path runs when a concrete id is posted.
         if ($id !== null) {
             $record = $this->channelRead->findById($id);
             // Single-row delete path (row action button).
@@ -365,6 +385,7 @@ final class ChannelEditController
                 Redirect::redirect($this->context->panelUrl('/channel'));
             }
 
+            // Remove stored channel images when deleted row existed.
             if ($record !== null) {
                 $this->editorMeta->deleteMetaImageStoredPaths(
                     'channels',
@@ -387,8 +408,10 @@ final class ChannelEditController
         $deletedCount = 0;
         $failedCount = 0;
 
+        // Bulk-delete loop continues through all selected ids even on individual failures.
         foreach ($selectedIds as $selectedId) {
             $record = $this->channelRead->findById($selectedId);
+            // Each selected id is deleted in isolation so later ids still run on failure.
             try {
                 // Continue deleting remaining ids even if one operation throws.
                 $this->channelRepo->deleteById($selectedId);
@@ -405,8 +428,10 @@ final class ChannelEditController
             }
         }
 
+        // Report mixed success/failure summary for bulk delete requests.
         if ($deletedCount > 0) {
             $message = 'Deleted ' . $deletedCount . ' channel' . ($deletedCount === 1 ? '' : 's') . '.';
+            // Append failure details when some selected rows could not be deleted.
             if ($failedCount > 0) {
                 $message .= ' Failed to delete ' . $failedCount . ' selected channel' . ($failedCount === 1 ? '' : 's') . '.';
             }
@@ -425,11 +450,13 @@ final class ChannelEditController
      */
     private function categorySetRepo(): SetRead
     {
+        // Reuse cached set-read repository when already resolved.
         if ($this->categorySetRepo instanceof SetRead) {
             return $this->categorySetRepo;
         }
 
         $repo = ($this->categorySetRepoResolver)();
+        // Resolver contract must return SetRead instance.
         if (!$repo instanceof SetRead) {
             throw new \RuntimeException('Panel category-set repository resolver returned an invalid value.');
         }
@@ -445,11 +472,13 @@ final class ChannelEditController
      */
     private function tagSetRepo(): SetRead
     {
+        // Reuse cached set-read repository when already resolved.
         if ($this->tagSetRepo instanceof SetRead) {
             return $this->tagSetRepo;
         }
 
         $repo = ($this->tagSetRepoResolver)();
+        // Resolver contract must return SetRead instance.
         if (!$repo instanceof SetRead) {
             throw new \RuntimeException('Panel tag-set repository resolver returned an invalid value.');
         }
@@ -471,38 +500,47 @@ final class ChannelEditController
     private function normalizeSubmittedSetSelection(mixed $raw, array $options): array
     {
         $submitted = is_array($raw) ? $raw : [];
+        // Explicit "default" keyword clears custom set selection entirely.
         foreach ($submitted as $candidate) {
+            // Treat "default" sentinel (case-insensitive) as empty selection.
             if (strtolower(trim((string) $candidate)) === 'default') {
                 return [];
             }
         }
 
         $selection = SetParser::normalizeSelection($submitted, false);
+        // Preserve all-sets sentinel when parser detected all selection.
         if (SetParser::selectionIncludesAll($selection)) {
             return [SetParser::ALL_SET_ID];
         }
 
         $allowedIds = [];
+        // Build allow-list from repository option ids.
         foreach ($options as $option) {
             $allowedId = (int) ($option['id'] ?? -1);
+            // Keep only ids at or above default-set sentinel.
             if ($allowedId >= SetParser::DEFAULT_SET_ID) {
                 $allowedIds[$allowedId] = true;
             }
         }
 
         $normalized = [];
+        // Keep only submitted ids that exist in allow-list.
         foreach ($selection as $item) {
             $setId = (int) $item;
+            // Unknown set ids are dropped from persisted selection.
             if (isset($allowedIds[$setId])) {
                 $normalized[$setId] = $setId;
             }
         }
 
+        // Empty normalized selection maps to default behavior.
         if ($normalized === []) {
             return [];
         }
 
         ksort($normalized, SORT_NUMERIC);
+        // Promote to all-sets sentinel when every allowed set is selected.
         if (count($normalized) === count($allowedIds) && $allowedIds !== []) {
             return [SetParser::ALL_SET_ID];
         }
@@ -520,13 +558,16 @@ final class ChannelEditController
     private function selectedIdsFromPost(array $post, string $key = 'selected_ids'): array
     {
         $raw = $post[$key] ?? [];
+        // Selection payload must be array-shaped for checkbox list processing.
         if (!is_array($raw)) {
             return [];
         }
 
         $selected = [];
+        // Normalize each selected id through shared integer sanitizer bounds.
         foreach ($raw as $candidate) {
             $id = $this->input->int($candidate, 1);
+            // Keep only ids that survived integer sanitization.
             if ($id !== null) {
                 $selected[$id] = $id;
             }

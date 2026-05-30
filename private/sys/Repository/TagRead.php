@@ -79,6 +79,7 @@ class TagRead
         $tags = $this->table('tags');
         $sql = 'SELECT COUNT(*) FROM ' . $tags;
         $params = [];
+        // Optional set filter applies only when caller passes a non-negative set id.
         if ($setId !== null && $setId >= 0) {
             $sql .= ' WHERE ' . $this->setColumn() . ' = :set_id';
             $params[':set_id'] = $setId;
@@ -102,6 +103,7 @@ class TagRead
         $tags = $this->table('tags');
         $pageTags = $this->table('page_tags');
         $whereSql = '';
+        // Build WHERE clause only for explicit set-filter requests.
         if ($setId !== null && $setId >= 0) {
             $whereSql = 'WHERE ' . $this->setColumn('t') . ' = :set_id';
         }
@@ -120,6 +122,7 @@ class TagRead
              ORDER BY t.name ASC, t.id ASC
              LIMIT :limit OFFSET :offset'
         );
+        // Bind filter parameter only when the WHERE clause is active.
         if ($setId !== null && $setId >= 0) {
             $stmt->bindValue(':set_id', $setId, PDO::PARAM_INT);
         }
@@ -145,6 +148,7 @@ class TagRead
         $safeLimit = max(1, $limit);
         $safeOffset = max(0, $offset);
         $whereSql = '';
+        // Reuse the same optional filter semantics for paged listing queries.
         if ($setId !== null && $setId >= 0) {
             $whereSql = 'WHERE ' . $this->setColumn('t') . ' = :set_id';
         }
@@ -181,6 +185,7 @@ class TagRead
                  FROM ' . $tags . ($setId !== null && $setId >= 0 ? ' WHERE ' . $this->setColumn() . ' = :set_id_total' : '') . '
              ) AS totals'
         );
+        // Bind both page and total-count filter placeholders together when filtered.
         if ($setId !== null && $setId >= 0) {
             $stmt->bindValue(':set_id', $setId, PDO::PARAM_INT);
             $stmt->bindValue(':set_id_total', $setId, PDO::PARAM_INT);
@@ -192,7 +197,9 @@ class TagRead
         $rows = $stmt->fetchAll() ?: [];
         $total = 0;
         $resultRows = [];
+        // Hydrate each paged row and capture the repeated window total once.
         foreach ($rows as $row) {
+            // Total is duplicated per row by CROSS JOIN; keep first observed value.
             if ($total === 0) {
                 $total = (int) ($row['total_rows'] ?? 0);
             }
@@ -230,6 +237,7 @@ class TagRead
 
         $rows = $stmt->fetchAll() ?: [];
         $result = [];
+        // Project each row into compact option payloads for form/select consumers.
         foreach ($rows as $row) {
             $result[] = [
                 'id' => (int) ($row['id'] ?? 0),
@@ -253,13 +261,16 @@ class TagRead
     public function existingIds(array $ids): array
     {
         $normalizedIds = [];
+        // Normalize and de-duplicate candidate ids before querying the database.
         foreach ($ids as $id) {
             $value = (int) $id;
+            // Only positive ids are valid persisted tag identifiers.
             if ($value > 0) {
                 $normalizedIds[$value] = $value;
             }
         }
 
+        // Empty candidate lists should short-circuit without issuing SQL.
         if ($normalizedIds === []) {
             return [];
         }
@@ -275,8 +286,10 @@ class TagRead
 
         $rows = $stmt->fetchAll() ?: [];
         $existing = [];
+        // Build a unique positive-id map from query hits.
         foreach ($rows as $row) {
             $value = (int) ($row['id'] ?? 0);
+            // Preserve only valid positive ids to match existingIds() contract.
             if ($value > 0) {
                 $existing[$value] = $value;
             }
@@ -362,6 +375,7 @@ class TagRead
     public function setIdsByIds(array $ids): array
     {
         $normalizedIds = $this->existingIds($ids);
+        // No valid ids means no set-id map entries.
         if ($normalizedIds === []) {
             return [];
         }
@@ -376,6 +390,7 @@ class TagRead
         $stmt->execute(array_values($normalizedIds));
 
         $result = [];
+        // Build a direct id=>set map for fast downstream membership checks.
         foreach ($stmt->fetchAll() ?: [] as $row) {
             $result[(int) ($row['id'] ?? 0)] = (int) ($row['set'] ?? 0);
         }
@@ -399,6 +414,7 @@ class TagRead
         $stmt->execute();
 
         $result = [];
+        // Fold grouped count rows into a simple set-id keyed dictionary.
         foreach ($stmt->fetchAll() ?: [] as $row) {
             $result[(int) ($row['set'] ?? 0)] = (int) ($row['row_count'] ?? 0);
         }
@@ -423,6 +439,7 @@ class TagRead
     private function hydrateRows(array $rows): array
     {
         $result = [];
+        // Hydrate each row so callers always receive normalized media path fields.
         foreach ($rows as $row) {
             $result[] = $this->hydrateRow($row);
         }

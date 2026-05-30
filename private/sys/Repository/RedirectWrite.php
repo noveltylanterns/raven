@@ -70,10 +70,12 @@ final class RedirectWrite
         $isActive = (int) ($data['active'] ?? 0) === 1 ? 1 : 0;
         $targetUrl = trim((string) ($data['target'] ?? ''));
         $channelId = $this->channelIdBySlug($channelSlug) ?? 0;
+        // Reject explicit non-root channel selections that failed to resolve.
         if (trim((string) ($channelSlug ?? '')) !== '' && $channelId < 1) {
             throw new RuntimeException('The stock <root> channel placeholder cannot be selected directly.');
         }
 
+        // Core redirect fields are mandatory for deterministic route matching.
         if ($title === '' || $slug === '' || $targetUrl === '') {
             throw new RuntimeException('Redirect title, slug, and target URL are required.');
         }
@@ -84,6 +86,7 @@ final class RedirectWrite
         }
 
         $now = gmdate('Y-m-d H:i:s');
+        // Persist edits in place when an existing id is present.
         if ($id !== null && $id > 0) {
             // Update in place so edit routes preserve existing redirect ids.
             $stmt = $this->db->prepare(
@@ -174,6 +177,7 @@ final class RedirectWrite
      */
     private function channelIdBySlug(?string $slug): ?int
     {
+        // Root-channel sentinel maps to `0` for database scope comparisons.
         if (ChannelShared::isRootChannelSlug((string) ($slug ?? ''))) {
             return 0;
         }

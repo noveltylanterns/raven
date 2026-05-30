@@ -33,6 +33,7 @@ final class ProfileRouter
         $profileRouteEnabled = !empty($deps->routeConfig['profile_route_enabled']);
         $profilePrefix = (string) ($deps->routeConfig['profile_prefix'] ?? '');
 
+        // Profile pages are unreachable unless both enable-flag and prefix are configured.
         if (!$profileRouteEnabled || $profilePrefix === '') {
             return;
         }
@@ -41,6 +42,7 @@ final class ProfileRouter
         $router->add('GET', $profileRouteBase . '/{username}', static function (array $params) use ($publicProfileController, $publicRequestContext, $input): void {
             $username = $input->text(rawurldecode((string) ($params['username'] ?? '')), 254);
 
+            // Empty usernames should behave as missing routes, not empty-profile lookups.
             if ($username === '') {
                 $publicRequestContext()->notFound();
                 return;

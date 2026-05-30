@@ -29,6 +29,7 @@ final class RuntimeAssert
      */
     public static function assertRequiredCallables(array $runtime, array $requiredKeys, string $scope): void
     {
+        // Validate each required key so callers fail fast on incomplete runtime payloads.
         foreach ($requiredKeys as $key) {
             self::requireCallable($runtime, $key, $scope);
         }
@@ -46,6 +47,7 @@ final class RuntimeAssert
     public static function requireCallable(array $runtime, string $key, string $scope): callable
     {
         $value = $runtime[$key] ?? null;
+        // Missing/non-callable entries indicate broken runtime scope wiring.
         if (!is_callable($value)) {
             throw new RuntimeException(
                 sprintf('Missing callable runtime factory for scope "%s": %s', $scope, $key)

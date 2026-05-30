@@ -3,7 +3,7 @@
 /**
  * RAVEN CMS
  * ~/private/tpl/panel/routing.php
- * Admin panel routing inventory for public page/channel/redirect URL paths.
+ * Admin panel routing inventory template for public page/channel/redirect URL paths.
  * Docs: https://lanterns.io/raven
  */
 

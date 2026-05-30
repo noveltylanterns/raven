@@ -3,7 +3,7 @@
 /**
  * RAVEN CMS
  * ~/private/tpl/panel/partial/editor_blocks.php
- * Route-scoped shared repeater CSS and JS for panel editor-block rows.
+ * Panel editor-block partial template for shared repeater CSS and JS.
  * Docs: https://lanterns.io/raven
  */
 

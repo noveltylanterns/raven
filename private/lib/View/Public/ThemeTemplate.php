@@ -68,8 +68,10 @@ final class ThemeTemplate
     public function currentThemeViewsRoots(string $themesRoot, string $activeThemeSlug): array
     {
         $roots = [];
+        // Build tpl roots in child-first inheritance order.
         foreach ($this->currentThemeInheritanceChain($themesRoot, $activeThemeSlug) as $candidateThemeSlug) {
             $themeViewsRoot = rtrim($themesRoot, '/\\') . '/' . $candidateThemeSlug . '/tpl';
+            // Include only directories that exist on disk.
             if (is_dir($themeViewsRoot)) {
                 $roots[] = $themeViewsRoot;
             }
@@ -96,6 +98,7 @@ final class ThemeTemplate
         // theme chains for the same template name do not collide in the cache.
         $cacheKey = md5($template . "\0" . implode("\0", $roots));
 
+        // Return memoized hit/miss immediately for repeated lookups.
         if (array_key_exists($cacheKey, $this->resolvedCache)) {
             return $this->resolvedCache[$cacheKey];
         }
@@ -103,12 +106,15 @@ final class ThemeTemplate
         $relative = trim($template, '/') . '.php';
         $resolved = null;
 
+        // Walk roots in priority order and stop on first existing file.
         foreach ($roots as $root) {
+            // Skip empty roots to avoid malformed path checks.
             if ($root === '') {
                 continue;
             }
 
             $candidate = rtrim($root, '/\\') . '/' . $relative;
+            // First match wins to preserve inheritance precedence.
             if (is_file($candidate)) {
                 $resolved = $candidate;
                 break;
@@ -131,11 +137,13 @@ final class ThemeTemplate
     public function resolveChannelTemplateName(string $channelSlug, string ...$lookupRoots): string
     {
         $normalizedSlug = $this->input->slug($channelSlug);
+        // Unsafe/invalid channel slugs fall back to channel index template.
         if ($normalizedSlug === null) {
             return 'channel/index';
         }
 
         $slugTemplate = 'channel/' . $normalizedSlug;
+        // Use slug-specific channel template when available in lookup roots.
         if ($this->resolveTemplateFile($slugTemplate, ...$lookupRoots) !== null) {
             return $slugTemplate;
         }
@@ -152,10 +160,13 @@ final class ThemeTemplate
      */
     public function resolvePageTemplateName(?string $channelSlug, string ...$lookupRoots): string
     {
+        // Channel-aware page template overrides are optional.
         if ($channelSlug !== null) {
             $normalizedSlug = $this->input->slug($channelSlug);
+            // Use slug override only when sanitizer accepted the channel slug.
             if ($normalizedSlug !== null) {
                 $channelTemplate = 'page/' . $normalizedSlug;
+                // Prefer channel-specific page template when it exists.
                 if ($this->resolveTemplateFile($channelTemplate, ...$lookupRoots) !== null) {
                     return $channelTemplate;
                 }
@@ -175,11 +186,13 @@ final class ThemeTemplate
     public function resolveCategoryTemplateName(string $categorySlug, string ...$lookupRoots): string
     {
         $normalizedSlug = $this->input->slug($categorySlug);
+        // Unsafe/invalid category slugs fall back to category index template.
         if ($normalizedSlug === null) {
             return 'category/index';
         }
 
         $slugTemplate = 'category/' . $normalizedSlug;
+        // Use slug-specific category template when available in lookup roots.
         if ($this->resolveTemplateFile($slugTemplate, ...$lookupRoots) !== null) {
             return $slugTemplate;
         }
@@ -197,11 +210,13 @@ final class ThemeTemplate
     public function resolveTagTemplateName(string $tagSlug, string ...$lookupRoots): string
     {
         $normalizedSlug = $this->input->slug($tagSlug);
+        // Unsafe/invalid tag slugs fall back to tag index template.
         if ($normalizedSlug === null) {
             return 'tag/index';
         }
 
         $slugTemplate = 'tag/' . $normalizedSlug;
+        // Use slug-specific tag template when available in lookup roots.
         if ($this->resolveTemplateFile($slugTemplate, ...$lookupRoots) !== null) {
             return $slugTemplate;
         }
@@ -311,11 +326,13 @@ final class ThemeTemplate
         string ...$lookupRoots
     ): string {
         $content = $this->renderResolvedTemplate($template, $data, $renderFile, 0, ...$lookupRoots);
+        // Layout is optional; content-only render returns immediately when null.
         if ($layout === null) {
             return $content;
         }
 
         $layoutFile = $this->resolveTemplateFile($layout, ...$lookupRoots);
+        // Layout name must resolve to a file once layout mode is requested.
         if ($layoutFile === null) {
             throw new RuntimeException('Public layout not found: ' . $layout);
         }
@@ -365,6 +382,7 @@ final class ThemeTemplate
     private function currentThemeInheritanceChain(string $themesRoot, string $themeSlug): array
     {
         $chain = ThemeDiscovery::inheritanceChain(rtrim($themesRoot, '/\\'), $themeSlug);
+        // Unknown themes still return requested slug for deterministic fallback.
         if ($chain === []) {
             return [$themeSlug];
         }
@@ -389,17 +407,20 @@ final class ThemeTemplate
         int $depth,
         string ...$lookupRoots
     ): string {
+        // Guard against redirect loops with bounded recursive depth.
         if ($depth > 4) {
             throw new RuntimeException('Public template redirect depth exceeded for: ' . $template);
         }
 
         $templateFile = $this->resolveTemplateFile($template, ...$lookupRoots);
+        // Rendered template must resolve to a concrete file path.
         if ($templateFile === null) {
             throw new RuntimeException('Public template not found: ' . $template);
         }
 
         $content = $renderFile($templateFile, $data);
         $redirectTemplate = $this->templateRedirectTarget($content);
+        // Return immediately when no redirect marker was produced.
         if ($redirectTemplate === null || $redirectTemplate === $template) {
             return $content;
         }
@@ -416,11 +437,13 @@ final class ThemeTemplate
      */
     private function templateRedirectTarget(string $content): ?string
     {
+        // Empty rendered output cannot contain a redirect marker.
         if ($content === '') {
             return null;
         }
 
         $pattern = '/' . preg_quote(self::TEMPLATE_REDIRECT_PREFIX, '/') . '\s*([A-Za-z0-9_\/-]+)/';
+        // Missing marker means no internal template redirect is requested.
         if (preg_match($pattern, $content, $matches) !== 1) {
             return null;
         }
@@ -444,6 +467,7 @@ final class ThemeTemplate
             default => null,
         };
 
+        // Only known status templates map to HTTP status overrides.
         if (is_int($status)) {
             http_response_code($status);
         }

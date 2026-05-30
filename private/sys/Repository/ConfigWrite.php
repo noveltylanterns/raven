@@ -3,7 +3,7 @@
 /**
  * RAVEN CMS
  * ~/private/sys/Repository/ConfigWrite.php
- * Handles nested config writes and on-disk persistence for Raven config files.
+ * Repository-style config writer for nested updates and on-disk persistence.
  * Docs: https://lanterns.io/raven
  */
 
@@ -41,6 +41,7 @@ final class ConfigWrite
      */
     public static function setNested(array &$config, array $segments, mixed $value): void
     {
+        // Empty segment lists cannot identify a write destination.
         if ($segments === []) {
             return;
         }
@@ -48,12 +49,15 @@ final class ConfigWrite
         $cursor = &$config;
         $lastIndex = count($segments) - 1;
 
+        // Walk each segment, creating intermediate arrays as needed.
         foreach ($segments as $index => $segment) {
+            // Final segment receives the assigned value and ends traversal.
             if ($index === $lastIndex) {
                 $cursor[$segment] = $value;
                 return;
             }
 
+            // Materialize missing/non-array branches so nested assignment can continue safely.
             if (!isset($cursor[$segment]) || !is_array($cursor[$segment])) {
                 $cursor[$segment] = [];
             }
@@ -113,11 +117,13 @@ return {$export};
 PHP;
 
         $written = file_put_contents($path, $content, LOCK_EX);
+        // Fail fast when config file cannot be written to disk.
         if ($written === false) {
             throw new RuntimeException('Failed to save config file.');
         }
 
         clearstatcache(true, $path);
+        // Refresh OPcache entry when extension is available so runtime sees updated config.
         if (function_exists('opcache_invalidate')) {
             @opcache_invalidate($path, true);
         }

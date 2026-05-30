@@ -3,7 +3,7 @@
 /**
  * RAVEN CMS
  * ~/private/ext/smallweb/tpl/panel_index.php
- * Smallweb extension tabbed index: settings + per-protocol file lists.
+ * Smallweb extension tabbed index template for settings and per-protocol file lists.
  * Docs: https://lanterns.io/raven
  */
 

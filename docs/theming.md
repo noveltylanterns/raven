@@ -1,7 +1,5 @@
 # Raven CMS Theming
 
-***Note: This document was generated with ChatGPT Codex. I have not been able to personally verify every detail within matches the actual script. I do not plan on hammering these `docs/` files down until later releases, so use them with caution!***
-
 This document covers public-theme rendering behavior, brace-tag syntax, and theme CLI workflows.
 
 Authoritative runtime contract: [public/theme/AGENTS.md](../public/theme/AGENTS.md).
@@ -17,7 +15,7 @@ Public rendering resolves templates from:
 Theme wrappers are expected at:
 
 - `public/theme/{slug}/tpl/wrapper.php`
-- Core fallback wrapper is `private/tpl/wrapper.php` and loads `/theme/fallback.css` (compiled from `public/theme/fallback.scss`).
+- Core fallback wrapper is `private/tpl/public/wrapper.php` and loads `/theme/fallback.css` (compiled from `public/theme/fallback.scss`).
 - Stock/core wrappers advertise configured root feeds in `<head>` using `{if site:feed_rss_url}<link rel="alternate" ...>{/if}` and `{if site:feed_atom_url}<link rel="alternate" ...>{/if}`.
 
 ## 2) Complete Brace-Tag Directive Inventory

@@ -56,6 +56,7 @@ final class GroupListController
     public function groupList(): void
     {
         $this->context->requirePanelLogin();
+        // Group listing is view-permission gated.
         if (!$this->context->requireRoutePermissionOrForbidden('group', 'view')) {
             return;
         }
@@ -66,6 +67,7 @@ final class GroupListController
         $totalItems = (int) ($pageResult['total'] ?? 0);
         $groupRows = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
         $pagination = Pagination::state($totalItems, $requestedPage, $perPage);
+        // Requery with clamped offset when requested page exceeds available range.
         if ($totalItems > 0 && $pagination['current'] !== $requestedPage) {
             $pageResult = $this->groupRead->listPage($perPage, $pagination['offset']);
             $groupRows = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];

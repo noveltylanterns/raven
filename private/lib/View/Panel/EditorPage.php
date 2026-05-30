@@ -44,6 +44,7 @@ final class EditorPage
     public function mergeTypeDefinitions(array $extensionDefinitions = []): array
     {
         $definitions = $this->pageBlockParser->defaultDefinitions();
+        // Allow extensions to append only unknown types so core definitions remain canonical.
         foreach ($extensionDefinitions as $type => $definition) {
             // Core block types keep ownership of their labels and editor modes.
             if (isset($definitions[$type])) {
@@ -66,12 +67,15 @@ final class EditorPage
      */
     public function normalizeEditorSubmittedBlocks(mixed $raw, array $definitions, int $maxBlocks = 50): array
     {
+        // Reject malformed payloads so downstream persistence always receives list-shaped data.
         if (!is_array($raw)) {
             return [];
         }
 
         $blocks = [];
+        // Normalize each submitted row while preserving original editor order.
         foreach ($raw as $entry) {
+            // Enforce configured cap to protect persistence and render paths from oversized submissions.
             if ($maxBlocks > 0 && count($blocks) >= $maxBlocks) {
                 break;
             }
@@ -80,6 +84,7 @@ final class EditorPage
             $value = $entry;
             $cssId = '';
             $cssClass = '';
+            // Array rows can carry explicit type/content/css fields from advanced block editors.
             if (is_array($entry)) {
                 $type = $this->pageBlockParser->normalizeType((string) ($entry['type'] ?? 'tinymce'), $definitions);
                 $value = $entry['content'] ?? '';
@@ -87,16 +92,19 @@ final class EditorPage
                 $cssClass = $this->pageBlockParser->normalizeCssClassList($entry['css_class'] ?? null);
             }
 
+            // Ignore non-scalar content payloads that cannot be sanitized to editor text/html.
             if (!is_scalar($value) && $value !== null) {
                 continue;
             }
 
             $editorMode = $this->pageBlockParser->editorMode($type, $definitions);
             $normalized = $this->input->html($value !== null ? (string) $value : null, 500000);
+            // File-backed markdown blocks store path-like content and should not preserve outer whitespace.
             if ($editorMode === 'markdown_file') {
                 $normalized = trim($normalized);
             }
 
+            // Gallery blocks carry structure only; content is persisted separately in media tables.
             if ($editorMode === 'gallery') {
                 $blocks[] = [
                     'type' => $type,
@@ -107,6 +115,7 @@ final class EditorPage
                 continue;
             }
 
+            // Drop empty textual blocks after normalization to avoid storing presentation-only rows.
             if (trim($normalized) === '') {
                 continue;
             }

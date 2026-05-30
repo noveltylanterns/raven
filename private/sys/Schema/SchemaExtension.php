@@ -47,18 +47,22 @@ final class SchemaExtension
     public function ensureExtensionSchemas(PDO $db, string $driver, string $prefix): void
     {
         $root = dirname(__DIR__, 3);
+        // Run schema providers only for currently enabled extension directories.
         foreach (Registry::enabledDirectories($root, true) as $directory) {
             $manifest = Registry::readManifest($root, $directory);
+            // Skip extensions with unreadable/malformed manifests.
             if (!is_array($manifest)) {
                 continue;
             }
 
             $bootstrap = $this->bootstrapResolver->resolve($root, $directory, $manifest);
+            // Skip extensions that fail bootstrap contract validation.
             if (!$bootstrap['valid']) {
                 continue;
             }
 
             $storage = (array) ($bootstrap['storage'] ?? []);
+            // Skip providers that declare no storage/table/public/panel footprint.
             if (
                 empty($storage['local'])
                 && empty($storage['table'])
@@ -71,6 +75,7 @@ final class SchemaExtension
 
             $extensionRoot = $root . '/private/ext/' . $directory;
             $schemaPath = Resolver::providerPath($extensionRoot, 'schema.php');
+            // Extension without schema provider does not participate in schema bootstrap.
             if ($schemaPath === null) {
                 continue;
             }
@@ -82,13 +87,16 @@ final class SchemaExtension
                 continue;
             }
 
+            // Provider failures are isolated per extension to avoid halting global bootstrap.
             try {
                 $tableStem = SqlTable::appTable($driver, $prefix, 'ext_' . $directory);
                 $storageLocalPath = $root . '/private/dat/ext/' . $directory;
                 $storagePanelPath = $root . '/panel/ext/' . $directory;
                 $storagePublicPath = $root . '/public/uploads/ext/' . $directory;
                 $storageAuxPaths = [];
+                // Resolve optional auxiliary storage directories from extension manifest.
                 foreach ((array) ($storage['aux'] ?? []) as $auxDirectory) {
+                    // Ignore invalid aux directory declarations.
                     if (!is_string($auxDirectory) || $auxDirectory === '') {
                         continue;
                     }
@@ -98,10 +106,12 @@ final class SchemaExtension
                 $tableResolver = static fn (): string => $tableStem;
                 $tablesResolver = function (string $suffix) use ($driver, $prefix, $directory, $storage): string {
                     $normalized = strtolower(trim($suffix));
+                    // Enforce a safe suffix format before constructing table names.
                     if (preg_match('/^[a-z0-9][a-z0-9_]{0,63}$/', $normalized) !== 1) {
                         throw new \RuntimeException('Invalid extension table suffix requested.');
                     }
 
+                    // Restrict dynamic table resolution to declared table suffixes only.
                     if (!in_array($normalized, (array) ($storage['tables'] ?? []), true)) {
                         throw new \RuntimeException('Extension table suffix was not provisioned: ' . $normalized);
                     }

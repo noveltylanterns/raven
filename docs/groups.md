@@ -1,7 +1,5 @@
 # Raven CMS Groups
 
-***Note: This document was generated with ChatGPT Codex. I have not been able to personally verify every detail within matches the actual script. I do not plan on hammering these `docs/` files down until later releases, so use them with caution!***
-
 This document explains Raven's Group system for both panel users and developers/agents.
 
 Maintenance note: keep this file updated whenever group structure, group routes, or Group panel views change (`private/tpl/panel/group/*`, group controller/repository behavior, or permission/routing contracts).
@@ -100,13 +98,13 @@ Stock-group constraints visible in UI:
   - `private/tpl/panel/group/list.php`
   - `private/tpl/panel/group/edit.php`
 - Panel controller:
-  - `private/sys/Controller/Panel/GroupController.php`
+  - `private/sys/Controller/Panel/GroupListController.php, private/sys/Controller/Panel/GroupEditController.php`
 - Persistence:
-  - `private/sys/Repository/GroupRepository.php`
+  - `private/sys/Repository/GroupRead.php, private/sys/Repository/GroupWrite.php`
 
 ### Panel Routes
 
-Declared in `panel/index.php`:
+Declared in `private/sys/Router/Panel/GroupRouter.php`:
 
 - `GET /group` -> list
 - `GET /group/edit` -> create form
@@ -118,39 +116,43 @@ All state-changing routes use CSRF validation.
 
 ### Controller Flow
 
-`GroupController` group handlers:
+Split group handlers:
 
 - `groupList()`
+  - Owned by `GroupListController`.
   - Requires login + `Manage Groups` permission.
-  - Renders list with `GroupRepository::listAll()`.
+  - Renders list with `GroupRead::listAll()`.
 - `groupEdit(?int $id)`
+  - Owned by `GroupEditController`.
   - Loads existing row when id is provided.
   - Includes permission definitions, route prefix, and system-level group routing flag.
   - Missing id row triggers flash error + redirect to `/group`.
 - `groupSave(array $post)`
+  - Owned by `GroupEditController`.
   - Validates CSRF.
   - Sanitizes/normalizes id/name/slug and permission bit payload.
   - Enforces stock-role routing/permission constraints.
   - Enforces admin-only change policy for `MANAGE_CONFIGURATION` bit.
-  - Saves via `GroupRepository::save(...)`.
+  - Saves via `GroupWrite::save(...)`.
 - `groupDelete(array $post)`
+  - Owned by `GroupEditController`.
   - Validates CSRF.
   - Supports single delete (`id`) and bulk delete (`selected_ids[]`).
   - Repository enforces stock-group deletion protection.
 
 ### Data Model And Repository Behavior
 
-`GroupRepository` behavior:
+`GroupRead` + `GroupWrite` behavior:
 
 - Reserved stock slugs: `super`, `admin`, `editor`, `user`, `guest`, `validating`, `banned`.
 - Custom group IDs start at `100` (IDs `<100` reserved for stock/system).
-- `save(...)`:
+- `GroupWrite::save(...)`:
   - create/update in one method
   - stock slugs immutable
   - reserved stock slugs blocked for new custom groups
   - persists optional `cover_image`
   - role-specific permission normalization enforced server-side
-- `deleteById(...)`:
+- `GroupWrite::deleteById(...)`:
   - rejects stock groups
   - deletes memberships for that group
   - deletes group row

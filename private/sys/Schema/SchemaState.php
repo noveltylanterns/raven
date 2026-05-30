@@ -57,11 +57,13 @@ final class SchemaState
      */
     public function ensureIfChanged(string $driver, string $prefix, callable $ensure): void
     {
+        // Fast path exits when schema inputs and marker state have not changed.
         if (!$this->isDirty()) {
             return;
         }
 
         $lockHandle = @fopen($this->lockFile, 'c+');
+        // If lock file cannot be opened, run ensure anyway for safety.
         if (!is_resource($lockHandle)) {
             // Fallback to the safe behavior when the local lock file cannot be opened.
             $ensure();
@@ -69,7 +71,9 @@ final class SchemaState
             return;
         }
 
+        // Lock-guard ensure so concurrent requests do not duplicate heavy schema work.
         try {
+            // If lock acquisition fails, still run ensure to preserve correctness.
             if (!@flock($lockHandle, LOCK_EX)) {
                 $ensure();
                 $this->writeState($driver, $prefix);
@@ -103,10 +107,12 @@ final class SchemaState
         $this->dirtyCache = null;
 
         $markerDirectory = dirname($this->markerFile);
+        // Ensure marker directory exists before touching/creating marker file.
         if (!is_dir($markerDirectory) && !mkdir($markerDirectory, 0775, true) && !is_dir($markerDirectory)) {
             return;
         }
 
+        // Fallback to file_put_contents when touch cannot create marker file.
         if (@touch($this->markerFile) === false && @file_put_contents($this->markerFile, '', LOCK_EX) === false) {
             return;
         }
@@ -122,24 +128,29 @@ final class SchemaState
      */
     private function isDirty(bool $useCache = true): bool
     {
+        // Reuse request-local dirty result unless caller explicitly bypasses cache.
         if ($useCache && $this->dirtyCache !== null) {
             return $this->dirtyCache;
         }
 
+        // Missing state file means ensure has never completed successfully.
         if (!is_file($this->stateFile)) {
             return $this->cacheDirtyResult(true, $useCache);
         }
 
+        // Missing marker file is treated as dirty to force a safe ensure pass.
         if (!is_file($this->markerFile)) {
             return $this->cacheDirtyResult(true, $useCache);
         }
 
         $stateMtime = (int) (@filemtime($this->stateFile) ?: 0);
         $markerMtime = (int) (@filemtime($this->markerFile) ?: 0);
+        // Invalid mtimes are treated as dirty because freshness cannot be proven.
         if ($stateMtime <= 0 || $markerMtime <= 0) {
             return $this->cacheDirtyResult(true, $useCache);
         }
 
+        // Newer marker means a mutation happened after last successful ensure.
         if ($markerMtime > $stateMtime) {
             return $this->cacheDirtyResult(true, $useCache);
         }
@@ -170,8 +181,10 @@ final class SchemaState
         ];
 
         $latest = 0;
+        // Track newest schema-source mtime across all schema pipeline files.
         foreach ($files as $file) {
             $mtime = (int) (@filemtime($file) ?: 0);
+            // Keep the maximum readable mtime as the invalidation baseline.
             if ($mtime > $latest) {
                 $latest = $mtime;
             }
@@ -197,6 +210,7 @@ final class SchemaState
         $this->dirtyCache = null;
 
         $stateDirectory = dirname($this->stateFile);
+        // Ensure state directory exists before writing ensure stamp.
         if (!is_dir($stateDirectory) && !mkdir($stateDirectory, 0775, true) && !is_dir($stateDirectory)) {
             return;
         }
@@ -209,6 +223,7 @@ final class SchemaState
             'ensured_at' => gmdate('c'),
         ], true) . ";\n";
 
+        // Abort cache update when ensure stamp cannot be persisted.
         if (@file_put_contents($this->stateFile, $payload, LOCK_EX) === false) {
             return;
         }
@@ -227,6 +242,7 @@ final class SchemaState
      */
     private function cacheDirtyResult(bool $dirty, bool $useCache): bool
     {
+        // Store request-local cache only when caller permits caching.
         if ($useCache) {
             $this->dirtyCache = $dirty;
         }

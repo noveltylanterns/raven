@@ -43,17 +43,21 @@ final class SchemaInstaller
              VALUES (:slug, :name, :description, :route, :permissions, :created, :updated)'
         );
 
+        // Ensure each stock group exists at least once by canonical slug.
         foreach ($stockGroups as $group) {
             $stockSlug = strtolower(trim((string) ($group['slug'] ?? '')));
+            // Derive slug from stock name when manifest slug is absent.
             if ($stockSlug === '') {
                 $stockSlug = $this->slugifyGroupName((string) ($group['name'] ?? ''));
             }
+            // Skip stock rows that cannot produce a valid slug token.
             if ($stockSlug === '') {
                 continue;
             }
 
             $findBySlug->execute([':slug' => $stockSlug]);
             $existingId = $findBySlug->fetchColumn();
+            // Insert missing stock group rows while preserving existing customizations.
             if ($existingId === false) {
                 $insertStock->execute([
                     ':slug' => $stockSlug,
@@ -75,11 +79,14 @@ final class SchemaInstaller
         $this->ensureStockGroupId($db, $driver, $prefix, 'banned', 5);
 
         $stockMaskBySlug = [];
+        // Build canonical permission-mask map keyed by stock group slug.
         foreach ($stockGroups as $stockGroup) {
             $slug = strtolower(trim((string) ($stockGroup['slug'] ?? '')));
+            // Derive slug from stock name when manifest slug is absent.
             if ($slug === '') {
                 $slug = $this->slugifyGroupName((string) ($stockGroup['name'] ?? ''));
             }
+            // Skip stock rows that cannot produce a valid slug token.
             if ($slug === '') {
                 continue;
             }
@@ -94,6 +101,7 @@ final class SchemaInstaller
              WHERE LOWER(slug) = :slug
                AND (permissions <> :permissions OR route <> 0)'
         );
+        // Force stock-group permissions to match canonical masks.
         foreach ($stockMaskBySlug as $slug => $mask) {
             $syncStockMask->execute([
                 ':slug' => $slug,
@@ -116,6 +124,7 @@ final class SchemaInstaller
 
         $userCountStmt = $db->query('SELECT COUNT(*) FROM ' . $usersTable);
         $userCount = (int) (($userCountStmt?->fetchColumn()) ?: 0);
+        // Starter home page is only seeded on empty-user fresh installs.
         if ($userCount > 0) {
             return;
         }
@@ -128,6 +137,7 @@ final class SchemaInstaller
             ':index' => 'index',
         ]);
 
+        // Do not seed home page when root home/index already exists.
         if ((int) $check->fetchColumn() > 0) {
             return;
         }
@@ -168,6 +178,7 @@ final class SchemaInstaller
     private function ensureStockGroupId(PDO $db, string $driver, string $prefix, string $slug, int $targetId): void
     {
         $slug = strtolower(trim($slug));
+        // Invalid inputs cannot participate in canonical stock-id normalization.
         if ($slug === '' || $targetId < 1) {
             return;
         }
@@ -183,11 +194,13 @@ final class SchemaInstaller
         );
         $findStock->execute([':slug' => $slug]);
         $currentIdRaw = $findStock->fetchColumn();
+        // Skip when stock slug is missing from current group rows.
         if ($currentIdRaw === false) {
             return;
         }
 
         $currentId = (int) $currentIdRaw;
+        // No-op when stock group already has canonical id.
         if ($currentId === $targetId) {
             return;
         }
@@ -220,7 +233,9 @@ final class SchemaInstaller
         );
 
         $db->beginTransaction();
+        // Move id rows and membership references atomically.
         try {
+            // Temporarily relocate occupying row before assigning canonical id.
             if ($targetOccupied) {
                 $moveGroupId->execute([
                     ':to_id' => $temporaryId,
@@ -249,6 +264,7 @@ final class SchemaInstaller
 
             $db->commit();
         } catch (\Throwable $exception) {
+            // Roll back only when transaction remains open after failure.
             if ($db->inTransaction()) {
                 $db->rollBack();
             }
@@ -266,6 +282,7 @@ final class SchemaInstaller
     private function slugifyGroupName(string $value): string
     {
         $value = strtolower(trim($value));
+        // Empty source strings cannot produce valid group slugs.
         if ($value === '') {
             return '';
         }
@@ -273,6 +290,7 @@ final class SchemaInstaller
         $value = preg_replace('/[^a-z0-9]+/', '-', $value) ?? '';
         $value = trim($value, '-');
         $value = preg_replace('/-+/', '-', $value) ?? '';
+        // Slug may normalize to empty after stripping unsupported characters.
         if ($value === '') {
             return '';
         }

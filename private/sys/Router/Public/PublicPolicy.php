@@ -89,22 +89,28 @@ final class PublicPolicy
             }
         }
 
+        // Keep group prefix distinct from category/tag prefixes to prevent route ambiguity.
         if ($groupPrefix !== '' && in_array($groupPrefix, [$categoryPrefix, $tagPrefix], true)) {
             $groupPrefix = 'group';
+            // Fallback again if the canonical slug still collides.
             if (in_array($groupPrefix, [$categoryPrefix, $tagPrefix], true)) {
                 $groupPrefix = 'grp';
             }
         }
 
+        // Keep profile prefix distinct from all existing public content prefixes.
         if ($profilePrefix !== '' && in_array($profilePrefix, [$categoryPrefix, $tagPrefix, $groupPrefix], true)) {
             $profilePrefix = 'user';
+            // Use a second fallback if "user" is already occupied.
             if (in_array($profilePrefix, [$categoryPrefix, $tagPrefix, $groupPrefix], true)) {
                 $profilePrefix = 'profile';
             }
         }
 
+        // Final guard: group/profile cannot share the same prefix.
         if ($groupPrefix !== '' && $groupPrefix === $profilePrefix) {
             $groupPrefix = 'group';
+            // Ensure group fallback does not re-collide with profile/category/tag paths.
             if ($groupPrefix === $profilePrefix || in_array($groupPrefix, [$categoryPrefix, $tagPrefix], true)) {
                 $groupPrefix = 'grp';
             }

@@ -37,12 +37,14 @@ final class ThemeValidator
     public function normalize(string $themeSlug, array $manifest): ?array
     {
         $name = trim((string) ($manifest['name'] ?? ''));
+        // Theme name is required for panel/theme selector display.
         if ($name === '') {
             return null;
         }
 
         $isChildTheme = $this->toBool($manifest['is_child_theme'] ?? false);
         $parentTheme = strtolower(trim((string) ($manifest['parent_theme'] ?? '')));
+        // Parent is cleared when child mode is off, slug is invalid, or self-referential.
         if (!$isChildTheme || !$this->isValidSlug($parentTheme) || $parentTheme === $themeSlug) {
             $parentTheme = '';
         }
@@ -62,10 +64,12 @@ final class ThemeValidator
      */
     private function toBool(mixed $value): bool
     {
+        // Preserve strict booleans without additional coercion.
         if (is_bool($value)) {
             return $value;
         }
 
+        // Numeric values follow 1=true, everything else=false.
         if (is_int($value) || is_float($value)) {
             return (int) $value === 1;
         }

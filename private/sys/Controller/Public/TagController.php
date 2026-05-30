@@ -80,6 +80,7 @@ final class TagController
      */
     public function tag(string $tagSlug, int $pageNumber = 1): void
     {
+        // Route must remain disabled unless tag URLs are explicitly enabled in config.
         if (!TagPolicy::tagRouteEnabled($this->context->config())) {
             $this->context->notFound();
             return;
@@ -87,6 +88,7 @@ final class TagController
         $tagPrefix = TagPolicy::tagRoutePrefix($this->context->config(), $this->context->input());
 
         $tag = $this->tagRead->findBySlug($tagSlug);
+        // Unknown tag slugs map to 404 so route probing does not expose internals.
         if ($tag === null) {
             $this->context->notFound();
             return;
@@ -99,6 +101,7 @@ final class TagController
         $total = (int) ($pageResult['total'] ?? 0);
         $totalPages = max(1, (int) ceil($total / $perPage));
 
+        // Keep canonical pagination bounds instead of serving sparse out-of-range pages.
         if ($total > 0 && $pageNumber > $totalPages) {
             $this->context->notFound();
             return;
@@ -137,19 +140,23 @@ final class TagController
      */
     private function buildPageUrls(array $pages): array
     {
+        // Normalize each row into a public URL so themes can link without route assembly logic.
         foreach ($pages as $index => $page) {
+            // Repository rows should be arrays; skip malformed values defensively.
             if (!is_array($page)) {
                 continue;
             }
 
             $slug = $this->context->input()->slug((string) ($page['slug'] ?? ''));
             $pageId = (int) ($page['id'] ?? 0);
+            // Missing slugs cannot produce stable permalinks, so point to the site root.
             if ($slug === null || $slug === '') {
                 $pages[$index]['url'] = '/';
                 continue;
             }
 
             $channelSlug = $this->context->input()->slug((string) ($page['channel_slug'] ?? ''));
+            // Channelless pages use the global route mode instead of channel-specific rules.
             if ($channelSlug === null || $channelSlug === '') {
                 $rootSegment = PagePolicy::buildRouteSegment($this->context->input(), 
                     $slug,
@@ -208,6 +215,7 @@ final class TagController
      */
     private function themeTemplate(): ThemeTemplate
     {
+        // Tag routes may resolve template names repeatedly; cache service per request.
         if (!$this->themeTemplate instanceof ThemeTemplate) {
             $this->themeTemplate = new ThemeTemplate($this->context->input());
         }

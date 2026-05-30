@@ -36,10 +36,12 @@ final class PagePolicy
     public static function normalizeSlugForLookup(InputSanitizer $input, string $segment, string $wordSeparator): ?string
     {
         $segment = strtolower(trim($segment));
+        // Empty segments cannot represent a valid slug lookup.
         if ($segment === '') {
             return null;
         }
 
+        // Reject characters outside the URL-safe slug character set early.
         if (preg_match('/^[a-z0-9][a-z0-9_-]*$/', $segment) !== 1) {
             return null;
         }
@@ -64,15 +66,18 @@ final class PagePolicy
     public static function parseDateSlugSegment(InputSanitizer $input, string $segment, string $wordSeparator): ?array
     {
         $segment = strtolower(trim($segment));
+        // Empty segments cannot contain a date-prefixed slug payload.
         if ($segment === '') {
             return null;
         }
 
+        // Date-prefixed routes must match `YYYY-MM-DD-slug`.
         if (preg_match('/^(\d{4}-\d{2}-\d{2})-(.+)$/', $segment, $matches) !== 1) {
             return null;
         }
 
         $slug = self::normalizeSlugForLookup($input, (string) ($matches[2] ?? ''), $wordSeparator);
+        // Reject date segments whose slug part fails normalization.
         if ($slug === null || $slug === '') {
             return null;
         }
@@ -92,6 +97,7 @@ final class PagePolicy
     public static function normalizePageIdForLookup(string $segment): ?int
     {
         $segment = trim($segment);
+        // Page-id routes accept only positive integer path segments.
         if ($segment === '' || preg_match('/^[1-9][0-9]*$/', $segment) !== 1) {
             return null;
         }
@@ -117,10 +123,12 @@ final class PagePolicy
     ): ?array {
         $mode = ChannelPolicy::normalizeRouteMode($routeMode);
         $lookupValue = self::extractLookupValue($segment, $mode);
+        // Abort when route-mode extraction cannot produce a usable lookup token.
         if ($lookupValue === null || $lookupValue === '') {
             return null;
         }
 
+        // Id-based route modes bypass slug normalization and parse numeric ids directly.
         if (ChannelPolicy::usesPageId($mode)) {
             $id = self::normalizePageIdForLookup($lookupValue);
             return $id === null ? null : ['type' => 'id', 'id' => $id];
@@ -154,7 +162,9 @@ final class PagePolicy
         string $globalWordSeparator
     ): string {
         $mode = ChannelPolicy::normalizeRouteMode($routeMode);
+        // Id-based modes emit numeric route values instead of sanitized slugs.
         if (ChannelPolicy::usesPageId($mode)) {
+            // Guard against invalid/non-persisted ids in id-driven route modes.
             if ($pageId <= 0) {
                 return '';
             }
@@ -162,6 +172,7 @@ final class PagePolicy
             $routeValue = (string) $pageId;
         } else {
             $normalizedSlug = $input->slug($slug);
+            // Slug-based modes require a valid sanitized slug segment.
             if ($normalizedSlug === null || $normalizedSlug === '') {
                 return '';
             }
@@ -173,6 +184,7 @@ final class PagePolicy
         }
 
         $prefix = self::datePrefix($createdAt, $mode);
+        // Non-date modes return the raw route value without a prefix.
         if ($prefix === '') {
             return $routeValue;
         }
@@ -195,21 +207,26 @@ final class PagePolicy
             'month_slug', 'month_id' => 'Y-m',
             default => '',
         };
+        // Slug/id modes do not include any date prefix component.
         if ($format === '') {
             return '';
         }
 
         $createdAt = trim($createdAt);
+        // Prefer fast substring extraction when timestamp already starts with expected date shape.
         if ($createdAt !== '') {
+            // Day-granularity modes read a leading YYYY-MM-DD directly when available.
             if ($format === 'Y-m-d' && preg_match('/^\d{4}-\d{2}-\d{2}/', $createdAt, $matches) === 1) {
                 return (string) ($matches[0] ?? gmdate('Y-m-d'));
             }
+            // Month-granularity modes read a leading YYYY-MM directly when available.
             if ($format === 'Y-m' && preg_match('/^\d{4}-\d{2}/', $createdAt, $matches) === 1) {
                 return (string) ($matches[0] ?? gmdate('Y-m'));
             }
         }
 
         $timestamp = $createdAt !== '' ? strtotime($createdAt) : false;
+        // Fall back to current time when timestamp parsing fails.
         if ($timestamp === false || $timestamp <= 0) {
             $timestamp = time();
         }
@@ -227,6 +244,7 @@ final class PagePolicy
     private static function extractLookupValue(string $segment, string $routeMode): ?string
     {
         $segment = strtolower(trim($segment));
+        // Empty segments cannot resolve to any lookup token.
         if ($segment === '') {
             return null;
         }
@@ -247,6 +265,7 @@ final class PagePolicy
      */
     private static function extractPrefixedValue(string $segment, string $pattern): ?string
     {
+        // Prefix pattern mismatch means this route mode cannot parse the segment.
         if (preg_match($pattern, $segment, $matches) !== 1) {
             return null;
         }

@@ -34,6 +34,7 @@ final class GroupRouter
         $groupRouteEnabled = !empty($deps->routeConfig['group_route_enabled']);
         $groupPrefix = (string) ($deps->routeConfig['group_prefix'] ?? '');
 
+        // Group pages are unreachable unless both enable-flag and prefix are configured.
         if (!$groupRouteEnabled || $groupPrefix === '') {
             return;
         }
@@ -43,6 +44,7 @@ final class GroupRouter
             $slug = RouteValidator::slugOrNotFound($input, $params['slug'] ?? null, static function () use ($publicRequestContext): void {
                 $publicRequestContext()->notFound();
             });
+            // Validator already rendered not-found for invalid slugs.
             if ($slug === null) {
                 return;
             }

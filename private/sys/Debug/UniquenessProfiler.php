@@ -44,6 +44,7 @@ final class UniquenessProfiler
         string $channelColumn = 'channel'
     ): bool {
         $excludePlaceholder = trim($excludePlaceholder);
+        // Keep SQL placeholder names stable even when callers pass empty values.
         if ($excludePlaceholder === '') {
             $excludePlaceholder = 'exclude_id';
         }
@@ -53,6 +54,7 @@ final class UniquenessProfiler
                 WHERE slug = :slug';
         $params = [':slug' => $slug];
         $channelColumn = trim($channelColumn);
+        // Default to canonical channel column when callers omit/blank the override.
         if ($channelColumn === '') {
             $channelColumn = 'channel';
         }
@@ -65,6 +67,7 @@ final class UniquenessProfiler
             $params[':channel_id'] = $channelId;
         }
 
+        // Exclude current row during updates so a record does not conflict with itself.
         if ($excludeId !== null && $excludeId > 0) {
             $placeholder = ':' . $excludePlaceholder;
             $sql .= ' AND id <> ' . $placeholder;

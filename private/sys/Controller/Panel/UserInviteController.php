@@ -56,13 +56,16 @@ final class UserInviteController
     public function userInvitesCreate(array $post): void
     {
         $this->context->requirePanelLogin();
+        // Invite creation shares user-create permission guard.
         if (!$this->context->requireRoutePermissionOrForbidden('user', 'create')) {
             return;
         }
+        // Invites are available only when registration mode supports invite flow.
         if (!$this->ensureInviteRegistrationMode()) {
             return;
         }
 
+        // CSRF validation protects invite-token creation endpoint.
         if (!$this->context->csrf()->validate($post['_csrf'] ?? null)) {
             $this->context->flash('error', 'Invalid CSRF token.');
             Redirect::redirect($this->context->panelUrl('/user/invites'));
@@ -70,13 +73,16 @@ final class UserInviteController
 
         $isReusable = $this->isReusableInviteType($post['invite_type'] ?? 'single');
         $manualToken = null;
+        // Manual token slug applies only to single-use invite creation.
         if (!$isReusable) {
             $manualToken = trim((string) $this->input->text($post['token_slug'] ?? null, 255));
+            // Empty manual token means generator should choose token automatically.
             if ($manualToken === '') {
                 $manualToken = null;
             }
         }
 
+        // Parse optional expiration timestamp before invite creation.
         try {
             $expiresAt = $this->parseInviteExpirationTimestamp($post['expires_at'] ?? null);
         } catch (\RuntimeException $exception) {
@@ -84,6 +90,7 @@ final class UserInviteController
             Redirect::redirect($this->context->panelUrl('/user/invites'));
         }
 
+        // Token creation can fail on storage/uniqueness errors.
         try {
             $token = $this->inviteWrite()->createToken($isReusable, $expiresAt, $this->context->auth()->userId(), $manualToken);
         } catch (\Throwable $exception) {
@@ -105,13 +112,16 @@ final class UserInviteController
     public function userInvitesGenerate(array $post): void
     {
         $this->context->requirePanelLogin();
+        // Batch invite generation shares user-create permission guard.
         if (!$this->context->requireRoutePermissionOrForbidden('user', 'create')) {
             return;
         }
+        // Invite generation is available only in invite registration mode.
         if (!$this->ensureInviteRegistrationMode()) {
             return;
         }
 
+        // CSRF validation protects invite-token batch generation.
         if (!$this->context->csrf()->validate($post['_csrf'] ?? null)) {
             $this->context->flash('error', 'Invalid CSRF token.');
             Redirect::redirect($this->context->panelUrl('/user/invites'));
@@ -119,6 +129,7 @@ final class UserInviteController
 
         $count = $this->normalizeInviteBatchCount($post['count'] ?? null, 10, 1, 100);
 
+        // Parse optional expiration timestamp before batch generation.
         try {
             $expiresAt = $this->parseInviteExpirationTimestamp($post['expires_at'] ?? null);
         } catch (\RuntimeException $exception) {
@@ -126,6 +137,7 @@ final class UserInviteController
             Redirect::redirect($this->context->panelUrl('/user/invites'));
         }
 
+        // Batch creation can fail on storage or token-generation errors.
         try {
             $tokens = $this->inviteWrite()->createSingleUseBatch($count, $expiresAt, $this->context->auth()->userId());
         } catch (\Throwable $exception) {
@@ -147,24 +159,29 @@ final class UserInviteController
     public function userInvitesDelete(array $post): void
     {
         $this->context->requirePanelLogin();
+        // Invite deletion uses user-delete permission gate.
         if (!$this->context->requireRoutePermissionOrForbidden('user', 'delete')) {
             return;
         }
+        // Invite deletion is available only in invite registration mode.
         if (!$this->ensureInviteRegistrationMode()) {
             return;
         }
 
+        // CSRF validation protects invite delete actions.
         if (!$this->context->csrf()->validate($post['_csrf'] ?? null)) {
             $this->context->flash('error', 'Invalid CSRF token.');
             Redirect::redirect($this->context->panelUrl('/user/invites'));
         }
 
         $id = $this->input->int($post['id'] ?? null, 1);
+        // Invite delete requires a valid numeric token id.
         if ($id === null) {
             $this->context->flash('error', 'Invite token id is required.');
             Redirect::redirect($this->context->panelUrl('/user/invites'));
         }
 
+        // Report missing token when repository delete returns false.
         if (!$this->inviteWrite()->deleteById($id)) {
             $this->context->flash('error', 'Invite token was not found.');
             Redirect::redirect($this->context->panelUrl('/user/invites'));
@@ -181,11 +198,13 @@ final class UserInviteController
      */
     private function inviteWrite(): InviteWrite
     {
+        // Reuse cached invite write repository once resolved.
         if ($this->inviteWrite instanceof InviteWrite) {
             return $this->inviteWrite;
         }
 
         $repo = ($this->inviteWriteResolver)();
+        // Resolver contract must return invite write repository.
         if (!$repo instanceof InviteWrite) {
             throw new \RuntimeException('Panel invite write resolver returned an invalid value.');
         }
@@ -204,8 +223,10 @@ final class UserInviteController
     private function storeFlashList(string $key, array $values): void
     {
         $normalized = [];
+        // Normalize and sanitize each flash-list value before session storage.
         foreach ($values as $value) {
             $item = trim($value);
+            // Skip empty/whitespace values.
             if ($item === '') {
                 continue;
             }
@@ -213,6 +234,7 @@ final class UserInviteController
             $normalized[] = $this->input->text($item, 400);
         }
 
+        // Do not write empty flash-list payloads.
         if ($normalized === []) {
             return;
         }
@@ -238,6 +260,7 @@ final class UserInviteController
      */
     private function ensureInviteRegistrationMode(): bool
     {
+        // Invite-token management is allowed only in invite registration mode.
         if ($this->registrationMode() === 'invite') {
             return true;
         }
@@ -257,15 +280,18 @@ final class UserInviteController
     private function parseInviteExpirationTimestamp(mixed $rawValue): ?int
     {
         $value = trim((string) $this->input->text(is_string($rawValue) ? $rawValue : null, 40));
+        // Blank expiration means invite does not expire.
         if ($value === '') {
             return null;
         }
 
         $timestamp = strtotime($value);
+        // Invalid date/time text is rejected explicitly.
         if ($timestamp === false) {
             throw new \RuntimeException('Invite expiration must be a valid date/time or left blank.');
         }
 
+        // Expiration timestamp must be in the future.
         if ($timestamp <= time()) {
             throw new \RuntimeException('Invite expiration must be in the future.');
         }

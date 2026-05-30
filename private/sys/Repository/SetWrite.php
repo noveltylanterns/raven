@@ -52,22 +52,27 @@ final class SetWrite
         $description = trim((string) ($data['description'] ?? ''));
         $slug = SetParser::normalizeSlug((string) ($data['slug'] ?? ''));
 
+        // Default set fields are canonical and cannot be overridden by payload input.
         if ($setId === SetParser::DEFAULT_SET_ID) {
             $name = SetParser::defaultSetName($this->taxonomyType);
             $slug = SetParser::DEFAULT_SET_SLUG;
             $description = SetParser::defaultSetDescription($this->taxonomyType);
         }
 
+        // Non-default sets require a visible name plus a valid canonical slug.
         if ($name === '' || !SetParser::isValidSlug($slug)) {
             throw new RuntimeException('Set name and valid slug are required.');
         }
 
+        // Enforce slug uniqueness across all set ids within one taxonomy namespace.
         foreach ($this->read->listAll() as $existing) {
             $existingId = (int) ($existing['id'] ?? -1);
+            // Ignore the current record during update flows.
             if ($existingId === $setId) {
                 continue;
             }
 
+            // Slug comparison is case-insensitive to match path and selector semantics.
             if (strtolower(trim((string) ($existing['slug'] ?? ''))) === $slug) {
                 throw new RuntimeException('A ' . $this->taxonomyType . ' set with that slug already exists.');
             }
@@ -75,6 +80,7 @@ final class SetWrite
 
         $existing = $this->read->findById($setId);
         $createdAt = trim((string) ($existing['created_at'] ?? ''));
+        // Preserve original created_at when editing; initialize only for new/legacy rows.
         if ($createdAt === '') {
             $createdAt = gmdate('Y-m-d H:i:s');
         }
@@ -102,6 +108,7 @@ final class SetWrite
      */
     public function deleteById(int $id): void
     {
+        // The stock default set is required for parser fallbacks and must always remain present.
         if ($id === SetParser::DEFAULT_SET_ID) {
             throw new RuntimeException('The stock default set cannot be deleted.');
         }
@@ -123,13 +130,16 @@ final class SetWrite
         $normalizedDir = rtrim($setDirectory, '/');
         $normalizedTaxonomy = strtolower(trim($taxonomyType));
 
+        // Rewrite each discovered file into canonical id/slug path form.
         foreach (self::rawSetFilePaths($normalizedDir) as $path) {
             $raw = self::loadRawByPath($path);
+            // Skip files that do not deserialize into a usable record payload.
             if ($raw === []) {
                 continue;
             }
 
             $recordId = self::recordIdFromRaw($raw, $path);
+            // Files without a resolvable record id are ignored during normalization.
             if ($recordId === null) {
                 continue;
             }
@@ -138,6 +148,7 @@ final class SetWrite
             $canonical = $raw;
             $canonical['id'] = $recordId;
             $canonical['slug'] = $recordSlug;
+            // Force default record metadata back to canonical values.
             if ($recordId === SetParser::DEFAULT_SET_ID) {
                 $canonical['name'] = SetParser::defaultSetName($normalizedTaxonomy);
                 $canonical['slug'] = SetParser::DEFAULT_SET_SLUG;
@@ -146,11 +157,13 @@ final class SetWrite
 
             $targetPath = self::pathForRecord($normalizedDir, $recordId, (string) $canonical['slug']);
             $needsRewrite = $path !== $targetPath || $canonical !== $raw;
+            // Avoid unnecessary writes when both path and payload are already canonical.
             if (!$needsRewrite) {
                 continue;
             }
 
             self::writeRecordById($normalizedDir, $normalizedTaxonomy, $recordId, $canonical);
+            // Delete only old file aliases after the canonical record write succeeds.
             if ($path !== $targetPath && is_file($path)) {
                 @unlink($path);
                 self::invalidatePhpFileCache($path);
@@ -184,10 +197,12 @@ final class SetWrite
 
         // Write to a temp file first so the final rename is atomic.
         $tmpPath = $path . '.tmp';
+        // Fail fast when the temp write cannot be completed safely.
         if (file_put_contents($tmpPath, $content, LOCK_EX) === false) {
             throw new RuntimeException('Failed to write taxonomy set file.');
         }
 
+        // Atomic rename prevents readers from observing partial file contents.
         if (!@rename($tmpPath, $path)) {
             @unlink($tmpPath);
             throw new RuntimeException('Failed to finalize taxonomy set file.');
@@ -197,7 +212,9 @@ final class SetWrite
         self::invalidatePhpFileCache($path);
 
         // Remove any stale files that matched the same id but had a different path.
+        // Remove stale aliases for the same id so only one canonical file remains.
         foreach (self::candidatePathsForId($normalizedDir, $id) as $candidatePath) {
+            // Keep the canonical target path and skip non-existent candidates.
             if ($candidatePath === $path || !is_file($candidatePath)) {
                 continue;
             }
@@ -218,7 +235,9 @@ final class SetWrite
     public static function deleteRecordById(string $setDirectory, string $taxonomyType, int $id): void
     {
         $normalizedDir = rtrim($setDirectory, '/');
+        // Remove every candidate file variant that maps to the target id.
         foreach (self::candidatePathsForId($normalizedDir, $id) as $path) {
+            // Ignore missing paths so delete operations stay idempotent.
             if (!is_file($path)) {
                 continue;
             }
@@ -245,6 +264,7 @@ final class SetWrite
         self::normalizeStorageLayout($normalizedDir, $normalizedTaxonomy);
         $path = self::pathForRecord($normalizedDir, SetParser::DEFAULT_SET_ID, SetParser::DEFAULT_SET_SLUG);
         $raw = self::loadRawById($normalizedDir, SetParser::DEFAULT_SET_ID);
+        // Skip rewrite when a valid canonical default record already exists.
         if (is_file($path) && $raw !== [] && !self::defaultRecordNeedsRewrite($normalizedTaxonomy, $raw)) {
             return;
         }
@@ -261,10 +281,12 @@ final class SetWrite
      */
     private static function ensureDirectory(string $setDirectory): void
     {
+        // Existing directories require no initialization work.
         if (is_dir($setDirectory)) {
             return;
         }
 
+        // Recursive create supports first-run installs where parent paths are absent.
         if (!@mkdir($setDirectory, 0775, true) && !is_dir($setDirectory)) {
             throw new RuntimeException('Failed to initialize taxonomy set directory.');
         }
@@ -282,6 +304,7 @@ final class SetWrite
     {
         $safeId = max(0, $id);
         $safeSlug = SetParser::normalizeSlug($slug);
+        // Guarantee non-empty filenames even when upstream slug normalization strips all chars.
         if ($safeSlug === '') {
             $safeSlug = 'set-' . $safeId;
         }
@@ -299,6 +322,7 @@ final class SetWrite
     private static function loadRawById(string $setDirectory, int $id): array
     {
         $path = self::findPathById($setDirectory, $id);
+        // Missing ids resolve to an empty payload to keep callers idempotent.
         if ($path === null) {
             return [];
         }
@@ -314,12 +338,14 @@ final class SetWrite
      */
     private static function loadRawByPath(string $path): array
     {
+        // Non-existent paths are treated as absent records, not hard failures.
         if (!is_file($path)) {
             return [];
         }
 
         self::invalidatePhpFileCache($path);
 
+        // Guard include-time errors so one broken file does not crash repository reads.
         try {
             /** @var mixed $raw */
             $raw = require $path;
@@ -370,16 +396,20 @@ final class SetWrite
         $normalizedId = max(0, $id);
         $paths = [];
 
+        // Fast-path canonical filename matches for the requested id pattern.
         foreach (glob($setDirectory . '/' . $normalizedId . '_*.php') ?: [] as $path) {
             $paths[] = $path;
         }
 
+        // Backfill any non-canonical legacy filenames that still map to the same id.
         foreach (self::rawSetFilePaths($setDirectory) as $path) {
+            // Skip duplicates already collected from canonical glob matches.
             if (in_array($path, $paths, true)) {
                 continue;
             }
 
             $raw = self::loadRawByPath($path);
+            // Include legacy path only when payload id resolves to the target id.
             if ((self::recordIdFromRaw($raw, $path) ?? -1) === $normalizedId) {
                 $paths[] = $path;
             }
@@ -412,6 +442,7 @@ final class SetWrite
     private static function recordIdFromRaw(array $raw, string $path): ?int
     {
         $idFromRaw = SetParser::normalizeSetId($raw['id'] ?? null);
+        // Embedded payload id takes precedence over filename-derived ids.
         if ($idFromRaw !== null) {
             return $idFromRaw;
         }
@@ -432,11 +463,13 @@ final class SetWrite
     private static function recordSlugFromRaw(array $raw, int $id, string $fallback): string
     {
         $slug = SetParser::normalizeSlug((string) ($raw['slug'] ?? ''));
+        // Persist explicit slugs whenever valid normalized content exists.
         if ($slug !== '') {
             return $slug;
         }
 
         $fallbackSlug = SetParser::normalizeSlug($fallback);
+        // Fall back to filename/context slug when payload slug is empty.
         if ($fallbackSlug !== '') {
             return $fallbackSlug;
         }
@@ -453,6 +486,7 @@ final class SetWrite
     private static function invalidatePhpFileCache(string $path): void
     {
         clearstatcache(true, $path);
+        // Invalidate OPcache when available so subsequent includes observe fresh data.
         if (function_exists('opcache_invalidate')) {
             @opcache_invalidate($path, true);
         }

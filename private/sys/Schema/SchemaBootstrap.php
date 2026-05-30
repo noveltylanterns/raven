@@ -42,6 +42,7 @@ final class SchemaBootstrap
     {
         $this->renameLegacyMediaTables($db, $driver, $prefix);
 
+        // SQLite bootstrap path uses text-friendly types and IF NOT EXISTS semantics.
         if ($driver === 'sqlite') {
             $pagesTable = $prefix . 'pages';
             $categoriesTable = $prefix . 'categories';
@@ -206,6 +207,7 @@ final class SchemaBootstrap
             return;
         }
 
+        // MySQL bootstrap path uses InnoDB tables and explicit index clauses.
         if ($driver === 'mysql') {
             // Shared-database MySQL mode: all logical tables receive configured prefix.
             $db->exec('CREATE TABLE IF NOT EXISTS ' . $prefix . 'pages (
@@ -545,15 +547,18 @@ final class SchemaBootstrap
      */
     private function renameLegacyTable(PDO $db, string $driver, string $fromName, string $toName): void
     {
+        // Rename only when legacy table exists and replacement table does not.
         if (!$this->introspector->tableExists($db, $driver, $fromName) || $this->introspector->tableExists($db, $driver, $toName)) {
             return;
         }
 
+        // MySQL supports direct RENAME TABLE syntax.
         if ($driver === 'mysql') {
             $db->exec('RENAME TABLE ' . $fromName . ' TO ' . $toName);
             return;
         }
 
+        // PostgreSQL rename path requires quoted identifiers.
         if ($driver === 'pgsql') {
             $db->exec(
                 'ALTER TABLE ' . $this->introspector->quotePgIdentifier($fromName) . '

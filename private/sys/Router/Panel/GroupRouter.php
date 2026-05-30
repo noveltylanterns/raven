@@ -43,6 +43,7 @@ final class GroupRouter
 
         $router->add('GET', '/group/edit/{id}', static function (array $params) use ($panelGroupEditController, $input, $renderNotFound): void {
             $id = RouteValidator::intOrNotFound($input, $params['id'] ?? null, 1, $renderNotFound);
+            // Validation helper already rendered not-found for invalid ids.
             if ($id === null) {
                 return;
             }

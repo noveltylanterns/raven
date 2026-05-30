@@ -58,6 +58,7 @@ class ChannelRead
     {
         $channels = $this->listRecords();
         $counts = $this->pageCountsByChannelId();
+        // Attach precomputed page counts to each channel row before sorting.
         foreach ($channels as $index => $channel) {
             $id = (int) ($channel['id'] ?? 0);
             $channels[$index]['page_count'] = (int) ($counts[$id] ?? 0);
@@ -66,12 +67,14 @@ class ChannelRead
         usort($channels, static function (array $a, array $b): int {
             $aIsRoot = ChannelShared::isRootChannelId((int) ($a['id'] ?? -1));
             $bIsRoot = ChannelShared::isRootChannelId((int) ($b['id'] ?? -1));
+            // Force root channel ordering independent of lexical name sort.
             if ($aIsRoot !== $bIsRoot) {
                 // Root channel sorts last in listings.
                 return $aIsRoot ? 1 : -1;
             }
 
             $nameCompare = strcasecmp((string) ($a['name'] ?? ''), (string) ($b['name'] ?? ''));
+            // Keep alphabetical order for non-root channels with stable id tie-breaker below.
             if ($nameCompare !== 0) {
                 return $nameCompare;
             }
@@ -92,6 +95,7 @@ class ChannelRead
      */
     public function listRecords(): array
     {
+        // Reuse in-process cache across repeated read calls in the same request lifecycle.
         if (is_array($this->channelsCache)) {
             return $this->channelsCache;
         }
@@ -104,16 +108,20 @@ class ChannelRead
         $maxId = 0;
         $pendingRecords = [];
 
+        // First pass loads valid records and separates rows needing id repair.
         foreach ($paths as $path) {
             $record = $this->loadRecordFromPath($path);
+            // Skip unreadable or malformed channel files.
             if ($record === null) {
                 continue;
             }
 
             $rawId = $this->normalizeChannelId($record['id'] ?? null);
+            // Accept existing unique ids and track max id for future repair allocations.
             if ($rawId !== null && !isset($usedIds[$rawId])) {
                 $record['id'] = $rawId;
                 $usedIds[$rawId] = true;
+                // Root channel (id 0) should not influence positive-id high-water tracking.
                 if ($rawId > 0) {
                     $maxId = max($maxId, $rawId);
                 }
@@ -128,22 +136,26 @@ class ChannelRead
             ];
         }
 
+        // Second pass assigns fresh ids to records that collided or lacked valid ids.
         foreach ($pendingRecords as $pending) {
             $id = $this->nextAvailableChannelId($usedIds, $maxId);
             $record = $pending['record'];
+            // Defensive guard for unexpected pending payload types.
             if (!is_array($record)) {
                 continue;
             }
 
             $record['id'] = $id;
             $records[] = $record;
-                $slug = (string) ($record['slug'] ?? '');
-                if ($slug !== '') {
-                    try {
-                        ChannelWrite::persistChannelId($this->channelDirectory, $slug, $id);
-                    } catch (\Throwable) {
-                        // Read paths should stay resilient even if best-effort id repair cannot be persisted.
-                    }
+            $slug = (string) ($record['slug'] ?? '');
+            // Persist repaired ids back to storage only when a non-empty slug is available.
+            if ($slug !== '') {
+                // Best-effort persistence keeps file ids aligned without blocking read paths.
+                try {
+                    ChannelWrite::persistChannelId($this->channelDirectory, $slug, $id);
+                } catch (\Throwable) {
+                    // Read paths should stay resilient even if best-effort id repair cannot be persisted.
+                }
             }
         }
 
@@ -173,11 +185,14 @@ class ChannelRead
     public function idBySlug(string $slug): ?int
     {
         $normalized = strtolower(trim($slug));
+        // Empty slugs are invalid lookups and should not trigger list scans.
         if ($normalized === '') {
             return null;
         }
 
+        // Resolve first matching slug from the normalized record list.
         foreach ($this->listRecords() as $channel) {
+            // Keep scanning until normalized slug match is found.
             if (strtolower((string) ($channel['slug'] ?? '')) !== $normalized) {
                 continue;
             }
@@ -243,7 +258,9 @@ class ChannelRead
     public function listOptions(): array
     {
         $rows = [];
+        // Build selectable options from record cache while excluding non-selectable root channel.
         foreach ($this->listRecords() as $channel) {
+            // Root channel is implicit and should not appear in destination pickers.
             if (ChannelShared::isRootChannelId((int) ($channel['id'] ?? -1))) {
                 continue;
             }
@@ -262,6 +279,7 @@ class ChannelRead
 
         usort($rows, static function (array $a, array $b): int {
             $nameCompare = strcasecmp($a['name'], $b['name']);
+            // Keep deterministic alphabetical ordering for non-tied names.
             if ($nameCompare !== 0) {
                 return $nameCompare;
             }
@@ -280,6 +298,7 @@ class ChannelRead
     public function listRoutingOptions(): array
     {
         $rows = [];
+        // Include all channels (including root) for route diagnostics inventory.
         foreach ($this->listRecords() as $channel) {
             $rows[] = [
                 'id' => (int) ($channel['id'] ?? 0),
@@ -297,11 +316,13 @@ class ChannelRead
         usort($rows, static function (array $a, array $b): int {
             $aIsRoot = ChannelShared::isRootChannelId((int) ($a['id'] ?? -1));
             $bIsRoot = ChannelShared::isRootChannelId((int) ($b['id'] ?? -1));
+            // Route diagnostics keep root channel first so inherited route context is obvious.
             if ($aIsRoot !== $bIsRoot) {
                 return $aIsRoot ? -1 : 1;
             }
 
             $nameCompare = strcasecmp($a['name'], $b['name']);
+            // Non-root rows sort by display name before id tie-break.
             if ($nameCompare !== 0) {
                 return $nameCompare;
             }
@@ -331,11 +352,14 @@ class ChannelRead
      */
     public function findById(int $id): ?array
     {
+        // Negative ids are invalid for channel lookup.
         if ($id < ChannelShared::ROOT_CHANNEL_ID) {
             return null;
         }
 
+        // Return the first channel whose normalized id matches the requested id.
         foreach ($this->listRecords() as $channel) {
+            // Continue scan until id match is found.
             if ((int) ($channel['id'] ?? 0) === $id) {
                 return $channel;
             }
@@ -353,11 +377,14 @@ class ChannelRead
     public function findBySlug(string $slug): ?array
     {
         $normalized = strtolower(trim($slug));
+        // Empty slug cannot map to a valid channel record.
         if ($normalized === '') {
             return null;
         }
 
+        // Return the first channel whose normalized slug matches the requested slug.
         foreach ($this->listRecords() as $channel) {
+            // Continue scan until slug match is found.
             if (strtolower((string) ($channel['slug'] ?? '')) === $normalized) {
                 return $channel;
             }
@@ -377,11 +404,13 @@ class ChannelRead
      */
     public function findByIdOrSlug(int|string $idOrSlug): ?array
     {
+        // Preserve direct integer lookups without string normalization.
         if (is_int($idOrSlug)) {
             return $this->findById($idOrSlug);
         }
 
         $trimmed = trim($idOrSlug);
+        // Numeric strings are treated as ids for backward-compatible routing helpers.
         if (ctype_digit($trimmed)) {
             return $this->findById((int) $trimmed);
         }
@@ -401,6 +430,7 @@ class ChannelRead
     public function loadRawBySlug(string $slug): array
     {
         $path = $this->findPathBySlug($slug);
+        // Return empty payload when no matching channel file exists.
         if ($path === null) {
             return [];
         }
@@ -423,8 +453,10 @@ class ChannelRead
         $field = strtolower(trim($kind)) === 'tag' ? 'tag_sets' : 'category_sets';
         $counts = [];
 
+        // Accumulate per-set assignment counts across all channel records.
         foreach ($this->listRecords() as $record) {
             $selection = SetParser::normalizeSelection($record[$field] ?? [], false);
+            // One channel can increment multiple set buckets when multiple sets are selected.
             foreach ($selection as $setId) {
                 $counts[$setId] = (int) ($counts[$setId] ?? 0) + 1;
             }
@@ -444,6 +476,7 @@ class ChannelRead
      */
     public function countExplicitTaxonomySetAssignments(string $kind, int $setId): int
     {
+        // Non-positive set ids are invalid for explicit-assignment counting.
         if ($setId < 1) {
             return 0;
         }
@@ -469,6 +502,7 @@ class ChannelRead
         $stmt->execute();
 
         $counts = [];
+        // Convert grouped SQL rows into channel-id keyed page-count map.
         foreach ($stmt->fetchAll() ?: [] as $row) {
             $channelId = (int) ($row['resolved_channel_id'] ?? 0);
             $counts[$channelId] = (int) ($row['page_count'] ?? 0);
@@ -504,15 +538,18 @@ class ChannelRead
      */
     private static function normalizeChannelId(mixed $value): ?int
     {
+        // Arrays/objects are invalid channel-id payload types.
         if (!is_scalar($value) && $value !== null) {
             return null;
         }
 
+        // Null id fields represent missing ids in legacy records.
         if ($value === null) {
             return null;
         }
 
         $normalized = trim((string) $value);
+        // Require integer-like strings before casting to preserve id integrity.
         if ($normalized === '' || preg_match('/^-?\d+$/', $normalized) !== 1) {
             return null;
         }
@@ -532,6 +569,7 @@ class ChannelRead
     {
         $raw = $this->loadRawBySlug(ChannelShared::ROOT_CHANNEL_SLUG);
         $createdAt = trim((string) ($raw['created_at'] ?? ''));
+        // Backfill missing root created-at timestamp for canonical record output.
         if ($createdAt === '') {
             $createdAt = gmdate('Y-m-d H:i:s');
         }
@@ -564,6 +602,7 @@ class ChannelRead
             'created_at' => $createdAt,
         ];
 
+        // Rewrite root file when missing or when immutable canonical fields have drifted.
         if ($raw === [] || $this->rootRecordNeedsRewrite($raw)) {
             ChannelWrite::writeRecordById(
                 $this->channelDirectory,
@@ -582,10 +621,12 @@ class ChannelRead
      */
     private function rootRecordNeedsRewrite(array $raw): bool
     {
+        // Root record id is immutable and must always remain at ROOT_CHANNEL_ID.
         if (self::normalizeChannelId($raw['id'] ?? null) !== ChannelShared::ROOT_CHANNEL_ID) {
             return true;
         }
 
+        // Root record slug is immutable and must always remain the reserved root slug.
         if (!ChannelShared::isRootChannelSlug((string) ($raw['slug'] ?? ''))) {
             return true;
         }
@@ -604,6 +645,7 @@ class ChannelRead
         usort($paths, static function (string $left, string $right): int {
             $leftId = self::filenameId($left);
             $rightId = self::filenameId($right);
+            // Primary sort uses numeric filename id to stabilize processing order.
             if ($leftId !== $rightId) {
                 return $leftId <=> $rightId;
             }
@@ -622,12 +664,14 @@ class ChannelRead
      */
     private function loadRawByPath(string $path): array
     {
+        // Missing files are treated as empty payloads for resilient read flows.
         if (!is_file($path)) {
             return [];
         }
 
         $this->invalidatePhpFileCache($path);
 
+        // Isolate include-time errors so unreadable channel files do not break repository reads.
         try {
             /** @var mixed $raw */
             $raw = require $path;
@@ -647,11 +691,13 @@ class ChannelRead
     private function loadRecordFromPath(string $path): ?array
     {
         $raw = $this->loadRawByPath($path);
+        // Empty payload means file did not contain a usable channel record.
         if ($raw === []) {
             return null;
         }
 
         $channelId = $this->recordIdFromRaw($raw, $path);
+        // Records without resolvable ids are skipped from normalized channel listings.
         if ($channelId === null) {
             return null;
         }
@@ -685,16 +731,20 @@ class ChannelRead
         $normalizedId = max(ChannelShared::ROOT_CHANNEL_ID, $id);
         $paths = [];
 
+        // Start with canonical filename-pattern matches for the requested id.
         foreach (glob($this->channelDirectory . '/' . $normalizedId . '_*.php') ?: [] as $path) {
             $paths[] = $path;
         }
 
+        // Then scan all channel files for id matches stored inside payload data.
         foreach ($this->rawChannelFilePaths() as $path) {
+            // Skip paths already captured by canonical filename matching.
             if (in_array($path, $paths, true)) {
                 continue;
             }
 
             $raw = $this->loadRawByPath($path);
+            // Keep only files whose resolved record id matches the requested id.
             if (($this->recordIdFromRaw($raw, $path) ?? -1) === $normalizedId) {
                 $paths[] = $path;
             }
@@ -712,21 +762,26 @@ class ChannelRead
     private function findPathBySlug(string $slug): ?string
     {
         $normalizedSlug = strtolower(trim($slug));
+        // Invalid slug format cannot map to a channel file.
         if (!ChannelShared::isValidSlug($normalizedSlug)) {
             return null;
         }
 
+        // Scan all files and return the first path whose resolved slug matches.
         foreach ($this->rawChannelFilePaths() as $path) {
             $raw = $this->loadRawByPath($path);
+            // Skip unreadable or empty payload files.
             if ($raw === []) {
                 continue;
             }
 
             $channelId = $this->recordIdFromRaw($raw, $path);
+            // Skip files whose id cannot be resolved.
             if ($channelId === null) {
                 continue;
             }
 
+            // Return immediately on first slug match.
             if ($this->recordSlugFromRaw($raw, $channelId, basename($path, '.php')) === $normalizedSlug) {
                 return $path;
             }
@@ -745,16 +800,19 @@ class ChannelRead
     private function recordIdFromRaw(array $raw, string $path): ?int
     {
         $rawId = self::normalizeChannelId($raw['id'] ?? null);
+        // Prefer explicit id field when present and valid.
         if ($rawId !== null) {
             return $rawId;
         }
 
         $filenameId = self::filenameId($path);
+        // Fall back to numeric id encoded in filename.
         if ($filenameId >= ChannelShared::ROOT_CHANNEL_ID) {
             return $filenameId;
         }
 
         $fallbackSlug = $this->slugFromFilename($path);
+        // Root-slug fallback maps legacy root files without explicit id fields.
         if ($fallbackSlug !== '' && ChannelShared::isRootChannelSlug($fallbackSlug)) {
             return ChannelShared::ROOT_CHANNEL_ID;
         }
@@ -772,23 +830,28 @@ class ChannelRead
      */
     private function recordSlugFromRaw(array $raw, int $id, string $fallback): string
     {
+        // Root channel slug is immutable regardless of stored payload values.
         if ($id === ChannelShared::ROOT_CHANNEL_ID) {
             return ChannelShared::ROOT_CHANNEL_SLUG;
         }
 
         $slug = strtolower(trim((string) ($raw['slug'] ?? '')));
+        // Prefer explicit stored slug when it passes canonical validation.
         if (ChannelShared::isValidSlug($slug)) {
             return $slug;
         }
 
+        // Next fallback extracts slug from canonical "id_slug" filename format.
         if (preg_match('/^\d+_([a-z0-9-]+)$/', $fallback, $matches) === 1) {
             $slug = strtolower(trim((string) ($matches[1] ?? '')));
+            // Accept filename-derived slug when it passes canonical validation.
             if (ChannelShared::isValidSlug($slug)) {
                 return $slug;
             }
         }
 
         $slug = $this->slugFromFilename($fallback);
+        // Accept plain filename fallback when it is valid and not pure numeric id text.
         if ($slug !== '' && ChannelShared::isValidSlug($slug) && !preg_match('/^\d+$/', $slug)) {
             return $slug;
         }
@@ -797,6 +860,7 @@ class ChannelRead
         $nameSlug = preg_replace('/[^a-z0-9]+/', '-', $nameSlug) ?? '';
         $nameSlug = trim($nameSlug, '-');
         $nameSlug = preg_replace('/-+/', '-', $nameSlug) ?? '';
+        // Name-derived slug is last human-readable fallback before synthetic id slug.
         if ($nameSlug !== '' && ChannelShared::isValidSlug($nameSlug)) {
             return $nameSlug;
         }
@@ -817,6 +881,7 @@ class ChannelRead
         $normalizedId = max(ChannelShared::ROOT_CHANNEL_ID, $id);
         $normalizedSlug = $this->recordSlugFromRaw($raw, $normalizedId, $slug);
         $name = trim((string) ($raw['name'] ?? ''));
+        // Root channel forces canonical reserved name/slug regardless of stored values.
         if ($normalizedId === ChannelShared::ROOT_CHANNEL_ID) {
             $name = ChannelShared::ROOT_CHANNEL_NAME;
             $normalizedSlug = ChannelShared::ROOT_CHANNEL_SLUG;
@@ -825,6 +890,7 @@ class ChannelRead
         }
 
         $createdAt = trim((string) ($raw['created_at'] ?? ''));
+        // Backfill missing timestamps to preserve required created_at field.
         if ($createdAt === '') {
             $createdAt = gmdate('Y-m-d H:i:s');
         }
@@ -867,6 +933,7 @@ class ChannelRead
     private static function filenameId(string $path): int
     {
         $basename = basename($path, '.php');
+        // Accept canonical filename forms like `12_slug.php` or bare `12.php`.
         if (preg_match('/^(\d+)(?:_[a-z0-9-]+)?$/', $basename, $matches) === 1) {
             return (int) ($matches[1] ?? -1);
         }
@@ -883,6 +950,7 @@ class ChannelRead
     private function slugFromFilename(string $path): string
     {
         $basename = basename($path, '.php');
+        // Prefer explicit slug segment when filename includes `id_slug` pattern.
         if (preg_match('/^\d+_([a-z0-9-]+)$/', $basename, $matches) === 1) {
             return strtolower(trim((string) ($matches[1] ?? '')));
         }
@@ -899,11 +967,13 @@ class ChannelRead
     private function invalidatePhpFileCache(string $path): void
     {
         $normalized = trim($path);
+        // Ignore empty paths because there is no concrete file cache entry to invalidate.
         if ($normalized === '') {
             return;
         }
 
         clearstatcache(true, $normalized);
+        // Invalidate OPcache entry when extension is available to avoid stale file reads.
         if (function_exists('opcache_invalidate')) {
             @opcache_invalidate($normalized, true);
         }
@@ -931,12 +1001,14 @@ class ChannelRead
      */
     public static function loadRawByPathStatic(string $path): array
     {
+        // Static helpers return empty payload for missing files to keep caller logic simple.
         if (!is_file($path)) {
             return [];
         }
 
         self::invalidatePhpFileCacheStatic($path);
 
+        // Isolate include-time errors so one bad file does not break directory-wide scans.
         try {
             /** @var mixed $raw */
             $raw = require $path;
@@ -957,21 +1029,26 @@ class ChannelRead
     public static function findPathBySlugInDirectory(string $channelDirectory, string $slug): ?string
     {
         $normalizedSlug = strtolower(trim($slug));
+        // Reject malformed slugs before scanning directory files.
         if (!ChannelShared::isValidSlug($normalizedSlug)) {
             return null;
         }
 
+        // Scan files and return the first path whose resolved slug matches.
         foreach (self::rawChannelFilePathsInDirectory($channelDirectory) as $path) {
             $raw = self::loadRawByPathStatic($path);
+            // Skip empty or unreadable payload files.
             if ($raw === []) {
                 continue;
             }
 
             $channelId = self::recordIdFromRawStatic($raw, $path);
+            // Skip files whose id cannot be resolved.
             if ($channelId === null) {
                 continue;
             }
 
+            // Return first slug match for deterministic lookup behavior.
             if (self::recordSlugFromRawStatic($raw, $channelId, basename($path, '.php')) === $normalizedSlug) {
                 return $path;
             }
@@ -995,16 +1072,20 @@ class ChannelRead
         $normalizedId = max(ChannelShared::ROOT_CHANNEL_ID, $id);
         $paths = [];
 
+        // Collect canonical filename matches first.
         foreach (glob($normalizedDirectory . '/' . $normalizedId . '_*.php') ?: [] as $path) {
             $paths[] = $path;
         }
 
+        // Then include files whose stored payload id matches the requested id.
         foreach (self::rawChannelFilePathsInDirectory($normalizedDirectory) as $path) {
+            // Avoid duplicate entries when canonical and payload scans overlap.
             if (in_array($path, $paths, true)) {
                 continue;
             }
 
             $raw = self::loadRawByPathStatic($path);
+            // Accept file when resolved record id matches target id.
             if ((self::recordIdFromRawStatic($raw, $path) ?? -1) === $normalizedId) {
                 $paths[] = $path;
             }
@@ -1023,16 +1104,19 @@ class ChannelRead
     public static function recordIdFromRawStatic(array $raw, string $path): ?int
     {
         $rawId = self::normalizeChannelId($raw['id'] ?? null);
+        // Prefer explicit id field when valid.
         if ($rawId !== null) {
             return $rawId;
         }
 
         $filenameId = self::filenameIdStatic($path);
+        // Fall back to numeric id encoded in filename.
         if ($filenameId >= ChannelShared::ROOT_CHANNEL_ID) {
             return $filenameId;
         }
 
         $fallbackSlug = self::slugFromFilenameStatic($path);
+        // Legacy root files can still resolve via reserved root slug fallback.
         if ($fallbackSlug !== '' && ChannelShared::isRootChannelSlug($fallbackSlug)) {
             return ChannelShared::ROOT_CHANNEL_ID;
         }
@@ -1050,23 +1134,28 @@ class ChannelRead
      */
     public static function recordSlugFromRawStatic(array $raw, int $id, string $fallback): string
     {
+        // Root channel slug is immutable regardless of stored payload values.
         if ($id === ChannelShared::ROOT_CHANNEL_ID) {
             return ChannelShared::ROOT_CHANNEL_SLUG;
         }
 
         $slug = strtolower(trim((string) ($raw['slug'] ?? '')));
+        // Prefer explicit stored slug when valid.
         if (ChannelShared::isValidSlug($slug)) {
             return $slug;
         }
 
+        // Next fallback extracts slug from canonical `id_slug` filename shape.
         if (preg_match('/^\d+_([a-z0-9-]+)$/', $fallback, $matches) === 1) {
             $slug = strtolower(trim((string) ($matches[1] ?? '')));
+            // Accept filename-derived slug when it passes validation.
             if (ChannelShared::isValidSlug($slug)) {
                 return $slug;
             }
         }
 
         $slug = self::slugFromFilenameStatic($fallback);
+        // Accept plain filename fallback when valid and not pure numeric text.
         if ($slug !== '' && ChannelShared::isValidSlug($slug) && !preg_match('/^\d+$/', $slug)) {
             return $slug;
         }
@@ -1075,6 +1164,7 @@ class ChannelRead
         $nameSlug = preg_replace('/[^a-z0-9]+/', '-', $nameSlug) ?? '';
         $nameSlug = trim($nameSlug, '-');
         $nameSlug = preg_replace('/-+/', '-', $nameSlug) ?? '';
+        // Name-derived slug is last human-readable fallback before synthetic id slug.
         if ($nameSlug !== '' && ChannelShared::isValidSlug($nameSlug)) {
             return $nameSlug;
         }
@@ -1095,6 +1185,7 @@ class ChannelRead
         $normalizedId = max(ChannelShared::ROOT_CHANNEL_ID, $id);
         $normalizedSlug = self::recordSlugFromRawStatic($raw, $normalizedId, $slug);
         $name = trim((string) ($raw['name'] ?? ''));
+        // Root channel enforces canonical reserved name/slug values.
         if ($normalizedId === ChannelShared::ROOT_CHANNEL_ID) {
             $name = ChannelShared::ROOT_CHANNEL_NAME;
             $normalizedSlug = ChannelShared::ROOT_CHANNEL_SLUG;
@@ -1103,6 +1194,7 @@ class ChannelRead
         }
 
         $createdAt = trim((string) ($raw['created_at'] ?? ''));
+        // Backfill missing timestamps to keep canonicalized payload shape complete.
         if ($createdAt === '') {
             $createdAt = gmdate('Y-m-d H:i:s');
         }
@@ -1145,6 +1237,7 @@ class ChannelRead
     public static function filenameIdStatic(string $path): int
     {
         $basename = basename($path, '.php');
+        // Accept canonical filename forms like `12_slug.php` or bare `12.php`.
         if (preg_match('/^(\d+)(?:_[a-z0-9-]+)?$/', $basename, $matches) === 1) {
             return (int) ($matches[1] ?? -1);
         }
@@ -1161,6 +1254,7 @@ class ChannelRead
     public static function slugFromFilenameStatic(string $path): string
     {
         $basename = basename($path, '.php');
+        // Prefer explicit slug segment when filename includes `id_slug` pattern.
         if (preg_match('/^\d+_([a-z0-9-]+)$/', $basename, $matches) === 1) {
             return strtolower(trim((string) ($matches[1] ?? '')));
         }
@@ -1177,11 +1271,13 @@ class ChannelRead
     public static function invalidatePhpFileCacheStatic(string $path): void
     {
         $normalized = trim($path);
+        // Ignore empty paths because there is no concrete cache entry to invalidate.
         if ($normalized === '') {
             return;
         }
 
         clearstatcache(true, $normalized);
+        // Invalidate OPcache entry when extension is available to avoid stale file reads.
         if (function_exists('opcache_invalidate')) {
             @opcache_invalidate($normalized, true);
         }
@@ -1199,12 +1295,15 @@ class ChannelRead
     public static function channelsByIdMap(array $channelRecords): array
     {
         $map = [];
+        // Build id-keyed map while skipping malformed or non-channel payload entries.
         foreach ($channelRecords as $channel) {
+            // Defensive guard for unexpected non-array payloads.
             if (!is_array($channel)) {
                 continue;
             }
 
             $id = (int) ($channel['id'] ?? 0);
+            // Ignore root/invalid ids for maps intended for positive-channel lookups.
             if ($id < 1) {
                 continue;
             }

@@ -54,6 +54,7 @@ final class TagWrite
         $description = (string) ($data['description'] ?? '');
         $now = gmdate('Y-m-d H:i:s');
 
+        // Existing ids follow the update path so relationships keep stable tag ids.
         if ($id !== null && $id > 0) {
             $stmt = $this->db->prepare(
                 'UPDATE ' . $tags . '
@@ -133,6 +134,7 @@ final class TagWrite
      */
     public function reassignSetToDefault(int $fromSetId, int $defaultSetId): void
     {
+        // No-op when source and destination sets are identical.
         if ($fromSetId === $defaultSetId) {
             return;
         }
@@ -159,6 +161,7 @@ final class TagWrite
 
         $this->db->beginTransaction();
 
+        // Remove junction links and tag row in one transaction to avoid orphan relations.
         try {
             $detach = $this->db->prepare(
                 'DELETE FROM ' . $relationTable . ' WHERE tag = :taxonomy_id'
@@ -170,6 +173,7 @@ final class TagWrite
 
             $this->db->commit();
         } catch (\Throwable $exception) {
+            // Roll back only when transaction remains active after the failure.
             if ($this->db->inTransaction()) {
                 $this->db->rollBack();
             }
@@ -210,6 +214,7 @@ final class TagWrite
     private function normalizeNullableFilename(mixed $value): ?string
     {
         $raw = trim((string) $value);
+        // Empty strings clear optional image filename fields.
         if ($raw === '') {
             return null;
         }

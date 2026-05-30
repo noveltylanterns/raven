@@ -32,6 +32,7 @@ final class Header
     public static function render(array $config): string
     {
         $titleHtml = self::textOrHtml($config, 'title', 'title_html');
+        // Without a title the shared header shell should not render.
         if ($titleHtml === '') {
             return '';
         }
@@ -55,11 +56,17 @@ final class Header
         ?>
 <header class="<?= e($cardClass) ?>">
     <div class="<?= e($bodyClass) ?>">
-        <?php if ($actions !== []): ?>
+        <?php
+        /* Render action row only when at least one trusted action fragment exists. */
+        if ($actions !== []):
+        ?>
             <div class="d-flex align-items-start justify-content-between gap-2">
                 <h1<?= $titleClass !== '' ? ' class="' . e($titleClass) . '"' : '' ?>><?= $titleHtml ?></h1>
                 <div class="<?= e($actionsClass) ?>">
-                    <?php foreach ($actions as $actionHtml): ?>
+                    <?php
+                    /* Emit action fragments as provided by the route template. */
+                    foreach ($actions as $actionHtml):
+                    ?>
                         <?= $actionHtml ?>
                     <?php endforeach; ?>
                 </div>
@@ -67,16 +74,28 @@ final class Header
         <?php else: ?>
             <h1<?= $titleClass !== '' ? ' class="' . e($titleClass) . '"' : '' ?>><?= $titleHtml ?></h1>
         <?php endif; ?>
-        <?php if ($introHtml !== ''): ?>
+        <?php
+        /* Intro markup is optional and shown only when provided by the route. */
+        if ($introHtml !== ''):
+        ?>
             <?= $introHtml ?>
         <?php endif; ?>
-        <?php if ($subheadingHtml !== ''): ?>
+        <?php
+        /* Subheading block is optional secondary heading content. */
+        if ($subheadingHtml !== ''):
+        ?>
             <div class="<?= e($subheadingClass) ?>"><?= $subheadingHtml ?></div>
         <?php endif; ?>
-        <?php if ($summaryHtml !== ''): ?>
+        <?php
+        /* Summary copy remains optional for compact headers. */
+        if ($summaryHtml !== ''):
+        ?>
             <p class="<?= e($summaryClass) ?>"><?= $summaryHtml ?></p>
         <?php endif; ?>
-        <?php if ($bodyHtml !== ''): ?>
+        <?php
+        /* Body markup provides optional route-specific detail under the summary. */
+        if ($bodyHtml !== ''):
+        ?>
             <?= $bodyHtml ?>
         <?php endif; ?>
     </div>
@@ -97,11 +116,13 @@ final class Header
     private static function textOrHtml(array $config, string $textKey, string $htmlKey): string
     {
         $html = trim((string) ($config[$htmlKey] ?? ''));
+        // Trusted HTML field wins when present so templates can supply rich markup.
         if ($html !== '') {
             return $html;
         }
 
         $text = trim((string) ($config[$textKey] ?? ''));
+        // Return empty when neither HTML nor text is available.
         if ($text === '') {
             return '';
         }
@@ -130,13 +151,16 @@ final class Header
      */
     private static function normalizeHtmlList(mixed $value): array
     {
+        // Non-array values cannot represent a list of action fragments.
         if (!is_array($value)) {
             return [];
         }
 
         $items = [];
+        // Preserve order while filtering empty action entries.
         foreach ($value as $item) {
             $html = trim((string) $item);
+            // Skip empty fragments so templates can build lists conditionally.
             if ($html === '') {
                 continue;
             }

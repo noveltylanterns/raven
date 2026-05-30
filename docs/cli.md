@@ -1,7 +1,5 @@
 # Raven CMS CLI
 
-***Note: This document was generated with ChatGPT Codex. I have not been able to personally verify every detail within matches the actual script. I do not plan on hammering these `docs/` files down until later releases, so use them with caution!***
-
 This file documents Raven's redistributable CLI tools under `private/bin/`.
 
 Maintenance note: keep this file updated whenever any tool is added, removed, or behavior-changed under `private/bin/`.
@@ -211,8 +209,8 @@ Optional:
 CLI commands are wired to the same repository/config structures used by panel flows:
 
 - category/tag/redirect use repository CRUD methods
-- channel uses filesystem-backed `ChannelRepository`
-- config updates persist through `Config::save()`
+- channel uses `ChannelRead` + `ChannelWrite` (including channel record files under `private/dat/channel/`)
+- config updates persist through `ConfigWrite::persist(...)` / `ConfigWrite::persistValue(...)`
 - extension enablement uses the runtime state map at `private/dat/ext/.state.php`
 
 ## 8) QA Contract

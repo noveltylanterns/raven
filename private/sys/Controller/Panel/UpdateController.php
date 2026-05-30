@@ -72,6 +72,7 @@ final class UpdateController
     public function update(): void
     {
         $this->context->requirePanelLogin();
+        // Update page view is permission-gated.
         if (!$this->context->requireRoutePermissionOrForbidden('update', 'view')) {
             return;
         }
@@ -90,6 +91,7 @@ final class UpdateController
     public function updateAction(array $post): void
     {
         $this->context->requirePanelLogin();
+        // Update actions share the same view permission gate.
         if (!$this->context->requireRoutePermissionOrForbidden('update', 'view')) {
             return;
         }
@@ -102,6 +104,7 @@ final class UpdateController
         $error = null;
         $success = null;
 
+        // CSRF validation protects update source/action submissions.
         if (!$this->context->csrf()->validate($post['_csrf'] ?? null)) {
             $error = 'Invalid CSRF token.';
             $result = $this->archiveUpdate()->compare($source);
@@ -110,6 +113,7 @@ final class UpdateController
         }
 
         $sourceErrors = $this->upstream()->validationErrors($source);
+        // Source validation errors are shown before persisting config or running actions.
         if ($sourceErrors !== []) {
             $error = implode(' ', $sourceErrors);
             $result = $this->archiveUpdate()->compare($source);
@@ -117,6 +121,7 @@ final class UpdateController
             return;
         }
 
+        // Persisting updater source settings can fail on config IO errors.
         try {
             ConfigWrite::persistValue(
                 $this->config->path(),
@@ -137,6 +142,7 @@ final class UpdateController
         }
 
         $action = strtolower(trim((string) ($post['update_action'] ?? 'check')));
+        // Unknown action values are coerced to the safe "check" mode.
         if (!in_array($action, ['check', 'dry_run', 'update_now'], true)) {
             $action = 'check';
         }
@@ -147,6 +153,7 @@ final class UpdateController
             default => $this->archiveUpdate()->compare($source),
         };
 
+        // Display success/error flash text from updater result payload.
         if ((bool) ($result['ok'] ?? false)) {
             $success = trim((string) ($result['message'] ?? ''));
         } else {
@@ -181,6 +188,7 @@ final class UpdateController
      */
     private function git(): Git
     {
+        // Lazily initialize Git helper for updater operations.
         if (!$this->git instanceof Git) {
             $this->git = new Git();
         }
@@ -195,6 +203,7 @@ final class UpdateController
      */
     private function upstream(): Upstream
     {
+        // Lazily initialize update-source resolver for compare/update actions.
         if (!$this->upstream instanceof Upstream) {
             $this->upstream = new Upstream($this->input);
         }
@@ -209,6 +218,7 @@ final class UpdateController
      */
     private function archiveUpdate(): ArchiveUpdate
     {
+        // Lazily initialize archive-update workflow service.
         if (!$this->archiveUpdate instanceof ArchiveUpdate) {
             $this->archiveUpdate = new ArchiveUpdate(
                 $this->root,

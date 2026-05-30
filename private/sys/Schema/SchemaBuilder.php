@@ -42,7 +42,9 @@ final class SchemaBuilder
     {
         $pagesTable = $prefix . 'pages';
 
+        // Add published column only when schema predates scheduling support.
         if (!$this->introspector->columnExists($db, $driver, $pagesTable, 'published')) {
+            // Choose column type based on backend datetime conventions.
             if ($driver === 'mysql') {
                 $db->exec('ALTER TABLE ' . $pagesTable . ' ADD COLUMN published DATETIME NULL');
             } elseif ($driver === 'pgsql') {
@@ -52,7 +54,9 @@ final class SchemaBuilder
             }
         }
 
+        // Add expires column only when schema predates scheduling support.
         if (!$this->introspector->columnExists($db, $driver, $pagesTable, 'expires')) {
+            // Choose column type based on backend datetime conventions.
             if ($driver === 'mysql') {
                 $db->exec('ALTER TABLE ' . $pagesTable . ' ADD COLUMN expires DATETIME NULL');
             } elseif ($driver === 'pgsql') {
@@ -73,6 +77,7 @@ final class SchemaBuilder
     public function ensurePageDescriptionColumn(PDO $db, string $driver, string $prefix): void
     {
         $pagesTable = $prefix . 'pages';
+        // Description column is backfilled for legacy installs.
         if (!$this->introspector->columnExists($db, $driver, $pagesTable, 'description')) {
             $db->exec('ALTER TABLE ' . $pagesTable . ' ADD COLUMN description TEXT NULL');
         }
@@ -88,7 +93,9 @@ final class SchemaBuilder
     public function ensurePageDisplayTitleColumn(PDO $db, string $driver, string $prefix): void
     {
         $pagesTable = $prefix . 'pages';
+        // Display-title toggle is backfilled for legacy installs.
         if (!$this->introspector->columnExists($db, $driver, $pagesTable, 'display_title')) {
+            // Choose boolean-like column type per backend.
             if ($driver === 'mysql') {
                 $db->exec('ALTER TABLE ' . $pagesTable . ' ADD COLUMN display_title TINYINT(1) NOT NULL DEFAULT 1');
             } elseif ($driver === 'pgsql') {
@@ -109,11 +116,13 @@ final class SchemaBuilder
     public function ensurePageSlugScopeUniqueness(PDO $db, string $driver, string $prefix): void
     {
         $pagesTable = $prefix . 'pages';
+        // SQLite uses partial unique indexes created in a dedicated helper.
         if ($driver === 'sqlite') {
             $this->ensurePageSlugScopeUniquenessSqlite($db, $pagesTable);
             return;
         }
 
+        // MySQL enforces channel+slug uniqueness with one composite unique index.
         if ($driver === 'mysql') {
             if (!$this->introspector->indexExists($db, 'mysql', $pagesTable, 'uniq_' . $prefix . 'pages_channel_slug')) {
                 $db->exec(
@@ -125,6 +134,7 @@ final class SchemaBuilder
             return;
         }
 
+        // PostgreSQL root-scope uniqueness uses a partial unique index.
         if (!$this->introspector->indexExists($db, 'pgsql', $pagesTable, 'uniq_' . $prefix . 'pages_root_slug')) {
             $db->exec(
                 'CREATE UNIQUE INDEX uniq_' . $prefix . 'pages_root_slug
@@ -133,6 +143,7 @@ final class SchemaBuilder
             );
         }
 
+        // PostgreSQL non-root uniqueness uses a second partial unique index.
         if (!$this->introspector->indexExists($db, 'pgsql', $pagesTable, 'uniq_' . $prefix . 'pages_channel_slug')) {
             $db->exec(
                 'CREATE UNIQUE INDEX uniq_' . $prefix . 'pages_channel_slug
@@ -157,6 +168,7 @@ final class SchemaBuilder
         $db->exec('UPDATE ' . $pagesTable . ' SET channel = 0 WHERE channel IS NULL');
         $db->exec('UPDATE ' . $redirectsTable . ' SET channel = 0 WHERE channel IS NULL');
 
+        // SQLite indexes are rebuilt after null-to-zero normalization.
         if ($driver === 'sqlite') {
             $db->exec('DROP INDEX IF EXISTS idx_' . $pagesTable . '_root_slug_unique');
             $db->exec('DROP INDEX IF EXISTS idx_' . $pagesTable . '_channel_slug_unique');
@@ -164,6 +176,7 @@ final class SchemaBuilder
             return;
         }
 
+        // PostgreSQL indexes are rebuilt after null-to-zero normalization.
         if ($driver === 'pgsql') {
             $db->exec('DROP INDEX IF EXISTS ' . $this->introspector->quotePgIdentifier('uniq_' . $prefix . 'pages_root_slug'));
             $db->exec('DROP INDEX IF EXISTS ' . $this->introspector->quotePgIdentifier('uniq_' . $prefix . 'pages_channel_slug'));
@@ -187,6 +200,7 @@ final class SchemaBuilder
              FROM ' . $groupsTable . '
              ORDER BY id ASC'
         );
+        // Abort gracefully when group query cannot be executed.
         if ($rows === false) {
             return;
         }
@@ -200,8 +214,10 @@ final class SchemaBuilder
 
         /** @var array<string, bool> $usedSlugs */
         $usedSlugs = [];
+        // Normalize each group slug/route row and apply updates only when required.
         foreach ($rows->fetchAll() ?: [] as $row) {
             $groupId = (int) ($row['id'] ?? 0);
+            // Ignore malformed/non-positive ids.
             if ($groupId <= 0) {
                 continue;
             }
@@ -209,6 +225,7 @@ final class SchemaBuilder
             $rawSlug = trim((string) ($row['slug'] ?? ''));
             $rawName = trim((string) ($row['name'] ?? ''));
             $slug = $this->slugifyGroupName($rawSlug !== '' ? $rawSlug : $rawName);
+            // Last-resort slug guarantees a stable non-empty route token.
             if ($slug === '') {
                 $slug = 'group-' . $groupId;
             }
@@ -230,6 +247,7 @@ final class SchemaBuilder
             $needsSlugUpdate = $rawSlug !== $slug;
             $needsRouteUpdate = !$hasRouteEnabled || $routeEnabledRaw !== $routeEnabled;
 
+            // Skip writes when normalized values already match persisted state.
             if (!$needsSlugUpdate && !$needsRouteUpdate) {
                 continue;
             }
@@ -253,12 +271,15 @@ final class SchemaBuilder
     {
         $taxonomyTables = ['categories', 'tags'];
 
+        // SQLite uses TEXT columns for taxonomy image filename fields.
         if ($driver === 'sqlite') {
             foreach ($taxonomyTables as $table) {
                 $qualifiedTable = SqlTable::appTable($driver, $prefix, $table);
+                // Add cover image column when missing on legacy schemas.
                 if (!$this->introspector->columnExists($db, 'sqlite', $qualifiedTable, 'cover_image')) {
                     $db->exec('ALTER TABLE ' . $qualifiedTable . ' ADD COLUMN cover_image TEXT NULL');
                 }
+                // Add preview image column when missing on legacy schemas.
                 if (!$this->introspector->columnExists($db, 'sqlite', $qualifiedTable, 'preview_image')) {
                     $db->exec('ALTER TABLE ' . $qualifiedTable . ' ADD COLUMN preview_image TEXT NULL');
                 }
@@ -268,11 +289,14 @@ final class SchemaBuilder
             return;
         }
 
+        // MySQL/PostgreSQL use VARCHAR columns for taxonomy image filename fields.
         foreach ($taxonomyTables as $table) {
             $physicalTable = $prefix . $table;
+            // Add cover image column when missing on legacy schemas.
             if (!$this->introspector->columnExists($db, $driver, $physicalTable, 'cover_image')) {
                 $db->exec('ALTER TABLE ' . $physicalTable . ' ADD COLUMN cover_image VARCHAR(255) NULL');
             }
+            // Add preview image column when missing on legacy schemas.
             if (!$this->introspector->columnExists($db, $driver, $physicalTable, 'preview_image')) {
                 $db->exec('ALTER TABLE ' . $physicalTable . ' ADD COLUMN preview_image VARCHAR(255) NULL');
             }
@@ -290,9 +314,12 @@ final class SchemaBuilder
     {
         $tables = ['categories', 'tags', 'groups'];
 
+        // SQLite stores icon filenames as TEXT columns.
         if ($driver === 'sqlite') {
+            // Backfill icon_image on each taxonomy/group table variant.
             foreach ($tables as $table) {
                 $qualifiedTable = SqlTable::appTable($driver, $prefix, $table);
+                // Add icon column when absent on legacy schemas.
                 if (!$this->introspector->columnExists($db, 'sqlite', $qualifiedTable, 'icon_image')) {
                     $db->exec('ALTER TABLE ' . $qualifiedTable . ' ADD COLUMN icon_image TEXT NULL');
                 }
@@ -301,8 +328,10 @@ final class SchemaBuilder
             return;
         }
 
+        // MySQL/PostgreSQL store icon filenames as VARCHAR columns.
         foreach ($tables as $table) {
             $physicalTable = $prefix . $table;
+            // Add icon column when absent on legacy schemas.
             if (!$this->introspector->columnExists($db, $driver, $physicalTable, 'icon_image')) {
                 $db->exec('ALTER TABLE ' . $physicalTable . ' ADD COLUMN icon_image VARCHAR(255) NULL');
             }
@@ -321,9 +350,12 @@ final class SchemaBuilder
         $taxonomyTables = ['categories', 'tags'];
         $setColumn = $this->setColumnIdentifier($driver);
 
+        // SQLite uses INTEGER set columns and IF NOT EXISTS indexes.
         if ($driver === 'sqlite') {
+            // Ensure set columns/indexes exist for each taxonomy table.
             foreach ($taxonomyTables as $table) {
                 $qualifiedTable = SqlTable::appTable($driver, $prefix, $table);
+                // Add set column when absent on legacy schemas.
                 if (!$this->introspector->columnExists($db, 'sqlite', $qualifiedTable, 'set')) {
                     $db->exec('ALTER TABLE ' . $qualifiedTable . ' ADD COLUMN ' . $setColumn . ' INTEGER NOT NULL DEFAULT 1');
                 }
@@ -334,14 +366,18 @@ final class SchemaBuilder
             return;
         }
 
+        // MySQL path uses BIGINT set columns and named secondary indexes.
         if ($driver === 'mysql') {
+            // Ensure set columns/indexes exist for each taxonomy table.
             foreach ($taxonomyTables as $table) {
                 $physicalTable = $prefix . $table;
+                // Add set column when absent on legacy schemas.
                 if (!$this->introspector->columnExists($db, 'mysql', $physicalTable, 'set')) {
                     $db->exec('ALTER TABLE ' . $physicalTable . ' ADD COLUMN ' . $setColumn . ' BIGINT UNSIGNED NOT NULL DEFAULT 1 AFTER slug');
                 }
                 $db->exec('UPDATE ' . $physicalTable . ' SET ' . $setColumn . ' = 1 WHERE ' . $setColumn . ' IS NULL OR ' . $setColumn . ' = 0');
                 $indexName = 'idx_' . $prefix . $table . '_set';
+                // Create set index when absent.
                 if (!$this->introspector->indexExists($db, 'mysql', $physicalTable, $indexName)) {
                     $db->exec('ALTER TABLE ' . $physicalTable . ' ADD INDEX ' . $indexName . ' (' . $setColumn . ')');
                 }
@@ -350,13 +386,16 @@ final class SchemaBuilder
             return;
         }
 
+        // PostgreSQL path uses BIGINT set columns and standard secondary indexes.
         foreach ($taxonomyTables as $table) {
             $physicalTable = $prefix . $table;
+            // Add set column when absent on legacy schemas.
             if (!$this->introspector->columnExists($db, 'pgsql', $physicalTable, 'set')) {
                 $db->exec('ALTER TABLE ' . $physicalTable . ' ADD COLUMN ' . $setColumn . ' BIGINT NOT NULL DEFAULT 1');
             }
             $db->exec('UPDATE ' . $physicalTable . ' SET ' . $setColumn . ' = 1 WHERE ' . $setColumn . ' IS NULL OR ' . $setColumn . ' = 0');
             $indexName = 'idx_' . $prefix . $table . '_set';
+            // Create set index when absent.
             if (!$this->introspector->indexExists($db, 'pgsql', $physicalTable, $indexName)) {
                 $db->exec(
                     'CREATE INDEX IF NOT EXISTS ' . $indexName . '
@@ -375,6 +414,7 @@ final class SchemaBuilder
      */
     public function ensurePanelPerformanceIndexes(PDO $db, string $driver, string $prefix): void
     {
+        // SQLite path creates all lookup indexes unconditionally with IF NOT EXISTS.
         if ($driver === 'sqlite') {
             $pageCategoriesTable = SqlTable::appTable($driver, $prefix, 'page_categories');
             $pageTagsTable = SqlTable::appTable($driver, $prefix, 'page_tags');
@@ -392,16 +432,21 @@ final class SchemaBuilder
         $userGroupsTable = $prefix . 'user_groups';
         $redirectsTable = $prefix . 'redirects';
 
+        // MySQL path creates each lookup index only when missing.
         if ($driver === 'mysql') {
+            // Category lookup index for page_categories.
             if (!$this->introspector->indexExists($db, 'mysql', $pageCategoriesTable, 'idx_' . $prefix . 'page_categories_category')) {
                 $db->exec('ALTER TABLE ' . $pageCategoriesTable . ' ADD INDEX idx_' . $prefix . 'page_categories_category (category, page)');
             }
+            // Tag lookup index for page_tags.
             if (!$this->introspector->indexExists($db, 'mysql', $pageTagsTable, 'idx_' . $prefix . 'page_tags_tag')) {
                 $db->exec('ALTER TABLE ' . $pageTagsTable . ' ADD INDEX idx_' . $prefix . 'page_tags_tag (tag, page)');
             }
+            // Group-membership lookup index for user_groups.
             if (!$this->introspector->indexExists($db, 'mysql', $userGroupsTable, 'idx_' . $prefix . 'user_groups_group_id')) {
                 $db->exec('ALTER TABLE ' . $userGroupsTable . ' ADD INDEX idx_' . $prefix . 'user_groups_group_id (`group`, user)');
             }
+            // Redirect lookup index for slug/channel/activity filter.
             if (!$this->introspector->indexExists($db, 'mysql', $redirectsTable, 'idx_' . $prefix . 'redirects_lookup')) {
                 $db->exec('ALTER TABLE ' . $redirectsTable . ' ADD INDEX idx_' . $prefix . 'redirects_lookup (slug, channel, active)');
             }
@@ -409,15 +454,19 @@ final class SchemaBuilder
             return;
         }
 
+        // Category lookup index for page_categories.
         if (!$this->introspector->indexExists($db, 'pgsql', $pageCategoriesTable, 'idx_' . $prefix . 'page_categories_category')) {
             $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $prefix . 'page_categories_category ON ' . $this->introspector->quotePgIdentifier($pageCategoriesTable) . ' (category, page)');
         }
+        // Tag lookup index for page_tags.
         if (!$this->introspector->indexExists($db, 'pgsql', $pageTagsTable, 'idx_' . $prefix . 'page_tags_tag')) {
             $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $prefix . 'page_tags_tag ON ' . $this->introspector->quotePgIdentifier($pageTagsTable) . ' (tag, page)');
         }
+        // Group-membership lookup index for user_groups.
         if (!$this->introspector->indexExists($db, 'pgsql', $userGroupsTable, 'idx_' . $prefix . 'user_groups_group_id')) {
             $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $prefix . 'user_groups_group_id ON ' . $this->introspector->quotePgIdentifier($userGroupsTable) . ' ("group", "user")');
         }
+        // Redirect lookup index for slug/channel/activity filter.
         if (!$this->introspector->indexExists($db, 'pgsql', $redirectsTable, 'idx_' . $prefix . 'redirects_lookup')) {
             $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $prefix . 'redirects_lookup ON ' . $this->introspector->quotePgIdentifier($redirectsTable) . ' (slug, channel, active)');
         }
@@ -486,13 +535,17 @@ final class SchemaBuilder
     {
         $indexPrefix = 'idx_' . $this->sanitizeIndexToken($table);
 
+        // MySQL path adds redirect indexes only when missing.
         if ($driver === 'mysql') {
+            // Slug index supports direct redirect slug lookup.
             if (!$this->introspector->indexExists($db, 'mysql', $table, $indexPrefix . '_slug')) {
                 $db->exec('ALTER TABLE ' . $table . ' ADD INDEX ' . $indexPrefix . '_slug (slug)');
             }
+            // Channel index supports channel-scoped redirect filtering.
             if (!$this->introspector->indexExists($db, 'mysql', $table, $indexPrefix . '_channel')) {
                 $db->exec('ALTER TABLE ' . $table . ' ADD INDEX ' . $indexPrefix . '_channel (channel)');
             }
+            // Composite lookup index accelerates slug+channel+active predicate.
             if (!$this->introspector->indexExists($db, 'mysql', $table, $indexPrefix . '_lookup')) {
                 $db->exec('ALTER TABLE ' . $table . ' ADD INDEX ' . $indexPrefix . '_lookup (slug, channel, active)');
             }
@@ -522,10 +575,12 @@ final class SchemaBuilder
     {
         $table = $prefix . 'event_log';
 
+        // Do not recreate event_log table when it already exists.
         if ($this->introspector->tableExists($db, $driver, $table)) {
             return;
         }
 
+        // MySQL event_log schema with inline secondary indexes.
         if ($driver === 'mysql') {
             $db->exec(
                 'CREATE TABLE IF NOT EXISTS ' . $table . ' (
@@ -542,6 +597,7 @@ final class SchemaBuilder
             return;
         }
 
+        // PostgreSQL event_log schema with follow-up index statements.
         if ($driver === 'pgsql') {
             $quoted = $this->introspector->quotePgIdentifier($table);
             $db->exec(
@@ -605,6 +661,7 @@ final class SchemaBuilder
     private function slugifyGroupName(string $value): string
     {
         $value = strtolower(trim($value));
+        // Empty source strings cannot produce valid group slugs.
         if ($value === '') {
             return '';
         }
@@ -612,6 +669,7 @@ final class SchemaBuilder
         $value = preg_replace('/[^a-z0-9]+/', '-', $value) ?? '';
         $value = trim($value, '-');
         $value = preg_replace('/-+/', '-', $value) ?? '';
+        // Slug may normalize to empty after stripping unsupported characters.
         if ($value === '') {
             return '';
         }

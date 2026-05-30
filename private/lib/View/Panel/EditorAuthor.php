@@ -26,17 +26,20 @@ final class EditorAuthor
     public function build(array $users, InputSanitizer $input, callable $normalizeIdentifier): array
     {
         $options = [];
+        // Normalize each user row into a unique author-select option keyed by user id.
         foreach ($users as $entry) {
             if (!is_array($entry)) {
                 continue;
             }
 
             $userId = (int) ($entry['id'] ?? 0);
+            // Author rows require a positive persisted user id.
             if ($userId < 1) {
                 continue;
             }
 
             $username = $normalizeIdentifier((string) ($entry['username'] ?? ''));
+            // Skip users without a normalizable public identifier.
             if (!is_string($username) || $username === '') {
                 continue;
             }
@@ -52,6 +55,7 @@ final class EditorAuthor
         usort($options, static function (array $left, array $right): int {
             $leftLabel = strtolower(trim((string) (($left['name'] ?? '') ?: ($left['username'] ?? ''))));
             $rightLabel = strtolower(trim((string) (($right['name'] ?? '') ?: ($right['username'] ?? ''))));
+            // Primary sort by human-facing display label.
             if ($leftLabel !== $rightLabel) {
                 return $leftLabel <=> $rightLabel;
             }

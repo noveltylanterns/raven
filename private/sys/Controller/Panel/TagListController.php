@@ -68,16 +68,19 @@ final class TagListController
     public function tagList(): void
     {
         $this->context->requirePanelLogin();
+        // Tag list UI is unavailable when tag taxonomy feature is disabled.
         if (!$this->tagEnabled) {
             $this->context->renderPanelNotFound();
             return;
         }
+        // Tag list view requires tag:view permission.
         if (!$this->context->requireRoutePermissionOrForbidden('tag', 'view')) {
             return;
         }
 
         $tagCountsBySetId = $this->tagRead()->countsBySetId();
         $selectedSetId = $this->input->int($_GET['set'] ?? null, 0);
+        // Ignore set filters that do not exist or currently have no tags.
         if (
             $selectedSetId !== null
             && (
@@ -94,6 +97,7 @@ final class TagListController
         $totalItems = (int) ($pageResult['total'] ?? 0);
         $tagRows = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
         $pagination = Pagination::state($totalItems, $requestedPage, $perPage);
+        // Requery with clamped offset when requested page exceeds available range.
         if ($totalItems > 0 && $pagination['current'] !== $requestedPage) {
             $pageResult = $this->tagRead()->listPage($perPage, $pagination['offset'], $selectedSetId);
             $tagRows = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
@@ -103,6 +107,7 @@ final class TagListController
         $setOptions = [];
         foreach ($this->tagSetRepo()->listOptions() as $setOption) {
             $setId = (int) ($setOption['id'] ?? 0);
+            // Hide set tabs that currently have no tag members.
             if ((int) ($tagCountsBySetId[$setId] ?? 0) < 1) {
                 continue;
             }
@@ -132,10 +137,12 @@ final class TagListController
     public function tagSetList(): void
     {
         $this->context->requirePanelLogin();
+        // Tag-set list UI is unavailable when tag taxonomy feature is disabled.
         if (!$this->tagEnabled) {
             $this->context->renderPanelNotFound();
             return;
         }
+        // Tag-set list view requires tag:view permission.
         if (!$this->context->requireRoutePermissionOrForbidden('tag', 'view')) {
             return;
         }
@@ -144,6 +151,7 @@ final class TagListController
         $countsBySetId = $this->tagRead()->countsBySetId();
         $channelCountsBySetId = $this->channelRead->explicitTaxonomySetCounts('tag');
         $setRows = [];
+        // Merge count metadata into each set row for management table rendering.
         foreach ($this->tagSetRepo()->listAll() as $setRow) {
             $setId = (int) ($setRow['id'] ?? 0);
             $setRow['tag_count'] = (int) ($countsBySetId[$setId] ?? 0);
@@ -168,11 +176,13 @@ final class TagListController
      */
     private function tagRead(): TagRead
     {
+        // Reuse cached tag read repository once resolved.
         if ($this->tagRead instanceof TagRead) {
             return $this->tagRead;
         }
 
         $repo = ($this->tagReadResolver)();
+        // Resolver contract must return the tag read repository.
         if (!$repo instanceof TagRead) {
             throw new \RuntimeException('Panel tag read resolver returned an invalid value.');
         }
@@ -189,11 +199,13 @@ final class TagListController
      */
     private function tagSetRepo(): SetRead
     {
+        // Reuse cached tag-set read repository once resolved.
         if ($this->tagSetRepo instanceof SetRead) {
             return $this->tagSetRepo;
         }
 
         $repo = ($this->tagSetRepoResolver)();
+        // Resolver contract must return the tag-set read repository.
         if (!$repo instanceof SetRead) {
             throw new \RuntimeException('Panel tag-set repository resolver returned an invalid value.');
         }

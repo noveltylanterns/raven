@@ -45,6 +45,7 @@ final class OutputProfiler
         bool $enabledForScope,
         callable $canRenderProfiler
     ): void {
+        // Skip profiler injection for non-GET responses or disallowed scope/path/auth contexts.
         if ($requestMethod !== 'GET' || !$enabledForScope || !$canRenderProfiler()) {
             return;
         }
@@ -53,6 +54,7 @@ final class OutputProfiler
         RequestProfiler::enable();
 
         ob_start(static function (string $body) use ($settings, $scope, $requestMethod, $requestPath, $canRenderProfiler): string {
+            // Only inject into HTML bodies while profiler capture remains active.
             if (!RequestProfiler::isEnabled() || !self::isHtmlResponseCandidate($body)) {
                 return $body;
             }
@@ -81,6 +83,7 @@ final class OutputProfiler
                 ]
             );
 
+            // Rendering failures should never corrupt the original response body.
             if ($profilerHtml === '') {
                 return $body;
             }
@@ -154,6 +157,7 @@ final class OutputProfiler
         self::appendSection($sections, $settings, 'show_stack_trace', 'Render Stack Trace', static fn (): string => self::renderTrace($traceRows));
         self::appendSection($sections, $settings, 'show_request', 'Request Data', static fn (): string => self::renderRequestData());
         self::appendSection($sections, $settings, 'show_environment', 'Environment', static fn (): string => self::renderEnvironment($scope, $hostname, $requestPath));
+        // Provide one explicit placeholder section so an empty toolbar still explains why no panels opened.
         if ($sections === []) {
             $sections[] = self::section(
                 'Profiler',
@@ -253,16 +257,20 @@ final class OutputProfiler
     public static function isHtmlResponseCandidate(string $body): bool
     {
         $statusCode = http_response_code();
+        // Redirect responses should remain untouched so Location/navigation semantics are preserved.
         if (is_int($statusCode) && $statusCode >= 300 && $statusCode < 400) {
             return false;
         }
 
+        // Ignore empty bodies; injecting markup would create unintended output.
         if ($body === '') {
             return false;
         }
 
         $contentType = '';
+        // Respect explicit response Content-Type values when deciding whether HTML injection is safe.
         foreach (headers_list() as $headerLine) {
+            // Skip unrelated headers and stop only on the first Content-Type match.
             if (stripos($headerLine, 'Content-Type:') !== 0) {
                 continue;
             }
@@ -271,6 +279,7 @@ final class OutputProfiler
             break;
         }
 
+        // Non-HTML content should never receive toolbar markup even when body text is present.
         if ($contentType !== '' && !str_contains($contentType, 'text/html') && !str_contains($contentType, 'application/xhtml+xml')) {
             return false;
         }
@@ -292,6 +301,7 @@ final class OutputProfiler
     {
         $needle = '</body>';
         $offset = strripos($body, $needle);
+        // Malformed fragments without </body> still get the profiler appended at the end.
         if ($offset === false) {
             return $body . $profilerHtml;
         }
@@ -317,6 +327,7 @@ final class OutputProfiler
         ];
 
         $html = '<table><tbody>';
+        // Render each metric as a two-column row for compact, scan-friendly diagnostics.
         foreach ($rows as $row) {
             $html .= '<tr><th scope="row">' . self::escapeHtml($row[0]) . '</th><td>' . self::escapeHtml($row[1]) . '</td></tr>';
         }
@@ -331,17 +342,20 @@ final class OutputProfiler
      */
     private static function renderQueries(array $queries, int $droppedCount): string
     {
+        // Keep empty-query output explicit so operators can distinguish "none run" from render failure.
         if ($queries === []) {
             return '<p class="rvnd-empty">No SQL queries were recorded in this request.</p>';
         }
 
         $html = '<div class="rvnd-muted" style="margin-bottom:8px">Logged ' . self::escapeHtml((string) count($queries)) . ' query row(s)';
+        // Surface dropped rows so slow-query analysis accounts for profiler capture limits.
         if ($droppedCount > 0) {
             $html .= '; dropped ' . self::escapeHtml((string) $droppedCount) . ' due to profiler cap';
         }
         $html .= '.</div>';
         $html .= '<table><thead><tr><th>Connection</th><th>Mode</th><th>Duration</th><th>SQL</th><th>Bindings</th></tr></thead><tbody>';
 
+        // Normalize each captured query row into one table line with sanitized SQL/bindings display.
         foreach ($queries as $query) {
             $bindings = $query['params'] ?? [];
             $bindingsText = is_array($bindings) && $bindings !== []
@@ -372,6 +386,7 @@ final class OutputProfiler
      */
     private static function renderTrace(array $trace): string
     {
+        // Show a deterministic empty-state message when no template stack was recorded.
         if ($trace === []) {
             return '<p class="rvnd-empty">No render stack trace snapshot was captured.</p>';
         }
@@ -450,6 +465,7 @@ final class OutputProfiler
         string $title,
         callable $render
     ): void {
+        // Section render callbacks can be expensive; invoke them only when the toggle is enabled.
         if (!empty($settings[$flag])) {
             $sections[] = self::section($title, (string) $render());
         }
@@ -463,6 +479,7 @@ final class OutputProfiler
      */
     private static function formatBytes(int $bytes): string
     {
+        // Guard against zero/negative values before calling log() to avoid invalid math.
         if ($bytes < 1) {
             return '0 B';
         }

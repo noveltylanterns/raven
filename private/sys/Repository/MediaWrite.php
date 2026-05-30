@@ -52,7 +52,9 @@ final class MediaWrite
 
         $this->db->beginTransaction();
 
+        // Insert source row + variants atomically so partially-created images never persist.
         try {
+            // PostgreSQL path uses RETURNING to fetch inserted id without lastInsertId().
             if ($this->driver === 'pgsql') {
                 $insert = $this->db->prepare(
                     'INSERT INTO ' . $images . ' (
@@ -100,6 +102,7 @@ final class MediaWrite
                 )'
             );
 
+            // Persist each prepared variant row for the inserted image id.
             foreach ($variants as $variant) {
                 $insertVariant->execute([
                     ':image_id' => $imageId,
@@ -119,6 +122,7 @@ final class MediaWrite
 
             return $imageId;
         } catch (\Throwable $exception) {
+            // Roll back only when transaction remains active after failure.
             if ($this->db->inTransaction()) {
                 $this->db->rollBack();
             }
@@ -144,6 +148,7 @@ final class MediaWrite
 
         $this->db->beginTransaction();
 
+        // Update page cover/preview references and image metadata in one transaction.
         try {
             $updatePage = $this->db->prepare(
                 'UPDATE ' . $pages . '
@@ -159,6 +164,7 @@ final class MediaWrite
                 ':id' => $pageId,
             ]);
 
+            // Per-image metadata updates are optional and skipped when payload is empty.
             if ($imageUpdates !== []) {
                 $updateImage = $this->db->prepare(
                     'UPDATE ' . $images . '
@@ -172,10 +178,11 @@ final class MediaWrite
                          sort_order = :sort_order,
                          include_in_gallery = :include_in_gallery,
                          updated = :updated
-                     WHERE id = :id
-                       AND page = :page'
+	                     WHERE id = :id
+	                       AND page = :page'
                 );
 
+                // Apply metadata update to each submitted image row.
                 foreach ($imageUpdates as $imageId => $update) {
                     $updateImage->execute([
                         ':alt_text' => (string) ($update['alt_text'] ?? ''),
@@ -196,6 +203,7 @@ final class MediaWrite
 
             $this->db->commit();
         } catch (\Throwable $exception) {
+            // Roll back only when transaction remains active after failure.
             if ($this->db->inTransaction()) {
                 $this->db->rollBack();
             }
@@ -219,6 +227,7 @@ final class MediaWrite
 
         $this->db->beginTransaction();
 
+        // Delete image + variant rows atomically and collect file paths for storage cleanup.
         try {
             $readImage = $this->db->prepare(
                 'SELECT stored_path
@@ -232,6 +241,7 @@ final class MediaWrite
             ]);
             $imagePath = $readImage->fetchColumn();
 
+            // No scoped image row means there is nothing to delete for this page/id pair.
             if ($imagePath === false) {
                 $this->db->rollBack();
 
@@ -271,6 +281,7 @@ final class MediaWrite
             $this->db->commit();
 
             $storedPaths = [(string) $imagePath];
+            // Include variant paths in cleanup list returned to caller.
             foreach ($variantRows as $variantRow) {
                 $storedPaths[] = (string) ($variantRow['stored_path'] ?? '');
             }
@@ -281,6 +292,7 @@ final class MediaWrite
                 ),
             ];
         } catch (\Throwable $exception) {
+            // Roll back only when transaction remains active after failure.
             if ($this->db->inTransaction()) {
                 $this->db->rollBack();
             }
@@ -303,6 +315,7 @@ final class MediaWrite
 
         $this->db->beginTransaction();
 
+        // Remove all image + variant rows for the page atomically and gather cleanup paths.
         try {
             $readPaths = $this->db->prepare(
                 'SELECT i.stored_path AS image_path, v.stored_path AS variant_path
@@ -319,6 +332,7 @@ final class MediaWrite
             $imageIdsStmt->execute([':page' => $pageId]);
             $imageIds = array_map(static fn (mixed $value): int => (int) $value, $imageIdsStmt->fetchAll(PDO::FETCH_COLUMN) ?: []);
 
+            // Only execute variant delete when at least one image id exists.
             if ($imageIds !== []) {
                 $placeholders = implode(', ', array_fill(0, count($imageIds), '?'));
                 $deleteVariants = $this->db->prepare(
@@ -343,14 +357,17 @@ final class MediaWrite
             $this->db->commit();
 
             $paths = [];
+            // Build deduplicated image/variant path set for storage cleanup.
             foreach ($rows as $row) {
                 $imagePath = (string) ($row['image_path'] ?? '');
                 $variantPath = (string) ($row['variant_path'] ?? '');
 
+                // Record non-empty source image paths.
                 if ($imagePath !== '') {
                     $paths[$imagePath] = $imagePath;
                 }
 
+                // Record non-empty variant paths.
                 if ($variantPath !== '') {
                     $paths[$variantPath] = $variantPath;
                 }
@@ -358,6 +375,7 @@ final class MediaWrite
 
             return array_values($paths);
         } catch (\Throwable $exception) {
+            // Roll back only when transaction remains active after failure.
             if ($this->db->inTransaction()) {
                 $this->db->rollBack();
             }
@@ -409,17 +427,21 @@ final class MediaWrite
         $resolved = [];
         $primaryId = null;
 
+        // Normalize update keys and pick first primary-designated image as canonical primary.
         foreach ($imageUpdates as $imageId => $update) {
             $normalizedId = (int) $imageId;
+            // Skip invalid/non-positive image ids from payload.
             if ($normalizedId < 1) {
                 continue;
             }
 
+            // Coerce malformed update payloads to empty arrays for safe key access.
             if (!is_array($update)) {
                 $update = [];
             }
 
             $isPrimary = !empty($update['is_primary']) || !empty($update['is_cover']) || !empty($update['is_preview']);
+            // First declared primary wins; later primary flags are normalized in second pass.
             if ($isPrimary && $primaryId === null) {
                 $primaryId = $normalizedId;
             }
@@ -429,6 +451,7 @@ final class MediaWrite
             $resolved[$normalizedId] = $update;
         }
 
+        // Enforce single-primary invariant across normalized update payload.
         if ($primaryId !== null) {
             foreach ($resolved as $imageId => $update) {
                 $update['is_primary'] = $imageId === $primaryId ? 1 : 0;
@@ -446,6 +469,7 @@ final class MediaWrite
      */
     private function resolvedPrimaryImageId(int $pageId, array $imageUpdates): ?int
     {
+        // Prefer explicit primary flag from submitted updates when present.
         foreach ($imageUpdates as $imageId => $update) {
             if (!empty($update['is_primary'])) {
                 return (int) $imageId;
@@ -462,6 +486,7 @@ final class MediaWrite
         $stmt->execute([':page' => $pageId]);
         $value = $stmt->fetchColumn();
 
+        // No images on page means there is no fallback primary image id.
         if ($value === false || $value === null) {
             return null;
         }

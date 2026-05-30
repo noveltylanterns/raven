@@ -40,6 +40,7 @@ final class ThemeGenerator
         bool $generateComposerFile = false,
         bool $generatePackageFile = false
     ): void {
+        // Create destination theme directory tree before writing scaffold files.
         if (!is_dir($themePath) && !mkdir($themePath, 0775, true) && !is_dir($themePath)) {
             throw new \RuntimeException('Failed to create theme directory.');
         }
@@ -131,12 +132,15 @@ final class ThemeGenerator
         $this->writeScaffoldFile($themePath . '/css/style.css', $css);
         $this->writeScaffoldFile($themePath . '/tpl/wrapper.php', $wrapper);
         $this->writeScaffoldFile($themePath . '/tpl/home.php', $home);
+        // Optional guidance files are generated only when caller requests them.
         if ($generateAgentsFile) {
             $this->writeAgentGuidanceBundle($themePath, $meta);
         }
+        // Optional composer scaffold is generated only when requested.
         if ($generateComposerFile) {
             $this->writeScaffoldFile($themePath . '/composer.json', $this->composerFileContent($meta));
         }
+        // Optional package scaffold is generated only when requested.
         if ($generatePackageFile) {
             $this->writeScaffoldFile($themePath . '/package.json', $this->packageFileContent($meta));
         }
@@ -179,12 +183,15 @@ final class ThemeGenerator
             ]
         );
 
+        // Optional guidance files are generated only when caller requests them.
         if ($generateAgentsFile) {
             $this->writeAgentGuidanceBundle($themePath, $meta);
         }
+        // Optional composer scaffold is generated only when requested.
         if ($generateComposerFile) {
             $this->writeScaffoldFile($themePath . '/composer.json', $this->composerFileContent($meta));
         }
+        // Optional package scaffold is generated only when requested.
         if ($generatePackageFile) {
             $this->writeScaffoldFile($themePath . '/package.json', $this->packageFileContent($meta));
         }
@@ -201,15 +208,18 @@ final class ThemeGenerator
      */
     public function copyDirectoryRecursively(string $sourceDirectory, string $targetDirectory): void
     {
+        // Source theme directory must exist before clone traversal begins.
         if (!is_dir($sourceDirectory)) {
             throw new \RuntimeException('Clone source directory not found: ' . $sourceDirectory);
         }
 
         $sourceRoot = realpath($sourceDirectory);
+        // Abort when source directory cannot be resolved to a concrete path.
         if ($sourceRoot === false || !is_dir($sourceRoot)) {
             throw new \RuntimeException('Failed to resolve clone source directory.');
         }
 
+        // Create clone target directory tree before writing copied files.
         if (!is_dir($targetDirectory) && !mkdir($targetDirectory, 0775, true) && !is_dir($targetDirectory)) {
             throw new \RuntimeException('Failed to create clone target directory.');
         }
@@ -219,19 +229,24 @@ final class ThemeGenerator
             \RecursiveIteratorIterator::SELF_FIRST
         );
 
+        // Copy each directory entry while preserving relative structure.
         foreach ($iterator as $item) {
             $sourcePath = $item->getPathname();
+            // Symlinked source entries are rejected for safety and portability.
             if ($item->isLink()) {
                 throw new \RuntimeException('Theme clone source contains symlinks, which are not supported.');
             }
 
             $relativePath = ltrim(substr($sourcePath, strlen($sourceRoot)), DIRECTORY_SEPARATOR);
+            // Empty relative path corresponds to source root sentinel entry.
             if ($relativePath === '') {
                 continue;
             }
 
             $targetPath = rtrim($targetDirectory, '/\\') . '/' . str_replace('\\', '/', $relativePath);
+            // Create target directories recursively before descending/copying.
             if ($item->isDir()) {
+                // Ensure directory exists even when source tree has nested levels.
                 if (!is_dir($targetPath) && !mkdir($targetPath, 0775, true) && !is_dir($targetPath)) {
                     throw new \RuntimeException('Failed to create clone directory: ' . $targetPath);
                 }
@@ -239,10 +254,12 @@ final class ThemeGenerator
             }
 
             $targetDir = dirname($targetPath);
+            // Ensure parent directory exists before copying file payloads.
             if (!is_dir($targetDir) && !mkdir($targetDir, 0775, true) && !is_dir($targetDir)) {
                 throw new \RuntimeException('Failed to create clone directory: ' . $targetDir);
             }
 
+            // Copy source file payload into destination path.
             if (!copy($sourcePath, $targetPath)) {
                 throw new \RuntimeException('Failed to copy clone file: ' . $relativePath);
             }
@@ -274,6 +291,7 @@ final class ThemeGenerator
         $content .= "## Scope\n";
         $content .= "- This file applies only to `public/theme/{$slug}/`.\n";
         $content .= "- Follow project-wide theme contracts in `public/theme/AGENTS.md`.\n";
+        // Child-theme scaffolds include parent-theme context in generated guidance.
         if ($isChildTheme && $parentTheme !== '') {
             $content .= "- This theme is a child theme of `{$parentTheme}`.\n";
         }
@@ -322,11 +340,13 @@ final class ThemeGenerator
         $slug = strtolower(trim((string) ($meta['slug'] ?? 'theme')));
         $slug = preg_replace('/[^a-z0-9_-]+/', '-', $slug) ?? 'theme';
         $slug = trim($slug, '-_');
+        // Slug fallback avoids empty package names after sanitization.
         if ($slug === '') {
             $slug = 'theme';
         }
 
         $name = trim((string) ($meta['name'] ?? 'Raven Theme'));
+        // Name fallback avoids empty package descriptions.
         if ($name === '') {
             $name = 'Raven Theme';
         }
@@ -343,6 +363,7 @@ final class ThemeGenerator
         ];
 
         $encoded = json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT);
+        // JSON encoding failure should hard-stop scaffold generation.
         if (!is_string($encoded)) {
             throw new \RuntimeException('Failed to generate theme composer.json content.');
         }
@@ -364,11 +385,13 @@ final class ThemeGenerator
         $slug = strtolower(trim((string) ($meta['slug'] ?? 'theme')));
         $slug = preg_replace('/[^a-z0-9_-]+/', '-', $slug) ?? 'theme';
         $slug = trim($slug, '-_');
+        // Slug fallback avoids empty package names after sanitization.
         if ($slug === '') {
             $slug = 'theme';
         }
 
         $name = trim((string) ($meta['name'] ?? 'Raven Theme'));
+        // Name fallback avoids empty package descriptions.
         if ($name === '') {
             $name = 'Raven Theme';
         }
@@ -384,6 +407,7 @@ final class ThemeGenerator
         ];
 
         $encoded = json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT);
+        // JSON encoding failure should hard-stop scaffold generation.
         if (!is_string($encoded)) {
             throw new \RuntimeException('Failed to generate theme package.json content.');
         }
@@ -407,6 +431,7 @@ final class ThemeGenerator
         ];
 
         $encoded = json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT);
+        // JSON encoding failure should hard-stop manifest generation.
         if (!is_string($encoded)) {
             throw new \RuntimeException('Failed to build theme manifest JSON.');
         }
@@ -426,11 +451,13 @@ final class ThemeGenerator
     private function writeScaffoldFile(string $targetPath, string $content): void
     {
         $directory = dirname($targetPath);
+        // Create parent directories before writing scaffold-owned files.
         if (!is_dir($directory) && !mkdir($directory, 0775, true) && !is_dir($directory)) {
             throw new \RuntimeException('Failed to create directory: ' . $directory);
         }
 
         $written = file_put_contents($targetPath, $content, LOCK_EX);
+        // File write failures are fatal to preserve scaffold consistency.
         if ($written === false) {
             throw new \RuntimeException('Failed to write file: ' . $targetPath);
         }
@@ -447,10 +474,12 @@ final class ThemeGenerator
      */
     private function writeRelativeSymlink(string $linkPath, string $target): void
     {
+        // Remove stale file/link at target path before writing replacement symlink.
         if (is_link($linkPath) || is_file($linkPath)) {
             @unlink($linkPath);
         }
 
+        // Symlink creation failures are fatal to keep guidance links consistent.
         if (!@symlink($target, $linkPath)) {
             throw new \RuntimeException('Failed to write symlink: ' . $linkPath);
         }

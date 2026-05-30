@@ -3,7 +3,7 @@
 /**
  * RAVEN CMS
  * ~/private/tpl/panel/extensions.php
- * Admin panel extensions manager for scaffolding, upload, and lifecycle controls.
+ * Admin panel extensions manager template for scaffolding, upload, and lifecycle controls.
  * Docs: https://lanterns.io/raven
  */
 

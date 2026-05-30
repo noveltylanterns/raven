@@ -31,12 +31,6 @@ It sounds dystopian, but the AI is much like a German Shephard dog. It was bred 
 7) PROFIT!!!
 
 
-## Updating Raven
-
-That's the neat thing: You don't!
-
-No but seriously, the Agent has been very uncooperative about this one. I'm not gonna get hung up on it yet since this is still a prototype. Once the core architecture is nailed down, I'm just gonna manually build an updater later.
-
 ## Building on Raven
 
 There are several places in your local install that are going to be ignored by the future update process: Your **Theme** and **Extension** folders. They are designed to safely accomodate your modifications and preserve them through system updates. If you need further architectural info, I had Codex [document](docs/readme.md) its work.

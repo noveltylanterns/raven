@@ -56,6 +56,7 @@ final class FeedPolicy
      */
     public function rssRoute(): string
     {
+        // Disabled feeds should not expose any route prefix.
         if (!$this->feedEnabled()) {
             return '';
         }
@@ -70,6 +71,7 @@ final class FeedPolicy
      */
     public function atomRoute(): string
     {
+        // Disabled feeds should not expose any route prefix.
         if (!$this->feedEnabled()) {
             return '';
         }

@@ -33,22 +33,27 @@ final class Theme
     {
         $normalized = strtolower(trim($theme));
 
+        // Blank values resolve to caller-selected default sentinel behavior.
         if ($normalized === '') {
             return $allowDefault ? 'default' : 'corp';
         }
 
+        // Preserve explicit default sentinel when the caller accepts it.
         if ($allowDefault && $normalized === 'default') {
             return 'default';
         }
 
+        // Legacy "light" preference maps to the canonical modern slug.
         if ($normalized === 'light') {
             return 'ice';
         }
 
+        // Legacy "dark" preference maps to the canonical modern slug.
         if ($normalized === 'dark') {
             return 'midnight';
         }
 
+        // Accept only canonical built-in Raven panel theme slugs.
         if (in_array($normalized, ['corp', 'ice', 'midnight'], true)) {
             return $normalized;
         }
@@ -77,15 +82,18 @@ final class Theme
      */
     public function effectiveFromPreferences(?array $preferences, string $defaultTheme): string
     {
+        // Missing or malformed preference rows always fall back to site default.
         if (!is_array($preferences)) {
             return $defaultTheme;
         }
 
         $candidate = $this->normalizeChoice((string) ($preferences['theme'] ?? 'default'), true);
+        // Invalid stored values are treated as default-theme fallback.
         if (!is_string($candidate)) {
             return $defaultTheme;
         }
 
+        // Explicit default sentinel resolves to the runtime site-default theme.
         if ($candidate === 'default') {
             return $defaultTheme;
         }

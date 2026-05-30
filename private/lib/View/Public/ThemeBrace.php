@@ -50,6 +50,7 @@ final class ThemeBrace
         $__rvn_brace = $this;
         extract($data, EXTR_SKIP);
 
+        // Define render-context sentinel once so templates can detect view runtime safely.
         if (!defined('RAVEN_VIEW_RENDER_CONTEXT')) {
             define('RAVEN_VIEW_RENDER_CONTEXT', true);
         }
@@ -71,15 +72,18 @@ final class ThemeBrace
     public function value(string $path, array $scope, bool $raw = false): string
     {
         $value = $this->resolve($path, $scope);
+        // Unknown paths render as empty strings for template safety.
         if ($value === null) {
             return '';
         }
 
+        // Boolean values render as Raven-style "1"/"" flags.
         if (is_bool($value)) {
             $rendered = $value ? '1' : '';
             return $raw ? $rendered : e($rendered);
         }
 
+        // Scalar values are string-cast and escaped unless raw output is requested.
         if (is_scalar($value)) {
             $rendered = (string) $value;
             return $raw ? $rendered : e($rendered);
@@ -98,23 +102,28 @@ final class ThemeBrace
     public function truthy(string $path, array $scope): bool
     {
         $value = $this->resolve($path, $scope);
+        // Unknown paths are always falsy in template conditionals.
         if ($value === null) {
             return false;
         }
 
+        // Native booleans map directly to truthiness.
         if (is_bool($value)) {
             return $value;
         }
 
+        // Numeric values are truthy when non-zero.
         if (is_int($value) || is_float($value)) {
             return $value != 0;
         }
 
+        // Strings are truthy unless empty or literal zero.
         if (is_string($value)) {
             $normalized = trim($value);
             return $normalized !== '' && $normalized !== '0';
         }
 
+        // Arrays are truthy when non-empty.
         if (is_array($value)) {
             return $value !== [];
         }
@@ -193,6 +202,7 @@ final class ThemeBrace
      */
     private function compiledTemplateFile(string $sourceFile): string
     {
+        // Source template must exist and be readable before compile/caching.
         if (!is_file($sourceFile) || !is_readable($sourceFile)) {
             throw new RuntimeException('Template source file is unreadable: ' . $sourceFile);
         }
@@ -202,21 +212,25 @@ final class ThemeBrace
         $cacheKey = sha1($sourceFile . '|' . (string) ($mtime === false ? 0 : (int) $mtime));
         $compiledFile = $this->cacheDirectory . '/theme-brace-' . $cacheKey . '.php';
 
+        // Reuse cached compile output when present and readable.
         if (is_file($compiledFile) && is_readable($compiledFile)) {
             return $compiledFile;
         }
 
         $source = file_get_contents($sourceFile);
+        // Abort when source read fails to avoid caching incomplete output.
         if (!is_string($source)) {
             throw new RuntimeException('Failed to read template source file: ' . $sourceFile);
         }
 
         $compiledSource = $this->compileTemplate($source);
         $tmpFile = $compiledFile . '.tmp.' . uniqid('', true);
+        // Write compiled source to temp file first for atomic publish semantics.
         if (file_put_contents($tmpFile, $compiledSource, LOCK_EX) === false) {
             throw new RuntimeException('Failed to write compiled template file: ' . $compiledFile);
         }
 
+        // Atomic rename publishes completed file or fails cleanly.
         if (!@rename($tmpFile, $compiledFile)) {
             @unlink($tmpFile);
             throw new RuntimeException('Failed to publish compiled template file: ' . $compiledFile);
@@ -235,10 +249,12 @@ final class ThemeBrace
      */
     private function ensureCacheDirectory(): void
     {
+        // Existing cache directory requires no additional setup.
         if (is_dir($this->cacheDirectory)) {
             return;
         }
 
+        // Create cache directory recursively when missing.
         if (!@mkdir($this->cacheDirectory, 0700, true) && !is_dir($this->cacheDirectory)) {
             throw new RuntimeException('Failed to create theme-brace cache directory: ' . $this->cacheDirectory);
         }
@@ -255,8 +271,11 @@ final class ThemeBrace
         $tokens = token_get_all($source);
         $compiled = '';
 
+        // Rebuild source while compiling brace tags only inside inline HTML tokens.
         foreach ($tokens as $token) {
+            // Array tokens expose type/value pairs from token_get_all().
             if (is_array($token)) {
+                // Inline HTML segments are where brace-tag grammar is compiled.
                 if ($token[0] === T_INLINE_HTML) {
                     $compiled .= $this->compileInlineHtml($token[1]);
                     continue;
@@ -280,6 +299,7 @@ final class ThemeBrace
      */
     private function compileInlineHtml(string $html): string
     {
+        // Skip compilation when chunk has no brace tags.
         if ($html === '' || !str_contains($html, '{')) {
             return $html;
         }
@@ -309,6 +329,7 @@ final class ThemeBrace
                 $path = (string) ($matches[1] ?? '');
                 $op = (string) ($matches[2] ?? '');
                 $rhs = (string) ($matches[3] ?? '');
+                // Branch to compare helper only when template included an operator.
                 if ($op !== '') {
                     return '<?php elseif ($__rvn_brace->compare('
                         . var_export($path, true) . ', '
@@ -339,6 +360,7 @@ final class ThemeBrace
                 $path = (string) ($matches[1] ?? '');
                 $op = (string) ($matches[2] ?? '');
                 $rhs = (string) ($matches[3] ?? '');
+                // Branch to compare helper only when template included an operator.
                 if ($op !== '') {
                     return '<?php if ($__rvn_brace->compare('
                         . var_export($path, true) . ', '
@@ -389,6 +411,7 @@ final class ThemeBrace
             $compiled
         ) ?? $compiled;
 
+        // Restore deferred raw tags after escaped value replacement pass.
         if ($rawTagPlaceholders !== []) {
             $compiled = strtr($compiled, $rawTagPlaceholders);
         }
@@ -406,27 +429,33 @@ final class ThemeBrace
     private function resolve(string $path, array $scope): mixed
     {
         $segments = array_values(array_filter(explode(':', trim($path)), static fn (string $value): bool => $value !== ''));
+        // Empty/invalid path segments cannot resolve to runtime values.
         if ($segments === []) {
             return null;
         }
 
         $first = array_shift($segments);
+        // First segment must be a non-empty string key.
         if (!is_string($first) || $first === '') {
             return null;
         }
 
         $found = false;
         $value = $this->lookupFirstSegment($first, $scope, $found);
+        // Unknown first segment stops resolution early.
         if (!$found) {
             return null;
         }
 
+        // Resolve remaining nested segments against previous lookup result.
         foreach ($segments as $segment) {
+            // Empty nested segment is invalid.
             if ($segment === '') {
                 return null;
             }
 
             $value = $this->lookupNestedSegment($value, $segment, $found);
+            // Stop when any nested segment lookup fails.
             if (!$found) {
                 return null;
             }
@@ -445,19 +474,24 @@ final class ThemeBrace
      */
     private function lookupFirstSegment(string $segment, array $scope, bool &$found): mixed
     {
+        // Walk scope from innermost to outermost so local loop scopes win.
         for ($index = count($scope) - 1; $index >= 0; $index--) {
             $layer = $scope[$index] ?? null;
+            // Non-array layers are ignored defensively.
             if (!is_array($layer)) {
                 continue;
             }
 
+            // Prefer exact string-key matches before numeric fallback logic.
             if (array_key_exists($segment, $layer)) {
                 $found = true;
                 return $layer[$segment];
             }
 
+            // Numeric-string segment also checks integer key variant.
             if (ctype_digit($segment)) {
                 $intKey = (int) $segment;
+                // Numeric-key fallback supports array payloads keyed by integer indexes.
                 if (array_key_exists($intKey, $layer)) {
                     $found = true;
                     return $layer[$intKey];
@@ -479,14 +513,18 @@ final class ThemeBrace
      */
     private function lookupNestedSegment(mixed $value, string $segment, bool &$found): mixed
     {
+        // Array values support both string and numeric-key nested lookups.
         if (is_array($value)) {
+            // Prefer exact string-key matches before numeric fallback logic.
             if (array_key_exists($segment, $value)) {
                 $found = true;
                 return $value[$segment];
             }
 
+            // Numeric-string segment also checks integer key variant.
             if (ctype_digit($segment)) {
                 $intKey = (int) $segment;
+                // Numeric-key fallback supports nested arrays keyed by integer indexes.
                 if (array_key_exists($intKey, $value)) {
                     $found = true;
                     return $value[$intKey];
@@ -497,8 +535,10 @@ final class ThemeBrace
             return null;
         }
 
+        // Object values are resolved through visible properties snapshot.
         if (is_object($value)) {
             $properties = get_object_vars($value);
+            // Expose public properties by name for brace-path traversal.
             if (array_key_exists($segment, $properties)) {
                 $found = true;
                 return $properties[$segment];

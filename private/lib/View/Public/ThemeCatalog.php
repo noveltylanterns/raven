@@ -55,6 +55,7 @@ final class ThemeCatalog
     public function options(): array
     {
         $options = ThemeDiscovery::options($this->themesRoot);
+        // Provide stock fallback option when no installable manifests were discovered.
         if ($options === []) {
             return ['raven' => 'Raven Basic'];
         }
@@ -73,10 +74,12 @@ final class ThemeCatalog
         $configured = strtolower($this->input->text((string) $config->get('site.theme', 'raven'), 80));
         $options = $this->options();
 
+        // Use configured slug when it exists in discovered options.
         if (isset($options[$configured])) {
             return $configured;
         }
 
+        // Fall back to canonical raven theme when available.
         if (isset($options['raven'])) {
             return 'raven';
         }
@@ -94,6 +97,7 @@ final class ThemeCatalog
     public function inheritanceChain(string $themeSlug): array
     {
         $chain = ThemeDiscovery::inheritanceChain($this->themesRoot, $themeSlug);
+        // Unknown themes still return at least the requested slug for deterministic callers.
         if ($chain === []) {
             return [$themeSlug];
         }
@@ -109,8 +113,10 @@ final class ThemeCatalog
      */
     public function cssSlug(string $themeSlug): string
     {
+        // First theme in chain with css/style.css owns active stylesheet URL slug.
         foreach ($this->inheritanceChain($themeSlug) as $candidateThemeSlug) {
             $cssPath = $this->themesRoot . '/' . $candidateThemeSlug . '/css/style.css';
+            // Return immediately when candidate provides a concrete stylesheet.
             if (is_file($cssPath)) {
                 return $candidateThemeSlug;
             }
@@ -138,6 +144,7 @@ final class ThemeCatalog
         $manifests = ThemeDiscovery::manifests($this->themesRoot);
         $rows = [];
 
+        // Build panel inventory rows from each discovered manifest entry.
         foreach ($manifests as $slug => $manifest) {
             $chain = $this->inheritanceChain((string) $slug);
             $rows[] = [
@@ -200,6 +207,7 @@ final class ThemeCatalog
         $base = preg_replace('/[^a-z0-9_-]+/', '-', $base) ?? '';
         $base = trim($base, '-_');
 
+        // Reject empty/unsafe derived slugs before filesystem checks.
         if ($base === '' || !$this->isSafeSlug($base)) {
             return null;
         }
@@ -217,11 +225,13 @@ final class ThemeCatalog
     public function nextAvailableSlug(string $baseSlug, int $maxAttempts = 250): ?string
     {
         $normalizedBase = strtolower(trim($baseSlug));
+        // Base slug must satisfy slug policy before copy suffixing.
         if (!$this->isSafeSlug($normalizedBase)) {
             return null;
         }
 
         $candidate = $normalizedBase;
+        // Reuse base slug when target directory does not already exist.
         if (!file_exists($this->themesRoot . '/' . $candidate)) {
             return $candidate;
         }
@@ -231,15 +241,18 @@ final class ThemeCatalog
             $maxBaseLength = max(1, 64 - strlen($suffix));
             $trimmedBase = substr($normalizedBase, 0, $maxBaseLength);
             $trimmedBase = rtrim($trimmedBase, '-_');
+            // Ensure suffixing still yields a non-empty basename.
             if ($trimmedBase === '') {
                 $trimmedBase = 'theme';
             }
 
             $candidate = $trimmedBase . $suffix;
+            // Skip candidates that violate slug policy after suffix append.
             if (!$this->isSafeSlug($candidate)) {
                 continue;
             }
 
+            // Return first safe candidate whose directory path is unused.
             if (!file_exists($this->themesRoot . '/' . $candidate)) {
                 return $candidate;
             }

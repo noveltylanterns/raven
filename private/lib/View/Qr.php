@@ -14,6 +14,7 @@ namespace Raven\Lib\View;
 // Load bacon/bacon-qr-code package handler on first use.
 (static function (): void {
     $handler = dirname(__DIR__) . '/Composer/bacon/bacon-qr-code.php';
+    // Require package bootstrap only when package handler file exists.
     if (is_file($handler)) {
         require_once $handler;
     }
@@ -33,6 +34,7 @@ final class Qr
      */
     public static function dataUriSvgBase64(string $payload, int $size = 220): string
     {
+        // Return empty string when required BaconQrCode classes are unavailable.
         if (
             !class_exists(\BaconQrCode\Writer::class)
             || !class_exists(\BaconQrCode\Renderer\ImageRenderer::class)
@@ -42,6 +44,7 @@ final class Qr
             return '';
         }
 
+        // Render and encode SVG in one guarded block so runtime errors downgrade cleanly.
         try {
             $renderer = new \BaconQrCode\Renderer\ImageRenderer(
                 new \BaconQrCode\Renderer\RendererStyle\RendererStyle(max(80, $size)),
@@ -50,6 +53,7 @@ final class Qr
             $writer = new \BaconQrCode\Writer($renderer);
             $svg = $writer->writeString($payload);
             return 'data:image/svg+xml;base64,' . base64_encode($svg);
+        // Any rendering failure yields empty output for caller-side fallback handling.
         } catch (\Throwable) {
             return '';
         }

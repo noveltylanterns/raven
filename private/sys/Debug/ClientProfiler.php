@@ -25,6 +25,7 @@ final class ClientProfiler
     public function normalizeClientIp(string $rawIp): ?string
     {
         $rawIp = trim($rawIp);
+        // Empty server/header values are treated as unknown instead of as loopback placeholders.
         if ($rawIp === '') {
             return null;
         }
@@ -35,6 +36,7 @@ final class ClientProfiler
             $rawIp = trim((string) ($parts[0] ?? ''));
         }
 
+        // Reject malformed or non-IP values before any downstream hostname lookup.
         if ($rawIp === '' || filter_var($rawIp, FILTER_VALIDATE_IP) === false) {
             return null;
         }
@@ -50,22 +52,26 @@ final class ClientProfiler
      */
     public function resolveClientHostname(?string $ipAddress): ?string
     {
+        // Skip reverse lookup when no normalized address is available.
         if ($ipAddress === null || $ipAddress === '') {
             return null;
         }
 
         $rawHostname = @gethostbyaddr($ipAddress);
+        // Failed reverse DNS lookups return non-string sentinel values.
         if (!is_string($rawHostname)) {
             return null;
         }
 
         $hostname = strtolower(trim($rawHostname));
+        // Ignore non-hostname outputs (empty, raw IP echo, or another literal address).
         if ($hostname === '' || $hostname === $ipAddress || filter_var($hostname, FILTER_VALIDATE_IP) !== false) {
             return null;
         }
 
         // Remove optional trailing dot from fully-qualified DNS names.
         $hostname = rtrim($hostname, '.');
+        // Drop invalid label patterns to avoid injecting malformed DNS names into diagnostics.
         if ($hostname === '' || str_contains($hostname, '..') || preg_match('/[^a-z0-9.-]/', $hostname) === 1) {
             return null;
         }
@@ -94,4 +100,3 @@ final class ClientProfiler
         ];
     }
 }
-

@@ -36,6 +36,7 @@ final class EditorMCE
     {
         $items = [];
 
+        // Convert hydrated gallery rows into compact TinyMCE picker item payloads.
         foreach ($galleryImages as $galleryImage) {
             // Only include images that have finished processing.
             if ((string) ($galleryImage['status'] ?? '') !== 'ready') {

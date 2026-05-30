@@ -69,6 +69,7 @@ class InviteRead
 
         $rows = $stmt->fetchAll() ?: [];
         $result = [];
+        // Hydrate each invite row into the normalized panel-list payload shape.
         foreach ($rows as $row) {
             $result[] = $this->hydrateListRow($row);
         }
@@ -89,6 +90,7 @@ class InviteRead
     public function findUsableByToken(string $submittedToken, int $now): ?array
     {
         $normalizedToken = $this->normalizeSubmittedToken($submittedToken);
+        // Invalid submitted tokens are rejected before any DB lookup.
         if ($normalizedToken === null) {
             return null;
         }
@@ -104,6 +106,7 @@ class InviteRead
         ]);
 
         $row = $stmt->fetch();
+        // Missing lookup row means token is unknown.
         if ($row === false) {
             return null;
         }
@@ -131,11 +134,13 @@ class InviteRead
     public function normalizeSubmittedToken(string $rawToken): ?string
     {
         $normalized = strtoupper(trim($rawToken));
+        // Empty tokens are invalid.
         if ($normalized === '') {
             return null;
         }
 
         $normalized = preg_replace('/[^A-Z0-9]+/', '', $normalized) ?? '';
+        // Enforce canonical length bounds after separator stripping.
         if ($normalized === '' || strlen($normalized) < 8 || strlen($normalized) > 64) {
             return null;
         }
@@ -243,14 +248,17 @@ class InviteRead
         $uses = max(0, (int) ($row['uses'] ?? 0));
         $expires = $this->normalizePositiveInt($this->nullableInt($row['expires'] ?? null));
 
+        // Missing/invalid id rows are never usable.
         if ($id < 1) {
             return null;
         }
 
+        // Expired tokens are not usable.
         if ($expires !== null && $expires <= $now) {
             return null;
         }
 
+        // Single-use tokens become unusable after first consumption.
         if ($reusable !== 1 && $uses > 0) {
             return null;
         }
@@ -271,6 +279,7 @@ class InviteRead
      */
     private function nullableInt(mixed $value): ?int
     {
+        // Null/empty DB scalars represent missing optional integer values.
         if ($value === null || $value === '') {
             return null;
         }
@@ -286,6 +295,7 @@ class InviteRead
      */
     private function normalizePositiveInt(?int $value): ?int
     {
+        // Missing or non-positive values are normalized to null for optional fields.
         if ($value === null || $value <= 0) {
             return null;
         }

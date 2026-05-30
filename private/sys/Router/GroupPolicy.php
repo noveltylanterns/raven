@@ -86,6 +86,7 @@ final class GroupPolicy
     private function normalizeMode(string $value, array $allowed, string $fallback, array $aliases = []): string
     {
         $mode = strtolower(trim($value));
+        // Apply legacy aliases before validating against the canonical allowed list.
         if (isset($aliases[$mode])) {
             $mode = $aliases[$mode];
         }

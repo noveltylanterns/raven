@@ -52,6 +52,7 @@ final class Footer
     public static function pushStyle(string $css): void
     {
         $css = trim($css);
+        // Ignore empty blocks so rendered footer output stays minimal.
         if ($css === '') {
             return;
         }
@@ -68,6 +69,7 @@ final class Footer
     public static function pushScript(string $javascript): void
     {
         $javascript = trim($javascript);
+        // Ignore empty blocks so rendered footer output stays minimal.
         if ($javascript === '') {
             return;
         }
@@ -87,6 +89,7 @@ final class Footer
     public static function pushHtml(string $html): void
     {
         $html = trim($html);
+        // Ignore empty fragments to avoid emitting blank lines in deferred output.
         if ($html === '') {
             return;
         }
@@ -113,7 +116,10 @@ final class Footer
         <a href="https://raven.lanterns.io" target="_blank" rel="noopener noreferrer">Documentation</a>
     </p>
 </footer>
-<?php foreach ($styleBlocks as $styleBlock): ?>
+<?php
+/* Emit all queued inline style blocks directly after the visible footer. */
+foreach ($styleBlocks as $styleBlock):
+?>
 <style>
 <?= $styleBlock ?>
 </style>
@@ -135,17 +141,20 @@ final class Footer
         self::$htmlBlocks = [];
         self::$scriptBlocks = [];
 
+        // Return early when no deferred assets were collected for this request.
         if ($htmlBlocks === [] && $scriptBlocks === []) {
             return '';
         }
 
         ob_start();
+        // Render trusted HTML fragments first to preserve callsite order.
         foreach ($htmlBlocks as $htmlBlock) {
             ?>
 <?= $htmlBlock ?>
 <?php
         }
 
+        // Render deferred scripts after HTML fragments for predictable execution order.
         foreach ($scriptBlocks as $scriptBlock) {
             ?>
 <script>

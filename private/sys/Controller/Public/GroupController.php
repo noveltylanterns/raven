@@ -60,18 +60,21 @@ final class GroupController
             return;
         }
 
+        // Private group mode requires authenticated viewer.
         if ($groupMode === 'private' && !$isLoggedIn) {
             $this->renderGroupUnavailable('permission_denied', 'private');
             return;
         }
 
         $normalizedSlug = $this->context->input()->slug($groupSlug);
+        // Invalid group slug normalization yields not-found.
         if ($normalizedSlug === null) {
             $this->context->notFound();
             return;
         }
 
         $groupRouteData = $this->groupRead->findRoutedBySlugWithMembers($normalizedSlug);
+        // Missing routed group record yields not-found.
         if ($groupRouteData === null) {
             $this->context->notFound();
             return;

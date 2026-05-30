@@ -1,7 +1,5 @@
 # Raven CMS Users
 
-***Note: This document was generated with ChatGPT Codex. I have not been able to personally verify every detail within matches the actual script. I do not plan on hammering these `docs/` files down until later releases, so use them with caution!***
-
 This document explains Raven's User system for both panel users and developers/agents.
 
 Maintenance note: keep this file updated whenever user structure, user routes, or User panel views change (`private/tpl/panel/user/*`, user controller/repository behavior, or user-group assignment rules).
@@ -106,31 +104,31 @@ Group assignment notes:
   - `private/tpl/panel/auth/login.php`
   - `private/tpl/panel/auth/login_2fa.php`
 - Public auth views:
-  - `private/tpl/auth/login.php`
-  - `private/tpl/auth/login_2fa.php`
-  - `private/tpl/auth/register.php`
+  - `private/tpl/public/auth/login.php`
+  - `private/tpl/public/auth/login_2fa.php`
+  - `private/tpl/public/auth/register.php`
 - Panel controller:
-  - `private/sys/Controller/Panel/UserController.php`
+  - `private/sys/Controller/Panel/UserListController.php, private/sys/Controller/Panel/UserEditController.php, private/sys/Controller/Panel/UserInviteController.php`
 - Public auth controller:
   - `private/sys/Controller/Public/AuthController.php`
 - Public profile controller:
-  - `private/sys/Controller/Public/UserController.php`
+  - `private/sys/Controller/Public/ProfileController.php`
 - Public group controller:
   - `private/sys/Controller/Public/GroupController.php`
 - Public content controller:
   - `private/sys/Controller/Public/PageController.php`
 - Shared login workflow:
   - `private/lib/Auth/LoginAttempt.php`
-  - `private/lib/Auth/LoginChallengeWorkflowService.php`
-  - `private/lib/Auth/LoginUiStateService.php`
+  - `private/lib/Auth/LoginChallenge.php`
+  - `private/lib/Auth/LoginUiState.php`
 - Persistence:
-  - `private/sys/Repository/UserRepository.php`
-  - `private/sys/Repository/InviteRepository.php`
-  - `private/sys/Repository/GroupRepository.php` (group option lookups and role constraints)
+  - `private/sys/Repository/UserRead.php, private/sys/Repository/UserWrite.php`
+  - `private/sys/Repository/InviteRead.php, private/sys/Repository/InviteWrite.php`
+  - `private/sys/Repository/GroupRead.php, private/sys/Repository/GroupWrite.php` (group option lookups and role constraints)
 
 ### Panel Routes
 
-Declared in `panel/index.php`:
+Declared in `private/sys/Router/Panel/UserRouter.php`:
 
 - `GET /user` -> list
 - `GET /user/edit` -> create form
@@ -144,7 +142,7 @@ Declared in `panel/index.php`:
 
 All state-changing routes use CSRF validation.
 
-Public routes (declared in `public/index.php`):
+Public routes (declared in `private/sys/Router/Public/AuthRouter.php`):
 
 - `GET /login` -> public login helper view
 - `POST /login` -> public login submit handler
@@ -158,16 +156,19 @@ Public routes (declared in `public/index.php`):
 
 ### Controller Flow
 
-`UserController` user handlers:
+Split user handlers:
 
 - `userList()`
+  - Owned by `UserListController`.
   - Requires login + `Manage Users` permission.
-  - Renders list with `UserRepository::listAll()`.
+  - Renders list with `UserRead::listAll()`.
 - `userEdit(?int $id)`
+  - Owned by `UserEditController`.
   - Loads existing row when id is provided.
   - Provides group options and theme options.
   - Includes capability flags for admin-group and configuration-capable-group assignment.
 - `userSave(array $post, array $files)`
+  - Owned by `UserEditController`.
   - Validates CSRF.
   - Sanitizes/normalizes user fields via `InputSanitizer`.
   - Validates username/email/theme.
@@ -180,20 +181,23 @@ Public routes (declared in `public/index.php`):
   - Generates companion avatar thumbnails as `public/uploads/user/avatar/{user_string}_thumb.jpg`.
   - If avatar exceeds `120x120`, thumb is center-cropped/resized to `120x120` JPEG.
   - If avatar is `<=120x120`, thumb file is a direct copy of the sanitized original.
-  - Saves through `UserRepository::save(...)`.
+  - Saves through `UserWrite::save(...)`.
   - Removes superseded avatar file when avatar changes/removal succeeds.
 - `userDelete(array $post)`
+  - Owned by `UserEditController`.
   - Validates CSRF.
   - Blocks self-delete in both single and bulk flows.
   - Supports bulk delete with deleted/failed/skipped counters.
 - `userInvites()`
+  - Owned by `UserListController`.
   - Requires login + `Manage Users`.
   - Renders invite token admin/list view.
 - `userInvitesCreate(array $post)` / `userInvitesGenerate(array $post)` / `userInvitesDelete(array $post)`
-  - Validate CSRF and mutate invite-token rows through `InviteRepository`.
+  - Owned by `UserInviteController`.
+  - Validate CSRF and mutate invite-token rows through `InviteWrite`.
 - `Public\AuthController::login()` / `loginSubmit(array $post)` / `loginTwoFactor()` / `loginTwoFactorSubmit(array $post)` / `loginTwoFactorSelect(array $post)`
   - Render and process the public login + login-time 2FA screens.
-  - Persist a sanitized post-login redirect target in `LoginUiStateService`.
+  - Persist a sanitized post-login redirect target in `LoginUiState`.
   - Reuse shared login-attempt throttling and challenge workflow services.
 - `Public\AuthController::loginTwoFactorWebauthnOptions(array $post)` / `loginTwoFactorWebauthnVerify(array $post)`
   - Provide JSON WebAuthn assertion options and verification for public login-time 2FA.
@@ -204,8 +208,8 @@ Public routes (declared in `public/index.php`):
   - Reuses the shared brute-force policy window/lock settings to temporarily lock repeated failed registration attempts per client IP.
   - Requires invite token when mode is `invite`.
   - Keeps duplicate-account and persistence failures user-generic instead of reflecting raw repository exception text.
-  - Creates user via `UserRepository::save(...)` and consumes invite token atomically where possible.
-- `Public\UserController::profile(string $username)`
+  - Creates user via `UserWrite::save(...)` and consumes invite token atomically where possible.
+- `Public\ProfileController::profile(string $username)`
   - public profile routes use the selector configured by `user.selector`
   - selector mode `id` uses numeric user ids
   - selector mode `username` uses usernames and is only valid when username login mode is enabled
@@ -216,11 +220,11 @@ Public routes (declared in `public/index.php`):
 
 ### Data Model And Repository Behavior
 
-`UserRepository` behavior:
+`UserRead` + `UserWrite` behavior:
 
-- `listAll()` loads users and joins group names into `groups_text` summaries.
-- `findById()` returns user + assigned `group_ids`.
-- `save(...)` handles create/update in one method:
+- `UserRead::listAll()` loads users and joins group names into `groups_text` summaries.
+- `UserRead::findById()` returns user + assigned `group_ids`.
+- `UserWrite::save(...)` handles create/update in one method:
   - enforces unique username/email
   - generates and persists a unique random alphanumeric `string` for each user when missing
   - honors config key `user.string` as the target generated string length
@@ -230,8 +234,8 @@ Public routes (declared in `public/index.php`):
   - updates avatar filename when `set_avatar` is true
   - writes Delight-compatible auth fields on create
   - replaces group memberships via `setUserGroups(...)`
-- `setUserGroups(...)` is replace-all transactional membership sync.
-- `deleteById(...)` removes user-group memberships and then deletes auth row.
+- `UserWrite::setUserGroups(...)` is replace-all transactional membership sync.
+- `UserWrite::deleteById(...)` removes user-group memberships and then deletes auth row.
 
 Storage detail:
 

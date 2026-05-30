@@ -47,6 +47,7 @@ class SetRead
      */
     public function listAll(): array
     {
+        // Reuse the in-process snapshot until a write invalidates it.
         if (is_array($this->cache)) {
             return $this->cache;
         }
@@ -54,14 +55,17 @@ class SetRead
         SetWrite::ensureRootRecord($this->setDirectory, $this->taxonomyType, $this->rootRecord());
 
         $rows = [];
+        // Load and validate each set file before canonicalizing it into one record row.
         foreach ($this->setParser->listSetFilePaths() as $path) {
             $loaded = $this->setParser->loadRecordFromPath($path);
+            // Skip unreadable or malformed files instead of poisoning list output.
             if (!is_array($loaded)) {
                 continue;
             }
 
             $setId = (int) ($loaded['id'] ?? -1);
             $raw = is_array($loaded['raw'] ?? null) ? $loaded['raw'] : [];
+            // Ignore files that do not map to valid ids or have empty payload data.
             if ($setId < SetParser::DEFAULT_SET_ID || $raw === []) {
                 continue;
             }
@@ -72,11 +76,13 @@ class SetRead
         usort($rows, static function (array $left, array $right): int {
             $leftId = (int) ($left['id'] ?? 0);
             $rightId = (int) ($right['id'] ?? 0);
+            // Keep the stock/default set pinned at the top of selector lists.
             if ($leftId === SetParser::DEFAULT_SET_ID || $rightId === SetParser::DEFAULT_SET_ID) {
                 return $leftId <=> $rightId;
             }
 
             $nameCompare = strcasecmp((string) ($left['name'] ?? ''), (string) ($right['name'] ?? ''));
+            // Name order is primary after default-set pinning.
             if ($nameCompare !== 0) {
                 return $nameCompare;
             }
@@ -96,6 +102,7 @@ class SetRead
     public function listOptions(): array
     {
         $result = [];
+        // Project full records down to minimal option payloads for select controls.
         foreach ($this->listAll() as $row) {
             $result[] = [
                 'id' => (int) ($row['id'] ?? 0),
@@ -116,7 +123,9 @@ class SetRead
      */
     public function findById(int $id): ?array
     {
+        // Linear scan is acceptable because taxonomy set counts remain small.
         foreach ($this->listAll() as $row) {
+            // Compare ids after normalization to protect against mixed scalar sources.
             if ((int) ($row['id'] ?? -1) === $id) {
                 return $row;
             }
@@ -162,22 +171,27 @@ class SetRead
         $description = trim((string) ($raw['description'] ?? ''));
         $createdAt = trim((string) ($raw['created_at'] ?? ''));
 
+        // Default set values are fixed so they stay stable across filesystem rewrites.
         if ($id === SetParser::DEFAULT_SET_ID) {
             $name = SetParser::defaultSetName($this->taxonomyType);
             $slug = SetParser::DEFAULT_SET_SLUG;
             $description = SetParser::defaultSetDescription($this->taxonomyType);
         } else {
+            // Fill missing names from slug/id so every non-default set has a readable label.
             if ($name === '') {
                 $name = ucwords(str_replace('-', ' ', $slug !== '' ? $slug : ('set-' . $id)));
             }
+            // Slug defaults to normalized name when omitted in stored data.
             if ($slug === '') {
                 $slug = SetParser::normalizeSlug($name);
             }
+            // Last-resort slug ensures a writable canonical filename for the record.
             if ($slug === '') {
                 $slug = 'set-' . $id;
             }
         }
 
+        // Backfill missing timestamps for legacy records that predate created_at.
         if ($createdAt === '') {
             $createdAt = gmdate('Y-m-d H:i:s');
         }

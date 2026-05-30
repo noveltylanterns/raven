@@ -84,10 +84,12 @@ final class PageWrite
         $description = (string) ($data['description'] ?? '');
         $displayTitle = !array_key_exists('display_title', $data) || !empty($data['display_title']) ? 1 : 0;
         $status = strtolower(trim((string) ($data['status'] ?? '')));
+        // Persist only canonical states so downstream queries can rely on fixed status values.
         if (!in_array($status, ['published', 'draft'], true)) {
             $status = 'draft';
         }
         $author = isset($data['author']) ? (int) $data['author'] : 0;
+        // Store missing/invalid authors as null to keep FK intent explicit.
         if ($author < 1) {
             $author = null;
         }
@@ -101,11 +103,13 @@ final class PageWrite
         $channelId = 0;
         if (!empty($data['channel_slug'])) {
             $channelId = $this->channelIdBySlug((string) $data['channel_slug']);
+            // Prevent explicit binding to reserved root placeholders.
             if ($channelId !== null && $channelId < 1) {
                 throw new RuntimeException('The stock <root> channel placeholder cannot be selected directly.');
             }
         }
 
+        // Slug is the stable path key and cannot be omitted.
         if ($slug === '') {
             throw new RuntimeException('Page slug is required.');
         }
@@ -143,6 +147,7 @@ final class PageWrite
     {
         $this->db->beginTransaction();
 
+        // Keep page and taxonomy mutation atomic so readers never observe half-applied writes.
         try {
             $pageIdParams = [':page' => $id];
 
@@ -152,6 +157,7 @@ final class PageWrite
                 [$this->categoryEnabled, $this->table('page_categories')],
                 [$this->tagEnabled, $this->table('page_tags')],
             ] as [$enabled, $table]) {
+                // Skip taxonomy tables disabled for this installation profile.
                 if (!$enabled) {
                     continue;
                 }
@@ -186,6 +192,7 @@ final class PageWrite
 
             $this->db->commit();
         } catch (\Throwable $exception) {
+            // Roll back only when the transaction is still open to avoid secondary failures.
             if ($this->db->inTransaction()) {
                 $this->db->rollBack();
             }
@@ -242,6 +249,7 @@ final class PageWrite
 
         $this->db->beginTransaction();
 
+        // Persist the page row and taxonomy links as one unit of work.
         try {
             if ($id > 0) {
                 // Updates stay in-place so page ids and related media rows remain stable.
@@ -274,10 +282,12 @@ final class PageWrite
                 $pageId = (int) $this->db->lastInsertId();
             }
 
+            // Category links are optional by deployment and guarded accordingly.
             if ($this->categoryEnabled) {
                 $this->replaceAssignments($this->table('page_categories'), $pageId, 'category', $categoryIds);
             }
 
+            // Tag links follow the same optional lifecycle as categories.
             if ($this->tagEnabled) {
                 $this->replaceAssignments($this->table('page_tags'), $pageId, 'tag', $tagIds);
             }
@@ -286,6 +296,7 @@ final class PageWrite
 
             return $pageId;
         } catch (\Throwable $exception) {
+            // Avoid rollBack() when PDO already auto-closed the transaction on error.
             if ($this->db->inTransaction()) {
                 $this->db->rollBack();
             }
@@ -325,6 +336,7 @@ final class PageWrite
             )
         );
 
+        // Reinsert every selected taxonomy id after the wipe to mirror submitted state.
         foreach ($ids as $id) {
             $insert->execute([
                 ':page' => $pageId,
@@ -343,11 +355,13 @@ final class PageWrite
      */
     private function normalizeDateTimeField(mixed $raw): ?string
     {
+        // Empty form fields intentionally clear the datetime columns.
         if ($raw === null || $raw === '') {
             return null;
         }
 
         $value = trim((string) $raw);
+        // Whitespace-only values are treated as empty, same as missing fields.
         if ($value === '') {
             return null;
         }
@@ -423,6 +437,7 @@ final class PageWrite
      */
     private function channelIdBySlug(string $slug): ?int
     {
+        // Root scope is implicit; explicit root slugs are rejected to keep save semantics unambiguous.
         if (ChannelShared::isRootChannelSlug($slug)) {
             throw new RuntimeException('The stock <root> channel placeholder cannot be selected directly.');
         }

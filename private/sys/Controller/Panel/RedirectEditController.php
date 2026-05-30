@@ -64,6 +64,7 @@ final class RedirectEditController
     {
         $this->context->requirePanelLogin();
         $requiredAction = $id === null ? 'create' : 'edit';
+        // Redirect editor permission is scoped by create vs edit mode.
         if (!$this->context->requireRoutePermissionOrForbidden('redirect', $requiredAction)) {
             return;
         }
@@ -71,6 +72,7 @@ final class RedirectEditController
         $redirectRow = $id !== null ? $this->redirectRead->findById($id) : null;
         $channelOptions = $this->channelRead->listOptions();
 
+        // Edit mode requires an existing redirect row.
         if ($id !== null && $redirectRow === null) {
             $this->context->flash('error', 'Redirect not found.');
             Redirect::redirect($this->context->panelUrl('/redirect'));
@@ -97,10 +99,12 @@ final class RedirectEditController
         $this->context->requirePanelLogin();
         $id = $this->input->int($post['id'] ?? null, 1);
         $requiredAction = $id === null ? 'create' : 'edit';
+        // Redirect save permission is scoped by create vs edit mode.
         if (!$this->context->requireRoutePermissionOrForbidden('redirect', $requiredAction)) {
             return;
         }
 
+        // CSRF validation protects redirect create/update operations.
         if (!$this->context->csrf()->validate($post['_csrf'] ?? null)) {
             $this->context->flash('error', 'Invalid CSRF token.');
             Redirect::redirect($this->context->panelUrl('/redirect'));
@@ -113,11 +117,13 @@ final class RedirectEditController
         $status = strtolower((string) $this->input->text($post['status'] ?? null, 20));
         $targetUrl = $this->input->text($post['target'] ?? null, 2048);
 
+        // Redirect records require both title and valid slug.
         if ($title === '' || $slug === null) {
             $this->context->flash('error', 'Redirect title and valid slug are required.');
             Redirect::redirect($this->editUrl($id));
         }
 
+        // Status is constrained to explicit active/inactive values.
         if (!in_array($status, ['active', 'inactive'], true)) {
             $this->context->flash('error', 'Status must be Active or Inactive.');
             Redirect::redirect($this->editUrl($id));
@@ -135,11 +141,13 @@ final class RedirectEditController
             Redirect::redirect($this->editUrl($id));
         }
 
+        // Target URL must pass redirect safety/format validation.
         if (!$this->isAllowedRedirectTargetUrl($targetUrl)) {
             $this->context->flash('error', 'Target URL must be an absolute http(s) URL or a root-relative path.');
             Redirect::redirect($this->editUrl($id));
         }
 
+        // Repository writes can throw on unique constraints or persistence errors.
         try {
             $savedId = $this->redirectRepo->save([
                 'id' => $id,
@@ -169,17 +177,21 @@ final class RedirectEditController
     public function redirectDelete(array $post): void
     {
         $this->context->requirePanelLogin();
+        // Redirect deletion is permission-gated due destructive behavior.
         if (!$this->context->requireRoutePermissionOrForbidden('redirect', 'delete')) {
             return;
         }
 
+        // CSRF validation protects delete actions.
         if (!$this->context->csrf()->validate($post['_csrf'] ?? null)) {
             $this->context->flash('error', 'Invalid CSRF token.');
             Redirect::redirect($this->context->panelUrl('/redirect'));
         }
 
         $id = $this->input->int($post['id'] ?? null, 1);
+        // Single-row delete path takes precedence when id is posted.
         if ($id !== null) {
+            // Continue with user-facing failure message if repository delete throws.
             try {
                 $this->redirectRepo->deleteById($id);
             } catch (\Throwable) {
@@ -192,6 +204,7 @@ final class RedirectEditController
         }
 
         $selectedIds = $this->selectedIdsFromPost($post);
+        // Bulk delete requires at least one selected id.
         if ($selectedIds === []) {
             $this->context->flash('error', 'No redirects selected.');
             Redirect::redirect($this->context->panelUrl('/redirect'));
@@ -200,7 +213,9 @@ final class RedirectEditController
         $deletedCount = 0;
         $failedCount = 0;
 
+        // Process all selected ids independently for partial-success feedback.
         foreach ($selectedIds as $selectedId) {
+            // Continue deleting remaining ids when one delete fails.
             try {
                 $this->redirectRepo->deleteById($selectedId);
                 $deletedCount++;
@@ -209,8 +224,10 @@ final class RedirectEditController
             }
         }
 
+        // Report successful deletes and append failed count when applicable.
         if ($deletedCount > 0) {
             $message = 'Deleted ' . $deletedCount . ' redirect' . ($deletedCount === 1 ? '' : 's') . '.';
+            // Include failure suffix for partial delete outcomes.
             if ($failedCount > 0) {
                 $message .= ' Failed to delete ' . $failedCount . ' selected redirect' . ($failedCount === 1 ? '' : 's') . '.';
             }
@@ -277,13 +294,16 @@ final class RedirectEditController
     private function selectedIdsFromPost(array $post, string $key = 'selected_ids'): array
     {
         $raw = $post[$key] ?? [];
+        // Selection payload must be an array of checkbox values.
         if (!is_array($raw)) {
             return [];
         }
 
         $selected = [];
+        // Normalize each posted checkbox value into a deduplicated id set.
         foreach ($raw as $candidate) {
             $id = $this->input->int($candidate, 1);
+            // Deduplicate ids via associative map keyed by parsed id.
             if ($id !== null) {
                 $selected[$id] = $id;
             }

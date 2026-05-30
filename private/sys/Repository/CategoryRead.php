@@ -79,6 +79,7 @@ class CategoryRead
         $categories = $this->table('categories');
         $sql = 'SELECT COUNT(*) FROM ' . $categories;
         $params = [];
+        // Apply taxonomy-set filter only when caller passes a valid non-negative set id.
         if ($setId !== null && $setId >= 0) {
             $sql .= ' WHERE ' . $this->setColumn() . ' = :set_id';
             $params[':set_id'] = $setId;
@@ -102,6 +103,7 @@ class CategoryRead
         $categories = $this->table('categories');
         $pageCategories = $this->table('page_categories');
         $whereSql = '';
+        // Scope list query to one taxonomy set when set filtering is requested.
         if ($setId !== null && $setId >= 0) {
             $whereSql = 'WHERE ' . $this->setColumn('c') . ' = :set_id';
         }
@@ -117,9 +119,10 @@ class CategoryRead
                  GROUP BY category
              ) pc ON pc.category = c.id
              ' . $whereSql . '
-             ORDER BY c.name ASC, c.id ASC
-             LIMIT :limit OFFSET :offset'
+                 ORDER BY c.name ASC, c.id ASC
+                 LIMIT :limit OFFSET :offset'
         );
+        // Bind set filter only when set-specific query branch was enabled above.
         if ($setId !== null && $setId >= 0) {
             $stmt->bindValue(':set_id', $setId, PDO::PARAM_INT);
         }
@@ -145,6 +148,7 @@ class CategoryRead
         $safeLimit = max(1, $limit);
         $safeOffset = max(0, $offset);
         $whereSql = '';
+        // Scope paged query to one taxonomy set when set filtering is requested.
         if ($setId !== null && $setId >= 0) {
             $whereSql = 'WHERE ' . $this->setColumn('c') . ' = :set_id';
         }
@@ -181,6 +185,7 @@ class CategoryRead
                  FROM ' . $categories . ($setId !== null && $setId >= 0 ? ' WHERE ' . $this->setColumn() . ' = :set_id_total' : '') . '
              ) AS totals'
         );
+        // Bind both page and total subquery set placeholders when set filtering is active.
         if ($setId !== null && $setId >= 0) {
             $stmt->bindValue(':set_id', $setId, PDO::PARAM_INT);
             $stmt->bindValue(':set_id_total', $setId, PDO::PARAM_INT);
@@ -192,7 +197,9 @@ class CategoryRead
         $rows = $stmt->fetchAll() ?: [];
         $total = 0;
         $resultRows = [];
+        // Hydrate each row while reading total count from the first returned record.
         foreach ($rows as $row) {
+            // Total appears on every row via CROSS JOIN; read once from the first row.
             if ($total === 0) {
                 $total = (int) ($row['total_rows'] ?? 0);
             }
@@ -230,6 +237,7 @@ class CategoryRead
 
         $rows = $stmt->fetchAll() ?: [];
         $result = [];
+        // Normalize option rows to strict scalar shape for select controls.
         foreach ($rows as $row) {
             $result[] = [
                 'id' => (int) ($row['id'] ?? 0),
@@ -253,13 +261,16 @@ class CategoryRead
     public function existingIds(array $ids): array
     {
         $normalizedIds = [];
+        // Coerce incoming ids and keep only positive unique values.
         foreach ($ids as $id) {
             $value = (int) $id;
+            // Ignore non-positive ids before building SQL placeholders.
             if ($value > 0) {
                 $normalizedIds[$value] = $value;
             }
         }
 
+        // No valid ids means there is nothing to resolve against storage.
         if ($normalizedIds === []) {
             return [];
         }
@@ -275,8 +286,10 @@ class CategoryRead
 
         $rows = $stmt->fetchAll() ?: [];
         $existing = [];
+        // Build deduplicated result map from matched row ids.
         foreach ($rows as $row) {
             $value = (int) ($row['id'] ?? 0);
+            // Keep only positive ids returned by storage.
             if ($value > 0) {
                 $existing[$value] = $value;
             }
@@ -362,6 +375,7 @@ class CategoryRead
     public function setIdsByIds(array $ids): array
     {
         $normalizedIds = $this->existingIds($ids);
+        // Skip query execution when none of the requested ids exist.
         if ($normalizedIds === []) {
             return [];
         }
@@ -376,6 +390,7 @@ class CategoryRead
         $stmt->execute(array_values($normalizedIds));
 
         $result = [];
+        // Build direct category-id to set-id map from the fetched rows.
         foreach ($stmt->fetchAll() ?: [] as $row) {
             $result[(int) ($row['id'] ?? 0)] = (int) ($row['set'] ?? 0);
         }
@@ -399,6 +414,7 @@ class CategoryRead
         $stmt->execute();
 
         $result = [];
+        // Convert grouped SQL rows into an integer map keyed by set id.
         foreach ($stmt->fetchAll() ?: [] as $row) {
             $result[(int) ($row['set'] ?? 0)] = (int) ($row['row_count'] ?? 0);
         }
@@ -423,6 +439,7 @@ class CategoryRead
     private function hydrateRows(array $rows): array
     {
         $result = [];
+        // Hydrate each raw DB row so image-storage metadata is expanded consistently.
         foreach ($rows as $row) {
             $result[] = $this->hydrateRow($row);
         }

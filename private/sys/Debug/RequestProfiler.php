@@ -97,15 +97,18 @@ final class RequestProfiler
         bool $success,
         ?string $error = null
     ): void {
+        // Fast-exit when profiling is off to keep hot query paths low overhead.
         if (!self::$enabled) {
             return;
         }
 
         $sql = trim($sql);
+        // Ignore empty SQL fragments so snapshots only include executable statements.
         if ($sql === '') {
             return;
         }
 
+        // Enforce an upper bound on retained rows and track how many records were dropped.
         if (count(self::$queries) >= self::$maxQueries) {
             self::$droppedQueries++;
             return;
@@ -133,13 +136,16 @@ final class RequestProfiler
      */
     public static function captureRenderTrace(array $trace): void
     {
+        // Capture only once per request and only while profiling is active.
         if (!self::$enabled || self::$renderTrace !== null) {
             return;
         }
 
         $lines = [];
+        // Build compact file/function lines from stack frames for operator readability.
         foreach ($trace as $frame) {
             $function = trim((string) ($frame['function'] ?? ''));
+            // Skip frames without callable names to avoid cluttering the trace output.
             if ($function === '') {
                 continue;
             }
@@ -153,6 +159,7 @@ final class RequestProfiler
             $location = $line > 0 ? ($file . ':' . $line) : $file;
             $lines[] = $location . ' - ' . $call;
 
+            // Bound render-trace size so snapshots remain lightweight.
             if (count($lines) >= 80) {
                 break;
             }
@@ -183,6 +190,7 @@ final class RequestProfiler
     {
         $durationMs = max(0.0, round((microtime(true) - self::$requestStart) * 1000, 3));
         $queryTimeMs = 0.0;
+        // Aggregate total SQL time across logged query rows for summary metrics.
         foreach (self::$queries as $query) {
             $queryTimeMs += (float) ($query['duration_ms'] ?? 0.0);
         }
@@ -213,6 +221,7 @@ final class RequestProfiler
     public static function registerOutput(RequestProfilerOutput $output): void
     {
         $id = strtolower(trim($output->id()));
+        // Empty output ids are invalid because outputs are addressed by this key.
         if ($id === '') {
             return;
         }
@@ -242,6 +251,7 @@ final class RequestProfiler
     public static function renderOutput(string $id, array $context = []): string
     {
         $normalized = strtolower(trim($id));
+        // Return empty output for unknown ids instead of raising runtime warnings.
         if ($normalized === '' || !isset(self::$outputs[$normalized])) {
             return '';
         }
@@ -259,8 +269,10 @@ final class RequestProfiler
     {
         $snapshot = self::snapshot();
         $rendered = [];
+        // Render each registered output against one shared snapshot for consistency.
         foreach (self::$outputs as $id => $output) {
             $html = $output->render($snapshot, $context);
+            // Skip empty fragments so callers only receive materialized outputs.
             if ($html === '') {
                 continue;
             }
@@ -290,6 +302,7 @@ final class RequestProfiler
     private static function normalizeParams(array $params): array
     {
         $normalized = [];
+        // Normalize every bound parameter to predictable scalar/debug-safe placeholders.
         foreach ($params as $key => $value) {
             $normalized[$key] = self::normalizeValue($value);
         }
@@ -305,17 +318,21 @@ final class RequestProfiler
      */
     private static function normalizeValue(mixed $value): mixed
     {
+        // Primitive scalars are already safe and readable for profiler output.
         if ($value === null || is_bool($value) || is_int($value) || is_float($value)) {
             return $value;
         }
 
+        // Collapse whitespace noise and cap long string payloads for compact display.
         if (is_string($value)) {
             $value = preg_replace('/\s+/', ' ', $value) ?? $value;
             return self::truncateValue(trim($value));
         }
 
+        // Encode arrays as JSON when possible so nested params stay visible in one cell.
         if (is_array($value)) {
             $encoded = json_encode($value, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+            // Use encoded payload when valid; otherwise fall back to a generic array marker.
             if (is_string($encoded)) {
                 return self::truncateValue($encoded);
             }
@@ -323,6 +340,7 @@ final class RequestProfiler
             return '[array]';
         }
 
+        // Expose class identity for object params without serializing internal state.
         if (is_object($value)) {
             return '[object ' . $value::class . ']';
         }
@@ -338,6 +356,7 @@ final class RequestProfiler
      */
     private static function truncateValue(string $value): string
     {
+        // Keep short values intact to avoid unnecessary noise in profiler rows.
         if (strlen($value) <= 400) {
             return $value;
         }

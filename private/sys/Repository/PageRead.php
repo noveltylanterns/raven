@@ -105,11 +105,13 @@ class PageRead
     {
         $pages = $this->table('pages');
         $channel = $this->channelRepo->findBySlug($channelSlug);
+        // Unknown channel slug means channel homepage lookup cannot proceed.
         if ($channel === null) {
             return null;
         }
 
         $channelId = (int) ($channel['id'] ?? 0);
+        // Channel-scoped homepage requires a positive resolved channel id.
         if ($channelId < 1) {
             return null;
         }
@@ -164,15 +166,18 @@ class PageRead
         ];
 
         $channel = null;
+        // Null channel slug explicitly targets root-scope pages only.
         if ($channelSlug === null) {
             $sql .= ' AND p.channel = 0';
         } else {
             $channel = $this->channelRepo->findBySlug($channelSlug);
+            // Unknown channel slug means no scoped page can match.
             if ($channel === null) {
                 return null;
             }
 
             $channelId = (int) ($channel['id'] ?? 0);
+            // Channel-scoped page lookup requires a positive channel id.
             if ($channelId < 1) {
                 return null;
             }
@@ -199,6 +204,7 @@ class PageRead
      */
     public function findPublishedById(int $pageId, ?string $channelSlug = null): ?array
     {
+        // Non-positive ids are invalid page lookup targets.
         if ($pageId < 1) {
             return null;
         }
@@ -214,15 +220,18 @@ class PageRead
         ];
 
         $channel = null;
+        // Null channel slug explicitly targets root-scope pages only.
         if ($channelSlug === null) {
             $sql .= ' AND p.channel = 0';
         } else {
             $channel = $this->channelRepo->findBySlug($channelSlug);
+            // Unknown channel slug means no scoped page can match.
             if ($channel === null) {
                 return null;
             }
 
             $channelId = (int) ($channel['id'] ?? 0);
+            // Channel-scoped page lookup requires a positive channel id.
             if ($channelId < 1) {
                 return null;
             }
@@ -256,8 +265,10 @@ class PageRead
         $sql = 'SELECT p.* FROM ' . $pages . ' p WHERE p.slug = :slug';
         $params = [':slug' => $pageSlug];
 
+        // String channel input resolves via channel slug lookup.
         if (is_string($channel)) {
             $channelId = $this->channelRepo->idBySlug($channel);
+            // Unknown channel slug cannot produce a scoped page match.
             if ($channelId === null || $channelId < 1) {
                 return null;
             }
@@ -294,8 +305,10 @@ class PageRead
         $sql = 'SELECT p.id FROM ' . $pages . ' p WHERE p.slug = :slug';
         $params = [':slug' => $pageSlug];
 
+        // String channel input resolves via channel slug lookup.
         if (is_string($channel)) {
             $channelId = $this->channelRepo->idBySlug($channel);
+            // Unknown channel slug cannot produce a scoped page-id match.
             if ($channelId === null || $channelId < 1) {
                 return null;
             }
@@ -339,15 +352,18 @@ class PageRead
         $params = [':status' => 'published'];
 
         $channel = null;
+        // Explicit root slug restricts listing to root-scope pages.
         if ($normalizedChannelSlug === ChannelShared::ROOT_CHANNEL_SLUG) {
             $sql .= ' AND p.channel = 0';
         } elseif ($normalizedChannelSlug !== '') {
             $channel = $this->channelRepo->findBySlug($normalizedChannelSlug);
+            // Unknown channel slug yields no published rows for scoped query.
             if ($channel === null) {
                 return [];
             }
 
             $channelId = (int) ($channel['id'] ?? 0);
+            // Scoped query requires a positive channel id.
             if ($channelId < 1) {
                 return [];
             }
@@ -361,6 +377,7 @@ class PageRead
                 LIMIT :limit';
 
         $stmt = $this->db->prepare($sql);
+        // Bind precomputed filter parameters with type-aware binding.
         foreach ($params as $key => $value) {
             $stmt->bindValue($key, $value, is_int($value) ? PDO::PARAM_INT : PDO::PARAM_STR);
         }
@@ -369,7 +386,9 @@ class PageRead
 
         $rows = $stmt->fetchAll() ?: [];
         $channelsById = $normalizedChannelSlug === '' ? $this->channelsByIdMap() : null;
+        // Hydrate each row and attach channel context for route/template consumers.
         foreach ($rows as $index => $row) {
+            // Skip malformed non-array rows defensively.
             if (!is_array($row)) {
                 continue;
             }
@@ -395,8 +414,10 @@ class PageRead
     {
         $safeLimit = max(1, $limit);
         $normalizedSlugs = [];
+        // Normalize and de-duplicate provided channel slug filters.
         foreach ($channelSlugs as $channelSlug) {
             $normalized = strtolower(trim((string) $channelSlug));
+            // Ignore empty slug entries from caller payloads.
             if ($normalized === '') {
                 continue;
             }
@@ -404,6 +425,7 @@ class PageRead
             $normalizedSlugs[$normalized] = $normalized;
         }
 
+        // Empty slug filter list yields no scoped results.
         if ($normalizedSlugs === []) {
             return [];
         }
@@ -418,18 +440,22 @@ class PageRead
         $includeRoot = isset($normalizedSlugs[ChannelShared::ROOT_CHANNEL_SLUG]);
         unset($normalizedSlugs[ChannelShared::ROOT_CHANNEL_SLUG]);
 
+        // Include root-scope clause when root slug appears in filter list.
         if ($includeRoot) {
             $clauses[] = 'p.channel = 0';
         }
 
         $channelIds = [];
+        // Resolve provided slugs to channel ids, skipping unknown channels.
         foreach ($normalizedSlugs as $normalizedSlug) {
             $channel = $this->channelRepo->findBySlug($normalizedSlug);
+            // Ignore unknown channel slugs in mixed filter lists.
             if (!is_array($channel)) {
                 continue;
             }
 
             $channelId = (int) ($channel['id'] ?? 0);
+            // Ignore invalid channel ids produced by malformed channel records.
             if ($channelId < 1) {
                 continue;
             }
@@ -437,9 +463,11 @@ class PageRead
             $channelIds[$channelId] = $channelId;
         }
 
+        // Add IN-clause only when at least one channel id resolved successfully.
         if ($channelIds !== []) {
             $placeholders = [];
             $index = 0;
+            // Build named placeholders for each resolved channel id.
             foreach ($channelIds as $channelId) {
                 $placeholder = ':channel_' . $index;
                 $placeholders[] = $placeholder;
@@ -450,6 +478,7 @@ class PageRead
             $clauses[] = 'p.channel IN (' . implode(', ', $placeholders) . ')';
         }
 
+        // No root clause and no resolved channel ids means query has no valid scopes.
         if ($clauses === []) {
             return [];
         }
@@ -460,6 +489,7 @@ class PageRead
                 LIMIT :limit';
 
         $stmt = $this->db->prepare($sql);
+        // Bind dynamic scope parameters with type-aware binding.
         foreach ($params as $key => $value) {
             $stmt->bindValue($key, $value, is_int($value) ? PDO::PARAM_INT : PDO::PARAM_STR);
         }
@@ -468,7 +498,9 @@ class PageRead
 
         $rows = $stmt->fetchAll() ?: [];
         $channelsById = $this->channelsByIdMap();
+        // Hydrate each row and attach channel context for route/template consumers.
         foreach ($rows as $index => $row) {
+            // Skip malformed non-array rows defensively.
             if (!is_array($row)) {
                 continue;
             }
@@ -572,7 +604,9 @@ class PageRead
 
         $rows = $stmt->fetchAll() ?: [];
         $channelsById = $this->channelsByIdMap();
+        // Attach channel context to each list row for panel/link rendering.
         foreach ($rows as $index => $row) {
+            // Skip malformed non-array rows defensively.
             if (!is_array($row)) {
                 continue;
             }
@@ -658,9 +692,11 @@ class PageRead
              ) AS totals'
         );
 
+        // Bind page-filter parameters for page_rows subquery.
         foreach ($pageParams as $key => $value) {
             $stmt->bindValue($key, $value, is_int($value) ? PDO::PARAM_INT : PDO::PARAM_STR);
         }
+        // Bind count-filter parameters for totals subquery.
         foreach ($countParams as $key => $value) {
             $stmt->bindValue($key, $value, is_int($value) ? PDO::PARAM_INT : PDO::PARAM_STR);
         }
@@ -672,7 +708,9 @@ class PageRead
         $total = 0;
         $resultRows = [];
         $channelsById = $this->channelsByIdMap();
+        // Hydrate rows and copy total count once from the first cross-joined row.
         foreach ($rows as $row) {
+            // Total repeats per row; capture it once on first iteration.
             if ($total === 0) {
                 $total = (int) ($row['total_rows'] ?? 0);
             }
@@ -722,13 +760,16 @@ class PageRead
     {
         $pages = $this->table('pages');
         $channelsById = $this->channelsByIdMap();
+        // No channels means there is no channel-homepage map to build.
         if ($channelsById === []) {
             return [];
         }
 
         $result = [];
+        // Initialize every known channel slug with empty homepage sentinel.
         foreach ($channelsById as $channelId => $channel) {
             $slug = trim((string) ($channel['slug'] ?? ''));
+            // Skip malformed channel rows missing slugs.
             if ($slug === '') {
                 continue;
             }
@@ -756,13 +797,16 @@ class PageRead
 
         $rows = $stmt->fetchAll() ?: [];
         $seen = [];
+        // Pick first ranked homepage row per channel.
         foreach ($rows as $row) {
             $channelId = (int) ($row['channel'] ?? 0);
+            // Ignore invalid/duplicate/unresolvable channel rows.
             if ($channelId < 1 || isset($seen[$channelId]) || !isset($channelsById[$channelId])) {
                 continue;
             }
 
             $channelSlug = trim((string) ($channelsById[$channelId]['slug'] ?? ''));
+            // Skip channels with malformed empty slugs.
             if ($channelSlug === '') {
                 continue;
             }
@@ -855,14 +899,17 @@ class PageRead
         );
         $stmt->execute([':id' => $id]);
         $rows = $stmt->fetchAll() ?: [];
+        // Missing rows mean page id does not exist.
         if ($rows === []) {
             return null;
         }
 
         // Strip image/variant join columns before hydrating the page row.
         $pageRow = $rows[0];
+        // Remove join-only columns so hydratePageRow receives canonical page fields only.
         foreach (array_keys($pageRow) as $col) {
             $col = (string) $col;
+            // Drop joined media columns from the page payload before hydration.
             if (str_starts_with($col, 'image_') || str_starts_with($col, 'variant_')) {
                 unset($pageRow[$col]);
             }
@@ -882,6 +929,7 @@ class PageRead
      */
     public function assignedCategoryRowsForPage(int $pageId): array
     {
+        // Category assignments are disabled when category taxonomy support is off.
         if (!$this->categoryEnabled) {
             return [];
         }
@@ -900,6 +948,7 @@ class PageRead
 
         $rows = $stmt->fetchAll() ?: [];
         $result = [];
+        // Normalize assigned-category rows to strict scalar payload shape.
         foreach ($rows as $row) {
             $result[] = [
                 'id'   => (int) $row['id'],
@@ -919,6 +968,7 @@ class PageRead
      */
     public function assignedTagRowsForPage(int $pageId): array
     {
+        // Tag assignments are disabled when tag taxonomy support is off.
         if (!$this->tagEnabled) {
             return [];
         }
@@ -937,6 +987,7 @@ class PageRead
 
         $rows = $stmt->fetchAll() ?: [];
         $result = [];
+        // Normalize assigned-tag rows to strict scalar payload shape.
         foreach ($rows as $row) {
             $result[] = [
                 'id'   => (int) $row['id'],
@@ -957,11 +1008,13 @@ class PageRead
     public function taxonomyAssignmentIdsByPage(array $pageIds): array
     {
         $normalizedPageIds = PageShared::normalizeIds($pageIds);
+        // No valid page ids means there is no assignment data to query.
         if ($normalizedPageIds === []) {
             return [];
         }
 
         $result = [];
+        // Pre-initialize result buckets for every requested page id.
         foreach ($normalizedPageIds as $pageId) {
             $result[$pageId] = [
                 'categories' => [],
@@ -969,12 +1022,14 @@ class PageRead
             ];
         }
 
+        // Skip SQL work entirely when both taxonomies are disabled.
         if (!$this->categoryEnabled && !$this->tagEnabled) {
             return $result;
         }
 
         $unionQueries = [];
         $params = [];
+        // Add category-assignment query branch only when category taxonomy is enabled.
         if ($this->categoryEnabled) {
             $categoryPlaceholders = implode(', ', array_fill(0, count($normalizedPageIds), '?'));
             $pageCategories = $this->table('page_categories');
@@ -984,6 +1039,7 @@ class PageRead
                  WHERE page IN (' . $categoryPlaceholders . ')';
             $params = array_merge($params, $normalizedPageIds);
         }
+        // Add tag-assignment query branch only when tag taxonomy is enabled.
         if ($this->tagEnabled) {
             $tagPlaceholders = implode(', ', array_fill(0, count($normalizedPageIds), '?'));
             $pageTags = $this->table('page_tags');
@@ -1001,24 +1057,29 @@ class PageRead
              ) AS assignment_rows'
         );
         $assignmentStmt->execute($params);
+        // Merge assignment rows into per-page category/tag id buckets.
         foreach ($assignmentStmt->fetchAll() ?: [] as $row) {
             $pageId = (int) ($row['page_id'] ?? 0);
             $taxonomyId = (int) ($row['taxonomy_id'] ?? 0);
             $taxonomyType = strtolower(trim((string) ($row['taxonomy_type'] ?? '')));
+            // Ignore malformed rows or rows for pages outside requested id set.
             if ($pageId < 1 || $taxonomyId < 1 || !isset($result[$pageId])) {
                 continue;
             }
 
+            // Category ids are collected into category bucket for the page.
             if ($taxonomyType === 'category') {
                 $result[$pageId]['categories'][$taxonomyId] = $taxonomyId;
                 continue;
             }
 
+            // Tag ids are collected into tag bucket for the page.
             if ($taxonomyType === 'tag') {
                 $result[$pageId]['tags'][$taxonomyId] = $taxonomyId;
             }
         }
 
+        // Reindex assignment buckets to sequential integer arrays for callers.
         foreach ($result as $pageId => $assignments) {
             $result[$pageId]['categories'] = array_values($assignments['categories']);
             $result[$pageId]['tags'] = array_values($assignments['tags']);
@@ -1037,6 +1098,7 @@ class PageRead
      */
     public function listByCategorySlug(string $slug, int $limit, int $offset): array
     {
+        // Category-slug listings are unavailable when category taxonomy is disabled.
         if (!$this->categoryEnabled) {
             return [];
         }
@@ -1052,6 +1114,7 @@ class PageRead
      */
     public function countByCategorySlug(string $slug): int
     {
+        // Category counts are unavailable when category taxonomy is disabled.
         if (!$this->categoryEnabled) {
             return 0;
         }
@@ -1069,6 +1132,7 @@ class PageRead
      */
     public function listByTagSlug(string $slug, int $limit, int $offset): array
     {
+        // Tag-slug listings are unavailable when tag taxonomy is disabled.
         if (!$this->tagEnabled) {
             return [];
         }
@@ -1084,6 +1148,7 @@ class PageRead
      */
     public function countByTagSlug(string $slug): int
     {
+        // Tag counts are unavailable when tag taxonomy is disabled.
         if (!$this->tagEnabled) {
             return 0;
         }
@@ -1101,6 +1166,7 @@ class PageRead
      */
     public function listPageByCategorySlug(string $slug, int $limit, int $offset): array
     {
+        // Category paged listings are unavailable when category taxonomy is disabled.
         if (!$this->categoryEnabled) {
             return ['rows' => [], 'total' => 0];
         }
@@ -1126,6 +1192,7 @@ class PageRead
      */
     public function listPageByTagSlug(string $slug, int $limit, int $offset): array
     {
+        // Tag paged listings are unavailable when tag taxonomy is disabled.
         if (!$this->tagEnabled) {
             return ['rows' => [], 'total' => 0];
         }
@@ -1151,6 +1218,7 @@ class PageRead
      */
     public function listByCategoryId(int $categoryId, int $limit, int $offset): array
     {
+        // Category-id listings require category taxonomy enabled and positive id.
         if (!$this->categoryEnabled || $categoryId < 1) {
             return [];
         }
@@ -1166,6 +1234,7 @@ class PageRead
      */
     public function countByCategoryId(int $categoryId): int
     {
+        // Category-id counts require category taxonomy enabled and positive id.
         if (!$this->categoryEnabled || $categoryId < 1) {
             return 0;
         }
@@ -1183,6 +1252,7 @@ class PageRead
      */
     public function listPageByCategoryId(int $categoryId, int $limit, int $offset): array
     {
+        // Category-id paged listings require category taxonomy enabled and positive id.
         if (!$this->categoryEnabled || $categoryId < 1) {
             return ['rows' => [], 'total' => 0];
         }
@@ -1207,6 +1277,7 @@ class PageRead
      */
     public function listByTagId(int $tagId, int $limit, int $offset): array
     {
+        // Tag-id listings require tag taxonomy enabled and positive id.
         if (!$this->tagEnabled || $tagId < 1) {
             return [];
         }
@@ -1222,6 +1293,7 @@ class PageRead
      */
     public function countByTagId(int $tagId): int
     {
+        // Tag-id counts require tag taxonomy enabled and positive id.
         if (!$this->tagEnabled || $tagId < 1) {
             return 0;
         }
@@ -1239,6 +1311,7 @@ class PageRead
      */
     public function listPageByTagId(int $tagId, int $limit, int $offset): array
     {
+        // Tag-id paged listings require tag taxonomy enabled and positive id.
         if (!$this->tagEnabled || $tagId < 1) {
             return ['rows' => [], 'total' => 0];
         }
@@ -1261,6 +1334,7 @@ class PageRead
      */
     private function hydratePageRow(array $row): array
     {
+        // Backfill legacy rows that predate gallery_enabled column/default.
         if (!array_key_exists('gallery_enabled', $row)) {
             $row['gallery_enabled'] = 0;
         }
@@ -1306,8 +1380,10 @@ class PageRead
     private function withChannelContext(array $row, ?array $channel = null, ?array $channelsById = null): array
     {
         $resolvedChannel = $channel;
+        // Resolve channel lazily only when caller did not provide pre-resolved channel row.
         if ($resolvedChannel === null) {
             $channelId = (int) ($row['channel'] ?? 0);
+            // Root pages (channel 0) intentionally keep null channel context.
             if ($channelId > 0) {
                 $channelsById ??= $this->channelsByIdMap();
                 $resolvedChannel = $channelsById[$channelId] ?? null;
@@ -1355,11 +1431,13 @@ class PageRead
         bool $includeCategoryFilters = true,
         bool $includeTagFilters = true
     ): void {
+        // Append channel filter only when caller requested a positive channel id.
         if ($channelId !== null && $channelId > 0) {
             $where[] = 'p.channel = :' . $placeholderPrefix . '_channel_id';
             $params[':' . $placeholderPrefix . '_channel_id'] = $channelId;
         }
 
+        // Append category EXISTS filter only when enabled and a positive category id was supplied.
         if ($includeCategoryFilters && $categoryId !== null && $categoryId > 0) {
             $where[] = 'EXISTS (
                 SELECT 1 FROM ' . $pageCategoriesTable . ' pc
@@ -1368,6 +1446,7 @@ class PageRead
             $params[':' . $placeholderPrefix . '_category_id'] = $categoryId;
         }
 
+        // Append tag EXISTS filter only when enabled and a positive tag id was supplied.
         if ($includeTagFilters && $tagId !== null && $tagId > 0) {
             $where[] = 'EXISTS (
                 SELECT 1 FROM ' . $pageTagsTable . ' pt
@@ -1449,7 +1528,9 @@ class PageRead
 
         $channelsById = $this->channelsByIdMap();
         $result = [];
+        // Hydrate taxonomy result rows and attach channel context.
         foreach ($stmt->fetchAll() ?: [] as $row) {
+            // Skip malformed non-array rows defensively.
             if (is_array($row)) {
                 $result[] = $this->withChannelContext($this->hydratePageRow($row), null, $channelsById);
             }
@@ -1487,7 +1568,9 @@ class PageRead
 
         $channelsById = $this->channelsByIdMap();
         $result = [];
+        // Hydrate taxonomy result rows and attach channel context.
         foreach ($stmt->fetchAll() ?: [] as $row) {
+            // Skip malformed non-array rows defensively.
             if (is_array($row)) {
                 $result[] = $this->withChannelContext($this->hydratePageRow($row), null, $channelsById);
             }
@@ -1585,11 +1668,14 @@ class PageRead
         $total = 0;
         $resultRows = [];
 
+        // Filter and hydrate each PDO row while preserving the first window total.
         foreach ($rows as $row) {
+            // Defensive guard for non-array rows returned by atypical PDO fetch modes.
             if (!is_array($row)) {
                 continue;
             }
 
+            // Window total is duplicated per row; capture it once from the first row.
             if ($total === 0) {
                 $total = (int) ($row['total_rows'] ?? 0);
             }
@@ -1598,6 +1684,7 @@ class PageRead
             $resultRows[] = $this->withChannelContext($this->hydratePageRow($row), null, $channelsById);
         }
 
+        // Recover total when a past-end page is requested and no window row is available.
         if ($resultRows === [] && $fallbackCount !== null) {
             $total = $fallbackCount();
         }

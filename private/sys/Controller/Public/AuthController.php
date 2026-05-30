@@ -91,10 +91,12 @@ final class AuthController
     public function login(): void
     {
         $redirectPath = $this->resolveRedirectPath();
+        // Already-authenticated and verified users are redirected immediately.
         if ($this->context->auth()->isLoggedIn() && $this->context->auth()->isTwoFactorVerifiedForUser()) {
             Redirect::redirect($redirectPath);
         }
 
+        // Pending 2FA sessions bypass credential form and go straight to challenge.
         if ($this->context->auth()->pendingTwoFactorUserId() !== null) {
             $this->storePostLoginRedirect($redirectPath);
             Redirect::redirect($this->loginTwoFactorPathWithRedirect($redirectPath));
@@ -126,6 +128,7 @@ final class AuthController
         $requestedRedirect = $this->normalizeRedirectPath((string) ($post['redirect_to'] ?? ''));
         $this->storePostLoginRedirect($requestedRedirect);
 
+        // CSRF validation protects credential-submission endpoint.
         if (!$this->context->csrf()->validate($post['_csrf'] ?? null)) {
             $this->flash('error', 'Invalid CSRF token.');
             Redirect::redirect($this->loginPathWithRedirect($requestedRedirect));
@@ -138,14 +141,17 @@ final class AuthController
             $this->loginUiState()
         );
 
+        // 2FA-required logins continue into challenge flow.
         if (($result['status'] ?? '') === 'two_factor_required') {
             Redirect::redirect($this->loginTwoFactorPathWithRedirect($requestedRedirect));
         }
 
+        // Verified logins continue to resolved post-login redirect.
         if (($result['status'] ?? '') === 'verified') {
             Redirect::redirect($this->consumePostLoginRedirect());
         }
 
+        // Missing-user state invalidates session and clears stored redirect.
         if (($result['status'] ?? '') === 'missing_user') {
             $this->context->auth()->logout();
             $this->clearPostLoginRedirect();
@@ -163,11 +169,13 @@ final class AuthController
     public function loginTwoFactor(): void
     {
         $redirectPath = $this->resolveRedirectPath();
+        // Preserve requested redirect during 2FA flow when non-root destination exists.
         if ($redirectPath !== '/') {
             $this->storePostLoginRedirect($redirectPath);
         }
 
         $viewState = $this->loginChallenge()->buildViewState($this->context->auth(), $this->loginUiState());
+        // Invalid/expired pending 2FA sessions are reset to clean login flow.
         if (!(bool) ($viewState['ok'] ?? false)) {
             $this->context->auth()->logout();
             $this->clearPostLoginRedirect();
@@ -201,12 +209,14 @@ final class AuthController
         $requestedRedirect = $this->normalizeRedirectPath((string) ($post['redirect_to'] ?? ''));
         $this->storePostLoginRedirect($requestedRedirect);
 
+        // CSRF validation protects 2FA challenge submission endpoint.
         if (!$this->context->csrf()->validate($post['_csrf'] ?? null)) {
             $this->flash('error', 'Invalid CSRF token.');
             Redirect::redirect($this->loginTwoFactorPathWithRedirect($requestedRedirect));
         }
 
         $result = $this->loginChallenge()->verifyCodeChallenge($this->context->auth(), $this->loginUiState(), $post);
+        // Expired sessions reset auth state and restart login flow.
         if (($result['status'] ?? '') === 'expired') {
             $this->context->auth()->logout();
             $this->clearPostLoginRedirect();
@@ -214,11 +224,13 @@ final class AuthController
             Redirect::redirect($this->loginPathWithRedirect($requestedRedirect));
         }
 
+        // Email verification challenge may send a fresh code and stay on challenge page.
         if (($result['status'] ?? '') === 'email_sent') {
             $this->flash('success', (string) ($result['message'] ?? 'Check your email for a verification code.'));
             Redirect::redirect($this->loginTwoFactorPathWithRedirect($requestedRedirect));
         }
 
+        // Unsupported methods reset auth state and restart login flow.
         if (($result['status'] ?? '') === 'unsupported') {
             $this->context->auth()->logout();
             $this->clearPostLoginRedirect();
@@ -226,6 +238,7 @@ final class AuthController
             Redirect::redirect($this->loginPathWithRedirect($requestedRedirect));
         }
 
+        // Any non-verified result is treated as challenge failure.
         if (($result['status'] ?? '') !== 'verified') {
             $this->flash('error', (string) ($result['message'] ?? 'Verification failed.'));
             Redirect::redirect($this->loginTwoFactorPathWithRedirect($requestedRedirect));
@@ -245,12 +258,14 @@ final class AuthController
         $requestedRedirect = $this->normalizeRedirectPath((string) ($post['redirect_to'] ?? ''));
         $this->storePostLoginRedirect($requestedRedirect);
 
+        // CSRF validation protects 2FA method-selection endpoint.
         if (!$this->context->csrf()->validate($post['_csrf'] ?? null)) {
             $this->flash('error', 'Invalid CSRF token.');
             Redirect::redirect($this->loginTwoFactorPathWithRedirect($requestedRedirect));
         }
 
         $result = $this->loginChallenge()->selectMethod($this->context->auth(), $this->loginUiState(), $post);
+        // Expired method-selection sessions reset auth state and restart login flow.
         if (($result['status'] ?? '') === 'expired') {
             $this->context->auth()->logout();
             $this->clearPostLoginRedirect();
@@ -258,6 +273,7 @@ final class AuthController
             Redirect::redirect($this->loginPathWithRedirect($requestedRedirect));
         }
 
+        // Invalid method selection keeps user on challenge page with feedback.
         if (($result['status'] ?? '') === 'invalid_method') {
             $this->flash('error', (string) ($result['message'] ?? 'Selected verification method is invalid.'));
         }
@@ -273,12 +289,14 @@ final class AuthController
      */
     public function loginTwoFactorWebauthnOptions(array $post): void
     {
+        // CSRF validation protects WebAuthn options endpoint.
         if (!$this->context->csrf()->validate($post['_csrf'] ?? null)) {
             $this->jsonResponse(['ok' => false, 'message' => 'Invalid CSRF token.'], 400);
             return;
         }
 
         $result = $this->loginChallenge()->webauthnOptions($this->context->auth(), $this->loginUiState(), $_SERVER);
+        // Surface generation failures with provided status/message payload.
         if (!(bool) ($result['ok'] ?? false)) {
             $this->jsonResponse(
                 ['ok' => false, 'message' => (string) ($result['message'] ?? 'Failed to initialize WebAuthn challenge.')],
@@ -301,6 +319,7 @@ final class AuthController
      */
     public function loginTwoFactorWebauthnVerify(array $post): void
     {
+        // CSRF validation protects WebAuthn verify endpoint.
         if (!$this->context->csrf()->validate($post['_csrf'] ?? null)) {
             $this->jsonResponse(['ok' => false, 'message' => 'Invalid CSRF token.'], 400);
             return;
@@ -312,6 +331,7 @@ final class AuthController
             $post,
             $_SERVER
         );
+        // Surface verification failures with provided status/message payload.
         if (!(bool) ($result['ok'] ?? false)) {
             $this->jsonResponse(
                 ['ok' => false, 'message' => (string) ($result['message'] ?? 'Security key verification failed.')],
@@ -355,17 +375,20 @@ final class AuthController
      */
     public function registerSubmit(array $post): void
     {
+        // CSRF validation protects public registration submission.
         if (!$this->context->csrf()->validate($post['_csrf'] ?? null)) {
             $this->flash('error', 'Invalid CSRF token.');
             Redirect::redirect('/register');
         }
 
         $registrationMode = $this->registrationMode();
+        // Closed registration mode blocks all self-service registrations.
         if ($registrationMode === 'closed') {
             $this->flash('error', 'Registration is currently closed.');
             Redirect::redirect('/register');
         }
 
+        // Rate-limit lock blocks bursts of repeated registration attempts.
         if ($this->isRegistrationTemporarilyLocked()) {
             $this->flash('error', 'Too many registration attempts. Please wait a few minutes and try again.');
             Redirect::redirect('/register');
@@ -383,33 +406,42 @@ final class AuthController
 
         $errors = [];
         $usernameRequired = $loginIdentifierMode === 'username';
+        // Username mode requires a valid normalized username.
         if ($usernameRequired && !is_string($normalizedUsername)) {
             $errors[] = 'Username is required and must be valid.';
         }
+        // Optional username must still validate when provided.
         if (!$usernameRequired && $rawUsername !== '' && !is_string($normalizedUsername)) {
             $errors[] = 'Username must be valid when provided.';
         }
+        // Registration always requires a valid email.
         if ($email === null) {
             $errors[] = 'A valid email address is required.';
         }
+        // Password must satisfy minimum length requirement.
         if ($password === '' || strlen($password) < 8) {
             $errors[] = 'Password must be at least 8 characters.';
         }
+        // Password confirmation must match exactly.
         if (!hash_equals($password, $passwordConfirm)) {
             $errors[] = 'Password confirmation does not match.';
         }
         $captchaError = $this->publicCaptchaFlow->validateSubmission($post, $_SERVER);
+        // Captcha failures are appended to registration validation errors.
         if ($captchaError !== null) {
             $errors[] = $captchaError;
         }
 
         $usableInvite = null;
         $now = time();
+        // Invite-only mode requires a valid usable invite token.
         if ($registrationMode === 'invite') {
+            // Token text is mandatory when invite-only mode is active.
             if ($inviteToken === '') {
                 $errors[] = 'Invite token is required in invite-only mode.';
             } else {
                 $usableInvite = $this->inviteRead()->findUsableByToken($inviteToken, $now);
+                // Reject missing/expired/consumed invite tokens.
                 if ($usableInvite === null) {
                     $errors[] = 'Invite token is invalid, expired, or already used.';
                 }
@@ -417,10 +449,12 @@ final class AuthController
         }
 
         $groupIds = $this->registrationGroupIds();
+        // Registration requires at least one assignable target group.
         if ($groupIds === []) {
             $errors[] = 'Registration target group is unavailable. Contact an administrator.';
         }
 
+        // Validation failures increment lock counters and return to form.
         if ($errors !== []) {
             $this->recordRegistrationFailure();
             $this->flash('error', implode(' ', $errors));
@@ -428,6 +462,7 @@ final class AuthController
         }
 
         $savedUserId = null;
+        // User creation and optional invite consumption can throw from storage layers.
         try {
             $savedUserId = $this->userRepo->save([
                 'id' => null,
@@ -443,9 +478,11 @@ final class AuthController
                 'string_length' => (int) $this->context->config()->get('user.string', 28),
             ]);
 
+            // Consume invite token after user creation for invite-only registrations.
             if (is_array($usableInvite)) {
                 $inviteId = (int) ($usableInvite['id'] ?? 0);
                 $isReusable = (int) ($usableInvite['reusable'] ?? 0) === 1;
+                // Failed consume triggers rollback of newly created account.
                 if ($inviteId < 1 || !$this->inviteWrite()->consume($inviteId, $isReusable, $now)) {
                     // Consume failure means the token became unavailable between
                     // validation and save, so roll back the just-created account.
@@ -486,11 +523,13 @@ final class AuthController
      */
     private function inviteRead(): InviteRead
     {
+        // Reuse cached invite-token read repository once resolved.
         if ($this->inviteRead instanceof InviteRead) {
             return $this->inviteRead;
         }
 
         $repo = ($this->inviteReadResolver)();
+        // Resolver contract must return invite-token read repository.
         if (!$repo instanceof InviteRead) {
             throw new \RuntimeException('Public invite-token read resolver returned an invalid value.');
         }
@@ -506,11 +545,13 @@ final class AuthController
      */
     private function inviteWrite(): InviteWrite
     {
+        // Reuse cached invite-token write repository once resolved.
         if ($this->inviteWrite instanceof InviteWrite) {
             return $this->inviteWrite;
         }
 
         $repo = ($this->inviteWriteResolver)();
+        // Resolver contract must return invite-token write repository.
         if (!$repo instanceof InviteWrite) {
             throw new \RuntimeException('Public invite-token write resolver returned an invalid value.');
         }
@@ -526,8 +567,10 @@ final class AuthController
      */
     private function registrationGroupIds(): array
     {
+        // Prefer canonical fallback slugs in deterministic order.
         foreach (['user', 'guest', 'validating'] as $slug) {
             $groupId = $this->groupRead->idBySlug($slug);
+            // First valid positive id becomes the registration target group.
             if (is_int($groupId) && $groupId > 0) {
                 return [$groupId];
             }
@@ -543,6 +586,7 @@ final class AuthController
      */
     private function loginUiState(): LoginUiState
     {
+        // Lazily initialize shared login UI state storage.
         if (!$this->loginUiState instanceof LoginUiState) {
             $this->loginUiState = LoginUiState::forPublic();
         }
@@ -557,6 +601,7 @@ final class AuthController
      */
     private function loginAttempt(): LoginAttempt
     {
+        // Lazily initialize shared login attempt workflow.
         if (!$this->loginAttempt instanceof LoginAttempt) {
             $this->loginAttempt = new LoginAttempt(
                 $this->context->config(),
@@ -578,6 +623,7 @@ final class AuthController
      */
     private function loginChallenge(): LoginChallenge
     {
+        // Lazily initialize shared login challenge workflow.
         if (!$this->loginChallenge instanceof LoginChallenge) {
             $this->loginChallenge = new LoginChallenge(
                 $this->context->config(),
@@ -632,27 +678,34 @@ final class AuthController
     private function resolveRedirectPath(): string
     {
         $queryValue = $this->normalizeRedirectPath((string) ($_GET['redirect_to'] ?? ''));
+        // Query redirect parameter has highest precedence when valid.
         if ($queryValue !== '') {
             return $queryValue;
         }
 
         $storedValue = $this->normalizeRedirectPath($this->loginUiState()->postLoginRedirect());
+        // Stored redirect from prior auth step is next fallback.
         if ($storedValue !== '') {
             return $storedValue;
         }
 
         $referer = trim((string) ($_SERVER['HTTP_REFERER'] ?? ''));
+        // Same-host HTTP referers may be used as final fallback target.
         if ($referer !== '' && RedirectParser::isAllowedHttpOrRootPath($referer)) {
             $parts = parse_url($referer);
+            // parse_url must return array payload for referer-derived redirect.
             if (is_array($parts)) {
                 $host = strtolower(trim((string) ($parts['host'] ?? '')));
                 $currentHost = strtolower($this->request->resolveRequestHost((string) $this->context->config()->get('site.domain', 'localhost')));
+                // Accept referer only when host matches current request host.
                 if ($host !== '' && $host === $currentHost) {
                     $candidate = (string) ($parts['path'] ?? '/');
+                    // Preserve referer query when building candidate redirect.
                     if (isset($parts['query']) && $parts['query'] !== '') {
                         $candidate .= '?' . (string) $parts['query'];
                     }
                     $normalized = $this->normalizeRedirectPath($candidate);
+                    // Skip empty or auth-path redirects to avoid loops.
                     if ($normalized !== '' && !$this->isAuthPath($normalized)) {
                         return $normalized;
                     }
@@ -672,45 +725,55 @@ final class AuthController
     private function normalizeRedirectPath(string $value): string
     {
         $value = trim($value);
+        // Blank redirect values normalize to empty-string sentinel.
         if ($value === '') {
             return '';
         }
 
+        // Only root-relative paths are accepted; protocol-relative paths are rejected.
         if (!str_starts_with($value, '/') || str_starts_with($value, '//')) {
             return '';
         }
 
         $parts = @parse_url($value);
+        // parse_url failures indicate malformed redirect input.
         if (!is_array($parts)) {
             return '';
         }
 
+        // Absolute URL components are not allowed in redirect path values.
         if (isset($parts['scheme']) || isset($parts['host']) || isset($parts['user']) || isset($parts['pass'])) {
             return '';
         }
 
         $path = (string) ($parts['path'] ?? '/');
+        // Path component must remain absolute and non-empty.
         if ($path === '' || !str_starts_with($path, '/')) {
             return '';
         }
 
+        // Null bytes are rejected defensively.
         if (str_contains($path, "\0")) {
             return '';
         }
 
         $panelBase = $this->panelBasePath();
+        // Prevent public-auth redirects into panel base path.
         if ($panelBase !== '' && str_starts_with($path, $panelBase)) {
             return '';
         }
 
+        // Prevent redirect loops back into auth endpoints.
         if ($this->isAuthPath($path)) {
             return '';
         }
 
         $normalized = $path;
+        // Re-append query string when present.
         if (isset($parts['query']) && $parts['query'] !== '') {
             $normalized .= '?' . (string) $parts['query'];
         }
+        // Re-append fragment when present.
         if (isset($parts['fragment']) && $parts['fragment'] !== '') {
             $normalized .= '#' . (string) $parts['fragment'];
         }
@@ -727,6 +790,7 @@ final class AuthController
     private function loginPathWithRedirect(string $redirectPath): string
     {
         $normalized = $this->normalizeRedirectPath($redirectPath);
+        // Default login route is used when redirect is empty or root.
         if ($normalized === '' || $normalized === '/') {
             return '/login';
         }
@@ -743,6 +807,7 @@ final class AuthController
     private function loginTwoFactorPathWithRedirect(string $redirectPath): string
     {
         $normalized = $this->normalizeRedirectPath($redirectPath);
+        // Default 2FA route is used when redirect is empty or root.
         if ($normalized === '' || $normalized === '/') {
             return '/login/2fa';
         }
@@ -759,6 +824,7 @@ final class AuthController
     private function loginTwoFactorSelectPathWithRedirect(string $redirectPath): string
     {
         $normalized = $this->normalizeRedirectPath($redirectPath);
+        // Default 2FA-selection route is used when redirect is empty or root.
         if ($normalized === '' || $normalized === '/') {
             return '/login/2fa/select';
         }
@@ -775,6 +841,7 @@ final class AuthController
     private function isAuthPath(string $path): bool
     {
         $path = (string) parse_url($path, PHP_URL_PATH);
+        // Empty parse results cannot match auth-surface routes.
         if ($path === '') {
             return false;
         }

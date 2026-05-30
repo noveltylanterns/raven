@@ -51,6 +51,7 @@ final class RuntimeBuilder
      */
     public static function build(array $rvn): array
     {
+        // Skip panel wiring when required bootstrap dependencies are missing.
         if (!isset($rvn['root'], $rvn['db'], $rvn['auth_db'], $rvn['driver'], $rvn['prefix'], $rvn['config'], $rvn['auth'], $rvn['input'], $rvn['csrf'])) {
             return $rvn;
         }
@@ -58,9 +59,11 @@ final class RuntimeBuilder
         // Panel entry closures ($hasPanelPermissionBit, $canRenderPanelProfiler) capture
         // $rvn by value and call $rvn['auth']->method() directly, so auth must be a concrete
         // Gatekeeper before build() returns — resolve both lazy DB and service handles now.
+        // Eagerly resolve lazy auth DB handle for closures that capture the concrete service.
         if (is_callable($rvn['auth_db'])) {
             $rvn['auth_db'] = ($rvn['auth_db'])();
         }
+        // Eagerly resolve lazy auth service for closures that call auth methods directly.
         if (is_callable($rvn['auth'])) {
             $rvn['auth'] = ($rvn['auth'])();
         }
@@ -83,11 +86,13 @@ final class RuntimeBuilder
          */
         $resolveAuthDb = static function () use (&$rvn): PDO {
             $authDb = $rvn['auth_db'] ?? null;
+            // Resolve lazy auth DB handle exactly once on first use.
             if (is_callable($authDb)) {
                 $authDb = $authDb();
                 $rvn['auth_db'] = $authDb;
             }
 
+            // Guard against missing/miswired auth DB resolvers.
             if (!$authDb instanceof PDO) {
                 throw new RuntimeException('Panel runtime auth database resolver is unavailable.');
             }
@@ -100,11 +105,13 @@ final class RuntimeBuilder
          */
         $resolveAuth = static function () use (&$rvn): Gatekeeper {
             $auth = $rvn['auth'] ?? null;
+            // Resolve lazy auth service exactly once on first use.
             if (is_callable($auth)) {
                 $auth = $auth();
                 $rvn['auth'] = $auth;
             }
 
+            // Guard against missing/miswired auth service resolvers.
             if (!$auth instanceof Gatekeeper) {
                 throw new RuntimeException('Panel runtime auth service resolver is unavailable.');
             }
@@ -124,6 +131,7 @@ final class RuntimeBuilder
             $value = null;
 
             return static function () use (&$resolved, &$value, $builder): mixed {
+                // Return memoized instance after first successful build.
                 if ($resolved) {
                     return $value;
                 }
@@ -266,38 +274,45 @@ final class RuntimeBuilder
         $extensionFormsProvider = static function (string $extensionKey) use (&$rvn): array {
             $normalized = strtolower(trim($extensionKey));
             $extensionServicesFor = $rvn['extension_services_for'] ?? null;
+            // Extension service access is optional outside extension-aware runtime paths.
             if (!is_callable($extensionServicesFor)) {
                 return [];
             }
 
             $extensionServices = $extensionServicesFor($normalized);
+            // Non-array extension service payloads are treated as unavailable.
             if (!is_array($extensionServices)) {
                 return [];
             }
 
             $formsRepository = $extensionServices['forms'] ?? null;
+            // Forms repository is optional per extension.
             if (!is_object($formsRepository) || !method_exists($formsRepository, 'listAll')) {
                 return [];
             }
 
             /** @var mixed $rows */
             $rows = $formsRepository->listAll();
+            // Ignore malformed provider payloads to keep panel bootstrap resilient.
             if (!is_array($rows)) {
                 return [];
             }
 
             $items = [];
+            // Keep only enabled, valid slug rows for form-aware extension metadata.
             foreach ($rows as $row) {
                 if (!is_array($row) || empty($row['enabled'])) {
                     continue;
                 }
 
                 $slug = strtolower(trim((string) ($row['slug'] ?? '')));
+                // Reject empty/invalid slugs so route registration stays deterministic.
                 if ($slug === '' || preg_match('/^[a-z0-9][a-z0-9_-]*$/', $slug) !== 1) {
                     continue;
                 }
 
                 $name = trim((string) ($row['name'] ?? ''));
+                // Default display name to slug when extension omits a label.
                 if ($name === '') {
                     $name = $slug;
                 }

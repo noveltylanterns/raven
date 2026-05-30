@@ -62,9 +62,12 @@ final class EditorMeta
     public function cleanupMetaImagePathSets(string $entityType, int $entityId, array $pathSets): void
     {
         $paths = [];
+        // Flatten each returned path-set so duplicate paths are deleted only once.
         foreach ($pathSets as $pathSet) {
+            // Path-set rows may include nullable slots; normalize every candidate string first.
             foreach ($pathSet as $path) {
                 $normalized = trim((string) $path);
+                // Skip empty slot values from partially populated path payloads.
                 if ($normalized === '') {
                     continue;
                 }
@@ -86,18 +89,22 @@ final class EditorMeta
      */
     public function deleteMetaImageStoredPaths(string $entityType, int $entityId, array $paths): void
     {
+        // Bail out when runtime path context is unavailable.
         if ($this->projectRoot === null) {
             return;
         }
 
+        // Restrict cleanup to supported entity families and positive ids.
         if (!in_array($entityType, ['categories', 'channels', 'groups', 'tags'], true) || $entityId < 1) {
             return;
         }
 
         $prefix = 'uploads/' . $entityType . '/' . $entityId . '/';
 
+        // Validate each relative path before touching the filesystem.
         foreach ($paths as $path) {
             $normalized = ltrim(trim((string) $path), '/');
+            // Reject traversal/null-byte/backslash inputs and off-prefix paths.
             if (
                 $normalized === ''
                 || str_contains($normalized, '..')
@@ -109,6 +116,7 @@ final class EditorMeta
             }
 
             $absolute = $this->projectRoot . '/public/' . $normalized;
+            // Only unlink existing files so directory entries are never removed accidentally.
             if (is_file($absolute)) {
                 @unlink($absolute);
             }
@@ -146,10 +154,12 @@ final class EditorMeta
      */
     public function storeMetaImageUpload(string $entityType, int $entityId, string $slot, array $upload): array
     {
+        // Meta-image workflows require initialized config and root path context.
         if ($this->config === null || $this->projectRoot === null) {
             return ['ok' => false, 'error' => 'EditorMeta meta-image runtime is not initialized.'];
         }
 
+        // Reject unsupported targets before running any upload or image work.
         if (
             !in_array($entityType, ['categories', 'channels', 'groups', 'tags'], true)
             || $entityId < 1
@@ -158,21 +168,25 @@ final class EditorMeta
             return ['ok' => false, 'error' => 'Invalid meta image target.'];
         }
 
+        // All image normalization depends on Imagick support in this build.
         if (!class_exists(\Imagick::class)) {
             return ['ok' => false, 'error' => 'Image upload requires Imagick (ImageMagick) extension.'];
         }
 
         $uploadError = (int) ($upload['error'] ?? UPLOAD_ERR_NO_FILE);
+        // Map PHP upload-level failures before examining temporary file state.
         if ($uploadError !== UPLOAD_ERR_OK) {
             return ['ok' => false, 'error' => $this->metaImageUploadErrorMessage($uploadError)];
         }
 
         $tmpPath = trim((string) ($upload['tmp_name'] ?? ''));
+        // Require a verified uploaded file path to block forged local-path inputs.
         if ($tmpPath === '' || !is_uploaded_file($tmpPath) || !is_file($tmpPath)) {
             return ['ok' => false, 'error' => 'Uploaded image could not be validated as an upload.'];
         }
 
         $uploadTarget = strtolower((string) $this->config->get('media.upload_target', 'local'));
+        // This workflow currently writes only to local filesystem storage.
         if ($uploadTarget !== 'local') {
             return ['ok' => false, 'error' => 'Only local image storage is supported in this build.'];
         }
@@ -180,14 +194,17 @@ final class EditorMeta
         $validation = $slot === 'cover'
             ? $this->coverValidator()->validateUpload($upload)
             : $this->previewValidator()->validateUpload($upload);
+        // Stop on validator failure to keep policy errors explicit for panel responses.
         if (!(bool) ($validation['ok'] ?? false)) {
             return ['ok' => false, 'error' => (string) ($validation['error'] ?? 'Image upload failed.')];
         }
 
         $canonicalExtension = strtolower((string) ($validation['extension'] ?? ''));
+        // Normalize jpeg naming so extension checks and filenames stay consistent.
         if ($canonicalExtension === 'jpeg') {
             $canonicalExtension = 'jpg';
         }
+        // Guard final extension set against unsupported image formats.
         if (!in_array($canonicalExtension, ['jpg', 'png', 'gif'], true)) {
             return ['ok' => false, 'error' => 'Detected image format is not allowed by current configuration.'];
         }
@@ -196,21 +213,25 @@ final class EditorMeta
         $pathInfo = pathinfo($originalName);
         $originalExtension = strtolower((string) ($pathInfo['extension'] ?? ''));
         $originalExtension = $originalExtension === 'jpeg' ? 'jpg' : $originalExtension;
+        // Reject mismatched declared extensions to prevent extension-spoofed uploads.
         if ($originalExtension !== '' && $originalExtension !== $canonicalExtension) {
             return ['ok' => false, 'error' => 'Uploaded extension does not match detected image bytes.'];
         }
 
         $dimensions = @getimagesize($tmpPath);
+        // Ensure source dimensions are readable before variant generation begins.
         if (!is_array($dimensions) || !isset($dimensions[0], $dimensions[1])) {
             return ['ok' => false, 'error' => 'Failed to read image dimensions.'];
         }
 
         $relativeDirectory = 'uploads/' . $entityType . '/' . $entityId;
         $absoluteDirectory = $this->projectRoot . '/public/' . $relativeDirectory;
+        // Create per-entity storage directory on demand for new image sets.
         if (!is_dir($absoluteDirectory) && !mkdir($absoluteDirectory, 0750, true) && !is_dir($absoluteDirectory)) {
             return ['ok' => false, 'error' => 'Failed to create meta image directory.'];
         }
 
+        // Random token generation is isolated so crypto failures can return a clear message.
         try {
             $token = bin2hex(random_bytes(16));
         } catch (\Throwable) {
@@ -223,6 +244,7 @@ final class EditorMeta
         $originalAbsolutePath = $this->projectRoot . '/public/' . $originalStoredPath;
         $writtenPaths = [];
 
+        // Wrap image writes so partial output can be cleaned up on any failure path.
         try {
             $source = $this->metaImageImagickProcessor()->readFirstFrame($tmpPath);
             $this->metaImageImagickProcessor()->prepareForWrite(
@@ -232,6 +254,7 @@ final class EditorMeta
                 $this->metaImageExifProcessor()
             );
 
+            // Persist the normalized source image before generating its variants.
             if (!$source->writeImage($originalAbsolutePath)) {
                 throw new \RuntimeException('Failed to store processed source image.');
             }
@@ -244,6 +267,7 @@ final class EditorMeta
                 $slot . '_image_path' => $originalStoredPath,
             ];
 
+            // Generate each configured variant from the prepared source image.
             foreach ($this->metaImageVariantProcessor()->variantSpecs() as $variantKey => $spec) {
                 $variant = clone $source;
                 $target = $this->metaImageVariantProcessor()->resolveVariantSize(
@@ -253,6 +277,7 @@ final class EditorMeta
                     (int) ($spec['height'] ?? 0)
                 );
 
+                // Resize only when the variant dimensions differ from the source dimensions.
                 if ($target['width'] !== $sourceWidth || $target['height'] !== $sourceHeight) {
                     $variant->resizeImage(
                         $target['width'],
@@ -263,6 +288,7 @@ final class EditorMeta
                     );
                 }
 
+                // JPEG variants receive an explicit quality target for predictable compression.
                 if ($canonicalExtension === 'jpg') {
                     $variant->setImageCompressionQuality(85);
                 }
@@ -271,6 +297,7 @@ final class EditorMeta
                 $variantStoredPath = $relativeDirectory . '/' . $variantFilename;
                 $variantAbsolutePath = $this->projectRoot . '/public/' . $variantStoredPath;
 
+                // Abort when any variant fails so cleanup can remove partially written sets.
                 if (!$variant->writeImage($variantAbsolutePath)) {
                     throw new \RuntimeException('Failed to store generated image variant.');
                 }
@@ -304,10 +331,12 @@ final class EditorMeta
      */
     private function coverValidator(): CoverValidator
     {
+        // Reuse cached validator instance across calls to avoid duplicate construction.
         if ($this->coverValidator instanceof CoverValidator) {
             return $this->coverValidator;
         }
 
+        // Validator construction requires initialized runtime configuration.
         if ($this->config === null) {
             throw new \RuntimeException('EditorMeta meta-image runtime is not initialized.');
         }
@@ -323,10 +352,12 @@ final class EditorMeta
      */
     private function previewValidator(): PreviewValidator
     {
+        // Reuse cached validator instance across calls to avoid duplicate construction.
         if ($this->previewValidator instanceof PreviewValidator) {
             return $this->previewValidator;
         }
 
+        // Validator construction requires initialized runtime configuration.
         if ($this->config === null) {
             throw new \RuntimeException('EditorMeta meta-image runtime is not initialized.');
         }
@@ -342,6 +373,7 @@ final class EditorMeta
      */
     private function coverUpload(): CoverUpload
     {
+        // Reuse one policy instance because it is stateless across calls.
         if ($this->coverUpload instanceof CoverUpload) {
             return $this->coverUpload;
         }
@@ -358,6 +390,7 @@ final class EditorMeta
      */
     private function uploadPolicyForSlot(string $slot): CoverUpload|PreviewUpload
     {
+        // Cover uploads use the dedicated cover policy helper.
         if ($slot === 'cover') {
             return $this->coverUpload();
         }
@@ -374,25 +407,31 @@ final class EditorMeta
      */
     private function removeMetaImageDirectoryIfEmpty(string $entityType, int $entityId): void
     {
+        // Deleting files is impossible without a resolved project root.
         if ($this->projectRoot === null) {
             return;
         }
 
+        // Ignore unsupported entity scopes during cleanup checks.
         if (!in_array($entityType, ['categories', 'channels', 'groups', 'tags'], true) || $entityId < 1) {
             return;
         }
 
         $directory = $this->projectRoot . '/public/uploads/' . $entityType . '/' . $entityId;
+        // Nothing to prune when the per-entity directory does not exist.
         if (!is_dir($directory)) {
             return;
         }
 
         $entries = scandir($directory);
+        // Abort cleanup when directory listing fails unexpectedly.
         if ($entries === false) {
             return;
         }
 
+        // Keep the directory whenever any non-dot entry remains.
         foreach ($entries as $entry) {
+            // Dot entries do not count toward directory occupancy.
             if ($entry === '.' || $entry === '..') {
                 continue;
             }
@@ -430,10 +469,12 @@ final class EditorMeta
      */
     private function metaImageVariantProcessor(): ImageVariantProcessor
     {
+        // Reuse cached processor so variant rules stay consistent in one request.
         if ($this->variantProcessor instanceof ImageVariantProcessor) {
             return $this->variantProcessor;
         }
 
+        // Variant processor needs runtime config for size and quality policies.
         if ($this->config === null) {
             throw new \RuntimeException('EditorMeta meta-image runtime is not initialized.');
         }
@@ -449,6 +490,7 @@ final class EditorMeta
      */
     private function metaImageExifProcessor(): ImageExifProcessor
     {
+        // Reuse the EXIF processor to keep orientation handling centralized.
         if ($this->exifProcessor instanceof ImageExifProcessor) {
             return $this->exifProcessor;
         }
@@ -464,6 +506,7 @@ final class EditorMeta
      */
     private function metaImageImagickProcessor(): ImageImagickProcessor
     {
+        // Reuse shared ImageMagick helper for stable read/write behavior.
         if ($this->imagickProcessor instanceof ImageImagickProcessor) {
             return $this->imagickProcessor;
         }

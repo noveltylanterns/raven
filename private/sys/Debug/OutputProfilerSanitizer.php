@@ -25,6 +25,7 @@ final class OutputProfilerSanitizer
     public static function prettyJson(array $value): string
     {
         $encoded = json_encode($value, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        // Return deterministic fallback output when JSON encoding fails on mixed payload values.
         if (!is_string($encoded) || $encoded === '') {
             return '{}';
         }
@@ -41,33 +42,40 @@ final class OutputProfilerSanitizer
      */
     public static function sanitizeArray(array $value, int $depth = 0): array
     {
+        // Bound recursion depth so hostile or cyclic-like payloads cannot explode debug output.
         if ($depth > 6) {
             return ['__truncated' => true];
         }
 
         $output = [];
+        // Walk each key/value and normalize according to sensitivity and scalar type.
         foreach ($value as $key => $item) {
             $keyText = strtolower((string) $key);
+            // Redact common secret-bearing fields before they reach profiler HTML.
             if (preg_match('/password|passwd|secret|token|authorization|cookie|csrf/', $keyText) === 1) {
                 $output[$key] = '[redacted]';
                 continue;
             }
 
+            // Recurse nested arrays with depth tracking to keep redaction behavior consistent.
             if (is_array($item)) {
                 $output[$key] = self::sanitizeArray($item, $depth + 1);
                 continue;
             }
 
+            // Apply hostile-payload filtering to string values shown in debug UI.
             if (is_string($item)) {
                 $output[$key] = self::sanitizeStringValue($item);
                 continue;
             }
 
+            // Keep primitive scalars unchanged so numeric/boolean diagnostics stay readable.
             if (is_bool($item) || is_int($item) || is_float($item) || $item === null) {
                 $output[$key] = $item;
                 continue;
             }
 
+            // Preserve class identity without exposing full object internals.
             if (is_object($item)) {
                 $output[$key] = '[object ' . $item::class . ']';
                 continue;
@@ -103,12 +111,15 @@ final class OutputProfilerSanitizer
         ];
 
         $filtered = [];
+        // Copy only allow-listed server keys to avoid leaking sensitive process/env values.
         foreach ($allowed as $key) {
+            // Some SAPIs omit keys; skip absent entries rather than emitting null placeholders.
             if (!array_key_exists($key, $server)) {
                 continue;
             }
 
             $value = $server[$key];
+            // Server values are mostly strings and must pass the same hostile-input sanitizer.
             if (is_string($value)) {
                 $value = self::sanitizeStringValue($value);
             }
@@ -127,7 +138,9 @@ final class OutputProfilerSanitizer
     public static function normalizeFiles(array $files): array
     {
         $normalized = [];
+        // Keep uploaded-file diagnostics compact and consistent regardless of custom upload arrays.
         foreach ($files as $key => $file) {
+            // Ignore malformed entries so profiler output remains predictable.
             if (!is_array($file)) {
                 continue;
             }
@@ -152,6 +165,7 @@ final class OutputProfilerSanitizer
     private static function sanitizeStringValue(string $value): string
     {
         $value = trim($value);
+        // Trim oversized scalar fields to keep debug payload rendering bounded.
         if (strlen($value) > 500) {
             $value = substr($value, 0, 500) . '...';
         }
@@ -165,6 +179,7 @@ final class OutputProfilerSanitizer
             || preg_match('/\bor\s+1\s*=\s*1\b/i', $value) === 1
             || preg_match('/\bunion\s+select\b/i', $value) === 1;
 
+        // Replace suspicious payloads with one safe marker before renderer-side HTML escaping.
         if ($looksHostile) {
             return '[filtered potentially hostile input]';
         }

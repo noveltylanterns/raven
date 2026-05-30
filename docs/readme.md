@@ -1,7 +1,5 @@
 # Documentation Index
 
-***Note: This document was generated with ChatGPT Codex. I have not been able to personally verify every detail within matches the actual script. I do not plan on hammering these `docs/` files down until later releases, so use them with caution!***
-
 ### Start Here
 - [Introduction](./intro.md)
 - [Filetree](./appendix/filetree.md)

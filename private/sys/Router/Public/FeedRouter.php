@@ -42,6 +42,7 @@ final class FeedRouter
             ? array_values($routeConfig['reserved_prefixes'])
             : [];
 
+        // Register RSS routes only when feeds are enabled and the route prefix is configured.
         if ($feedsEnabled && $rssFeedRoute !== '') {
             $router->add('GET', '/' . $rssFeedRoute, static function () use ($publicFeedController): void {
                 $publicFeedController()->rssFeed();
@@ -54,6 +55,7 @@ final class FeedRouter
                 $channel = RouteValidator::slugAllowedOrNotFound($channel, $reservedPrefixes, static function () use ($publicRequestContext): void {
                     $publicRequestContext()->notFound();
                 });
+                // Validators already rendered not-found for invalid or reserved slugs.
                 if ($channel === null) {
                     return;
                 }
@@ -61,11 +63,13 @@ final class FeedRouter
                 $publicFeedController()->rssFeed($channel);
             });
 
+            // Taxonomy-scoped RSS category feeds are optional and prefix-driven.
             if ($categoryPrefix !== '') {
                 $router->add('GET', '/' . $rssFeedRoute . '/' . $categoryPrefix . '/{slug}', static function (array $params) use ($publicFeedController, $publicRequestContext, $input): void {
                     $slug = RouteValidator::slugOrNotFound($input, $params['slug'] ?? null, static function () use ($publicRequestContext): void {
                         $publicRequestContext()->notFound();
                     });
+                    // Validator already rendered not-found for invalid taxonomy slugs.
                     if ($slug === null) {
                         return;
                     }
@@ -74,11 +78,13 @@ final class FeedRouter
                 });
             }
 
+            // Taxonomy-scoped RSS tag feeds are optional and prefix-driven.
             if ($tagPrefix !== '') {
                 $router->add('GET', '/' . $rssFeedRoute . '/' . $tagPrefix . '/{slug}', static function (array $params) use ($publicFeedController, $publicRequestContext, $input): void {
                     $slug = RouteValidator::slugOrNotFound($input, $params['slug'] ?? null, static function () use ($publicRequestContext): void {
                         $publicRequestContext()->notFound();
                     });
+                    // Validator already rendered not-found for invalid taxonomy slugs.
                     if ($slug === null) {
                         return;
                     }
@@ -88,6 +94,7 @@ final class FeedRouter
             }
         }
 
+        // Register Atom routes only when feeds are enabled and the route prefix is configured.
         if ($feedsEnabled && $atomFeedRoute !== '') {
             $router->add('GET', '/' . $atomFeedRoute, static function () use ($publicFeedController): void {
                 $publicFeedController()->atomFeed();
@@ -100,6 +107,7 @@ final class FeedRouter
                 $channel = RouteValidator::slugAllowedOrNotFound($channel, $reservedPrefixes, static function () use ($publicRequestContext): void {
                     $publicRequestContext()->notFound();
                 });
+                // Validators already rendered not-found for invalid or reserved slugs.
                 if ($channel === null) {
                     return;
                 }
@@ -107,11 +115,13 @@ final class FeedRouter
                 $publicFeedController()->atomFeed($channel);
             });
 
+            // Taxonomy-scoped Atom category feeds are optional and prefix-driven.
             if ($categoryPrefix !== '') {
                 $router->add('GET', '/' . $atomFeedRoute . '/' . $categoryPrefix . '/{slug}', static function (array $params) use ($publicFeedController, $publicRequestContext, $input): void {
                     $slug = RouteValidator::slugOrNotFound($input, $params['slug'] ?? null, static function () use ($publicRequestContext): void {
                         $publicRequestContext()->notFound();
                     });
+                    // Validator already rendered not-found for invalid taxonomy slugs.
                     if ($slug === null) {
                         return;
                     }
@@ -120,11 +130,13 @@ final class FeedRouter
                 });
             }
 
+            // Taxonomy-scoped Atom tag feeds are optional and prefix-driven.
             if ($tagPrefix !== '') {
                 $router->add('GET', '/' . $atomFeedRoute . '/' . $tagPrefix . '/{slug}', static function (array $params) use ($publicFeedController, $publicRequestContext, $input): void {
                     $slug = RouteValidator::slugOrNotFound($input, $params['slug'] ?? null, static function () use ($publicRequestContext): void {
                         $publicRequestContext()->notFound();
                     });
+                    // Validator already rendered not-found for invalid taxonomy slugs.
                     if ($slug === null) {
                         return;
                     }

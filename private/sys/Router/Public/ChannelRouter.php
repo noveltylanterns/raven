@@ -43,6 +43,7 @@ final class ChannelRouter
             $slug = RouteValidator::slugAllowedOrNotFound($slug, $reservedPrefixes, static function () use ($publicRequestContext): void {
                 $publicRequestContext()->notFound();
             });
+            // Validators already rendered not-found for invalid or reserved slugs.
             if ($slug === null) {
                 return;
             }

@@ -46,7 +46,9 @@ final class PageBlocks
     public function mergeTypeDefinitions(array $extensionDefinitions = []): array
     {
         $definitions = $this->pageBlockParser->defaultDefinitions();
+        // Extension definitions may add new block types but cannot override core ones.
         foreach ($extensionDefinitions as $type => $definition) {
+            // Keep canonical core definitions when type keys collide.
             if (isset($definitions[$type])) {
                 continue;
             }
@@ -73,29 +75,34 @@ final class PageBlocks
         callable $embeddedFormRenderer
     ): array {
         $rawBlocks = $page['content_blocks'] ?? null;
+        // Coerce malformed content payloads to an empty block list.
         if (!is_array($rawBlocks)) {
             $rawBlocks = [];
         }
 
         $renderedBlocks = [];
         $galleryBlockHtml = null;
+        // Render each submitted block independently in declared order.
         foreach ($rawBlocks as $block) {
             $type = 'tinymce';
             $content = '';
             $cssId = '';
             $cssClass = '';
 
+            // Structured block arrays carry explicit type/content/css metadata.
             if (is_array($block)) {
                 $type = $this->pageBlockParser->normalizeType((string) ($block['type'] ?? 'tinymce'), $definitions);
                 $value = $block['content'] ?? '';
                 $cssId = $this->pageBlockParser->normalizeCssId($block['css_id'] ?? null);
                 $cssClass = $this->pageBlockParser->normalizeCssClassList($block['css_class'] ?? null);
+                // Skip non-scalar content values that cannot be rendered safely.
                 if (!is_scalar($value) && $value !== null) {
                     continue;
                 }
 
                 $content = (string) ($value ?? '');
             } else {
+                // Scalar shorthand blocks are allowed for backwards compatibility payloads.
                 if (!is_scalar($block) && $block !== null) {
                     continue;
                 }
@@ -103,10 +110,13 @@ final class PageBlocks
                 $content = (string) ($block ?? '');
             }
 
+            // Gallery block HTML is rendered lazily once and reused for duplicate gallery blocks.
             if ($this->pageBlockParser->editorMode($type, $definitions) === 'gallery') {
+                // Defer gallery rendering until the first gallery block is encountered.
                 if (!is_string($galleryBlockHtml)) {
                     $galleryBlockHtml = (string) $galleryRenderer();
                 }
+                // Skip gallery blocks when renderer produced empty output.
                 if (trim($galleryBlockHtml) === '') {
                     continue;
                 }
@@ -120,6 +130,7 @@ final class PageBlocks
             }
 
             $html = $this->renderBlockHtml($type, $content, $definitions, $embeddedFormRenderer);
+            // Drop blocks that render to empty output after mode-specific processing.
             if (trim($html) === '') {
                 continue;
             }
@@ -175,6 +186,7 @@ final class PageBlocks
     private function renderMarkdownBlockContent(string $markdown, callable $embeddedFormRenderer): string
     {
         $html = $this->pageMarkdown->toHtml($markdown);
+        // Empty Markdown render results should not emit wrapper artifacts.
         if (trim($html) === '') {
             return '';
         }
@@ -192,6 +204,7 @@ final class PageBlocks
     private function renderMarkdownFileBlock(string $pathInput, callable $embeddedFormRenderer): string
     {
         $markdown = $this->loadLocalMarkdownFileForBlock($pathInput);
+        // Abort file-backed block rendering when safe file load failed.
         if ($markdown === null) {
             return '';
         }
@@ -208,21 +221,25 @@ final class PageBlocks
     private function loadLocalMarkdownFileForBlock(string $pathInput): ?string
     {
         $path = trim($pathInput);
+        // Empty paths cannot reference a Markdown file.
         if ($path === '') {
             return null;
         }
 
         $path = (string) preg_replace('/[?#].*$/', '', $path);
+        // Remove query/fragment suffixes and reject blanks after trimming.
         if ($path === '') {
             return null;
         }
 
         $path = str_replace('\\', '/', $path);
+        // Only markdown-like extensions are allowed for file-backed block paths.
         if (preg_match('/\.(?:md|markdown)$/i', $path) !== 1) {
             return null;
         }
 
         $projectRootReal = realpath($this->projectRoot);
+        // Abort when project root cannot be resolved on disk.
         if (!is_string($projectRootReal) || $projectRootReal === '') {
             return null;
         }
@@ -231,25 +248,30 @@ final class PageBlocks
         // project tree even when authors attempt traversal or symlink escapes.
         $projectRootPrefix = rtrim($projectRootReal, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR;
         $trimmedPath = trim($path);
+        // Path is re-trimmed after normalization to reject whitespace-only variants.
         if ($trimmedPath === '') {
             return null;
         }
 
         $candidatePath = $projectRootReal . '/' . ltrim($trimmedPath, '/');
+        // Defensive guard for unexpected empty candidate paths.
         if ($candidatePath === '') {
             return null;
         }
 
         $resolved = realpath($candidatePath);
+        // Reject unresolved files before any prefix/readability checks.
         if (!is_string($resolved) || $resolved === '') {
             return null;
         }
 
+        // Enforce project-root scope and readable regular-file requirements.
         if (!str_starts_with($resolved, $projectRootPrefix) || !is_file($resolved) || !is_readable($resolved)) {
             return null;
         }
 
         $content = @file_get_contents($resolved, false, null, 0, 1048576);
+        // Empty or failed reads are treated as unusable markdown sources.
         if (!is_string($content) || $content === '') {
             return null;
         }

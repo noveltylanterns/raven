@@ -142,11 +142,13 @@ final class PreferencesController
         $this->context->requirePanelLogin();
 
         $userId = $this->context->auth()->userId();
+        // Preference screen requires an authenticated user id in session.
         if ($userId === null) {
             Redirect::redirect($this->context->panelUrl('/login'));
         }
 
         $preferences = $this->context->auth()->userPreferences($userId);
+        // Abort when preference data cannot be loaded for the session user.
         if ($preferences === null) {
             $this->context->flash('error', 'Unable to load your preferences.');
             Redirect::redirect($this->context->panelUrl('/'));
@@ -200,16 +202,19 @@ final class PreferencesController
         );
 
         $userId = $this->context->auth()->userId();
+        // Save flow requires a concrete authenticated user id.
         if ($userId === null) {
             Redirect::redirect($this->context->panelUrl('/login'));
         }
 
+        // CSRF validation protects preference and credential updates.
         if (!$this->context->csrf()->validate($post['_csrf'] ?? null)) {
             $this->context->flash('error', 'Invalid CSRF token.');
             Redirect::redirect($preferencesUrl);
         }
 
         $current = $this->context->auth()->userPreferences($userId);
+        // Current profile payload is required for merge/update operations.
         if ($current === null) {
             $this->context->flash('error', 'Unable to load your current profile data.');
             Redirect::redirect($preferencesUrl);
@@ -242,7 +247,9 @@ final class PreferencesController
             : null;
 
         $timezone = '';
+        // Timezone is optional but validated against PHP's canonical identifier list.
         if ($timezoneRaw !== '') {
+            // Unknown timezone strings are treated as invalid and cleared.
             if (!in_array($timezoneRaw, \DateTimeZone::listIdentifiers(\DateTimeZone::ALL_WITH_BC), true)) {
                 $timezone = '';
             } else {
@@ -252,27 +259,33 @@ final class PreferencesController
 
         $errors = [];
         $usernameRequired = $loginIdentifierMode === 'username';
+        // Preserve current username when optional username field was not submitted.
         if (!$usernameRequired && !$usernameSubmitted) {
             $username = trim((string) ($current['username'] ?? ''));
             $rawUsername = $username;
         }
 
+        // Username mode requires a valid normalized username.
         if ($usernameRequired && !is_string($username)) {
             $errors[] = 'Username must be 3-50 chars and contain only a-z, 0-9, _, -, .';
         }
 
+        // Optional username must still validate when user supplies one.
         if (!$usernameRequired && $rawUsername !== '' && !is_string($username)) {
             $errors[] = 'Optional username must be 3-50 chars and contain only a-z, 0-9, _, -, .';
         }
 
+        // Preferences always require a valid primary email.
         if ($email === null) {
             $errors[] = 'A valid email address is required.';
         }
 
+        // Theme choice must normalize to a supported panel theme.
         if (!is_string($theme)) {
             $errors[] = 'Theme selection is invalid.';
         }
 
+        // Reject timezone text that failed identifier validation above.
         if ($timezoneRaw !== '' && $timezone === '') {
             $errors[] = 'Timezone selection is invalid.';
         }
@@ -288,10 +301,12 @@ final class PreferencesController
         $coverImage = $currentCoverImage;
         $uploadedCoverFilename = null;
 
+        // Explicit avatar removal clears persisted avatar path.
         if ($removeAvatar) {
             $avatarSet = true;
             $avatarFilename = null;
         }
+        // Explicit cover-image removal clears persisted cover path.
         if ($removeCover) {
             $coverImage = null;
         }
@@ -299,6 +314,7 @@ final class PreferencesController
         $avatarUpload = $files['avatar'] ?? null;
         $hasUpload = is_array($avatarUpload)
             && (($avatarUpload['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE);
+        // Validate/process avatar upload only when an actual file was submitted.
         if ($hasUpload) {
             $avatarMaxSizeBytes = $this->avatarConfig->resolveMaxFilesizeBytes(1048576);
             $avatarMaxWidth = (int) $this->config->get('user.avatar.max_width', 500);
@@ -314,14 +330,17 @@ final class PreferencesController
             /** @var array<string, mixed> $avatarUpload */
             $result = $validator->validate($avatarUpload);
 
+            // Stop on validator failures before attempting storage writes.
             if (!(bool) $result['ok']) {
                 $errors[] = (string) ($result['error'] ?? 'Avatar upload failed.');
             } else {
                 $normalizedExtension = $this->avatarUpload->normalizeExtension((string) ($result['extension'] ?? ''));
+                // Extension normalization guards unsupported file types.
                 if ($normalizedExtension === null) {
                     $errors[] = 'Avatar upload format is not supported.';
                 } else {
                     $storeResult = $this->avatarUpload->storeForUser($userId, $avatarUpload, $normalizedExtension, $this->projectRoot);
+                    // Storage layer failures are surfaced to the profile form.
                     if (!(bool) ($storeResult['ok'] ?? false)) {
                         $errors[] = (string) ($storeResult['error'] ?? 'Avatar upload failed.');
                     } else {
@@ -336,18 +355,22 @@ final class PreferencesController
         $coverUpload = $files['cover_image'] ?? null;
         $hasCoverUpload = is_array($coverUpload)
             && (($coverUpload['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE);
+        // Validate/process cover upload only when an actual file was submitted.
         if ($hasCoverUpload) {
             /** @var array<string, mixed> $coverUpload */
             $result = $this->validateUserCoverUpload($coverUpload);
 
+            // Stop on validator failures before attempting storage writes.
             if (!(bool) $result['ok']) {
                 $errors[] = (string) ($result['error'] ?? 'Cover image upload failed.');
             } else {
                 $normalizedExtension = $this->avatarUpload->normalizeExtension((string) ($result['extension'] ?? ''));
+                // Extension normalization guards unsupported cover file types.
                 if ($normalizedExtension === null) {
                     $errors[] = 'Cover image upload format is not supported.';
                 } else {
                     $storeResult = $this->coverUpload->storeForUser($userId, $coverUpload, $normalizedExtension, $this->projectRoot);
+                    // Storage layer failures are surfaced to the profile form.
                     if (!(bool) ($storeResult['ok'] ?? false)) {
                         $errors[] = (string) ($storeResult['error'] ?? 'Cover image upload failed.');
                     } else {
@@ -358,10 +381,13 @@ final class PreferencesController
             }
         }
 
+        // Validation/upload errors roll back newly written files before redirect.
         if ($errors !== []) {
+            // Remove newly uploaded avatar when validation ultimately fails.
             if ($uploadedAvatarFilename !== null) {
                 $this->avatarDelete->deleteFile($uploadedAvatarFilename);
             }
+            // Remove newly uploaded cover image when validation ultimately fails.
             if ($uploadedCoverFilename !== null) {
                 $this->coverDelete->deleteFile($uploadedCoverFilename);
             }
@@ -385,10 +411,13 @@ final class PreferencesController
             'cover_image' => $coverImage,
         ], $this->userRead, $this->authWrite);
 
+        // Update failures also roll back newly written avatar/cover files.
         if (!$update['ok']) {
+            // Remove newly uploaded avatar when persistence fails.
             if ($uploadedAvatarFilename !== null) {
                 $this->avatarDelete->deleteFile($uploadedAvatarFilename);
             }
+            // Remove newly uploaded cover image when persistence fails.
             if ($uploadedCoverFilename !== null) {
                 $this->coverDelete->deleteFile($uploadedCoverFilename);
             }
@@ -398,9 +427,11 @@ final class PreferencesController
         }
 
         $oldAvatar = $current['avatar'] ?? null;
+        // Cleanup replaced prior avatar file after successful preference save.
         if (is_string($oldAvatar) && $oldAvatar !== '' && $oldAvatar !== $avatarFilename && $avatarSet) {
             $this->avatarDelete->deleteFile($oldAvatar);
         }
+        // Cleanup replaced prior cover image file after successful preference save.
         if ($currentCoverImage !== null && $currentCoverImage !== '' && $currentCoverImage !== $coverImage) {
             $this->coverDelete->deleteFile($currentCoverImage);
         }
@@ -421,18 +452,21 @@ final class PreferencesController
     {
         $this->context->requirePanelLogin();
 
+        // CSRF validation protects TOTP setup generation endpoint.
         if (!$this->context->csrf()->validate($post['_csrf'] ?? null)) {
             $this->jsonResponse(['ok' => false, 'message' => 'Invalid CSRF token.'], 400);
             return;
         }
 
         $userId = $this->context->auth()->userId();
+        // TOTP setup requires an active authenticated session.
         if ($userId === null) {
             $this->jsonResponse(['ok' => false, 'message' => 'Login session expired.'], 401);
             return;
         }
 
         $preferences = $this->context->auth()->userPreferences($userId);
+        // Preferences payload is required to derive account email/identity.
         if (!is_array($preferences)) {
             $this->jsonResponse(['ok' => false, 'message' => 'Unable to load user preferences.'], 500);
             return;
@@ -443,6 +477,7 @@ final class PreferencesController
             (string) ($preferences['email'] ?? ''),
             $this->totpIssuer()
         );
+        // Payload generator must succeed before returning QR/secret fields.
         if (!(bool) ($payload['ok'] ?? false)) {
             $this->jsonResponse(
                 ['ok' => false, 'message' => (string) ($payload['message'] ?? 'Unable to generate a TOTP secret.')],
@@ -471,18 +506,21 @@ final class PreferencesController
     {
         $this->context->requirePanelLogin();
 
+        // CSRF validation protects recovery-code generation endpoint.
         if (!$this->context->csrf()->validate($post['_csrf'] ?? null)) {
             $this->jsonResponse(['ok' => false, 'message' => 'Invalid CSRF token.'], 400);
             return;
         }
 
         $userId = $this->context->auth()->userId();
+        // Recovery-code generation requires an active authenticated session.
         if ($userId === null) {
             $this->jsonResponse(['ok' => false, 'message' => 'Login session expired.'], 401);
             return;
         }
 
         $recoveryCode = $this->form2fa->generateRecoveryPhrase(12);
+        // Generator must return a usable phrase string.
         if (!is_string($recoveryCode)) {
             $this->jsonResponse(['ok' => false, 'message' => 'Unable to generate a recovery phrase.'], 500);
             return;
@@ -504,18 +542,21 @@ final class PreferencesController
     {
         $this->context->requirePanelLogin();
 
+        // CSRF validation protects WebAuthn registration option generation.
         if (!$this->context->csrf()->validate($post['_csrf'] ?? null)) {
             $this->jsonResponse(['ok' => false, 'message' => 'Invalid CSRF token.'], 400);
             return;
         }
 
         $userId = $this->context->auth()->userId();
+        // WebAuthn registration requires an active authenticated session.
         if ($userId === null) {
             $this->jsonResponse(['ok' => false, 'message' => 'Login session expired.'], 401);
             return;
         }
 
         $preferences = $this->context->auth()->userPreferences($userId);
+        // Preferences payload is required to build relying-party user identity.
         if (!is_array($preferences)) {
             $this->jsonResponse(['ok' => false, 'message' => 'Unable to load user preferences.'], 500);
             return;
@@ -531,6 +572,7 @@ final class PreferencesController
             && (string) ($post['require_user_verification'] ?? '') === '1';
 
         $webAuthn = $this->createWebAuthnServer();
+        // WebAuthn runtime may be unavailable when extension/runtime dependencies are missing.
         if ($webAuthn === null) {
             $this->jsonResponse(['ok' => false, 'message' => 'WebAuthn runtime is unavailable.'], 500);
             return;
@@ -540,6 +582,7 @@ final class PreferencesController
         $username = (string) ($userIdentity['username'] ?? ('user-' . $userId));
         $displayName = (string) ($userIdentity['display_name'] ?? $username);
 
+        // WebAuthn libraries can throw during options/challenge generation.
         try {
             $options = $webAuthn->getCreateArgs(
                 (string) $userId,
@@ -570,18 +613,21 @@ final class PreferencesController
     {
         $this->context->requirePanelLogin();
 
+        // CSRF validation protects WebAuthn registration verification endpoint.
         if (!$this->context->csrf()->validate($post['_csrf'] ?? null)) {
             $this->jsonResponse(['ok' => false, 'message' => 'Invalid CSRF token.'], 400);
             return;
         }
 
         $userId = $this->context->auth()->userId();
+        // WebAuthn registration verification requires active session user.
         if ($userId === null) {
             $this->jsonResponse(['ok' => false, 'message' => 'Login session expired.'], 401);
             return;
         }
 
         $challenge = $_SESSION[self::SESSION_WEBAUTHN_PREFERENCES_CHALLENGE] ?? null;
+        // Challenge must exist from prior options request to verify attestation.
         if (!is_string($challenge) || $challenge === '') {
             $this->jsonResponse(['ok' => false, 'message' => 'Registration challenge is missing.'], 400);
             return;
@@ -589,6 +635,7 @@ final class PreferencesController
 
         $clientDataJSON = base64_decode((string) ($post['clientDataJSON'] ?? ''), true);
         $attestationObject = base64_decode((string) ($post['attestationObject'] ?? ''), true);
+        // Both WebAuthn payload segments must decode into non-empty binary strings.
         if (
             !is_string($clientDataJSON) || $clientDataJSON === ''
             || !is_string($attestationObject) || $attestationObject === ''
@@ -598,34 +645,41 @@ final class PreferencesController
         }
 
         $webAuthn = $this->createWebAuthnServer();
+        // Registration verification requires an initialized WebAuthn runtime.
         if ($webAuthn === null) {
             $this->jsonResponse(['ok' => false, 'message' => 'WebAuthn runtime is unavailable.'], 500);
             return;
         }
 
+        // Verification and attestation parsing can throw from WebAuthn library internals.
         try {
             $result = $webAuthn->processCreate($clientDataJSON, $attestationObject, $challenge, false, true, false);
             unset($_SESSION[self::SESSION_WEBAUTHN_PREFERENCES_CHALLENGE]);
 
             $credentialIdBinary = null;
+            // Preferred credential id shape from current WebAuthn implementation.
             if ($result->credentialId instanceof \lbuchs\WebAuthn\Binary\ByteBuffer) {
                 $credentialIdBinary = $result->credentialId->getBinaryString();
             } elseif (is_string($result->credentialId ?? null) && $result->credentialId !== '') {
+                // Backward-compatible fallback for string credential ids.
                 $credentialIdBinary = (string) $result->credentialId;
             }
 
+            // Credential id is mandatory for subsequent assertion verification.
             if (!is_string($credentialIdBinary) || $credentialIdBinary === '') {
                 $this->jsonResponse(['ok' => false, 'message' => 'Registration did not return a credential id.'], 400);
                 return;
             }
 
             $credentialPublicKey = trim((string) ($result->credentialPublicKey ?? ''));
+            // Public key is mandatory for subsequent assertion verification.
             if ($credentialPublicKey === '') {
                 $this->jsonResponse(['ok' => false, 'message' => 'Registration did not return a credential key.'], 400);
                 return;
             }
 
             $signatureCounter = (int) ($result->signatureCounter ?? 0);
+            // Normalize negative counters defensively to zero.
             if ($signatureCounter < 0) {
                 $signatureCounter = 0;
             }

@@ -64,6 +64,7 @@ final class PageListController
     public function pageList(): void
     {
         $this->context->requirePanelLogin();
+        // Page listing is view-permission gated.
         if (!$this->context->requireRoutePermissionOrForbidden('page', 'view')) {
             return;
         }
@@ -71,9 +72,11 @@ final class PageListController
         $prefilterChannel = $this->input->slug($_GET['channel'] ?? null) ?? '';
         $prefilterCategoryId = $this->input->int($_GET['category'] ?? null, 1) ?? 0;
         $prefilterTagId = $this->input->int($_GET['tag'] ?? null, 1) ?? 0;
+        // Disable category prefilter when taxonomy feature is globally off.
         if (!$this->categoryEnabled) {
             $prefilterCategoryId = 0;
         }
+        // Disable tag prefilter when taxonomy feature is globally off.
         if (!$this->tagEnabled) {
             $prefilterTagId = 0;
         }
@@ -94,6 +97,7 @@ final class PageListController
         $totalItems = (int) ($pageResult['total'] ?? 0);
         $pageRows = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
         $pagination = Pagination::state($totalItems, $requestedPage, $perPage);
+        // Requery with clamped offset when requested page exceeds available range.
         if (!$hasMissingChannelPrefilter && $totalItems > 0 && $pagination['current'] !== $requestedPage) {
             $pageResult = $this->pageRead->listPage(
                 $perPage,
@@ -106,6 +110,7 @@ final class PageListController
         }
         $prefilterCategoryIds = $prefilterCategoryId > 0 ? [$prefilterCategoryId] : [];
         $prefilterTagIds = $prefilterTagId > 0 ? [$prefilterTagId] : [];
+        // Mirror active prefilter ids into each row for client-side persistence helpers.
         foreach ($pageRows as &$pageRow) {
             // Server-side page prefilters already constrain result rows, so list rows only
             // need the active prefilter ids for client-side in-page filter persistence.

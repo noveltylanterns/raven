@@ -80,6 +80,7 @@ final class UserListController
     public function userList(): void
     {
         $this->context->requirePanelLogin();
+        // User list view is permission-gated.
         if (!$this->context->requireRoutePermissionOrForbidden('user', 'view')) {
             return;
         }
@@ -95,6 +96,7 @@ final class UserListController
         $totalItems = (int) ($pageResult['total'] ?? 0);
         $userRows = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
         $pagination = Pagination::state($totalItems, $requestedPage, $perPage);
+        // Requery with clamped offset when requested page exceeds available range.
         if ($totalItems > 0 && $pagination['current'] !== $requestedPage) {
             $pageResult = $this->userRead->listPage(
                 $perPage,
@@ -130,9 +132,11 @@ final class UserListController
     public function userInvites(): void
     {
         $this->context->requirePanelLogin();
+        // Invite listing shares user:view permission guard.
         if (!$this->context->requireRoutePermissionOrForbidden('user', 'view')) {
             return;
         }
+        // Invite listing is available only in invite registration mode.
         if (!$this->ensureInviteRegistrationMode()) {
             return;
         }
@@ -157,11 +161,13 @@ final class UserListController
      */
     private function inviteRead(): InviteRead
     {
+        // Reuse cached invite read repository once resolved.
         if ($this->inviteRead instanceof InviteRead) {
             return $this->inviteRead;
         }
 
         $repo = ($this->inviteReadResolver)();
+        // Resolver contract must return invite read repository.
         if (!$repo instanceof InviteRead) {
             throw new \RuntimeException('Panel invite read resolver returned an invalid value.');
         }
@@ -179,8 +185,10 @@ final class UserListController
     {
         $rows = $this->userRead->listAll();
         $map = [];
+        // Build creator-label map keyed by user id for invite list rendering.
         foreach ($rows as $row) {
             $userId = (int) ($row['id'] ?? 0);
+            // Ignore malformed rows without a positive user id.
             if ($userId < 1) {
                 continue;
             }
@@ -210,13 +218,16 @@ final class UserListController
     private function pullFlashList(string $key): ?array
     {
         $value = $this->flashList->pullList($key);
+        // Flash-list payload must be array-shaped to be usable.
         if (!is_array($value)) {
             return null;
         }
 
         $normalized = [];
+        // Normalize and sanitize each flash-list entry before returning.
         foreach ($value as $item) {
             $stringItem = is_string($item) ? trim($item) : '';
+            // Skip empty/non-string flash-list items.
             if ($stringItem === '') {
                 continue;
             }
@@ -245,6 +256,7 @@ final class UserListController
      */
     private function ensureInviteRegistrationMode(): bool
     {
+        // Invite-token screens are enabled only in invite registration mode.
         if ($this->registrationMode() === 'invite') {
             return true;
         }

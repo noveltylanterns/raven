@@ -147,16 +147,19 @@ final class UserEditController
     {
         $this->context->requirePanelLogin();
         $requiredAction = $id === null ? 'create' : 'edit';
+        // User editor permission is scoped by create vs edit mode.
         if (!$this->context->requireRoutePermissionOrForbidden('user', $requiredAction)) {
             return;
         }
 
         $activeTab = $this->editorTabs->normalizeEditorTab($_GET['tab'] ?? null, ['account', 'permissions', 'profile', 'security'], 'account');
         $user = $id !== null ? $this->userRead->findById($id) : null;
+        // Normalize loaded user row for theme and 2FA display fields.
         if (is_array($user)) {
             $normalizedTheme = $this->panelTheme->normalizeChoice((string) ($user['theme'] ?? 'default'), true);
             $user['theme'] = $normalizedTheme ?? 'default';
 
+            // Edit mode enriches form data with persisted 2FA preference entries.
             if ($id !== null) {
                 $preferences = $this->context->auth()->userPreferences($id);
                 $user['two_factor'] = is_array($preferences['two_factor'] ?? null)
@@ -167,6 +170,7 @@ final class UserEditController
             }
         }
 
+        // Edit mode must reference an existing user record.
         if ($id !== null && $user === null) {
             $this->context->flash('error', 'User not found.');
             Redirect::redirect($this->context->panelUrl('/user'));
@@ -217,10 +221,12 @@ final class UserEditController
         $this->context->requirePanelLogin();
         $id = $this->input->int($post['id'] ?? null, 1);
         $requiredAction = $id === null ? 'create' : 'edit';
+        // User save permission is scoped by create vs edit mode.
         if (!$this->context->requireRoutePermissionOrForbidden('user', $requiredAction)) {
             return;
         }
 
+        // CSRF validation protects user save actions.
         if (!$this->context->csrf()->validate($post['_csrf'] ?? null)) {
             $this->context->flash('error', 'Invalid CSRF token.');
             Redirect::redirect($this->context->panelUrl('/user'));
@@ -264,14 +270,17 @@ final class UserEditController
         $existingUser = null;
         $existingTwoFactorMethods = [];
         $canUpdateTwoFactorMethods = false;
+        // Edit mode loads existing user and 2FA preference state.
         if ($id !== null) {
             $existingUser = $this->userRead->findById($id);
+            // Abort when edit target no longer exists.
             if ($existingUser === null) {
                 $this->context->flash('error', 'User not found.');
                 Redirect::redirect($this->context->panelUrl('/user'));
             }
 
             $existingPreferences = $this->context->auth()->userPreferences($id);
+            // Existing preferences gate whether submitted 2FA methods can be merged.
             if (is_array($existingPreferences)) {
                 $existingTwoFactorMethods = is_array($existingPreferences['two_factor'] ?? null)
                     ? array_values($existingPreferences['two_factor'])
@@ -292,9 +301,12 @@ final class UserEditController
         /** @var mixed $secondaryGroupIdsRaw */
         $secondaryGroupIdsRaw = $post['secondary_group_ids'] ?? [];
         $secondaryGroupIds = [];
+        // Secondary group selections are optional checkbox arrays.
         if (is_array($secondaryGroupIdsRaw)) {
+            // Normalize secondary group ids from posted checkbox values.
             foreach ($secondaryGroupIdsRaw as $raw) {
                 $parsed = $this->input->int($raw, 1);
+                // Keep only valid positive integer group ids.
                 if ($parsed !== null) {
                     $secondaryGroupIds[] = $parsed;
                 }
@@ -310,38 +322,46 @@ final class UserEditController
         $groupIds = array_values(array_intersect($groupIds, $validGroupIds));
 
         $groupPermissionMasks = [];
+        // Build per-group permission mask lookup for assignment policy checks.
         foreach ($groupOptions as $groupOption) {
             $groupPermissionMasks[(int) ($groupOption['id'] ?? 0)] = (int) ($groupOption['permissions'] ?? 0);
         }
 
         $actorIsAdmin = $this->context->auth()->panelService()->isAdmin();
+        // Non-admin actors cannot newly assign the Admin group.
         if (!$actorIsAdmin) {
             $targetAlreadyHasAdmin = false;
+            // Existing group memberships are needed to detect admin-group retention.
             if (is_array($existingUser)) {
                 $existingGroupIds = array_map('intval', (array) ($existingUser['group_ids'] ?? []));
                 $targetAlreadyHasAdmin = in_array(1, $existingGroupIds, true);
             }
 
             $requestedAdmin = in_array(1, $groupIds, true);
+            // Block non-admin attempts to newly add Admin group membership.
             if ($requestedAdmin && !$targetAlreadyHasAdmin) {
                 $this->context->flash('error', 'Only Admin users can assign the Admin group.');
                 Redirect::redirect($editUrl);
             }
 
+            // Preserve existing Admin membership when non-admin edits user groups.
             if ($targetAlreadyHasAdmin && !in_array(1, $groupIds, true)) {
                 $groupIds[] = 1;
             }
         }
 
+        // Non-admin actors cannot assign configuration-capable groups.
         if (!$actorIsAdmin) {
             $configurationGroupIds = [];
             $systemPanelBitsMask = PanelAccess::maskFromBits(PanelAccess::systemPanelBits());
+            // Discover groups that carry system configuration capabilities.
             foreach ($groupPermissionMasks as $groupIdKey => $mask) {
                 if (($mask & $systemPanelBitsMask) !== 0) {
                     $configurationGroupIds[] = $groupIdKey;
                 }
             }
 
+            // Compare existing vs requested privileged-group assignments.
             if ($configurationGroupIds !== []) {
                 $existingGroupIds = is_array($existingUser)
                     ? array_map('intval', (array) ($existingUser['group_ids'] ?? []))
@@ -350,6 +370,7 @@ final class UserEditController
                 $requestedConfigurationGroupIds = array_values(array_intersect($groupIds, $configurationGroupIds));
                 $newConfigurationAssignments = array_values(array_diff($requestedConfigurationGroupIds, $existingConfigurationGroupIds));
 
+                // Block non-admin attempts to add new configuration-capable groups.
                 if ($newConfigurationAssignments !== []) {
                     $this->context->flash('error', 'Only Admin users can assign groups with Manage System Configuration.');
                     Redirect::redirect($editUrl);
@@ -358,6 +379,7 @@ final class UserEditController
         }
 
         $usernameRequired = $loginIdentifierMode === 'username';
+        // Preserve existing username when optional username was not submitted.
         if (!$usernameRequired && !$usernameSubmitted && is_array($existingUser)) {
             $username = trim((string) ($existingUser['username'] ?? ''));
             $rawUsername = $username;
@@ -365,6 +387,7 @@ final class UserEditController
         $usernameInvalid = $usernameRequired
             ? !is_string($username)
             : ($rawUsername !== '' && !is_string($username));
+        // Validate username/email/theme trio before any persistence actions.
         if ($usernameInvalid || $email === null || !is_string($theme)) {
             $this->context->flash(
                 'error',
@@ -375,36 +398,44 @@ final class UserEditController
             Redirect::redirect($editUrl);
         }
 
+        // New users must provide an initial password meeting minimum length.
         if ($id === null && strlen($password) < 8) {
             $this->context->flash('error', 'New users require a password of at least 8 characters.');
             Redirect::redirect($editUrl);
         }
 
+        // New-user password confirmation must match exactly.
         if ($id === null && !hash_equals($password, $passwordConfirm)) {
             $this->context->flash('error', 'Password confirmation does not match.');
             Redirect::redirect($securityTabUrl);
         }
 
+        // Existing-user password updates must meet minimum length when supplied.
         if ($id !== null && $password !== '' && strlen($password) < 8) {
             $this->context->flash('error', 'Password must be at least 8 characters.');
             Redirect::redirect($editUrl);
         }
 
+        // Existing-user password updates require matching confirmation.
         if ($id !== null && $password !== '' && !hash_equals($password, $passwordConfirm)) {
             $this->context->flash('error', 'Password confirmation does not match.');
             Redirect::redirect($securityTabUrl);
         }
 
+        // Derive fallback primary group when submitted primary group is missing.
         if ($primaryGroupId < 1) {
             $fallbackGroupId = $this->groupRead->idBySlug('guest') ?? 0;
+            // Use guest fallback when available.
             if ($fallbackGroupId > 0) {
                 $primaryGroupId = $fallbackGroupId;
+                // Ensure fallback primary group is represented in full group set.
                 if (!in_array($primaryGroupId, $groupIds, true)) {
                     $groupIds = array_merge([$primaryGroupId], $groupIds);
                 }
             }
         }
 
+        // Primary + at least one group assignment is required for saved users.
         if ($primaryGroupId < 1 || $groupIds === []) {
             $this->context->flash('error', 'At least one user group is required.');
             Redirect::redirect($editUrl);
@@ -419,10 +450,12 @@ final class UserEditController
         $uploadedCoverFilename = null;
         $pendingCoverUpload = null;
         $pendingCoverExtension = null;
+        // Explicit avatar removal clears persisted avatar path.
         if ($removeAvatar) {
             $avatarSet = true;
             $avatarFilename = null;
         }
+        // Explicit cover removal clears persisted cover image path.
         if ($removeCover) {
             $coverImage = null;
         }
@@ -430,6 +463,7 @@ final class UserEditController
         $avatarUpload = $files['avatar'] ?? null;
         $hasAvatarUpload = is_array($avatarUpload)
             && (($avatarUpload['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE);
+        // Validate/process avatar upload only when a real file was submitted.
         if ($hasAvatarUpload) {
             $avatarMaxSizeBytes = $this->avatarConfig->resolveMaxFilesizeBytes(1048576);
             $avatarMaxWidth = (int) $this->config->get('user.avatar.max_width', 500);
@@ -440,19 +474,23 @@ final class UserEditController
             /** @var array<string, mixed> $avatarUpload */
             $result = $validator->validate($avatarUpload);
 
+            // Validator failures return early with explicit error feedback.
             if (!(bool) $result['ok']) {
                 $this->context->flash('error', (string) ($result['error'] ?? 'Avatar upload failed.'));
                 Redirect::redirect($editUrl);
             }
 
             $normalizedExtension = $this->avatarUpload->normalizeExtension((string) ($result['extension'] ?? ''));
+            // Extension normalization guards unsupported avatar file types.
             if ($normalizedExtension === null) {
                 $this->context->flash('error', 'Avatar upload format is not supported.');
                 Redirect::redirect($editUrl);
             }
 
+            // Existing users can store avatar immediately; new users must defer until id exists.
             if ($id !== null) {
                 $storeResult = $this->avatarUpload->storeForUser($id, $avatarUpload, $normalizedExtension, $this->projectRoot);
+                // Storage-layer failures are surfaced before save transaction.
                 if (!(bool) ($storeResult['ok'] ?? false)) {
                     $this->context->flash('error', (string) ($storeResult['error'] ?? 'Avatar upload failed.'));
                     Redirect::redirect($editUrl);
@@ -470,6 +508,7 @@ final class UserEditController
         $coverUpload = $files['cover_image'] ?? null;
         $hasCoverUpload = is_array($coverUpload)
             && (($coverUpload['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE);
+        // Validate/process cover upload only when a real file was submitted.
         if ($hasCoverUpload) {
             /** @var array<string, mixed> $coverUpload */
             $coverResult = $this->validateUserCoverUpload($coverUpload);
@@ -479,13 +518,16 @@ final class UserEditController
             }
 
             $normalizedExtension = $this->avatarUpload->normalizeExtension((string) ($coverResult['extension'] ?? ''));
+            // Extension normalization guards unsupported cover file types.
             if ($normalizedExtension === null) {
                 $this->context->flash('error', 'Cover image upload format is not supported.');
                 Redirect::redirect($editUrl);
             }
 
+            // Existing users can store cover immediately; new users defer until id exists.
             if ($id !== null) {
                 $storeResult = $this->coverUpload->storeForUser($id, $coverUpload, $normalizedExtension, $this->projectRoot);
+                // Storage-layer failures are surfaced before save transaction.
                 if (!(bool) ($storeResult['ok'] ?? false)) {
                     $this->context->flash('error', (string) ($storeResult['error'] ?? 'Cover image upload failed.'));
                     Redirect::redirect($editUrl);
@@ -500,6 +542,7 @@ final class UserEditController
         }
 
         $createdUserId = null;
+        // Main save flow can throw from repository and deferred upload operations.
         try {
             $savedId = $this->userWrite->save([
                 'id' => $id,
@@ -518,6 +561,7 @@ final class UserEditController
                 'string_length' => (int) $this->config->get('user.string', 28),
             ]);
 
+            // Create mode runs second save after generated user string exists.
             if ($id === null) {
                 $this->userWrite->save([
                     'id' => $savedId,
@@ -538,12 +582,15 @@ final class UserEditController
 
                 $createdUserId = $savedId;
                 $createdUserString = $this->userRead->userStringById($savedId);
+                // Generated user string is required before completing create flow.
                 if ($createdUserString === null) {
                     throw new \RuntimeException('Failed to resolve generated user string.');
                 }
 
+                // Persist deferred avatar upload now that user id exists.
                 if (is_array($pendingAvatarUpload) && is_string($pendingAvatarExtension)) {
                     $storeResult = $this->avatarUpload->storeForUser($savedId, $pendingAvatarUpload, $pendingAvatarExtension, $this->projectRoot);
+                    // Deferred avatar store failures abort create flow.
                     if (!(bool) ($storeResult['ok'] ?? false)) {
                         throw new \RuntimeException((string) ($storeResult['error'] ?? 'Avatar upload failed.'));
                     }
@@ -553,8 +600,10 @@ final class UserEditController
                     $uploadedAvatarFilename = $avatarFilename;
                 }
 
+                // Persist deferred cover upload now that user id exists.
                 if (is_array($pendingCoverUpload) && is_string($pendingCoverExtension)) {
                     $storeResult = $this->coverUpload->storeForUser($savedId, $pendingCoverUpload, $pendingCoverExtension, $this->projectRoot);
+                    // Deferred cover store failures abort create flow.
                     if (!(bool) ($storeResult['ok'] ?? false)) {
                         throw new \RuntimeException((string) ($storeResult['error'] ?? 'Cover image upload failed.'));
                     }
@@ -563,6 +612,7 @@ final class UserEditController
                     $uploadedCoverFilename = $coverImage;
                 }
 
+                // Apply avatar/cover paths in a final save only when uploads were stored.
                 if ($avatarSet || $uploadedCoverFilename !== null) {
                     $this->userWrite->save([
                         'id' => $savedId,
@@ -583,14 +633,18 @@ final class UserEditController
                 }
             }
         } catch (\Throwable $exception) {
+            // Roll back newly written avatar file on failure.
             if ($uploadedAvatarFilename !== null) {
                 $this->avatarDelete->deleteFile($uploadedAvatarFilename);
             }
+            // Roll back newly written cover file on failure.
             if ($uploadedCoverFilename !== null) {
                 $this->coverDelete->deleteFile($uploadedCoverFilename);
             }
 
+            // Remove partially created user records in create mode.
             if ($id === null && $createdUserId !== null) {
+                // Cleanup delete failure should not mask original save failure.
                 try {
                     $this->userWrite->deleteById($createdUserId);
                 } catch (\Throwable) {
@@ -603,10 +657,13 @@ final class UserEditController
         }
 
         $twoFactorUpdateError = null;
+        // Optional 2FA method retention applies only in edit mode with submitted marker.
         if ($id !== null && $canUpdateTwoFactorMethods && $submittedTwoFactorMethodsPresent) {
             $retainedTwoFactorMethods = [];
+            // Retain only submitted indices that map to valid existing methods.
             foreach ($submittedTwoFactorMethodIndices as $methodIndex) {
                 $method = $existingTwoFactorMethods[$methodIndex] ?? null;
+                // Ignore malformed retained-method entries.
                 if (!is_array($method)) {
                     continue;
                 }
@@ -615,6 +672,7 @@ final class UserEditController
             }
 
             $twoFactorUpdate = $this->authWrite->updateTwoFactorMethods($savedId, $retainedTwoFactorMethods);
+            // Surface update errors without failing the overall user-save operation.
             if (!(bool) ($twoFactorUpdate['ok'] ?? false)) {
                 $rawErrors = is_array($twoFactorUpdate['errors'] ?? null) ? $twoFactorUpdate['errors'] : [];
                 $messages = array_map(static fn (mixed $value): string => trim((string) $value), $rawErrors);
@@ -625,13 +683,16 @@ final class UserEditController
             }
         }
 
+        // Remove replaced avatar file after successful save.
         if ($avatarSet && is_string($currentAvatarPath) && $currentAvatarPath !== '' && $currentAvatarPath !== $avatarFilename) {
             $this->avatarDelete->deleteFile($currentAvatarPath);
         }
+        // Remove replaced cover file after successful save.
         if ($currentCoverImage !== null && $currentCoverImage !== '' && $currentCoverImage !== $coverImage) {
             $this->coverDelete->deleteFile($currentCoverImage);
         }
 
+        // Report partial-success state when 2FA update failed.
         if ($twoFactorUpdateError !== null) {
             $this->context->flash('error', $twoFactorUpdateError);
             Redirect::redirect($this->editorTabs->panelEditorUrlWithTab(
@@ -662,10 +723,12 @@ final class UserEditController
     public function userDelete(array $post): void
     {
         $this->context->requirePanelLogin();
+        // User deletion is permission-gated due destructive behavior.
         if (!$this->context->requireRoutePermissionOrForbidden('user', 'delete')) {
             return;
         }
 
+        // CSRF validation protects user delete actions.
         if (!$this->context->csrf()->validate($post['_csrf'] ?? null)) {
             $this->context->flash('error', 'Invalid CSRF token.');
             Redirect::redirect($this->context->panelUrl('/user'));
@@ -674,12 +737,15 @@ final class UserEditController
         $id = $this->input->int($post['id'] ?? null, 1);
         $currentUserId = $this->context->auth()->userId();
 
+        // Single-row delete path takes precedence when id is posted.
         if ($id !== null) {
+            // Prevent deleting the currently authenticated account.
             if ($currentUserId === $id) {
                 $this->context->flash('error', 'You cannot delete your currently logged-in account.');
                 Redirect::redirect($this->context->panelUrl('/user'));
             }
 
+            // Repository delete may fail due relational or storage constraints.
             try {
                 $this->userWrite->deleteById($id);
             } catch (\Throwable $exception) {
@@ -692,6 +758,7 @@ final class UserEditController
         }
 
         $selectedIds = $this->selectedIdsFromPost($post);
+        // Bulk delete requires at least one selected id.
         if ($selectedIds === []) {
             $this->context->flash('error', 'No users selected.');
             Redirect::redirect($this->context->panelUrl('/user'));
@@ -701,12 +768,15 @@ final class UserEditController
         $failedCount = 0;
         $skippedCurrentCount = 0;
 
+        // Process bulk-selected ids independently for partial-success handling.
         foreach ($selectedIds as $selectedId) {
+            // Skip current account if included in selection.
             if ($currentUserId !== null && $selectedId === $currentUserId) {
                 $skippedCurrentCount++;
                 continue;
             }
 
+            // Continue processing remaining ids even when one delete fails.
             try {
                 $this->userWrite->deleteById($selectedId);
                 $deletedCount++;
@@ -715,16 +785,20 @@ final class UserEditController
             }
         }
 
+        // Report successful deletes and include skipped/failed counts when relevant.
         if ($deletedCount > 0) {
             $message = 'Deleted ' . $deletedCount . ' user' . ($deletedCount === 1 ? '' : 's') . '.';
+            // Explicitly mention when current account was skipped.
             if ($skippedCurrentCount > 0) {
                 $message .= ' Skipped your currently logged-in account.';
             }
+            // Include failed-count suffix for partial bulk outcomes.
             if ($failedCount > 0) {
                 $message .= ' Failed to delete ' . $failedCount . ' selected user' . ($failedCount === 1 ? '' : 's') . '.';
             }
             $this->context->flash('success', $message);
         } else {
+            // Distinguish "only skipped self" from generic bulk-delete failure.
             if ($skippedCurrentCount > 0 && $failedCount === 0) {
                 $this->context->flash('error', 'No users deleted because your currently logged-in account cannot be deleted.');
             } else {
@@ -797,6 +871,7 @@ final class UserEditController
     private function profileRouteSegment(array $user): ?string
     {
         $userId = (int) ($user['id'] ?? 0);
+        // Profile route segment requires a valid persisted user id.
         if ($userId <= 0) {
             return null;
         }
@@ -909,13 +984,16 @@ final class UserEditController
     private function selectedIdsFromPost(array $post, string $key = 'selected_ids'): array
     {
         $raw = $post[$key] ?? [];
+        // Selected-id payload must be array-shaped checkbox values.
         if (!is_array($raw)) {
             return [];
         }
 
         $selected = [];
+        // Normalize and deduplicate selected ids through associative map keys.
         foreach ($raw as $candidate) {
             $id = $this->input->int($candidate, 1);
+            // Keep only valid positive integer identifiers.
             if ($id !== null) {
                 $selected[$id] = $id;
             }

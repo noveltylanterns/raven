@@ -51,9 +51,11 @@ spl_autoload_register(static function (string $class): void {
     $root = dirname(__DIR__, 2);
 
     $libPrefix = 'Raven\\Lib\\';
+    // Resolve Raven library classes from private/lib for CLI-only bootstrap.
     if (str_starts_with($class, $libPrefix)) {
         $relative = str_replace('\\', '/', substr($class, strlen($libPrefix)));
         $path = $root . '/private/lib/' . $relative . '.php';
+        // Include only when file physically exists to avoid noisy warnings.
         if (is_file($path)) {
             require_once $path;
         }
@@ -61,9 +63,11 @@ spl_autoload_register(static function (string $class): void {
     }
 
     $corePrefix = 'Raven\\Core\\';
+    // Resolve Raven core classes from private/sys for CLI-only bootstrap.
     if (str_starts_with($class, $corePrefix)) {
         $relative = str_replace('\\', '/', substr($class, strlen($corePrefix)));
         $path = $root . '/private/sys/' . $relative . '.php';
+        // Include only when file physically exists to avoid noisy warnings.
         if (is_file($path)) {
             require_once $path;
         }
@@ -119,11 +123,13 @@ final class RavenCliContext
      */
     public function rvn(): array
     {
+        // Reuse previously booted container for repeated command operations.
         if (is_array($this->rvn)) {
             return $this->rvn;
         }
 
         $configPath = $this->root . '/private/dat/config.php';
+        // Repository-backed commands require a persisted runtime config.
         if (!is_file($configPath)) {
             throw new RuntimeException(
                 'Missing private/dat/config.php. Run installer first before using repository-backed CLI commands.'
@@ -131,6 +137,7 @@ final class RavenCliContext
         }
 
         $bootstrapPath = $this->root . '/private/Raven.php';
+        // Boot file must exist before loading the shared Raven container.
         if (!is_file($bootstrapPath)) {
             throw new RuntimeException('Missing private/Raven.php bootstrap file.');
         }
@@ -161,6 +168,7 @@ final class RavenCliContext
      */
     public function info(string $message): void
     {
+        // Human-readable info lines are suppressed in JSON mode.
         if ($this->json) {
             return;
         }
@@ -176,6 +184,7 @@ final class RavenCliContext
      */
     public function status(string $message): void
     {
+        // Status lines require explicit verbose mode and non-JSON output.
         if ($this->verboseStatus && !$this->json) {
             $this->line('[status] ' . $message);
         }
@@ -189,6 +198,7 @@ final class RavenCliContext
      */
     public function ok(string $message): void
     {
+        // Human-readable success lines are suppressed in JSON mode.
         if ($this->json) {
             return;
         }
@@ -202,6 +212,7 @@ final class RavenCliContext
     public function printJson(array $data): void
     {
         $encoded = json_encode($data, JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT);
+        // Emit a minimal fallback when JSON encoding fails.
         if (!is_string($encoded)) {
             $this->line('{"error":"Failed to encode JSON output."}');
             return;
@@ -219,8 +230,10 @@ final class RavenCliContext
      */
     public function error(string $message, ?Throwable $exception = null): void
     {
+        // JSON mode emits structured error payloads instead of stderr lines.
         if ($this->json) {
             $payload = ['ok' => false, 'error' => $message];
+            // Verbose-errors mode includes exception metadata and trace.
             if ($this->verboseErrors && $exception !== null) {
                 $payload['exception'] = $exception::class;
                 $payload['exception_message'] = $exception->getMessage();
@@ -231,6 +244,7 @@ final class RavenCliContext
         }
 
         fwrite(STDERR, '[error] ' . $message . PHP_EOL);
+        // Plain-text mode can optionally append exception detail.
         if ($this->verboseErrors && $exception !== null) {
             fwrite(STDERR, $exception::class . ': ' . $exception->getMessage() . PHP_EOL);
             fwrite(STDERR, $exception->getTraceAsString() . PHP_EOL);
@@ -249,6 +263,7 @@ final class RavenCliContext
         $suffix = $default !== '' ? ' [' . $default . ']' : '';
         $text = $question . $suffix . ': ';
 
+        // Prefer readline when available for better interactive UX.
         if (function_exists('readline')) {
             $raw = readline($text);
         } else {
@@ -256,6 +271,7 @@ final class RavenCliContext
             $raw = fgets(STDIN);
         }
 
+        // EOF or read failure falls back to the provided default.
         if ($raw === false) {
             return $default;
         }
@@ -275,6 +291,7 @@ final class RavenCliContext
     {
         $suffix = $default ? ' [Y/n]' : ' [y/N]';
         $answer = strtolower($this->prompt($question . $suffix));
+        // Empty confirmation input resolves to caller-provided default.
         if ($answer === '') {
             return $default;
         }
@@ -290,6 +307,7 @@ final class RavenCliContext
      */
     public function renderBanner(string $mode): void
     {
+        // Suppress banner in no-banner or JSON modes.
         if ($this->noBanner || $this->json) {
             return;
         }
@@ -306,6 +324,7 @@ final class RavenCliContext
      */
     public function renderHelpHeader(string $topic): void
     {
+        // Suppress help header in no-banner or JSON modes.
         if ($this->noBanner || $this->json) {
             return;
         }
@@ -321,6 +340,7 @@ final class RavenCliContext
 function raven_cli_bootstrap(array $argv): array
 {
     $root = getenv('RAVEN_ROOT');
+    // Default to project-relative root when env override is absent.
     if (!is_string($root) || trim($root) === '') {
         $root = dirname(__DIR__, 2);
     }
@@ -332,11 +352,14 @@ function raven_cli_bootstrap(array $argv): array
     $noBanner = false;
 
     $remaining = [];
+    // Parse global CLI flags first, leaving command tokens in `$remaining`.
     foreach (array_values($argv) as $index => $token) {
+        // Skip argv[0] executable path.
         if ($index === 0) {
             continue;
         }
 
+        // Ignore non-string argv entries defensively.
         if (!is_string($token)) {
             continue;
         }
@@ -390,18 +413,22 @@ function raven_cli_parse_tokens(array $tokens): array
     for ($i = 0; $i < $count; $i++) {
         $token = $tokens[$i];
 
+        // Parse long options (`--name` or `--name=value`) into options map.
         if (str_starts_with($token, '--')) {
             $raw = substr($token, 2);
+            // Ignore bare `--` tokens in this lightweight parser.
             if ($raw === '') {
                 continue;
             }
 
             $key = $raw;
             $value = true;
+            // Inline assignment form: `--key=value`.
             if (str_contains($raw, '=')) {
                 [$key, $value] = explode('=', $raw, 2);
             } else {
                 $next = $tokens[$i + 1] ?? null;
+                // Consume the next token as value when it is not another option.
                 if (is_string($next) && !str_starts_with($next, '-')) {
                     $value = $next;
                     $i++;
@@ -409,21 +436,26 @@ function raven_cli_parse_tokens(array $tokens): array
             }
 
             $key = strtolower(trim($key));
+            // Keep only non-empty normalized option keys.
             if ($key !== '') {
                 $options[$key] = $value;
             }
             continue;
         }
 
+        // Parse short flag bundles (`-abc`) into individual boolean/string options.
         if (str_starts_with($token, '-')) {
             $flags = substr($token, 1);
+            // Ignore lone `-` tokens.
             if ($flags === '') {
                 continue;
             }
 
             $chars = str_split($flags);
+            // Expand bundled short flags into individual option keys.
             foreach ($chars as $flagIndex => $char) {
                 $key = strtolower(trim($char));
+                // Ignore whitespace/empty flag tokens after normalization.
                 if ($key === '') {
                     continue;
                 }
@@ -431,6 +463,7 @@ function raven_cli_parse_tokens(array $tokens): array
                 $value = true;
                 $isLast = $flagIndex === count($chars) - 1;
                 $next = $tokens[$i + 1] ?? null;
+                // Only trailing short flag may consume a following scalar token as value.
                 if ($isLast && is_string($next) && !str_starts_with($next, '-')) {
                     $value = $next;
                     $i++;
@@ -456,12 +489,15 @@ function raven_cli_parse_tokens(array $tokens): array
 function raven_cli_option(array $options, string $name, mixed $default = null, ?string $short = null): mixed
 {
     $key = strtolower(trim($name));
+    // Prefer long option key when explicitly present.
     if ($key !== '' && array_key_exists($key, $options)) {
         return $options[$key];
     }
 
+    // Fallback to short alias when provided by caller.
     if ($short !== null) {
         $shortKey = strtolower(trim($short));
+        // Short key must be non-empty and present in parsed options.
         if ($shortKey !== '' && array_key_exists($shortKey, $options)) {
             return $options[$shortKey];
         }
@@ -478,6 +514,7 @@ function raven_cli_option(array $options, string $name, mixed $default = null, ?
  */
 function raven_cli_is_help_requested(array $tokens): bool
 {
+    // Accept any of the common help switches/aliases.
     foreach ($tokens as $token) {
         if ($token === '--help' || $token === '-h' || $token === 'help') {
             return true;
@@ -493,24 +530,30 @@ function raven_cli_is_help_requested(array $tokens): bool
 function raven_cli_bool_option(array $options, string $name, bool $default = false, ?string $short = null): bool
 {
     $raw = raven_cli_option($options, $name, $default, $short);
+    // Preserve boolean options as-is.
     if (is_bool($raw)) {
         return $raw;
     }
 
+    // Numeric options map zero/non-zero to false/true.
     if (is_int($raw) || is_float($raw)) {
         return ((int) $raw) !== 0;
     }
 
+    // String values are normalized through common boolean spellings.
     if (is_string($raw)) {
         $value = strtolower(trim($raw));
+        // Empty string falls back to caller default.
         if ($value === '') {
             return $default;
         }
 
+        // Truthy string aliases.
         if (in_array($value, ['1', 'true', 'yes', 'on', 'y'], true)) {
             return true;
         }
 
+        // Falsy string aliases.
         if (in_array($value, ['0', 'false', 'no', 'off', 'n'], true)) {
             return false;
         }
@@ -525,6 +568,7 @@ function raven_cli_bool_option(array $options, string $name, bool $default = fal
 function raven_cli_required_scalar_option(array $options, string $name, string $error, ?string $short = null): string
 {
     $raw = raven_cli_option($options, $name, null, $short);
+    // Required scalar options must be present and non-blank.
     if (!is_scalar($raw) || trim((string) $raw) === '') {
         throw new RuntimeException($error);
     }
@@ -543,6 +587,7 @@ function raven_cli_required_scalar_option(array $options, string $name, string $
 function raven_cli_slug_from_text(array $rvn, string $raw, string $label = 'Slug'): string
 {
     $slug = $rvn['input']->slug($raw);
+    // Invalid slug normalization is treated as caller-facing input error.
     if ($slug === null || $slug === '') {
         throw new RuntimeException($label . ' is invalid.');
     }
@@ -563,11 +608,13 @@ function raven_cli_slug_from_text(array $rvn, string $raw, string $label = 'Slug
  */
 function raven_cli_optional_slug(array $rvn, mixed $raw): ?string
 {
+    // Optional slug selectors ignore non-scalar option payloads.
     if (!is_scalar($raw)) {
         return null;
     }
 
     $value = trim((string) $raw);
+    // Blank optional slug selectors are treated as omitted.
     if ($value === '') {
         return null;
     }
@@ -582,15 +629,19 @@ function raven_cli_optional_slug(array $rvn, mixed $raw): ?string
 function raven_cli_find_row_by_slug(array $rows, string $slug): ?array
 {
     $needle = strtolower(trim($slug));
+    // Empty lookup slug cannot match any row.
     if ($needle === '') {
         return null;
     }
 
+    // Scan rows and return first slug match.
     foreach ($rows as $row) {
+        // Ignore malformed row payloads.
         if (!is_array($row)) {
             continue;
         }
 
+        // Compare case-insensitively against normalized needle.
         if (strtolower((string) ($row['slug'] ?? '')) === $needle) {
             return $row;
         }
@@ -614,6 +665,7 @@ function raven_cli_extension_state_store(string $root): StateRead
     static $stores = [];
 
     $normalizedRoot = rtrim($root, '/');
+    // Cache one extension state store per normalized project root.
     if (!isset($stores[$normalizedRoot]) || !$stores[$normalizedRoot] instanceof StateRead) {
         $stores[$normalizedRoot] = new StateRead($normalizedRoot . '/private/ext');
     }
@@ -651,6 +703,7 @@ function raven_cli_extension_state_save(string $root, array $enabled, array $per
  */
 function raven_cli_remove_directory_recursive(string $directory): void
 {
+    // Nothing to remove when directory is already absent.
     if (!is_dir($directory)) {
         return;
     }
@@ -660,10 +713,13 @@ function raven_cli_remove_directory_recursive(string $directory): void
         RecursiveIteratorIterator::CHILD_FIRST
     );
 
+    // Child-first traversal ensures directories are emptied before deletion.
     foreach ($iterator as $item) {
+        // Remove directory nodes after their children are processed.
         if ($item->isDir()) {
             @rmdir($item->getPathname());
         } else {
+            // Remove regular file nodes directly.
             @unlink($item->getPathname());
         }
     }
@@ -680,15 +736,18 @@ function raven_cli_remove_directory_recursive(string $directory): void
  */
 function raven_cli_copy_directory_recursive(string $source, string $target): void
 {
+    // Source path must be an existing directory.
     if (!is_dir($source)) {
         throw new RuntimeException('Clone source directory not found: ' . $source);
     }
 
     $sourceRoot = realpath($source);
+    // realpath failure or non-directory roots are treated as invalid sources.
     if ($sourceRoot === false || !is_dir($sourceRoot)) {
         throw new RuntimeException('Failed to resolve clone source directory.');
     }
 
+    // Ensure clone target root exists before recursive copy begins.
     if (!is_dir($target) && !mkdir($target, 0770, true) && !is_dir($target)) {
         throw new RuntimeException('Failed to create clone target directory.');
     }
@@ -698,18 +757,22 @@ function raven_cli_copy_directory_recursive(string $source, string $target): voi
         RecursiveIteratorIterator::SELF_FIRST
     );
 
+    // Traverse source tree and mirror entries into target.
     foreach ($iterator as $item) {
+        // Symlinks are rejected to avoid ambiguous or unsafe clone targets.
         if ($item->isLink()) {
             throw new RuntimeException('Clone source contains symlinks, which are not supported.');
         }
 
         $sourcePath = $item->getPathname();
         $relativePath = ltrim(substr($sourcePath, strlen($sourceRoot)), DIRECTORY_SEPARATOR);
+        // Skip iterator root marker entries that map to empty relative path.
         if ($relativePath === '') {
             continue;
         }
 
         $targetPath = rtrim($target, '/\\') . '/' . str_replace('\\', '/', $relativePath);
+        // Create directory nodes recursively before descending into children.
         if ($item->isDir()) {
             if (!is_dir($targetPath) && !mkdir($targetPath, 0770, true) && !is_dir($targetPath)) {
                 throw new RuntimeException('Failed to create clone directory: ' . $targetPath);
@@ -718,10 +781,12 @@ function raven_cli_copy_directory_recursive(string $source, string $target): voi
         }
 
         $targetDir = dirname($targetPath);
+        // Ensure parent directory exists before writing file payloads.
         if (!is_dir($targetDir) && !mkdir($targetDir, 0770, true) && !is_dir($targetDir)) {
             throw new RuntimeException('Failed to create clone directory: ' . $targetDir);
         }
 
+        // Copy file bytes and abort immediately on failure.
         if (!copy($sourcePath, $targetPath)) {
             throw new RuntimeException('Failed to copy clone file: ' . $relativePath);
         }
@@ -760,16 +825,19 @@ function raven_cli_package_install_workflow(string $root): ArchiveInstall
  */
 function raven_cli_merge_missing_config_defaults(array $config, array $defaults, array &$added, string $prefix = ''): array
 {
+    // Fill only missing config keys, recursing into nested arrays.
     foreach ($defaults as $key => $value) {
         $segment = (string) $key;
         $path = $prefix === '' ? $segment : $prefix . '.' . $segment;
 
+        // Missing key gets seeded from defaults and recorded in `$added`.
         if (!array_key_exists($segment, $config)) {
             $config[$segment] = $value;
             $added[] = $path;
             continue;
         }
 
+        // Recurse only when both default and config nodes are arrays.
         if (is_array($value) && is_array($config[$segment])) {
             $config[$segment] = raven_cli_merge_missing_config_defaults($config[$segment], $value, $added, $path);
         }
@@ -784,10 +852,12 @@ function raven_cli_merge_missing_config_defaults(array $config, array $defaults,
 function raven_cli_flatten_config_keys(array $node, string $prefix = ''): array
 {
     $keys = [];
+    // Flatten nested config arrays into dot-path key list.
     foreach ($node as $key => $value) {
         $segment = (string) $key;
         $path = $prefix === '' ? $segment : $prefix . '.' . $segment;
         $keys[] = $path;
+        // Descend recursively into nested arrays.
         if (is_array($value)) {
             $keys = array_merge($keys, raven_cli_flatten_config_keys($value, $path));
         }
@@ -807,12 +877,15 @@ function raven_cli_flatten_config_keys(array $node, string $prefix = ''): array
 function raven_cli_has_config_key(array $config, string $path): bool
 {
     $segments = array_values(array_filter(explode('.', trim($path)), static fn (string $item): bool => $item !== ''));
+    // Empty/invalid dot paths cannot resolve any config value.
     if ($segments === []) {
         return false;
     }
 
     $cursor = $config;
+    // Walk each dot-path segment through nested config nodes.
     foreach ($segments as $segment) {
+        // Missing path segment or non-array cursor means lookup miss.
         if (!is_array($cursor) || !array_key_exists($segment, $cursor)) {
             return false;
         }
@@ -834,7 +907,9 @@ function raven_cli_get_config_value(array $config, string $path): mixed
 {
     $segments = array_values(array_filter(explode('.', trim($path)), static fn (string $item): bool => $item !== ''));
     $cursor = $config;
+    // Walk each dot-path segment through nested config nodes.
     foreach ($segments as $segment) {
+        // Missing path segment or non-array cursor means lookup miss.
         if (!is_array($cursor) || !array_key_exists($segment, $cursor)) {
             return null;
         }
@@ -851,17 +926,21 @@ function raven_cli_get_config_value(array $config, string $path): mixed
 function raven_cli_set_config_value(array &$config, string $path, mixed $value): void
 {
     $segments = array_values(array_filter(explode('.', trim($path)), static fn (string $item): bool => $item !== ''));
+    // Empty/invalid dot paths are rejected for mutation.
     if ($segments === []) {
         throw new RuntimeException('Invalid config key path.');
     }
 
     $cursor = &$config;
+    // Walk segments and create intermediate arrays as needed.
     foreach ($segments as $index => $segment) {
+        // Final segment writes the value and returns.
         if ($index === count($segments) - 1) {
             $cursor[$segment] = $value;
             return;
         }
 
+        // Non-array intermediate nodes are replaced with arrays.
         if (!isset($cursor[$segment]) || !is_array($cursor[$segment])) {
             $cursor[$segment] = [];
         }
@@ -884,31 +963,40 @@ function raven_cli_parse_typed_value(string $raw, string $type, mixed $existingV
     $normalizedType = strtolower(trim($type));
     $value = trim($raw);
 
+    // Auto mode infers type from existing value when available.
     if ($normalizedType === '' || $normalizedType === 'auto') {
+        // Existing values drive strict coercion behavior.
         if ($hasExisting) {
             if (is_bool($existingValue)) {
                 return raven_cli_bool_option(['value' => $value], 'value', false);
             }
+            // Preserve integer-typed keys by requiring strict integer input.
             if (is_int($existingValue)) {
+                // Reject non-integer text for integer-backed keys.
                 if (!preg_match('/^-?[0-9]+$/', $value)) {
                     throw new RuntimeException('Value must be an integer for this key.');
                 }
                 return (int) $value;
             }
+            // Preserve float-typed keys by requiring numeric input.
             if (is_float($existingValue)) {
+                // Reject non-numeric text for float-backed keys.
                 if (!is_numeric($value)) {
                     throw new RuntimeException('Value must be numeric for this key.');
                 }
                 return (float) $value;
             }
+            // Null-backed keys accept literal `null` or fallback to raw string.
             if ($existingValue === null) {
                 if (strtolower($value) === 'null') {
                     return null;
                 }
                 return $value;
             }
+            // Array-backed keys require JSON object/array input.
             if (is_array($existingValue)) {
                 $decoded = json_decode($value, true);
+                // Reject non-array JSON payloads for array-backed keys.
                 if (!is_array($decoded)) {
                     throw new RuntimeException('Value must be JSON object/array for this key.');
                 }
@@ -916,20 +1004,26 @@ function raven_cli_parse_typed_value(string $raw, string $type, mixed $existingV
             }
         }
 
+        // Auto mode accepts explicit `null` literal.
         if (strtolower($value) === 'null') {
             return null;
         }
+        // Auto mode accepts explicit boolean literals.
         if (in_array(strtolower($value), ['true', 'false'], true)) {
             return strtolower($value) === 'true';
         }
+        // Auto mode prefers integer coercion before float coercion.
         if (preg_match('/^-?[0-9]+$/', $value) === 1) {
             return (int) $value;
         }
+        // Auto mode accepts generic numeric strings as float.
         if (is_numeric($value)) {
             return (float) $value;
         }
+        // Auto mode attempts JSON decode for object/array-like payloads.
         if ((str_starts_with($value, '{') && str_ends_with($value, '}')) || (str_starts_with($value, '[') && str_ends_with($value, ']'))) {
             $decoded = json_decode($value, true);
+            // Only array/object JSON payloads are returned from auto mode.
             if (is_array($decoded)) {
                 return $decoded;
             }
@@ -941,12 +1035,14 @@ function raven_cli_parse_typed_value(string $raw, string $type, mixed $existingV
     return match ($normalizedType) {
         'string' => $raw,
         'int', 'integer' => (function () use ($value): int {
+            // Explicit integer mode rejects non-integer strings.
             if (!preg_match('/^-?[0-9]+$/', $value)) {
                 throw new RuntimeException('Value is not a valid integer.');
             }
             return (int) $value;
         })(),
         'float', 'double', 'number' => (function () use ($value): float {
+            // Explicit float mode rejects non-numeric strings.
             if (!is_numeric($value)) {
                 throw new RuntimeException('Value is not numeric.');
             }
@@ -956,6 +1052,7 @@ function raven_cli_parse_typed_value(string $raw, string $type, mixed $existingV
         'null' => null,
         'json' => (function () use ($raw): array {
             $decoded = json_decode($raw, true);
+            // Explicit json mode requires object/array JSON payload.
             if (!is_array($decoded)) {
                 throw new RuntimeException('Value is not valid JSON object/array.');
             }
@@ -976,6 +1073,7 @@ function raven_cli_run_process(array $command, string $cwd): array
     ];
 
     $process = proc_open($command, $descriptorSpec, $pipes, $cwd);
+    // Process-open failure returns a synthetic non-zero result payload.
     if (!is_resource($process)) {
         return [
             'ok' => false,
@@ -993,6 +1091,7 @@ function raven_cli_run_process(array $command, string $cwd): array
     $exitCode = proc_close($process);
     $output = trim((string) $stdout);
     $err = trim((string) $stderr);
+    // Append stderr payload to output when command reports warnings/errors.
     if ($err !== '') {
         $output = trim($output . PHP_EOL . $err);
     }
@@ -1235,6 +1334,7 @@ function raven_cli_command_category(RavenCliContext $context, array $tokens): in
             ]);
 
             // Response format follows the active output mode.
+            // Emit structured result in JSON mode, plain text otherwise.
             if ($context->json) {
                 $context->printJson(['ok' => true, 'id' => $id, 'action' => $action]);
             } else {
@@ -1243,19 +1343,23 @@ function raven_cli_command_category(RavenCliContext $context, array $tokens): in
             return 0;
         }
 
+        // Delete flow resolves selector, validates id, then deletes row.
         if ($action === 'delete') {
             $row = $resolveCategory($options);
 
+            // Selector miss is surfaced as a user-facing not-found error.
             if (!is_array($row)) {
                 throw new RuntimeException('Category not found (use --id or --slug).');
             }
 
             $id = (int) ($row['id'] ?? 0);
+            // Guard against malformed rows missing positive ids.
             if ($id < 1) {
                 throw new RuntimeException('Category id is invalid.');
             }
 
             $repo->deleteById($id);
+            // Emit structured result in JSON mode, plain text otherwise.
             if ($context->json) {
                 $context->printJson(['ok' => true, 'deleted_id' => $id]);
             } else {
@@ -1280,10 +1384,12 @@ function raven_cli_command_category(RavenCliContext $context, array $tokens): in
  */
 function raven_cli_command_tag(RavenCliContext $context, array $tokens): int
 {
+    // Interactive mode prompts for missing action token.
     if ($tokens === [] && $context->interactive) {
         $tokens[] = strtolower(trim($context->prompt('Tag action (list/show/create/update/delete)', 'list')));
     }
 
+    // Empty/help invocations render command usage and exit cleanly.
     if ($tokens === [] || raven_cli_is_help_requested($tokens)) {
         $context->renderHelpHeader('tag');
         $context->info('Usage: private/bin/rvn-tag <action> [options]');
@@ -1296,17 +1402,20 @@ function raven_cli_command_tag(RavenCliContext $context, array $tokens): int
     $parsed = raven_cli_parse_tokens($tokens);
     $options = $parsed['options'];
 
+    // Wrap action dispatch so all failures funnel through unified CLI error output.
     try {
         $rvn = $context->rvn();
         $repoRead = new TagRead($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix']);
         $repo = new TagWrite($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix'], $repoRead);
         $resolveTag = static function (array $selectorOptions) use ($rvn, $repoRead): ?array {
             $idRaw = raven_cli_option($selectorOptions, 'id', null);
+            // Prefer numeric id lookup when selector includes a non-empty id.
             if (is_scalar($idRaw) && trim((string) $idRaw) !== '') {
                 return $repoRead->findById((int) $idRaw);
             }
 
             $slug = raven_cli_optional_slug($rvn, raven_cli_option($selectorOptions, 'slug', ''));
+            // Invalid/missing slug selector resolves as no match.
             if ($slug === null) {
                 return null;
             }
@@ -1314,11 +1423,14 @@ function raven_cli_command_tag(RavenCliContext $context, array $tokens): int
             return $repoRead->findBySlug($slug);
         };
 
+        // List action returns all tags.
         if ($action === 'list') {
             $rows = $repoRead->listAll();
+            // Emit structured result in JSON mode.
             if ($context->json) {
                 $context->printJson(['ok' => true, 'items' => $rows]);
             } else {
+                // Emit compact line format for human-readable mode.
                 foreach ($rows as $row) {
                     $context->line((string) ($row['id'] ?? 0) . ' | ' . (string) ($row['slug'] ?? '') . ' | ' . (string) ($row['name'] ?? ''));
                 }
@@ -1328,16 +1440,20 @@ function raven_cli_command_tag(RavenCliContext $context, array $tokens): int
             return 0;
         }
 
+        // Show action resolves one tag by id/slug selector.
         if ($action === 'show') {
             $row = $resolveTag($options);
 
+            // Selector miss is surfaced as a user-facing not-found error.
             if (!is_array($row)) {
                 throw new RuntimeException('Tag not found.');
             }
 
+            // Emit structured result in JSON mode.
             if ($context->json) {
                 $context->printJson(['ok' => true, 'item' => $row]);
             } else {
+                // Emit key/value dump in human-readable mode.
                 foreach ($row as $key => $value) {
                     $context->line((string) $key . ': ' . (is_scalar($value) || $value === null ? (string) $value : json_encode($value)));
                 }
@@ -1345,35 +1461,43 @@ function raven_cli_command_tag(RavenCliContext $context, array $tokens): int
             return 0;
         }
 
-        if ($action === 'create' || $action === 'update') {
-            $existing = null;
-            if ($action === 'update') {
-                $existing = $resolveTag($options);
-
-                if (!is_array($existing)) {
-                    throw new RuntimeException('Tag to update was not found (use --id or --slug).');
-                }
-            }
+        // Create/update share one payload-building flow with optional existing row preload.
+	        if ($action === 'create' || $action === 'update') {
+	            $existing = null;
+	            // Update flow requires a resolvable target row.
+	            if ($action === 'update') {
+	                $existing = $resolveTag($options);
+	
+	                // Fail fast when selector did not resolve an editable row.
+	                if (!is_array($existing)) {
+	                    throw new RuntimeException('Tag to update was not found (use --id or --slug).');
+	                }
+	            }
 
             $name = (string) raven_cli_option($options, 'name', '');
+            // Interactive mode prompts for missing tag name.
             if ($name === '' && $context->interactive) {
                 $name = $context->prompt('Tag name', is_array($existing) ? (string) ($existing['name'] ?? '') : '');
             }
             $name = $rvn['input']->text($name, 120);
+            // Name remains required after prompt/normalization.
             if ($name === '') {
                 throw new RuntimeException('Tag name is required.');
             }
 
             $slugInput = (string) raven_cli_option($options, 'slug', '');
+            // Interactive mode prompts for missing slug input.
             if ($slugInput === '' && $context->interactive) {
                 $slugInput = $context->prompt('Tag slug', is_array($existing) ? (string) ($existing['slug'] ?? '') : '');
             }
+            // Update flow falls back to existing slug when no new slug is provided.
             if ($slugInput === '' && is_array($existing)) {
                 $slugInput = (string) ($existing['slug'] ?? '');
             }
             $slug = raven_cli_slug_from_text($rvn, $slugInput, 'Tag slug');
 
             $description = (string) raven_cli_option($options, 'description', is_array($existing) ? (string) ($existing['description'] ?? '') : '');
+            // Interactive mode prompts for optional description when omitted.
             if ($description === '' && $context->interactive) {
                 $description = $context->prompt('Tag description', $description);
             }
@@ -1386,6 +1510,7 @@ function raven_cli_command_tag(RavenCliContext $context, array $tokens): int
                 'description' => $description,
             ]);
 
+            // Emit structured result in JSON mode, plain text otherwise.
             if ($context->json) {
                 $context->printJson(['ok' => true, 'id' => $id, 'action' => $action]);
             } else {
@@ -1394,19 +1519,23 @@ function raven_cli_command_tag(RavenCliContext $context, array $tokens): int
             return 0;
         }
 
+        // Delete flow resolves selector, validates id, then deletes row.
         if ($action === 'delete') {
             $row = $resolveTag($options);
 
+            // Selector miss is surfaced as a user-facing not-found error.
             if (!is_array($row)) {
                 throw new RuntimeException('Tag not found (use --id or --slug).');
             }
 
             $id = (int) ($row['id'] ?? 0);
+            // Guard against malformed rows missing positive ids.
             if ($id < 1) {
                 throw new RuntimeException('Tag id is invalid.');
             }
 
             $repo->deleteById($id);
+            // Emit structured result in JSON mode, plain text otherwise.
             if ($context->json) {
                 $context->printJson(['ok' => true, 'deleted_id' => $id]);
             } else {
@@ -1431,10 +1560,12 @@ function raven_cli_command_tag(RavenCliContext $context, array $tokens): int
  */
 function raven_cli_command_channel(RavenCliContext $context, array $tokens): int
 {
+    // Interactive mode prompts for missing action token.
     if ($tokens === [] && $context->interactive) {
         $tokens[] = strtolower(trim($context->prompt('Channel action (list/show/create/update/delete)', 'list')));
     }
 
+    // Empty/help invocations render command usage and exit cleanly.
     if ($tokens === [] || raven_cli_is_help_requested($tokens)) {
         $context->renderHelpHeader('channel');
         $context->info('Usage: private/bin/rvn-chan <action> [options]');
@@ -1447,87 +1578,105 @@ function raven_cli_command_channel(RavenCliContext $context, array $tokens): int
     $parsed = raven_cli_parse_tokens($tokens);
     $options = $parsed['options'];
 
-    try {
-        $rvn = $context->rvn();
-        $repoRead = new ChannelRead($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix'], (string) $rvn['root'] . '/private/dat/channel');
-        $repo = new ChannelWrite($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix'], $repoRead, (string) $rvn['root'] . '/private/dat/channel');
-        $resolveChannel = static function (array $selectorOptions) use ($rvn, $repoRead): ?array {
-            $idRaw = raven_cli_option($selectorOptions, 'id', null);
-            if (is_scalar($idRaw) && trim((string) $idRaw) !== '') {
-                return $repoRead->findById((int) $idRaw);
-            }
-
-            $slug = raven_cli_optional_slug($rvn, raven_cli_option($selectorOptions, 'slug', ''));
-            if ($slug === null) {
-                return null;
-            }
+	    // Convert all command failures into a consistent non-zero CLI exit.
+	    try {
+	        $rvn = $context->rvn();
+	        $repoRead = new ChannelRead($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix'], (string) $rvn['root'] . '/private/dat/channel');
+	        $repo = new ChannelWrite($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix'], $repoRead, (string) $rvn['root'] . '/private/dat/channel');
+	        $resolveChannel = static function (array $selectorOptions) use ($rvn, $repoRead): ?array {
+	            $idRaw = raven_cli_option($selectorOptions, 'id', null);
+	            // Numeric selector takes precedence to avoid slug ambiguity.
+	            if (is_scalar($idRaw) && trim((string) $idRaw) !== '') {
+	                return $repoRead->findById((int) $idRaw);
+	            }
+	
+	            $slug = raven_cli_optional_slug($rvn, raven_cli_option($selectorOptions, 'slug', ''));
+	            // Missing/invalid slug means caller did not provide a usable selector.
+	            if ($slug === null) {
+	                return null;
+	            }
 
             return $repoRead->findBySlug($slug);
         };
 
-        if ($action === 'list') {
-            $rows = $repoRead->listAll();
-            if ($context->json) {
-                $context->printJson(['ok' => true, 'items' => $rows]);
-            } else {
-                foreach ($rows as $row) {
-                    $context->line((string) ($row['id'] ?? 0) . ' | ' . (string) ($row['slug'] ?? '') . ' | ' . (string) ($row['name'] ?? ''));
-                }
-                $context->ok('Listed ' . count($rows) . ' channels.');
-            }
+	        // List action emits either machine JSON or human tabular lines.
+	        if ($action === 'list') {
+	            $rows = $repoRead->listAll();
+	            // Preserve stable JSON envelope for scripting clients.
+	            if ($context->json) {
+	                $context->printJson(['ok' => true, 'items' => $rows]);
+	            } else {
+	                // Human mode prints one concise channel summary per line.
+	                foreach ($rows as $row) {
+	                    $context->line((string) ($row['id'] ?? 0) . ' | ' . (string) ($row['slug'] ?? '') . ' | ' . (string) ($row['name'] ?? ''));
+	                }
+	                $context->ok('Listed ' . count($rows) . ' channels.');
+	            }
             return 0;
         }
 
-        if ($action === 'show') {
-            $row = $resolveChannel($options);
-
-            if (!is_array($row)) {
-                throw new RuntimeException('Channel not found.');
-            }
-
-            if ($context->json) {
-                $context->printJson(['ok' => true, 'item' => $row]);
-            } else {
-                foreach ($row as $key => $value) {
-                    $context->line((string) $key . ': ' . (is_scalar($value) || $value === null ? (string) $value : json_encode($value)));
-                }
-            }
+	        // Show action resolves exactly one channel selector.
+	        if ($action === 'show') {
+	            $row = $resolveChannel($options);
+	
+	            // Surface selector miss as a clear user-facing failure.
+	            if (!is_array($row)) {
+	                throw new RuntimeException('Channel not found.');
+	            }
+	
+	            // Preserve stable JSON envelope for scripting clients.
+	            if ($context->json) {
+	                $context->printJson(['ok' => true, 'item' => $row]);
+	            } else {
+	                // Human mode prints key/value rows for quick inspection.
+	                foreach ($row as $key => $value) {
+	                    $context->line((string) $key . ': ' . (is_scalar($value) || $value === null ? (string) $value : json_encode($value)));
+	                }
+	            }
             return 0;
         }
 
-        if ($action === 'create' || $action === 'update') {
-            $existing = null;
-            if ($action === 'update') {
-                $existing = $resolveChannel($options);
-
-                if (!is_array($existing)) {
-                    throw new RuntimeException('Channel to update was not found (use --id or --slug).');
-                }
-            }
-
-            $name = (string) raven_cli_option($options, 'name', '');
-            if ($name === '' && $context->interactive) {
-                $name = $context->prompt('Channel name', is_array($existing) ? (string) ($existing['name'] ?? '') : '');
-            }
-            $name = $rvn['input']->text($name, 120);
-            if ($name === '') {
-                throw new RuntimeException('Channel name is required.');
-            }
-
-            $slugInput = (string) raven_cli_option($options, 'slug', '');
-            if ($slugInput === '' && $context->interactive) {
-                $slugInput = $context->prompt('Channel slug', is_array($existing) ? (string) ($existing['slug'] ?? '') : '');
-            }
-            if ($slugInput === '' && is_array($existing)) {
-                $slugInput = (string) ($existing['slug'] ?? '');
-            }
-            $slug = raven_cli_slug_from_text($rvn, $slugInput, 'Channel slug');
-
-            $description = (string) raven_cli_option($options, 'description', is_array($existing) ? (string) ($existing['description'] ?? '') : '');
-            if ($description === '' && $context->interactive) {
-                $description = $context->prompt('Channel description', $description);
-            }
-            $description = $rvn['input']->text($description, 1000);
+	        // Create/update share one payload flow with optional preload.
+	        if ($action === 'create' || $action === 'update') {
+	            $existing = null;
+	            // Update requires an existing channel row to mutate.
+	            if ($action === 'update') {
+	                $existing = $resolveChannel($options);
+	
+	                // Fail fast when selector did not resolve an editable row.
+	                if (!is_array($existing)) {
+	                    throw new RuntimeException('Channel to update was not found (use --id or --slug).');
+	                }
+	            }
+	
+	            $name = (string) raven_cli_option($options, 'name', '');
+	            // Interactive mode prompts for required name when omitted.
+	            if ($name === '' && $context->interactive) {
+	                $name = $context->prompt('Channel name', is_array($existing) ? (string) ($existing['name'] ?? '') : '');
+	            }
+	            $name = $rvn['input']->text($name, 120);
+	            // Reject empty names after prompt/sanitization.
+	            if ($name === '') {
+	                throw new RuntimeException('Channel name is required.');
+	            }
+	
+	            $slugInput = (string) raven_cli_option($options, 'slug', '');
+	            // Interactive mode prompts for missing slug input.
+	            if ($slugInput === '' && $context->interactive) {
+	                $slugInput = $context->prompt('Channel slug', is_array($existing) ? (string) ($existing['slug'] ?? '') : '');
+	            }
+	            // Update keeps prior slug when caller omitted a new value.
+	            if ($slugInput === '' && is_array($existing)) {
+	                $slugInput = (string) ($existing['slug'] ?? '');
+	            }
+	            $slug = raven_cli_slug_from_text($rvn, $slugInput, 'Channel slug');
+	
+	            $description = (string) raven_cli_option($options, 'description', is_array($existing) ? (string) ($existing['description'] ?? '') : '');
+	            // Interactive mode prompts for optional description text.
+	            if ($description === '' && $context->interactive) {
+	                $description = $context->prompt('Channel description', $description);
+	            }
+	            $description = $rvn['input']->text($description, 1000);
 
             $editor = strtolower(trim((string) raven_cli_option($options, 'editor', is_array($existing) ? (string) ($existing['editor_override'] ?? 'inherit') : 'inherit')));
             $routeMode = strtolower(trim((string) raven_cli_option($options, 'route-mode', is_array($existing) ? (string) ($existing['route_mode'] ?? 'inherit') : 'inherit')));
@@ -1543,32 +1692,37 @@ function raven_cli_command_channel(RavenCliContext $context, array $tokens): int
                 'route_separator' => $separator,
             ]);
 
-            if ($context->json) {
-                $context->printJson(['ok' => true, 'id' => $id, 'action' => $action]);
-            } else {
-                $context->ok('Channel ' . $action . 'd (id: ' . $id . ').');
-            }
+	            // Emit structured result in JSON mode, plain text otherwise.
+	            if ($context->json) {
+	                $context->printJson(['ok' => true, 'id' => $id, 'action' => $action]);
+	            } else {
+	                $context->ok('Channel ' . $action . 'd (id: ' . $id . ').');
+	            }
             return 0;
         }
 
-        if ($action === 'delete') {
-            $row = $resolveChannel($options);
-
-            if (!is_array($row)) {
-                throw new RuntimeException('Channel not found (use --id or --slug).');
-            }
-
-            $id = (int) ($row['id'] ?? 0);
-            if ($id < 0) {
-                throw new RuntimeException('Channel id is invalid.');
-            }
-
-            $repo->deleteById($id);
-            if ($context->json) {
-                $context->printJson(['ok' => true, 'deleted_id' => $id]);
-            } else {
-                $context->ok('Channel deleted (id: ' . $id . ').');
-            }
+	        // Delete flow resolves selector, validates id, then deletes row.
+	        if ($action === 'delete') {
+	            $row = $resolveChannel($options);
+	
+	            // Selector miss is surfaced as a user-facing not-found error.
+	            if (!is_array($row)) {
+	                throw new RuntimeException('Channel not found (use --id or --slug).');
+	            }
+	
+	            $id = (int) ($row['id'] ?? 0);
+	            // Guard against malformed rows with invalid identifiers.
+	            if ($id < 0) {
+	                throw new RuntimeException('Channel id is invalid.');
+	            }
+	
+	            $repo->deleteById($id);
+	            // Emit structured result in JSON mode, plain text otherwise.
+	            if ($context->json) {
+	                $context->printJson(['ok' => true, 'deleted_id' => $id]);
+	            } else {
+	                $context->ok('Channel deleted (id: ' . $id . ').');
+	            }
             return 0;
         }
 
@@ -1588,13 +1742,15 @@ function raven_cli_command_channel(RavenCliContext $context, array $tokens): int
  */
 function raven_cli_command_group(RavenCliContext $context, array $tokens): int
 {
-    if ($tokens === [] && $context->interactive) {
-        $tokens[] = strtolower(trim($context->prompt('Group action (list/show/create/update/delete)', 'list')));
-    }
+	    // Interactive mode prompts for missing action token.
+	    if ($tokens === [] && $context->interactive) {
+	        $tokens[] = strtolower(trim($context->prompt('Group action (list/show/create/update/delete)', 'list')));
+	    }
 
-    if ($tokens === [] || raven_cli_is_help_requested($tokens)) {
-        $context->renderHelpHeader('group');
-        $context->info('Usage: private/bin/rvn-group <action> [options]');
+	    // Empty/help invocations render usage and exit cleanly.
+	    if ($tokens === [] || raven_cli_is_help_requested($tokens)) {
+	        $context->renderHelpHeader('group');
+	        $context->info('Usage: private/bin/rvn-group <action> [options]');
         $context->info('Actions: list, show, create, update, delete');
         $context->info('Options: --id, --slug, --name, --route-enabled(0|1), --permission-mask <int>, --permissions <csv>');
         $context->info('Permission names: view_public, view_private, view_disabled, panel_login, manage_content, manage_taxonomy, manage_users, manage_groups, manage_configuration');
@@ -1605,7 +1761,8 @@ function raven_cli_command_group(RavenCliContext $context, array $tokens): int
     $parsed = raven_cli_parse_tokens($tokens);
     $options = $parsed['options'];
 
-    try {
+	    // Convert all command failures into a consistent non-zero CLI exit.
+	    try {
         $rvn = $context->rvn();
         $repoRead = new GroupRead($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix']);
         $repo = new GroupWrite($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix'], $repoRead);
@@ -1644,26 +1801,30 @@ function raven_cli_command_group(RavenCliContext $context, array $tokens): int
             'config' => 'manage_configuration',
         ];
 
-        $maskNames = static function (int $mask) use ($orderedPermissions): array {
-            $names = [];
-            foreach ($orderedPermissions as $name => $bit) {
-                if (($mask & $bit) === $bit) {
-                    $names[] = $name;
-                }
+	        $maskNames = static function (int $mask) use ($orderedPermissions): array {
+	            $names = [];
+	            // Preserve a deterministic permission name order for output stability.
+	            foreach ($orderedPermissions as $name => $bit) {
+	                // Include names whose bit is fully set in the mask.
+	                if (($mask & $bit) === $bit) {
+	                    $names[] = $name;
+	                }
             }
             return $names;
         };
 
-        $resolveGroup = static function (array $selectorOptions) use ($rvn, $repoRead): ?array {
-            $idRaw = raven_cli_option($selectorOptions, 'id', null);
-            if (is_scalar($idRaw) && trim((string) $idRaw) !== '') {
-                return $repoRead->findById((int) $idRaw);
-            }
-
-            $slug = raven_cli_optional_slug($rvn, raven_cli_option($selectorOptions, 'slug', ''));
-            if ($slug === null) {
-                return null;
-            }
+	        $resolveGroup = static function (array $selectorOptions) use ($rvn, $repoRead): ?array {
+	            $idRaw = raven_cli_option($selectorOptions, 'id', null);
+	            // Numeric selector takes precedence to avoid slug ambiguity.
+	            if (is_scalar($idRaw) && trim((string) $idRaw) !== '') {
+	                return $repoRead->findById((int) $idRaw);
+	            }
+	
+	            $slug = raven_cli_optional_slug($rvn, raven_cli_option($selectorOptions, 'slug', ''));
+	            // Missing/invalid slug means caller did not provide a usable selector.
+	            if ($slug === null) {
+	                return null;
+	            }
 
             return $repoRead->findBySlug($slug);
         };
@@ -1675,41 +1836,50 @@ function raven_cli_command_group(RavenCliContext $context, array $tokens): int
             $hasMask = is_scalar($rawMask) && trim((string) $rawMask) !== '';
             $hasPermissions = is_scalar($rawPermissions) && trim((string) $rawPermissions) !== '';
 
-            if ($hasMask && $hasPermissions) {
-                throw new RuntimeException('Use either --permission-mask or --permissions, not both.');
-            }
-
-            if ($hasMask) {
-                $value = trim((string) $rawMask);
-                if (preg_match('/^-?[0-9]+$/', $value) !== 1) {
-                    throw new RuntimeException('--permission-mask must be an integer.');
-                }
-
-                $parsedMask = (int) $value;
-                if ($parsedMask < 0) {
-                    throw new RuntimeException('--permission-mask must be >= 0.');
-                }
+	            // Reject mutually-exclusive permission input modes early.
+	            if ($hasMask && $hasPermissions) {
+	                throw new RuntimeException('Use either --permission-mask or --permissions, not both.');
+	            }
+	
+	            // Explicit numeric mask overrides alias parsing.
+	            if ($hasMask) {
+	                $value = trim((string) $rawMask);
+	                // Keep mask parsing strict to avoid silent coercion surprises.
+	                if (preg_match('/^-?[0-9]+$/', $value) !== 1) {
+	                    throw new RuntimeException('--permission-mask must be an integer.');
+	                }
+	
+	                $parsedMask = (int) $value;
+	                // Negative masks are invalid for bit-flag storage.
+	                if ($parsedMask < 0) {
+	                    throw new RuntimeException('--permission-mask must be >= 0.');
+	                }
 
                 return $parsedMask;
             }
 
-            if ($hasPermissions) {
-                $mask = 0;
-                $parts = preg_split('/[,\s]+/', trim((string) $rawPermissions)) ?: [];
-                foreach ($parts as $part) {
-                    if (!is_string($part)) {
-                        continue;
-                    }
-
-                    $name = strtolower(trim($part));
-                    if ($name === '') {
-                        continue;
-                    }
-
-                    $canonical = $permissionAliases[$name] ?? null;
-                    if (!is_string($canonical) || !isset($orderedPermissions[$canonical])) {
-                        throw new RuntimeException('Unknown permission name: ' . $name);
-                    }
+	            // CSV/space permission names are converted into a bit mask.
+	            if ($hasPermissions) {
+	                $mask = 0;
+	                $parts = preg_split('/[,\s]+/', trim((string) $rawPermissions)) ?: [];
+	                // Walk each token and normalize aliases before bit assignment.
+	                foreach ($parts as $part) {
+	                    // Non-string fragments from split are ignored defensively.
+	                    if (!is_string($part)) {
+	                        continue;
+	                    }
+	
+	                    $name = strtolower(trim($part));
+	                    // Skip empty tokens from repeated separators.
+	                    if ($name === '') {
+	                        continue;
+	                    }
+	
+	                    $canonical = $permissionAliases[$name] ?? null;
+	                    // Reject unknown permission labels instead of dropping silently.
+	                    if (!is_string($canonical) || !isset($orderedPermissions[$canonical])) {
+	                        throw new RuntimeException('Unknown permission name: ' . $name);
+	                    }
 
                     $mask |= (int) $orderedPermissions[$canonical];
                 }
@@ -1720,23 +1890,28 @@ function raven_cli_command_group(RavenCliContext $context, array $tokens): int
             return $defaultMask;
         };
 
-        if ($action === 'list') {
-            $rows = $repoRead->listAll();
-            $items = [];
-            foreach ($rows as $row) {
-                if (!is_array($row)) {
-                    continue;
-                }
+	        // List action enriches rows with derived permission names for display.
+	        if ($action === 'list') {
+	            $rows = $repoRead->listAll();
+	            $items = [];
+	            // Normalize repository rows before emitting mixed-mode output.
+	            foreach ($rows as $row) {
+	                // Ignore non-array rows defensively to avoid malformed output.
+	                if (!is_array($row)) {
+	                    continue;
+	                }
                 $enriched = $row;
                 $enriched['permission_names'] = $maskNames((int) ($row['permissions'] ?? 0));
                 $items[] = $enriched;
             }
 
-            if ($context->json) {
-                $context->printJson(['ok' => true, 'items' => $items]);
-            } else {
-                foreach ($items as $row) {
-                    $context->line(
+	            // JSON mode emits a stable envelope for automation clients.
+	            if ($context->json) {
+	                $context->printJson(['ok' => true, 'items' => $items]);
+	            } else {
+	                // Human mode prints one compact summary per group row.
+	                foreach ($items as $row) {
+	                    $context->line(
                         (string) ($row['id'] ?? 0)
                         . ' | '
                         . (string) ($row['slug'] ?? '')
@@ -1751,49 +1926,60 @@ function raven_cli_command_group(RavenCliContext $context, array $tokens): int
             return 0;
         }
 
-        if ($action === 'show') {
-            $row = $resolveGroup($options);
-            if (!is_array($row)) {
-                throw new RuntimeException('Group not found.');
-            }
-
-            $row['permission_names'] = $maskNames((int) ($row['permissions'] ?? 0));
-            if ($context->json) {
-                $context->printJson(['ok' => true, 'item' => $row]);
-            } else {
-                foreach ($row as $key => $value) {
-                    $context->line((string) $key . ': ' . (is_scalar($value) || $value === null ? (string) $value : json_encode($value)));
-                }
-            }
+	        // Show action resolves one group selector and prints full fields.
+	        if ($action === 'show') {
+	            $row = $resolveGroup($options);
+	            // Selector miss is surfaced as a user-facing not-found error.
+	            if (!is_array($row)) {
+	                throw new RuntimeException('Group not found.');
+	            }
+	
+	            $row['permission_names'] = $maskNames((int) ($row['permissions'] ?? 0));
+	            // JSON mode emits a stable envelope for automation clients.
+	            if ($context->json) {
+	                $context->printJson(['ok' => true, 'item' => $row]);
+	            } else {
+	                // Human mode prints each field as key/value for inspection.
+	                foreach ($row as $key => $value) {
+	                    $context->line((string) $key . ': ' . (is_scalar($value) || $value === null ? (string) $value : json_encode($value)));
+	                }
+	            }
             return 0;
         }
 
-        if ($action === 'create' || $action === 'update') {
-            $existing = null;
-            if ($action === 'update') {
-                $existing = $resolveGroup($options);
-                if (!is_array($existing)) {
-                    throw new RuntimeException('Group to update was not found (use --id or --slug).');
-                }
-            }
-
-            $name = (string) raven_cli_option($options, 'name', is_array($existing) ? (string) ($existing['name'] ?? '') : '');
-            if ($name === '' && $context->interactive) {
-                $name = $context->prompt('Group name', $name);
-            }
-            $name = $rvn['input']->text($name, 120);
-            if ($name === '') {
-                throw new RuntimeException('Group name is required.');
-            }
-
-            $slugInput = (string) raven_cli_option($options, 'slug', is_array($existing) ? (string) ($existing['slug'] ?? '') : '');
-            if ($slugInput === '' && $context->interactive) {
-                $slugInput = $context->prompt('Group slug', $slugInput);
-            }
-            $slug = '';
-            if (trim($slugInput) !== '') {
-                $slug = raven_cli_slug_from_text($rvn, $slugInput, 'Group slug');
-            }
+	        // Create/update share one payload flow with optional preload.
+	        if ($action === 'create' || $action === 'update') {
+	            $existing = null;
+	            // Update requires an existing group row to mutate.
+	            if ($action === 'update') {
+	                $existing = $resolveGroup($options);
+	                // Fail fast when selector did not resolve an editable row.
+	                if (!is_array($existing)) {
+	                    throw new RuntimeException('Group to update was not found (use --id or --slug).');
+	                }
+	            }
+	
+	            $name = (string) raven_cli_option($options, 'name', is_array($existing) ? (string) ($existing['name'] ?? '') : '');
+	            // Interactive mode prompts for required name when omitted.
+	            if ($name === '' && $context->interactive) {
+	                $name = $context->prompt('Group name', $name);
+	            }
+	            $name = $rvn['input']->text($name, 120);
+	            // Reject empty names after prompt/sanitization.
+	            if ($name === '') {
+	                throw new RuntimeException('Group name is required.');
+	            }
+	
+	            $slugInput = (string) raven_cli_option($options, 'slug', is_array($existing) ? (string) ($existing['slug'] ?? '') : '');
+	            // Interactive mode prompts for optional slug when omitted.
+	            if ($slugInput === '' && $context->interactive) {
+	                $slugInput = $context->prompt('Group slug', $slugInput);
+	            }
+	            $slug = '';
+	            // Empty slug keeps route lookup disabled by slug for this group.
+	            if (trim($slugInput) !== '') {
+	                $slug = raven_cli_slug_from_text($rvn, $slugInput, 'Group slug');
+	            }
 
             $routeEnabledDefault = is_array($existing) && ((int) ($existing['route'] ?? 0) === 1);
             $routeEnabled = raven_cli_bool_option($options, 'route-enabled', $routeEnabledDefault, 'r');
@@ -1809,10 +1995,11 @@ function raven_cli_command_group(RavenCliContext $context, array $tokens): int
                 'permissions' => $permissionMask,
             ]);
 
-            $saved = $repoRead->findById($id);
-            $savedMask = is_array($saved) ? (int) ($saved['permissions'] ?? 0) : $permissionMask;
-            if ($context->json) {
-                $context->printJson([
+	            $saved = $repoRead->findById($id);
+	            $savedMask = is_array($saved) ? (int) ($saved['permissions'] ?? 0) : $permissionMask;
+	            // Emit structured result in JSON mode, plain text otherwise.
+	            if ($context->json) {
+	                $context->printJson([
                     'ok' => true,
                     'id' => $id,
                     'action' => $action,
@@ -1825,20 +2012,24 @@ function raven_cli_command_group(RavenCliContext $context, array $tokens): int
             return 0;
         }
 
-        if ($action === 'delete') {
-            $existing = $resolveGroup($options);
-            if (!is_array($existing)) {
-                throw new RuntimeException('Group not found (use --id or --slug).');
-            }
-
-            $id = (int) ($existing['id'] ?? 0);
-            if ($id < 1) {
-                throw new RuntimeException('Group id is invalid.');
-            }
-
-            $repo->deleteById($id);
-            if ($context->json) {
-                $context->printJson(['ok' => true, 'deleted_id' => $id]);
+	        // Delete flow resolves selector, validates id, then deletes row.
+	        if ($action === 'delete') {
+	            $existing = $resolveGroup($options);
+	            // Selector miss is surfaced as a user-facing not-found error.
+	            if (!is_array($existing)) {
+	                throw new RuntimeException('Group not found (use --id or --slug).');
+	            }
+	
+	            $id = (int) ($existing['id'] ?? 0);
+	            // Guard against malformed rows missing positive ids.
+	            if ($id < 1) {
+	                throw new RuntimeException('Group id is invalid.');
+	            }
+	
+	            $repo->deleteById($id);
+	            // Emit structured result in JSON mode, plain text otherwise.
+	            if ($context->json) {
+	                $context->printJson(['ok' => true, 'deleted_id' => $id]);
             } else {
                 $context->ok('Group deleted (id: ' . $id . ').');
             }
@@ -1861,12 +2052,14 @@ function raven_cli_command_group(RavenCliContext $context, array $tokens): int
  */
 function raven_cli_command_redirect(RavenCliContext $context, array $tokens): int
 {
-    if ($tokens === [] && $context->interactive) {
-        $tokens[] = strtolower(trim($context->prompt('Redirect action (list/show/create/update/delete)', 'list')));
-    }
-
-    if ($tokens === [] || raven_cli_is_help_requested($tokens)) {
-        $context->renderHelpHeader('redirect');
+	    // Interactive mode prompts for missing action token.
+	    if ($tokens === [] && $context->interactive) {
+	        $tokens[] = strtolower(trim($context->prompt('Redirect action (list/show/create/update/delete)', 'list')));
+	    }
+	
+	    // Empty/help invocations render usage and exit cleanly.
+	    if ($tokens === [] || raven_cli_is_help_requested($tokens)) {
+	        $context->renderHelpHeader('redirect');
         $context->info('Usage: private/bin/rvn-redir <action> [options]');
         $context->info('Actions: list, show, create, update, delete');
         $context->info('Options: --id, --slug, --channel, --title, --description, --target, --active');
@@ -1877,7 +2070,8 @@ function raven_cli_command_redirect(RavenCliContext $context, array $tokens): in
     $parsed = raven_cli_parse_tokens($tokens);
     $options = $parsed['options'];
 
-    try {
+	    // Convert all command failures into a consistent non-zero CLI exit.
+	    try {
         $rvn = $context->rvn();
         // RedirectWrite depends on ChannelRead for channel-slug validation.
         $channelRepo = new ChannelRead($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix'], (string) $rvn['root'] . '/private/dat/channel');
@@ -2227,12 +2421,14 @@ function raven_cli_command_config(RavenCliContext $context, array $tokens): int
  */
 function raven_cli_command_extension(RavenCliContext $context, array $tokens): int
 {
-    if ($tokens === [] && $context->interactive) {
-        $tokens[] = strtolower(trim($context->prompt('Extension action (list/enable/disable/create/import/uninstall)', 'list')));
-    }
-
-    if ($tokens === [] || raven_cli_is_help_requested($tokens)) {
-        $context->renderHelpHeader('ext');
+	    // Interactive mode prompts for missing action token.
+	    if ($tokens === [] && $context->interactive) {
+	        $tokens[] = strtolower(trim($context->prompt('Extension action (list/enable/disable/create/import/uninstall)', 'list')));
+	    }
+	
+	    // Empty/help invocations render usage and exit cleanly.
+	    if ($tokens === [] || raven_cli_is_help_requested($tokens)) {
+	        $context->renderHelpHeader('ext');
         $context->info('Usage: private/bin/rvn-ext <action> [options]');
         $context->info('Actions: list, enable, disable, create, import, uninstall');
         $context->info('Options: --slug, --archive, --type <helper|content|framework|module|system>, --name, --version (optional), --description, --author, --homepage');
@@ -2241,37 +2437,45 @@ function raven_cli_command_extension(RavenCliContext $context, array $tokens): i
         return 0;
     }
 
-    $action = strtolower(trim((string) array_shift($tokens)));
-    if ($action === 'delete') {
-        $action = 'uninstall';
-    }
+	    $action = strtolower(trim((string) array_shift($tokens)));
+	    // Legacy "delete" verb maps to "uninstall" for CLI compatibility.
+	    if ($action === 'delete') {
+	        $action = 'uninstall';
+	    }
     $parsed = raven_cli_parse_tokens($tokens);
     $options = $parsed['options'];
 
-    try {
-        $root = $context->root;
-        $extBase = $root . '/private/ext';
-        if (!is_dir($extBase) && !mkdir($extBase, 0770, true) && !is_dir($extBase)) {
-            throw new RuntimeException('Failed to initialize private/ext directory.');
-        }
-
-        if ($action === 'list') {
-            $state = raven_cli_extension_state_load($root);
-            $entries = scandir($extBase);
-            if ($entries === false) {
-                throw new RuntimeException('Failed to read extension directory.');
-            }
-
-            $items = [];
-            foreach ($entries as $entry) {
-                if ($entry === '.' || $entry === '..' || str_starts_with($entry, '.')) {
-                    continue;
-                }
-
-                $path = $extBase . '/' . $entry;
-                if (!is_dir($path)) {
-                    continue;
-                }
+	    // Convert all command failures into a consistent non-zero CLI exit.
+	    try {
+	        $root = $context->root;
+	        $extBase = $root . '/private/ext';
+	        // Ensure extension base directory exists before scanning/creating entries.
+	        if (!is_dir($extBase) && !mkdir($extBase, 0770, true) && !is_dir($extBase)) {
+	            throw new RuntimeException('Failed to initialize private/ext directory.');
+	        }
+	
+	        // List action inspects extension directories and manifest metadata.
+	        if ($action === 'list') {
+	            $state = raven_cli_extension_state_load($root);
+	            $entries = scandir($extBase);
+	            // Hard-fail when extension directory listing cannot be read.
+	            if ($entries === false) {
+	                throw new RuntimeException('Failed to read extension directory.');
+	            }
+	
+	            $items = [];
+	            // Build display items from each visible extension directory.
+	            foreach ($entries as $entry) {
+	                // Skip pseudo entries and dot-prefixed hidden directories.
+	                if ($entry === '.' || $entry === '..' || str_starts_with($entry, '.')) {
+	                    continue;
+	                }
+	
+	                $path = $extBase . '/' . $entry;
+	                // Ignore files; extension units are directory-based.
+	                if (!is_dir($path)) {
+	                    continue;
+	                }
 
                 $manifest = Registry::readManifest($root, $entry);
                 $items[] = [
@@ -2289,11 +2493,13 @@ function raven_cli_command_extension(RavenCliContext $context, array $tokens): i
                 return strcmp((string) $a['slug'], (string) $b['slug']);
             });
 
-            if ($context->json) {
-                $context->printJson(['ok' => true, 'items' => $items]);
-            } else {
-                foreach ($items as $item) {
-                    $context->line(
+	            // Emit structured result in JSON mode, plain text otherwise.
+	            if ($context->json) {
+	                $context->printJson(['ok' => true, 'items' => $items]);
+	            } else {
+	                // Human mode prints one compact extension summary per row.
+	                foreach ($items as $item) {
+	                    $context->line(
                         (string) $item['slug']
                         . ' | '
                         . (string) $item['type']
@@ -2309,200 +2515,237 @@ function raven_cli_command_extension(RavenCliContext $context, array $tokens): i
             return 0;
         }
 
-        if ($action === 'enable' || $action === 'disable') {
-            require_once $root . '/private/lib/Extension/Bootstrap.php';
-            require_once $root . '/private/lib/Extension/StorageProvisioner.php';
-            $slug = strtolower(trim(raven_cli_required_scalar_option($options, 'slug', 'Missing --slug option.')));
-            if (preg_match('/^[a-z0-9][a-z0-9_-]{0,119}$/', $slug) !== 1) {
-                throw new RuntimeException('Extension slug is invalid.');
-            }
-
-            $path = $extBase . '/' . $slug;
-            if (!is_dir($path)) {
-                throw new RuntimeException('Extension directory not found: ' . $slug);
-            }
-
-            $manifest = Registry::readManifest($root, $slug);
-            if ($action === 'enable' && $manifest === null) {
-                throw new RuntimeException('Extension manifest is invalid; refusing to enable.');
-            }
-
-            $state = raven_cli_extension_state_load($root);
-            if ($action === 'enable') {
-                $resolver = new \Raven\Lib\Extension\Bootstrap();
-                $contract = $resolver->resolve($root, $slug, $manifest);
-                if (!$contract['valid']) {
-                    throw new RuntimeException((string) ($contract['error'] ?? 'Invalid extension bootstrap contract.'));
-                }
-
-                if (!empty($contract['storage'])) {
-                    $provisioner = new \Raven\Lib\Extension\StorageProvisioner($root);
-                    $provisioner->provision($slug, (array) $contract['storage']);
+	        // Enable/disable share slug validation and state file persistence.
+	        if ($action === 'enable' || $action === 'disable') {
+	            require_once $root . '/private/lib/Extension/Bootstrap.php';
+	            require_once $root . '/private/lib/Extension/StorageProvisioner.php';
+	            $slug = strtolower(trim(raven_cli_required_scalar_option($options, 'slug', 'Missing --slug option.')));
+	            // Restrict slugs to manifest-safe naming rules.
+	            if (preg_match('/^[a-z0-9][a-z0-9_-]{0,119}$/', $slug) !== 1) {
+	                throw new RuntimeException('Extension slug is invalid.');
+	            }
+	
+	            $path = $extBase . '/' . $slug;
+	            // Require extension directory to exist before state mutation.
+	            if (!is_dir($path)) {
+	                throw new RuntimeException('Extension directory not found: ' . $slug);
+	            }
+	
+	            $manifest = Registry::readManifest($root, $slug);
+	            // Enable path requires a valid manifest contract.
+	            if ($action === 'enable' && $manifest === null) {
+	                throw new RuntimeException('Extension manifest is invalid; refusing to enable.');
+	            }
+	
+	            $state = raven_cli_extension_state_load($root);
+	            // Enable path validates bootstrap contract and provisions storage.
+	            if ($action === 'enable') {
+	                $resolver = new \Raven\Lib\Extension\Bootstrap();
+	                $contract = $resolver->resolve($root, $slug, $manifest);
+	                // Refuse enable when bootstrap contract validation fails.
+	                if (!$contract['valid']) {
+	                    throw new RuntimeException((string) ($contract['error'] ?? 'Invalid extension bootstrap contract.'));
+	                }
+	
+	                // Provision declared extension storage before marking enabled.
+	                if (!empty($contract['storage'])) {
+	                    $provisioner = new \Raven\Lib\Extension\StorageProvisioner($root);
+	                    $provisioner->provision($slug, (array) $contract['storage']);
                 }
 
                 $state['enabled'][$slug] = true;
-            } else {
-                unset($state['enabled'][$slug]);
-            }
-            raven_cli_extension_state_save($root, $state['enabled'], $state['permissions']);
-
-            if ($context->json) {
-                $context->printJson(['ok' => true, 'slug' => $slug, 'enabled' => $action === 'enable']);
-            } else {
+	            } else {
+	                unset($state['enabled'][$slug]);
+	            }
+	            raven_cli_extension_state_save($root, $state['enabled'], $state['permissions']);
+	
+	            // Emit structured result in JSON mode, plain text otherwise.
+	            if ($context->json) {
+	                $context->printJson(['ok' => true, 'slug' => $slug, 'enabled' => $action === 'enable']);
+	            } else {
                 $context->ok('Extension ' . $slug . ' ' . ($action === 'enable' ? 'enabled' : 'disabled') . '.');
             }
             return 0;
         }
 
-        if ($action === 'uninstall') {
-            require_once $root . '/private/lib/Extension/Bootstrap.php';
-            require_once $root . '/private/lib/Extension/StorageCleaner.php';
-            $slug = strtolower(trim(raven_cli_required_scalar_option($options, 'slug', 'Missing --slug option.')));
-            if (preg_match('/^[a-z0-9][a-z0-9_-]{0,119}$/', $slug) !== 1) {
-                throw new RuntimeException('Extension slug is invalid.');
-            }
+	        // Uninstall removes state, storage, and extension files.
+	        if ($action === 'uninstall') {
+	            require_once $root . '/private/lib/Extension/Bootstrap.php';
+	            require_once $root . '/private/lib/Extension/StorageCleaner.php';
+	            $slug = strtolower(trim(raven_cli_required_scalar_option($options, 'slug', 'Missing --slug option.')));
+	            // Restrict slugs to manifest-safe naming rules.
+	            if (preg_match('/^[a-z0-9][a-z0-9_-]{0,119}$/', $slug) !== 1) {
+	                throw new RuntimeException('Extension slug is invalid.');
+	            }
+	
+	            // Guard stock packages that ship with Raven from accidental removal.
+	            if (in_array($slug, ['contact', 'cron', 'database', 'phpinfo', 'signups'], true)) {
+	                throw new RuntimeException('Stock extension cannot be uninstalled: ' . $slug);
+	            }
+	
+	            $path = $extBase . '/' . $slug;
+	            // Require extension directory to exist before uninstall workflow.
+	            if (!is_dir($path)) {
+	                throw new RuntimeException('Extension directory not found: ' . $slug);
+	            }
 
-            if (in_array($slug, ['contact', 'cron', 'database', 'phpinfo', 'signups'], true)) {
-                throw new RuntimeException('Stock extension cannot be uninstalled: ' . $slug);
-            }
+	            $state = raven_cli_extension_state_load($root);
+	            $enabled = !empty($state['enabled'][$slug]);
+	            $force = raven_cli_bool_option($options, 'force', false, 'f');
+	            // Prevent uninstalling enabled extensions unless caller confirms force.
+	            if ($enabled && !$force) {
+	                throw new RuntimeException('Disable extension first or pass --force.');
+	            }
+	
+	            $manifest = Registry::readManifest($root, $slug);
+	            // When manifest exists, run cleanup contract to drop extension storage.
+	            if ($manifest !== null) {
+	                $resolver = new \Raven\Lib\Extension\Bootstrap();
+	                $contract = $resolver->resolve($root, $slug, $manifest);
+	                // Abort uninstall when contract cannot be trusted.
+	                if (!$contract['valid']) {
+	                    throw new RuntimeException((string) ($contract['error'] ?? 'Invalid extension bootstrap contract.'));
+	                }
 
-            $path = $extBase . '/' . $slug;
-            if (!is_dir($path)) {
-                throw new RuntimeException('Extension directory not found: ' . $slug);
-            }
-
-            $state = raven_cli_extension_state_load($root);
-            $enabled = !empty($state['enabled'][$slug]);
-            $force = raven_cli_bool_option($options, 'force', false, 'f');
-            if ($enabled && !$force) {
-                throw new RuntimeException('Disable extension first or pass --force.');
-            }
-
-            $manifest = Registry::readManifest($root, $slug);
-            if ($manifest !== null) {
-                $resolver = new \Raven\Lib\Extension\Bootstrap();
-                $contract = $resolver->resolve($root, $slug, $manifest);
-                if (!$contract['valid']) {
-                    throw new RuntimeException((string) ($contract['error'] ?? 'Invalid extension bootstrap contract.'));
+	                $rvn = $context->rvn();
+	                $db = $rvn['db'] ?? null;
+	                $driver = $rvn['driver'] ?? null;
+	                $prefix = $rvn['prefix'] ?? null;
+	                // Only run DB cleanup when runtime DB context is available.
+	                if ($db instanceof PDO && is_string($driver) && is_string($prefix)) {
+	                    $cleaner = new \Raven\Lib\Extension\StorageCleaner($root, $db, $driver, $prefix);
+	                    $cleaner->deleteStorageByContract($slug, (array) ($contract['storage'] ?? []));
                 }
-
-                $rvn = $context->rvn();
-                $db = $rvn['db'] ?? null;
-                $driver = $rvn['driver'] ?? null;
-                $prefix = $rvn['prefix'] ?? null;
-                if ($db instanceof PDO && is_string($driver) && is_string($prefix)) {
-                    $cleaner = new \Raven\Lib\Extension\StorageCleaner($root, $db, $driver, $prefix);
-                    $cleaner->deleteStorageByContract($slug, (array) ($contract['storage'] ?? []));
-                }
             }
 
-            unset($state['enabled'][$slug], $state['permissions'][$slug]);
-            raven_cli_extension_state_save($root, $state['enabled'], $state['permissions']);
-            raven_cli_remove_directory_recursive($path);
-            if (is_dir($path)) {
-                throw new RuntimeException('Failed to uninstall extension directory.');
-            }
-
-            if ($context->json) {
-                $context->printJson(['ok' => true, 'slug' => $slug, 'uninstalled' => true]);
-            } else {
+	            unset($state['enabled'][$slug], $state['permissions'][$slug]);
+	            raven_cli_extension_state_save($root, $state['enabled'], $state['permissions']);
+	            raven_cli_remove_directory_recursive($path);
+	            // Verify filesystem cleanup succeeded before reporting success.
+	            if (is_dir($path)) {
+	                throw new RuntimeException('Failed to uninstall extension directory.');
+	            }
+	
+	            // Emit structured result in JSON mode, plain text otherwise.
+	            if ($context->json) {
+	                $context->printJson(['ok' => true, 'slug' => $slug, 'uninstalled' => true]);
+	            } else {
                 $context->ok('Extension uninstalled: ' . $slug);
             }
             return 0;
         }
 
-        if ($action === 'import') {
-            $archivePath = raven_cli_required_scalar_option($options, 'archive', 'Missing --archive option.', 'a');
-            if (!is_file($archivePath)) {
-                throw new RuntimeException('Archive not found: ' . $archivePath);
-            }
+	        // Import action extracts and validates an extension package archive.
+	        if ($action === 'import') {
+	            $archivePath = raven_cli_required_scalar_option($options, 'archive', 'Missing --archive option.', 'a');
+	            // Fail early when archive path does not resolve to a file.
+	            if (!is_file($archivePath)) {
+	                throw new RuntimeException('Archive not found: ' . $archivePath);
+	            }
 
-            $archivePackages = raven_cli_archive_packages($root);
-            $packageWorkflow = raven_cli_package_install_workflow($root);
-            if (!$archivePackages->supports($archivePath)) {
-                throw new RuntimeException('Unsupported archive type. Use .zip, .tar, .tar.gz/.tgz, .tar.bz2/.tbz2, .tar.xz/.txz, .tar.zst/.tzst, or .7z.');
-            }
-
-            $slug = strtolower(trim((string) raven_cli_option($options, 'slug', '')));
-            if ($slug === '') {
-                $slug = (string) ($archivePackages->manifestSlug($archivePath, 'ext.json', 119) ?? '');
-            }
-            if ($slug === '') {
-                throw new RuntimeException('Missing extension slug. Provide --slug or include a valid ext.json slug in the archive.');
-            }
-            if (preg_match('/^[a-z0-9][a-z0-9_-]{0,119}$/', $slug) !== 1) {
-                throw new RuntimeException('Extension slug is invalid.');
-            }
-
-            $target = $extBase . '/' . $slug;
-            if (file_exists($target)) {
-                throw new RuntimeException('Target extension directory already exists: ' . $slug);
-            }
-            if (!mkdir($target, 0770, true) && !is_dir($target)) {
-                throw new RuntimeException('Failed to create extension target directory.');
-            }
+	            $archivePackages = raven_cli_archive_packages($root);
+	            $packageWorkflow = raven_cli_package_install_workflow($root);
+	            // Reject unsupported archive formats before extracting.
+	            if (!$archivePackages->supports($archivePath)) {
+	                throw new RuntimeException('Unsupported archive type. Use .zip, .tar, .tar.gz/.tgz, .tar.bz2/.tbz2, .tar.xz/.txz, .tar.zst/.tzst, or .7z.');
+	            }
+	
+	            $slug = strtolower(trim((string) raven_cli_option($options, 'slug', '')));
+	            // Slug falls back to package manifest when CLI option is omitted.
+	            if ($slug === '') {
+	                $slug = (string) ($archivePackages->manifestSlug($archivePath, 'ext.json', 119) ?? '');
+	            }
+	            // Require a usable slug from either CLI or manifest.
+	            if ($slug === '') {
+	                throw new RuntimeException('Missing extension slug. Provide --slug or include a valid ext.json slug in the archive.');
+	            }
+	            // Restrict slugs to manifest-safe naming rules.
+	            if (preg_match('/^[a-z0-9][a-z0-9_-]{0,119}$/', $slug) !== 1) {
+	                throw new RuntimeException('Extension slug is invalid.');
+	            }
+	
+	            $target = $extBase . '/' . $slug;
+	            // Avoid overwriting an existing extension directory.
+	            if (file_exists($target)) {
+	                throw new RuntimeException('Target extension directory already exists: ' . $slug);
+	            }
+	            // Create target directory before extraction begins.
+	            if (!mkdir($target, 0770, true) && !is_dir($target)) {
+	                throw new RuntimeException('Failed to create extension target directory.');
+	            }
 
             $extractError = $packageWorkflow->extractTo(
                 $archivePath,
                 $target,
-                static function (string $directory): void {
-                    raven_cli_remove_directory_recursive($directory);
-                },
-                'extension'
-            );
-            if (is_string($extractError)) {
-                raven_cli_remove_directory_recursive($target);
-                throw new RuntimeException($extractError);
+	                static function (string $directory): void {
+	                    raven_cli_remove_directory_recursive($directory);
+	                },
+	                'extension'
+	            );
+	            // Extraction failure triggers cleanup and hard-fails import.
+	            if (is_string($extractError)) {
+	                raven_cli_remove_directory_recursive($target);
+	                throw new RuntimeException($extractError);
+	            }
+	
+	            $flattenError = $packageWorkflow->flattenRoot($target);
+	            // Flattening failure triggers cleanup and hard-fails import.
+	            if (is_string($flattenError)) {
+	                raven_cli_remove_directory_recursive($target);
+	                throw new RuntimeException($flattenError);
+	            }
+	
+	            // Manifest contract must validate before persisting imported state.
+	            if (Registry::readManifest($root, $slug) === null) {
+	                raven_cli_remove_directory_recursive($target);
+	                throw new RuntimeException('Imported extension has invalid ext.json/type contract.');
             }
 
-            $flattenError = $packageWorkflow->flattenRoot($target);
-            if (is_string($flattenError)) {
-                raven_cli_remove_directory_recursive($target);
-                throw new RuntimeException($flattenError);
-            }
-
-            if (Registry::readManifest($root, $slug) === null) {
-                raven_cli_remove_directory_recursive($target);
-                throw new RuntimeException('Imported extension has invalid ext.json/type contract.');
-            }
-
-            $state = raven_cli_extension_state_load($root);
-            unset($state['enabled'][$slug], $state['permissions'][$slug]);
-            raven_cli_extension_state_save($root, $state['enabled'], $state['permissions']);
-
-            if ($context->json) {
-                $context->printJson(['ok' => true, 'slug' => $slug, 'imported' => true]);
-            } else {
+	            $state = raven_cli_extension_state_load($root);
+	            unset($state['enabled'][$slug], $state['permissions'][$slug]);
+	            raven_cli_extension_state_save($root, $state['enabled'], $state['permissions']);
+	
+	            // Emit structured result in JSON mode, plain text otherwise.
+	            if ($context->json) {
+	                $context->printJson(['ok' => true, 'slug' => $slug, 'imported' => true]);
+	            } else {
                 $context->ok('Imported extension: ' . $slug . ' (disabled by default).');
             }
             return 0;
         }
 
-        if ($action === 'create') {
-            $slug = strtolower(trim((string) raven_cli_option($options, 'slug', '')));
-            if ($slug === '' && $context->interactive) {
-                $slug = strtolower(trim($context->prompt('Extension slug')));
-            }
-            if (preg_match('/^[a-z0-9][a-z0-9_-]{0,119}$/', $slug) !== 1) {
-                throw new RuntimeException('Extension slug is invalid.');
-            }
-
-            $name = (string) raven_cli_option($options, 'name', '');
-            if ($name === '' && $context->interactive) {
-                $name = $context->prompt('Extension name', ucwords(str_replace(['-', '_'], ' ', $slug)));
-            }
-            $name = trim($name);
-            if ($name === '') {
-                throw new RuntimeException('Extension name is required.');
-            }
-
-            $type = strtolower(trim((string) raven_cli_option($options, 'type', 'content')));
-            if ($type === 'plugin') {
-                $type = 'content';
-            }
-            if (!in_array($type, ['helper', 'content', 'framework', 'module', 'system'], true)) {
-                throw new RuntimeException('Invalid extension type.');
-            }
+	        // Create action scaffolds a new extension package skeleton.
+	        if ($action === 'create') {
+	            $slug = strtolower(trim((string) raven_cli_option($options, 'slug', '')));
+	            // Interactive mode prompts for slug when caller omitted it.
+	            if ($slug === '' && $context->interactive) {
+	                $slug = strtolower(trim($context->prompt('Extension slug')));
+	            }
+	            // Restrict slugs to manifest-safe naming rules.
+	            if (preg_match('/^[a-z0-9][a-z0-9_-]{0,119}$/', $slug) !== 1) {
+	                throw new RuntimeException('Extension slug is invalid.');
+	            }
+	
+	            $name = (string) raven_cli_option($options, 'name', '');
+	            // Interactive mode prompts for human-readable extension name.
+	            if ($name === '' && $context->interactive) {
+	                $name = $context->prompt('Extension name', ucwords(str_replace(['-', '_'], ' ', $slug)));
+	            }
+	            $name = trim($name);
+	            // Name is required to generate a valid manifest.
+	            if ($name === '') {
+	                throw new RuntimeException('Extension name is required.');
+	            }
+	
+	            $type = strtolower(trim((string) raven_cli_option($options, 'type', 'content')));
+	            // Preserve backwards compatibility with older "plugin" wording.
+	            if ($type === 'plugin') {
+	                $type = 'content';
+	            }
+	            // Limit scaffold types to supported extension package classes.
+	            if (!in_array($type, ['helper', 'content', 'framework', 'module', 'system'], true)) {
+	                throw new RuntimeException('Invalid extension type.');
+	            }
 
             $version = trim((string) raven_cli_option($options, 'version', ''));
             $description = trim((string) raven_cli_option($options, 'description', ''));
@@ -2510,16 +2753,18 @@ function raven_cli_command_extension(RavenCliContext $context, array $tokens): i
             $homepage = trim((string) raven_cli_option($options, 'homepage', ''));
             $docs = trim((string) raven_cli_option($options, 'docs', ''));
             $withAgents = raven_cli_bool_option($options, 'with-agents', false);
-            $withComposer = raven_cli_bool_option($options, 'with-composer', true);
-
-            $path = $extBase . '/' . $slug;
-            if (file_exists($path)) {
-                throw new RuntimeException('Extension directory already exists: ' . $slug);
-            }
-
-            try {
-                $scaffold = new Scaffold();
-                $scaffold->createSkeleton($path, [
+	            $withComposer = raven_cli_bool_option($options, 'with-composer', true);
+	
+	            $path = $extBase . '/' . $slug;
+	            // Prevent scaffold creation from clobbering existing paths.
+	            if (file_exists($path)) {
+	                throw new RuntimeException('Extension directory already exists: ' . $slug);
+	            }
+	
+	            // On scaffold failure, cleanup the partial directory before rethrow.
+	            try {
+	                $scaffold = new Scaffold();
+	                $scaffold->createSkeleton($path, [
                     'directory' => $slug,
                     'name' => $name,
                     'version' => $version,
@@ -2529,53 +2774,61 @@ function raven_cli_command_extension(RavenCliContext $context, array $tokens): i
                     'homepage' => $homepage,
                     'docs' => $docs,
                 ], $withAgents, $withComposer);
-            } catch (Throwable $exception) {
-                raven_cli_remove_directory_recursive($path);
-                throw $exception;
-            }
+	            } catch (Throwable $exception) {
+	                raven_cli_remove_directory_recursive($path);
+	                throw $exception;
+	            }
 
             $createdFiles = ['ext.json', 'ext.php', 'schema.php'];
-            if (in_array($type, ['content', 'module'], true)) {
-                $createdFiles[] = 'shortcodes.php';
-                $createdFiles[] = 'fields.php';
-            }
-            if ($type !== 'framework') {
-                $createdFiles[] = 'routes_panel.php';
-                $createdFiles[] = 'tpl/panel_index.php';
-            }
-            if ($type === 'module') {
-                $createdFiles[] = 'routes_public.php';
-                $createdFiles[] = 'tpl/public_index.php';
-            }
-            if ($withAgents) {
-                $createdFiles[] = 'agents';
-                $createdFiles[] = 'AGENTS.md -> agents';
-                $createdFiles[] = 'CLAUDE.md -> agents';
-            }
-            if ($withComposer) {
-                $createdFiles[] = 'composer.json';
+	            // Content/module types include additional authoring provider stubs.
+	            if (in_array($type, ['content', 'module'], true)) {
+	                $createdFiles[] = 'shortcodes.php';
+	                $createdFiles[] = 'fields.php';
+	            }
+	            // Non-framework types include panel-facing route/template stubs.
+	            if ($type !== 'framework') {
+	                $createdFiles[] = 'routes_panel.php';
+	                $createdFiles[] = 'tpl/panel_index.php';
+	            }
+	            // Module type includes public route/template stubs as well.
+	            if ($type === 'module') {
+	                $createdFiles[] = 'routes_public.php';
+	                $createdFiles[] = 'tpl/public_index.php';
+	            }
+	            // Optional agents mode adds compatibility symlinks for AI agents.
+	            if ($withAgents) {
+	                $createdFiles[] = 'agents';
+	                $createdFiles[] = 'AGENTS.md -> agents';
+	                $createdFiles[] = 'CLAUDE.md -> agents';
+	            }
+	            // Optional composer mode writes a package manifest stub.
+	            if ($withComposer) {
+	                $createdFiles[] = 'composer.json';
+	            }
+	
+	            // Validate generated scaffold contract before persisting state.
+	            if (Registry::readManifest($root, $slug) === null) {
+	                raven_cli_remove_directory_recursive($path);
+	                throw new RuntimeException('Generated scaffold failed extension manifest/type validation.');
             }
 
-            if (Registry::readManifest($root, $slug) === null) {
-                raven_cli_remove_directory_recursive($path);
-                throw new RuntimeException('Generated scaffold failed extension manifest/type validation.');
-            }
-
-            $state = raven_cli_extension_state_load($root);
-            unset($state['enabled'][$slug], $state['permissions'][$slug]);
-            raven_cli_extension_state_save($root, $state['enabled'], $state['permissions']);
-
-            if ($context->json) {
-                $context->printJson([
+	            $state = raven_cli_extension_state_load($root);
+	            unset($state['enabled'][$slug], $state['permissions'][$slug]);
+	            raven_cli_extension_state_save($root, $state['enabled'], $state['permissions']);
+	
+	            // Emit structured result in JSON mode, plain text otherwise.
+	            if ($context->json) {
+	                $context->printJson([
                     'ok' => true,
                     'slug' => $slug,
-                    'created_files' => $createdFiles,
-                ]);
-            } else {
-                $context->ok('Created extension scaffold: ' . $slug);
-                foreach ($createdFiles as $file) {
-                    $context->line('  + ' . $file);
-                }
+	                    'created_files' => $createdFiles,
+	                ]);
+	            } else {
+	                $context->ok('Created extension scaffold: ' . $slug);
+	                // Human mode prints each created scaffold path for visibility.
+	                foreach ($createdFiles as $file) {
+	                    $context->line('  + ' . $file);
+	                }
             }
             return 0;
         }
@@ -2619,49 +2872,58 @@ function raven_cli_theme_is_stock_slug(string $slug): bool
  */
 function raven_cli_command_theme(RavenCliContext $context, array $tokens): int
 {
-    if ($tokens === [] && $context->interactive) {
-        $tokens[] = strtolower(trim($context->prompt('Theme action (list/enable/create/uninstall)', 'list')));
-    }
-
-    if ($tokens === [] || raven_cli_is_help_requested($tokens)) {
-        $context->renderHelpHeader('theme');
+	    // Interactive mode prompts for missing action token.
+	    if ($tokens === [] && $context->interactive) {
+	        $tokens[] = strtolower(trim($context->prompt('Theme action (list/enable/create/uninstall)', 'list')));
+	    }
+	
+	    // Empty/help invocations render usage and exit cleanly.
+	    if ($tokens === [] || raven_cli_is_help_requested($tokens)) {
+	        $context->renderHelpHeader('theme');
         $context->info('Usage: private/bin/rvn-theme <action> [options]');
         $context->info('Actions: list, enable, create, uninstall');
         $context->info('Options: --slug, --name, --parent, --clone, --set-default');
         return 0;
     }
 
-    $action = strtolower(trim((string) array_shift($tokens)));
-    if ($action === 'delete') {
-        $action = 'uninstall';
-    }
+	    $action = strtolower(trim((string) array_shift($tokens)));
+	    // Legacy "delete" verb maps to "uninstall" for CLI compatibility.
+	    if ($action === 'delete') {
+	        $action = 'uninstall';
+	    }
     $parsed = raven_cli_parse_tokens($tokens);
     $options = $parsed['options'];
 
-    try {
-        $root = $context->root;
-        $themeGenerator = new ThemeGenerator();
-
-        $themesRoot = $root . '/public/theme';
-        if ($action === 'create' && !is_dir($themesRoot) && !mkdir($themesRoot, 0770, true) && !is_dir($themesRoot)) {
-            throw new RuntimeException('Failed to initialize public/theme directory.');
-        }
-
-        if ($action === 'list') {
-            $activeTheme = '';
-            $configPath = $root . '/private/dat/config.php';
-            if (is_file($configPath)) {
-                /** @var mixed $loadedConfig */
-                $loadedConfig = require $configPath;
-                if (is_array($loadedConfig)) {
+	    // Convert all command failures into a consistent non-zero CLI exit.
+	    try {
+	        $root = $context->root;
+	        $themeGenerator = new ThemeGenerator();
+	
+	        $themesRoot = $root . '/public/theme';
+	        // Create mode ensures the theme root exists before scaffold writes.
+	        if ($action === 'create' && !is_dir($themesRoot) && !mkdir($themesRoot, 0770, true) && !is_dir($themesRoot)) {
+	            throw new RuntimeException('Failed to initialize public/theme directory.');
+	        }
+	
+	        // List action enumerates discovered themes and activity metadata.
+	        if ($action === 'list') {
+	            $activeTheme = '';
+	            $configPath = $root . '/private/dat/config.php';
+	            // Active theme is read from config when local config exists.
+	            if (is_file($configPath)) {
+	                /** @var mixed $loadedConfig */
+	                $loadedConfig = require $configPath;
+	                // Parse active theme only when config payload is array-shaped.
+	                if (is_array($loadedConfig)) {
                     $site = is_array($loadedConfig['site'] ?? null) ? $loadedConfig['site'] : [];
                     $activeTheme = strtolower(trim((string) ($site['theme'] ?? '')));
                 }
-            }
-
-            $items = [];
-            foreach (ThemeDiscovery::manifests($themesRoot) as $slug => $manifest) {
-                $items[] = [
+	            }
+	
+	            $items = [];
+	            // Build output rows from normalized theme manifests.
+	            foreach (ThemeDiscovery::manifests($themesRoot) as $slug => $manifest) {
+	                $items[] = [
                     'slug' => (string) $slug,
                     'name' => (string) ($manifest['name'] ?? $slug),
                     'is_stock' => raven_cli_theme_is_stock_slug((string) $slug),
@@ -2670,14 +2932,16 @@ function raven_cli_command_theme(RavenCliContext $context, array $tokens): int
                     'active' => $activeTheme !== '' && $slug === $activeTheme,
                     'has_css' => is_file($themesRoot . '/' . $slug . '/css/style.css'),
                     'has_wrapper' => is_file($themesRoot . '/' . $slug . '/tpl/wrapper.php'),
-                ];
-            }
-
-            if ($context->json) {
-                $context->printJson(['ok' => true, 'items' => $items]);
-            } else {
-                foreach ($items as $item) {
-                    $context->line(
+	                ];
+	            }
+	
+	            // Emit structured result in JSON mode, plain text otherwise.
+	            if ($context->json) {
+	                $context->printJson(['ok' => true, 'items' => $items]);
+	            } else {
+	                // Human mode prints one compact summary per discovered theme.
+	                foreach ($items as $item) {
+	                    $context->line(
                         (string) $item['slug']
                         . ' | '
                         . ((bool) $item['active'] ? 'active' : 'inactive')
@@ -2693,90 +2957,111 @@ function raven_cli_command_theme(RavenCliContext $context, array $tokens): int
             return 0;
         }
 
-        if ($action === 'enable') {
-            $slug = strtolower(trim(raven_cli_required_scalar_option($options, 'slug', 'Missing --slug option.')));
-            if (!raven_cli_theme_slug_is_valid($slug)) {
-                throw new RuntimeException('Theme slug is invalid.');
-            }
+	        // Enable action validates existence then persists site.theme config.
+	        if ($action === 'enable') {
+	            $slug = strtolower(trim(raven_cli_required_scalar_option($options, 'slug', 'Missing --slug option.')));
+	            // Restrict slugs to Raven theme directory naming rules.
+	            if (!raven_cli_theme_slug_is_valid($slug)) {
+	                throw new RuntimeException('Theme slug is invalid.');
+	            }
+	
+	            $manifests = ThemeDiscovery::manifests($themesRoot);
+	            // Activation requires a discoverable, valid theme manifest.
+	            if (!isset($manifests[$slug])) {
+	                throw new RuntimeException('Theme not found or manifest invalid: ' . $slug);
+	            }
+	
+	            $rvn = $context->rvn();
+	            // Config service is required to persist active theme selection.
+	            if (!isset($rvn['config']) || !$rvn['config'] instanceof Config) {
+	                throw new RuntimeException('Config service unavailable.');
+	            }
 
-            $manifests = ThemeDiscovery::manifests($themesRoot);
-            if (!isset($manifests[$slug])) {
-                throw new RuntimeException('Theme not found or manifest invalid: ' . $slug);
-            }
-
-            $rvn = $context->rvn();
-            if (!isset($rvn['config']) || !$rvn['config'] instanceof Config) {
-                throw new RuntimeException('Config service unavailable.');
-            }
-
-            ConfigWrite::persistValue($rvn['config']->path(), $rvn['config']->all(), 'site.theme', $slug);
-
-            if ($context->json) {
-                $context->printJson(['ok' => true, 'slug' => $slug, 'enabled' => true]);
-            } else {
+	            ConfigWrite::persistValue($rvn['config']->path(), $rvn['config']->all(), 'site.theme', $slug);
+	
+	            // Emit structured result in JSON mode, plain text otherwise.
+	            if ($context->json) {
+	                $context->printJson(['ok' => true, 'slug' => $slug, 'enabled' => true]);
+	            } else {
                 $context->ok('Activated theme: ' . $slug);
             }
             return 0;
         }
 
-        if ($action === 'create') {
-            $slug = strtolower(trim((string) raven_cli_option($options, 'slug', '')));
-            if ($slug === '' && $context->interactive) {
-                $slug = strtolower(trim($context->prompt('Theme slug')));
-            }
-            if (!raven_cli_theme_slug_is_valid($slug)) {
-                throw new RuntimeException('Theme slug is invalid.');
-            }
+	        // Create action scaffolds or clones a new theme directory.
+	        if ($action === 'create') {
+	            $slug = strtolower(trim((string) raven_cli_option($options, 'slug', '')));
+	            // Interactive mode prompts for slug when caller omitted it.
+	            if ($slug === '' && $context->interactive) {
+	                $slug = strtolower(trim($context->prompt('Theme slug')));
+	            }
+	            // Restrict slugs to Raven theme directory naming rules.
+	            if (!raven_cli_theme_slug_is_valid($slug)) {
+	                throw new RuntimeException('Theme slug is invalid.');
+	            }
+	
+	            $name = trim((string) raven_cli_option($options, 'name', ''));
+	            // Interactive mode prompts for human-readable theme name.
+	            if ($name === '' && $context->interactive) {
+	                $name = $context->prompt('Theme name', ucwords(str_replace(['-', '_'], ' ', $slug)));
+	            }
+	            // Name is required to write a valid manifest payload.
+	            if ($name === '') {
+	                throw new RuntimeException('Theme name is required.');
+	            }
+	
+	            $clone = strtolower(trim((string) raven_cli_option($options, 'clone', '')));
+	            // Clone source, when supplied, must satisfy theme slug policy.
+	            if ($clone !== '' && !raven_cli_theme_slug_is_valid($clone)) {
+	                throw new RuntimeException('Clone theme slug is invalid.');
+	            }
+	
+	            $parent = strtolower(trim((string) raven_cli_option($options, 'parent', '')));
+	            // Parent slug, when supplied, must satisfy theme slug policy.
+	            if ($parent !== '' && !raven_cli_theme_slug_is_valid($parent)) {
+	                throw new RuntimeException('Parent theme slug is invalid.');
+	            }
+	            // Prevent direct self-parent cycles.
+	            if ($parent === $slug) {
+	                throw new RuntimeException('Parent theme cannot be the same as slug.');
+	            }
+	            // Prevent clone source from targeting itself.
+	            if ($clone === $slug) {
+	                throw new RuntimeException('Clone source cannot be the same as slug.');
+	            }
+	
+	            $manifests = ThemeDiscovery::manifests($themesRoot);
+	            // Parent theme must exist when explicit parent is requested.
+	            if ($parent !== '' && !isset($manifests[$parent])) {
+	                throw new RuntimeException('Parent theme was not found: ' . $parent);
+	            }
+	            // Clone source must exist when clone mode is requested.
+	            if ($clone !== '' && !isset($manifests[$clone])) {
+	                throw new RuntimeException('Clone source theme was not found: ' . $clone);
+	            }
+	
+	            $target = $themesRoot . '/' . $slug;
+	            // Prevent create mode from clobbering existing directories.
+	            if (file_exists($target)) {
+	                throw new RuntimeException('Theme directory already exists: ' . $slug);
+	            }
+	            // Ensure target exists before scaffold/clone workflow runs.
+	            if (!mkdir($target, 0770, true) && !is_dir($target)) {
+	                throw new RuntimeException('Failed to create theme directory.');
+	            }
 
-            $name = trim((string) raven_cli_option($options, 'name', ''));
-            if ($name === '' && $context->interactive) {
-                $name = $context->prompt('Theme name', ucwords(str_replace(['-', '_'], ' ', $slug)));
-            }
-            if ($name === '') {
-                throw new RuntimeException('Theme name is required.');
-            }
-
-            $clone = strtolower(trim((string) raven_cli_option($options, 'clone', '')));
-            if ($clone !== '' && !raven_cli_theme_slug_is_valid($clone)) {
-                throw new RuntimeException('Clone theme slug is invalid.');
-            }
-
-            $parent = strtolower(trim((string) raven_cli_option($options, 'parent', '')));
-            if ($parent !== '' && !raven_cli_theme_slug_is_valid($parent)) {
-                throw new RuntimeException('Parent theme slug is invalid.');
-            }
-            if ($parent === $slug) {
-                throw new RuntimeException('Parent theme cannot be the same as slug.');
-            }
-            if ($clone === $slug) {
-                throw new RuntimeException('Clone source cannot be the same as slug.');
-            }
-
-            $manifests = ThemeDiscovery::manifests($themesRoot);
-            if ($parent !== '' && !isset($manifests[$parent])) {
-                throw new RuntimeException('Parent theme was not found: ' . $parent);
-            }
-            if ($clone !== '' && !isset($manifests[$clone])) {
-                throw new RuntimeException('Clone source theme was not found: ' . $clone);
-            }
-
-            $target = $themesRoot . '/' . $slug;
-            if (file_exists($target)) {
-                throw new RuntimeException('Theme directory already exists: ' . $slug);
-            }
-            if (!mkdir($target, 0770, true) && !is_dir($target)) {
-                throw new RuntimeException('Failed to create theme directory.');
-            }
-
-            $isChildTheme = $parent !== '';
-            $resolvedParent = $parent;
-            if ($clone !== '' && !$isChildTheme) {
-                $cloneManifest = $manifests[$clone] ?? null;
-                if (is_array($cloneManifest) && !empty($cloneManifest['is_child_theme'])) {
-                    $cloneParent = strtolower(trim((string) ($cloneManifest['parent_theme'] ?? '')));
-                    if ($cloneParent !== '' && $cloneParent !== $slug && isset($manifests[$cloneParent])) {
-                        $isChildTheme = true;
-                        $resolvedParent = $cloneParent;
+	            $isChildTheme = $parent !== '';
+	            $resolvedParent = $parent;
+	            // Clone mode can inherit child-theme ancestry from clone manifest.
+	            if ($clone !== '' && !$isChildTheme) {
+	                $cloneManifest = $manifests[$clone] ?? null;
+	                // Only inherit parent when clone manifest explicitly defines one.
+	                if (is_array($cloneManifest) && !empty($cloneManifest['is_child_theme'])) {
+	                    $cloneParent = strtolower(trim((string) ($cloneManifest['parent_theme'] ?? '')));
+	                    // Keep inherited parent only when it resolves to an existing theme.
+	                    if ($cloneParent !== '' && $cloneParent !== $slug && isset($manifests[$cloneParent])) {
+	                        $isChildTheme = true;
+	                        $resolvedParent = $cloneParent;
                     }
                 }
             }
@@ -2786,93 +3071,111 @@ function raven_cli_command_theme(RavenCliContext $context, array $tokens): int
                 'name' => $name,
                 'is_child_theme' => $isChildTheme,
                 'parent_theme' => $isChildTheme ? $resolvedParent : '',
-            ];
-            $createdFiles = ['theme.json', 'css/style.css', 'tpl/wrapper.php', 'tpl/home.php'];
-
-            try {
-                if ($clone !== '') {
-                    $themeGenerator->copyDirectoryRecursively($themesRoot . '/' . $clone, $target);
-                    $themeGenerator->finalizeClone($target, $scaffoldMeta);
-                } else {
-                    $themeGenerator->createSkeleton($target, $scaffoldMeta);
-                }
+	            ];
+	            $createdFiles = ['theme.json', 'css/style.css', 'tpl/wrapper.php', 'tpl/home.php'];
+	
+	            // On scaffold/clone failure, cleanup target directory before rethrow.
+	            try {
+	                // Clone mode copies files then rewrites manifest metadata.
+	                if ($clone !== '') {
+	                    $themeGenerator->copyDirectoryRecursively($themesRoot . '/' . $clone, $target);
+	                    $themeGenerator->finalizeClone($target, $scaffoldMeta);
+	                } else {
+	                    // Scaffold mode creates a fresh baseline theme structure.
+	                    $themeGenerator->createSkeleton($target, $scaffoldMeta);
+	                }
             } catch (Throwable $exception) {
                 raven_cli_remove_directory_recursive($target);
                 throw $exception;
-            }
-
-            $setDefault = raven_cli_bool_option($options, 'set-default', false);
-            if ($setDefault) {
-                $rvn = $context->rvn();
-                if (!isset($rvn['config']) || !$rvn['config'] instanceof Config) {
-                    throw new RuntimeException('Config service unavailable.');
-                }
-                ConfigWrite::persistValue($rvn['config']->path(), $rvn['config']->all(), 'site.theme', $slug);
-            }
-
-            if ($context->json) {
-                $context->printJson([
+	            }
+	
+	            $setDefault = raven_cli_bool_option($options, 'set-default', false);
+	            // Optional activation persists site.theme when requested.
+	            if ($setDefault) {
+	                $rvn = $context->rvn();
+	                // Config service is required to persist active theme selection.
+	                if (!isset($rvn['config']) || !$rvn['config'] instanceof Config) {
+	                    throw new RuntimeException('Config service unavailable.');
+	                }
+	                ConfigWrite::persistValue($rvn['config']->path(), $rvn['config']->all(), 'site.theme', $slug);
+	            }
+	
+	            // Emit structured result in JSON mode, plain text otherwise.
+	            if ($context->json) {
+	                $context->printJson([
                     'ok' => true,
                     'slug' => $slug,
                     'created_files' => $clone !== '' ? [] : $createdFiles,
                     'cloned_from' => $clone,
-                    'set_default' => $setDefault,
-                ]);
-            } else {
-                if ($clone !== '') {
-                    $context->ok('Created theme from clone: ' . $slug . ' (source: ' . $clone . ')');
-                    $context->line('  + copied all files from public/theme/' . $clone . '/');
-                    $context->line('  + refreshed theme.json with new name/manifest values');
-                } else {
-                    $context->ok('Created theme scaffold: ' . $slug);
-                    foreach ($createdFiles as $file) {
-                        $context->line('  + ' . $file);
-                    }
-                }
-                if ($setDefault) {
-                    $context->line('  + Activated as site.theme');
-                }
-            }
+	                    'set_default' => $setDefault,
+	                ]);
+	            } else {
+	                // Human mode distinguishes clone vs fresh scaffold messaging.
+	                if ($clone !== '') {
+	                    $context->ok('Created theme from clone: ' . $slug . ' (source: ' . $clone . ')');
+	                    $context->line('  + copied all files from public/theme/' . $clone . '/');
+	                    $context->line('  + refreshed theme.json with new name/manifest values');
+	                } else {
+	                    $context->ok('Created theme scaffold: ' . $slug);
+	                    // Print scaffold file list only for fresh-create mode.
+	                    foreach ($createdFiles as $file) {
+	                        $context->line('  + ' . $file);
+	                    }
+	                }
+	                // Highlight activation side-effect when --set-default was requested.
+	                if ($setDefault) {
+	                    $context->line('  + Activated as site.theme');
+	                }
+	            }
             return 0;
         }
 
-        if ($action === 'uninstall') {
-            $slug = strtolower(trim(raven_cli_required_scalar_option($options, 'slug', 'Missing --slug option.')));
-            if (!raven_cli_theme_slug_is_valid($slug)) {
-                throw new RuntimeException('Theme slug is invalid.');
-            }
-
-            if (raven_cli_bool_option($options, 'force', false, 'f')) {
-                throw new RuntimeException('Theme uninstall does not support --force. Activate another theme first.');
-            }
-
-            if (raven_cli_theme_is_stock_slug($slug)) {
-                throw new RuntimeException('Stock theme cannot be uninstalled: ' . $slug);
-            }
-
-            $target = $themesRoot . '/' . $slug;
-            if (!is_dir($target)) {
-                throw new RuntimeException('Theme directory not found: ' . $slug);
-            }
-
-            $rvn = $context->rvn();
-            if (!isset($rvn['config']) || !$rvn['config'] instanceof Config) {
-                throw new RuntimeException('Config service unavailable.');
-            }
-
-            $current = strtolower(trim((string) $rvn['config']->get('site.theme', 'raven')));
-            if ($current === $slug) {
-                throw new RuntimeException('Active theme cannot be uninstalled. Activate another theme first.');
-            }
-
-            raven_cli_remove_directory_recursive($target);
-            if (is_dir($target)) {
-                throw new RuntimeException('Failed to uninstall theme directory.');
-            }
-
-            if ($context->json) {
-                $context->printJson(['ok' => true, 'slug' => $slug, 'uninstalled' => true]);
-            } else {
+	        // Uninstall action removes custom theme directory after safety checks.
+	        if ($action === 'uninstall') {
+	            $slug = strtolower(trim(raven_cli_required_scalar_option($options, 'slug', 'Missing --slug option.')));
+	            // Restrict slugs to Raven theme directory naming rules.
+	            if (!raven_cli_theme_slug_is_valid($slug)) {
+	                throw new RuntimeException('Theme slug is invalid.');
+	            }
+	
+	            // Theme uninstall intentionally disallows force semantics.
+	            if (raven_cli_bool_option($options, 'force', false, 'f')) {
+	                throw new RuntimeException('Theme uninstall does not support --force. Activate another theme first.');
+	            }
+	
+	            // Guard stock bundled theme from deletion.
+	            if (raven_cli_theme_is_stock_slug($slug)) {
+	                throw new RuntimeException('Stock theme cannot be uninstalled: ' . $slug);
+	            }
+	
+	            $target = $themesRoot . '/' . $slug;
+	            // Target directory must exist to proceed with uninstall.
+	            if (!is_dir($target)) {
+	                throw new RuntimeException('Theme directory not found: ' . $slug);
+	            }
+	
+	            $rvn = $context->rvn();
+	            // Config service is required to validate active-theme protections.
+	            if (!isset($rvn['config']) || !$rvn['config'] instanceof Config) {
+	                throw new RuntimeException('Config service unavailable.');
+	            }
+	
+	            $current = strtolower(trim((string) $rvn['config']->get('site.theme', 'raven')));
+	            // Never allow removing the currently active site theme.
+	            if ($current === $slug) {
+	                throw new RuntimeException('Active theme cannot be uninstalled. Activate another theme first.');
+	            }
+	
+	            raven_cli_remove_directory_recursive($target);
+	            // Verify filesystem cleanup succeeded before reporting success.
+	            if (is_dir($target)) {
+	                throw new RuntimeException('Failed to uninstall theme directory.');
+	            }
+	
+	            // Emit structured result in JSON mode, plain text otherwise.
+	            if ($context->json) {
+	                $context->printJson(['ok' => true, 'slug' => $slug, 'uninstalled' => true]);
+	            } else {
                 $context->ok('Uninstalled theme: ' . $slug);
             }
             return 0;
@@ -2894,55 +3197,64 @@ function raven_cli_command_theme(RavenCliContext $context, array $tokens): int
  */
 function raven_cli_command_system(RavenCliContext $context, array $tokens): int
 {
-    if (raven_cli_is_help_requested($tokens)) {
-        $context->renderHelpHeader('system');
+	    // Help token short-circuits to usage output.
+	    if (raven_cli_is_help_requested($tokens)) {
+	        $context->renderHelpHeader('system');
         $context->info('Usage: private/bin/rvn-sys [info|version|env|extensions]');
         return 0;
     }
 
     $action = strtolower(trim((string) ($tokens[0] ?? 'info')));
 
-    try {
-        $root = $context->root;
-        $composerPath = $root . '/composer.json';
-        $composerVersion = '';
-        if (is_file($composerPath)) {
-            $raw = file_get_contents($composerPath);
-            if (is_string($raw) && $raw !== '') {
-                /** @var mixed $decoded */
-                $decoded = json_decode($raw, true);
-                if (is_array($decoded)) {
-                    $composerVersion = trim((string) ($decoded['version'] ?? ''));
-                }
+	    // Convert all command failures into a consistent non-zero CLI exit.
+	    try {
+	        $root = $context->root;
+	        $composerPath = $root . '/composer.json';
+	        $composerVersion = '';
+	        // Composer version is optional; parse when composer.json is present.
+	        if (is_file($composerPath)) {
+	            $raw = file_get_contents($composerPath);
+	            // Skip decode when file read returned empty/non-string content.
+	            if (is_string($raw) && $raw !== '') {
+	                /** @var mixed $decoded */
+	                $decoded = json_decode($raw, true);
+	                // Only trust decoded payload when it is array-shaped.
+	                if (is_array($decoded)) {
+	                    $composerVersion = trim((string) ($decoded['version'] ?? ''));
+	                }
             }
         }
 
         $gitBranch = '';
         $gitCommit = '';
-        $gitTag = '';
-
-        $branchResult = raven_cli_run_process(['git', 'rev-parse', '--abbrev-ref', 'HEAD'], $root);
-        if ($branchResult['ok']) {
-            $gitBranch = trim((string) $branchResult['output']);
-        }
-
-        $commitResult = raven_cli_run_process(['git', 'rev-parse', '--short', 'HEAD'], $root);
-        if ($commitResult['ok']) {
-            $gitCommit = trim((string) $commitResult['output']);
-        }
-
-        $tagResult = raven_cli_run_process(['git', 'describe', '--tags', '--abbrev=0'], $root);
-        if ($tagResult['ok']) {
-            $gitTag = trim((string) $tagResult['output']);
-        }
+	        $gitTag = '';
+	
+	        $branchResult = raven_cli_run_process(['git', 'rev-parse', '--abbrev-ref', 'HEAD'], $root);
+	        // Git metadata is best-effort; leave field empty when command fails.
+	        if ($branchResult['ok']) {
+	            $gitBranch = trim((string) $branchResult['output']);
+	        }
+	
+	        $commitResult = raven_cli_run_process(['git', 'rev-parse', '--short', 'HEAD'], $root);
+	        // Git metadata is best-effort; leave field empty when command fails.
+	        if ($commitResult['ok']) {
+	            $gitCommit = trim((string) $commitResult['output']);
+	        }
+	
+	        $tagResult = raven_cli_run_process(['git', 'describe', '--tags', '--abbrev=0'], $root);
+	        // Git metadata is best-effort; leave field empty when command fails.
+	        if ($tagResult['ok']) {
+	            $gitTag = trim((string) $tagResult['output']);
+	        }
 
         $rvn = $context->rvn();
-        $state = raven_cli_extension_state_load($root);
-        $enabledCount = count($state['enabled']);
-        $extensions = [];
-        foreach (array_keys($state['enabled']) as $slug) {
-            $extensions[] = $slug;
-        }
+	        $state = raven_cli_extension_state_load($root);
+	        $enabledCount = count($state['enabled']);
+	        $extensions = [];
+	        // Normalize enabled extension slugs into a flat list for reporting.
+	        foreach (array_keys($state['enabled']) as $slug) {
+	            $extensions[] = $slug;
+	        }
 
         $payload = [
             'ok' => true,
@@ -2968,10 +3280,11 @@ function raven_cli_command_system(RavenCliContext $context, array $tokens): int
                 'enabled_count' => $enabledCount,
                 'enabled' => $extensions,
             ],
-        ];
-
-        if ($action === 'version') {
-            $payload = [
+	        ];
+	
+	        // Version mode narrows output to release-identification fields.
+	        if ($action === 'version') {
+	            $payload = [
                 'ok' => true,
                 'composer' => $composerVersion,
                 'branch' => $gitBranch,
@@ -2999,13 +3312,16 @@ function raven_cli_command_system(RavenCliContext $context, array $tokens): int
             throw new RuntimeException('Unsupported system action: ' . $action);
         }
 
-        if ($context->json) {
-            $context->printJson($payload);
-        } else {
-            foreach ($payload as $key => $value) {
-                if (is_array($value)) {
-                    $context->line($key . ': ' . json_encode($value, JSON_UNESCAPED_SLASHES));
-                } else {
+	        // Emit structured result in JSON mode, plain text otherwise.
+	        if ($context->json) {
+	            $context->printJson($payload);
+	        } else {
+	            // Human mode prints arrays as compact JSON for readability.
+	            foreach ($payload as $key => $value) {
+	                // Preserve nested sections as one-line JSON fragments.
+	                if (is_array($value)) {
+	                    $context->line($key . ': ' . json_encode($value, JSON_UNESCAPED_SLASHES));
+	                } else {
                     $context->line($key . ': ' . (string) $value);
                 }
             }
@@ -3029,47 +3345,55 @@ function raven_cli_command_system(RavenCliContext $context, array $tokens): int
  * @param array<int, string> $tokens Remaining command tokens after the binary name.
  * @return int Exit code (0 = success, 1 = error).
  */
-function raven_cli_command_cron(RavenCliContext $context, array $tokens): int
-{
-    $action = strtolower(trim((string) ($tokens[0] ?? 'run')));
-
-    if ($action === 'help' || raven_cli_is_help_requested($tokens)) {
-        $context->renderHelpHeader('cron');
+	function raven_cli_command_cron(RavenCliContext $context, array $tokens): int
+	{
+	    $action = strtolower(trim((string) ($tokens[0] ?? 'run')));
+	
+	    // Help token short-circuits to usage output.
+	    if ($action === 'help' || raven_cli_is_help_requested($tokens)) {
+	        $context->renderHelpHeader('cron');
         $context->info('Usage: private/bin/rvn-cron [run|status]');
         $context->info('  run    Execute all registered jobs that are currently due. (default)');
         $context->info('  status Show each registered job with last-run time and overdue flag.');
         return 0;
     }
 
-    if (!in_array($action, ['run', 'status'], true)) {
-        $context->error('Unknown cron action: ' . $action . '. Use run or status.');
-        return 1;
-    }
-
-    try {
+	    // Reject unknown subcommands before bootstrapping runtime services.
+	    if (!in_array($action, ['run', 'status'], true)) {
+	        $context->error('Unknown cron action: ' . $action . '. Use run or status.');
+	        return 1;
+	    }
+	
+	    // Convert all command failures into a consistent non-zero CLI exit.
+	    try {
         // Bootstrap the full app container — sets up autoloader and all extension services.
-        $rvn = $context->rvn();
-        $root = $context->root;
-
-        $scheduler = $rvn['scheduler'] ?? null;
-        if (!$scheduler instanceof SchedulerRegistry) {
-            throw new RuntimeException('Scheduler registry not found in app container. Ensure private/Raven.php is up to date.');
-        }
-
-        if ($action === 'status') {
-            $status = $scheduler->getStatus();
-
-            if ($context->json) {
-                $context->printJson(['ok' => true, 'jobs' => $status]);
-                return 0;
-            }
-
-            if ($status === []) {
-                $context->info('No scheduler jobs registered.');
-                return 0;
-            }
-
-            foreach ($status as $key => $entry) {
+	        $rvn = $context->rvn();
+	        $root = $context->root;
+	
+	        $scheduler = $rvn['scheduler'] ?? null;
+	        // Cron command requires scheduler registry wiring in app container.
+	        if (!$scheduler instanceof SchedulerRegistry) {
+	            throw new RuntimeException('Scheduler registry not found in app container. Ensure private/Raven.php is up to date.');
+	        }
+	
+	        // Status mode reports scheduling metadata without executing jobs.
+	        if ($action === 'status') {
+	            $status = $scheduler->getStatus();
+	
+	            // JSON mode emits one structured payload for automation clients.
+	            if ($context->json) {
+	                $context->printJson(['ok' => true, 'jobs' => $status]);
+	                return 0;
+	            }
+	
+	            // Human mode reports explicit empty-state when no jobs exist.
+	            if ($status === []) {
+	                $context->info('No scheduler jobs registered.');
+	                return 0;
+	            }
+	
+	            // Print one human-readable line per registered scheduler job.
+	            foreach ($status as $key => $entry) {
                 $lastRunLabel = $entry['last_run'] !== null
                     ? date('Y-m-d H:i:s', $entry['last_run'])
                     : 'never';
@@ -3094,13 +3418,15 @@ function raven_cli_command_cron(RavenCliContext $context, array $tokens): int
 
         $ranCount = 0;
         $skippedCount = 0;
-        $errorCount = 0;
-        $resultRows = [];
-
-        foreach ($results as $key => $entry) {
-            if ($entry['ran']) {
-                $ranCount++;
-                $resultRows[$key] = ['ran' => true, 'error' => null];
+	        $errorCount = 0;
+	        $resultRows = [];
+	
+	        // Categorize each due-job result into ran/skipped/error buckets.
+	        foreach ($results as $key => $entry) {
+	            // Successful execution increments ran counters.
+	            if ($entry['ran']) {
+	                $ranCount++;
+	                $resultRows[$key] = ['ran' => true, 'error' => null];
             } elseif ($entry['error'] !== null) {
                 $errorCount++;
                 $resultRows[$key] = ['ran' => false, 'error' => $entry['error']];
@@ -3108,10 +3434,11 @@ function raven_cli_command_cron(RavenCliContext $context, array $tokens): int
                 $skippedCount++;
                 $resultRows[$key] = ['ran' => false, 'skipped' => true];
             }
-        }
-
-        if ($context->json) {
-            $context->printJson([
+	        }
+	
+	        // JSON mode returns aggregate counts and per-job results.
+	        if ($context->json) {
+	            $context->printJson([
                 'ok' => $errorCount === 0,
                 'ran' => $ranCount,
                 'skipped' => $skippedCount,
@@ -3119,13 +3446,15 @@ function raven_cli_command_cron(RavenCliContext $context, array $tokens): int
                 'jobs' => $resultRows,
             ]);
             return $errorCount > 0 ? 1 : 0;
-        }
-
-        $context->info('Scheduler run complete: ' . $ranCount . ' ran, ' . $skippedCount . ' skipped, ' . $errorCount . ' failed.');
-        foreach ($resultRows as $key => $entry) {
-            if (!empty($entry['error'])) {
-                $context->error('Job "' . $key . '" failed: ' . (string) $entry['error']);
-            }
+	        }
+	
+	        $context->info('Scheduler run complete: ' . $ranCount . ' ran, ' . $skippedCount . ' skipped, ' . $errorCount . ' failed.');
+	        // Surface job-level failures explicitly in human-readable mode.
+	        foreach ($resultRows as $key => $entry) {
+	            // Only emit error lines for jobs that returned failures.
+	            if (!empty($entry['error'])) {
+	                $context->error('Job "' . $key . '" failed: ' . (string) $entry['error']);
+	            }
         }
 
         return $errorCount > 0 ? 1 : 0;

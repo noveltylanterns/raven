@@ -26,50 +26,60 @@ final class ThemeDiscovery
      */
     public static function manifests(string $themesRoot): array
     {
+        // Missing theme root means no discoverable manifests.
         if (!is_dir($themesRoot)) {
             return [];
         }
 
         $themesRoot = rtrim($themesRoot, '/\\');
         $directoryEntries = scandir($themesRoot);
+        // Abort discovery when root scan fails.
         if (!is_array($directoryEntries)) {
             return [];
         }
 
         $validator = self::validator();
         $manifests = [];
+        // Validate each root entry as a potential theme directory.
         foreach ($directoryEntries as $entry) {
+            // Skip dot entries from scandir output.
             if ($entry === '.' || $entry === '..') {
                 continue;
             }
 
             $slug = strtolower(trim($entry));
+            // Enforce slug policy before touching per-theme files.
             if (!$validator->isValidSlug($slug)) {
                 continue;
             }
 
             $themeDirectory = $themesRoot . DIRECTORY_SEPARATOR . $slug;
+            // Ignore entries that are not directories.
             if (!is_dir($themeDirectory)) {
                 continue;
             }
 
             $manifestPath = $themeDirectory . DIRECTORY_SEPARATOR . 'theme.json';
+            // Manifest file must exist and be readable.
             if (!is_file($manifestPath) || !is_readable($manifestPath)) {
                 continue;
             }
 
             $rawManifest = file_get_contents($manifestPath);
+            // Skip unreadable or empty manifest payloads.
             if (!is_string($rawManifest) || trim($rawManifest) === '') {
                 continue;
             }
 
             /** @var mixed $decodedManifest */
             $decodedManifest = json_decode($rawManifest, true);
+            // Skip invalid JSON documents.
             if (!is_array($decodedManifest)) {
                 continue;
             }
 
             $normalized = $validator->normalize($slug, $decodedManifest);
+            // Skip manifests that fail schema normalization.
             if (!is_array($normalized)) {
                 continue;
             }
@@ -93,6 +103,7 @@ final class ThemeDiscovery
     public static function options(string $themesRoot): array
     {
         $options = [];
+        // Map discovered manifests to slug => display-name option pairs.
         foreach (self::manifests($themesRoot) as $slug => $manifest) {
             $options[$slug] = (string) ($manifest['name'] ?? '');
         }
@@ -111,6 +122,7 @@ final class ThemeDiscovery
     {
         $manifests = self::manifests($themesRoot);
         $themeSlug = strtolower(trim($themeSlug));
+        // Unknown/blank theme slugs cannot produce an inheritance chain.
         if ($themeSlug === '' || !isset($manifests[$themeSlug])) {
             return [];
         }
@@ -120,7 +132,9 @@ final class ThemeDiscovery
         $current = $themeSlug;
         $maxDepth = 12;
 
+        // Walk parent links with cycle and depth protection.
         for ($index = 0; $index < $maxDepth; $index++) {
+            // Stop on cycles or missing manifests.
             if (isset($visited[$current]) || !isset($manifests[$current])) {
                 break;
             }
@@ -131,6 +145,7 @@ final class ThemeDiscovery
             $manifest = $manifests[$current];
             $isChildTheme = (bool) ($manifest['is_child_theme'] ?? false);
             $parentTheme = (string) ($manifest['parent_theme'] ?? '');
+            // Stop when chain reaches non-child or invalid parent declaration.
             if (!$isChildTheme || $parentTheme === '' || !isset($manifests[$parentTheme])) {
                 break;
             }
@@ -148,6 +163,7 @@ final class ThemeDiscovery
      */
     private static function validator(): ThemeValidator
     {
+        // Lazily instantiate shared validator once per process.
         if (!self::$validator instanceof ThemeValidator) {
             self::$validator = new ThemeValidator();
         }

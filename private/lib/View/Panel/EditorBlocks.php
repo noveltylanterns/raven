@@ -33,6 +33,7 @@ final class EditorBlocks
     public function layout(string $variant = 'default'): array
     {
         $normalizedVariant = strtolower(trim($variant));
+        // Unknown variants fall back to the shared default class set.
         if (!in_array($normalizedVariant, ['default', 'contact', 'security', 'page_body', 'task'], true)) {
             $normalizedVariant = 'default';
         }

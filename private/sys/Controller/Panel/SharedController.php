@@ -126,8 +126,10 @@ final class SharedController
         $normalizedRouteKey = strtolower(trim($routeKey));
         $normalizedAction = strtolower(trim($action));
         $cacheKey = $normalizedRouteKey . ':' . $normalizedAction;
+        // Reuse cached permission decisions to avoid repeated policy checks per request.
         if (array_key_exists($cacheKey, $this->routePermissionDecisionCache)) {
             $granted = $this->routePermissionDecisionCache[$cacheKey];
+            // Cached grant short-circuits immediately for positive permission checks.
             if ($granted) {
                 return true;
             }
@@ -137,12 +139,14 @@ final class SharedController
         }
 
         $routePermission = PanelAccess::stockPanelRoutePermission($routeKey);
+        // Unknown stock-route keys are denied by default.
         if ($routePermission === null) {
             $this->routePermissionDecisionCache[$cacheKey] = false;
             $this->renderPanelDenied();
             return false;
         }
 
+        // Action must match the canonical stock-route action set.
         if (!in_array($normalizedAction, ['view', 'create', 'edit', 'delete', 'uninstall'], true)) {
             $this->routePermissionDecisionCache[$cacheKey] = false;
             $this->renderPanelDenied();
@@ -150,6 +154,7 @@ final class SharedController
         }
 
         $requiredBit = (int) ($routePermission[$normalizedAction] ?? 0);
+        // Grant access when required permission bit is present.
         if ($requiredBit > 0 && $this->auth->panelService()->hasPanelPermissionBit($requiredBit)) {
             $this->routePermissionDecisionCache[$cacheKey] = true;
             return true;
@@ -229,21 +234,25 @@ final class SharedController
      */
     public static function serveThemeAssetIfMatched(array $rvn, string $path, string $method): bool
     {
+        // Theme asset endpoint serves only safe read verbs.
         if (!in_array($method, ['GET', 'HEAD'], true)) {
             return false;
         }
 
+        // Skip non-theme paths so normal panel routing can continue.
         if (!str_starts_with($path, '/theme/')) {
             return false;
         }
 
         $relativePath = ltrim(substr($path, strlen('/theme/')), '/');
+        // Empty relative paths do not map to a concrete asset file.
         if ($relativePath === '') {
             http_response_code(404);
             echo 'Not Found';
             return true;
         }
 
+        // Reject traversal/null-byte/backslash and non-whitelisted path characters.
         if (
             str_contains($relativePath, '..')
             || str_contains($relativePath, "\0")
@@ -259,6 +268,7 @@ final class SharedController
         $themeRootReal = realpath($themeRoot);
         $assetReal = realpath($themeRoot . '/' . $relativePath);
 
+        // Require readable file within panel/theme realpath boundary.
         if (
             $themeRootReal === false
             || $assetReal === false
@@ -293,10 +303,12 @@ final class SharedController
 
         $isFontAsset = in_array($extension, ['woff', 'woff2', 'ttf', 'otf', 'eot'], true);
         $lastModifiedTs = (int) @filemtime($assetReal);
+        // Fallback timestamp avoids invalid cache headers on stat failures.
         if ($lastModifiedTs <= 0) {
             $lastModifiedTs = time();
         }
         $fileSize = (int) @filesize($assetReal);
+        // Guard against negative filesize results from filesystem edge cases.
         if ($fileSize < 0) {
             $fileSize = 0;
         }
@@ -313,6 +325,7 @@ final class SharedController
         header('X-Content-Type-Options: nosniff');
         header('Last-Modified: ' . gmdate('D, d M Y H:i:s', $lastModifiedTs) . ' GMT');
         header('ETag: ' . $etag);
+        // Font assets are immutable and can be cached aggressively.
         if ($isFontAsset) {
             header('Cache-Control: public, max-age=31536000, immutable');
         } else {
@@ -320,16 +333,20 @@ final class SharedController
         }
 
         $ifNoneMatchRaw = trim((string) ($_SERVER['HTTP_IF_NONE_MATCH'] ?? ''));
+        // Honor ETag validators before reading file contents.
         if ($ifNoneMatchRaw !== '') {
             $etagMatches = false;
+            // Check weak and strong ETag tokens against current asset tag.
             foreach (explode(',', $ifNoneMatchRaw) as $candidate) {
                 $candidate = trim($candidate);
+                // RFC-compatible wildcard/weak/strong comparisons.
                 if ($candidate === '*' || $candidate === $etag || $candidate === ('W/' . $etag)) {
                     $etagMatches = true;
                     break;
                 }
             }
 
+            // Matching ETag returns not-modified without body.
             if ($etagMatches) {
                 http_response_code(304);
                 return true;
@@ -337,19 +354,23 @@ final class SharedController
         }
 
         $ifModifiedSinceRaw = trim((string) ($_SERVER['HTTP_IF_MODIFIED_SINCE'] ?? ''));
+        // Fallback validator for clients without ETag cache support.
         if ($ifModifiedSinceRaw !== '') {
             $ifModifiedSinceTs = strtotime($ifModifiedSinceRaw);
+            // Not-modified when client timestamp is at/after asset mtime.
             if ($ifModifiedSinceTs !== false && $ifModifiedSinceTs >= $lastModifiedTs) {
                 http_response_code(304);
                 return true;
             }
         }
 
+        // HEAD returns headers only with no streamed body.
         if ($method === 'HEAD') {
             return true;
         }
 
         $stream = @fopen($assetReal, 'rb');
+        // File open failures are treated as internal errors at this point.
         if (!is_resource($stream)) {
             http_response_code(500);
             header('Content-Type: text/plain; charset=UTF-8');
@@ -357,6 +378,7 @@ final class SharedController
             return true;
         }
 
+        // Stream file contents directly to output buffer.
         if (@fpassthru($stream) === false) {
             http_response_code(500);
             header('Content-Type: text/plain; charset=UTF-8');
@@ -420,6 +442,7 @@ final class SharedController
             $categoryEnabled ? '1' : '0',
             $tagEnabled ? '1' : '0',
         ]));
+        // Skip recomputation when nav-affecting inputs match prior request key.
         if (($_SESSION['_raven_nav_cache_key'] ?? '') === $navCacheKey) {
             return;
         }
@@ -488,13 +511,16 @@ final class SharedController
         $systemExtensionNavItems = [];
         $canViewSystemExtensions = !empty($_SESSION['_raven_nav_stock']['system']['system_extensions'] ?? false);
 
+        // Build nav entries from enabled extension manifests.
         foreach ($enabledExtensionManifests as $directoryName => $manifest) {
             $type = strtolower(trim((string) ($manifest['type'] ?? 'plugin')));
+            // Normalize unknown extension types to plugin bucket.
             if (!in_array($type, ['helper', 'content', 'plugin', 'module', 'system'], true)) {
                 $type = 'plugin';
             }
 
             $extensionRoot = $rvn['root'] . '/private/ext/' . $directoryName;
+            // Skip extensions that do not expose panel routes.
             if (Resolver::providerPath($extensionRoot, 'routes_panel.php') === null) {
                 continue;
             }
@@ -510,6 +536,7 @@ final class SharedController
                 'section' => $directoryName,
             ];
 
+            // System extensions render only for users allowed to view them.
             if ($isSystemType) {
                 if ($canViewSystemExtensions) {
                     $systemExtensionNavItems[] = $item;
@@ -517,10 +544,12 @@ final class SharedController
                 continue;
             }
 
+            // Non-system extension nav items require their resolved permission bit.
             if ($requiredPermissionBit <= 0 || !$hasBit($requiredPermissionBit)) {
                 continue;
             }
 
+            // Modules are grouped separately from generic extension nav items.
             if ($type === 'module') {
                 $moduleNavItems[] = $item;
                 continue;
@@ -549,14 +578,18 @@ final class SharedController
     {
         $pageCreateChannelItems = [];
 
+        // Page-create shortcuts are shown only to users with page-create permission.
         if ($hasBit(PanelAccess::PAGES_CREATE)) {
+            // Build channel shortcut rows from normalized channel option data.
             foreach ($rvn['panel_domain_content']()['channel_read']->listOptions() as $channelOption) {
+                // Ignore malformed channel rows from repository outputs.
                 if (!is_array($channelOption)) {
                     continue;
                 }
 
                 $channelName = trim((string) ($channelOption['name'] ?? ''));
                 $channelSlug = strtolower(trim((string) ($channelOption['slug'] ?? '')));
+                // Require display name and a valid slug token for shortcut links.
                 if ($channelName === '' || $channelSlug === '' || preg_match('/^[a-z0-9][a-z0-9_-]{0,127}$/', $channelSlug) !== 1) {
                     continue;
                 }
@@ -579,6 +612,7 @@ final class SharedController
      */
     private static function resolveRequiredPermissionBit(?array $permissionMeta): int
     {
+        // Missing permission metadata means extension nav item is not permission-scoped.
         if (!is_array($permissionMeta)) {
             return 0;
         }
@@ -586,12 +620,15 @@ final class SharedController
         $defaultLevel = strtolower(trim((string) ($permissionMeta['default_level'] ?? '')));
         $levelRows = is_array($permissionMeta['levels'] ?? null) ? $permissionMeta['levels'] : [];
 
+        // Inspect extension-defined permission levels to find default-level bit.
         foreach ($levelRows as $levelRow) {
+            // Skip malformed permission level rows.
             if (!is_array($levelRow)) {
                 continue;
             }
 
             $levelKey = strtolower(trim((string) ($levelRow['key'] ?? '')));
+            // When default level is set, ignore non-matching level rows.
             if ($defaultLevel !== '' && $levelKey !== $defaultLevel) {
                 continue;
             }
@@ -652,6 +689,7 @@ final class SharedController
     {
         $defaultTheme = $this->defaultPanelTheme();
         $userId = $this->auth->userId();
+        // Guests and expired sessions fall back to configured default theme.
         if ($userId === null) {
             return $defaultTheme;
         }

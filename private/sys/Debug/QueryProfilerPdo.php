@@ -61,6 +61,7 @@ final class QueryProfilerPdo extends PDO
      */
     public function prepare(string $query, array $options = []): PDOStatement|false
     {
+        // Preserve caller-provided statement class overrides, otherwise enforce profiler-aware statements.
         if (!isset($options[PDO::ATTR_STATEMENT_CLASS])) {
             $options[PDO::ATTR_STATEMENT_CLASS] = [
                 QueryProfilerStatement::class,
@@ -80,6 +81,7 @@ final class QueryProfilerPdo extends PDO
     public function exec(string $statement): int|false
     {
         $startedAt = microtime(true);
+        // Record both successful and failed executions with timing for diagnostics parity.
         try {
             $result = parent::exec($statement);
             $this->record('exec', $statement, null, (microtime(true) - $startedAt) * 1000, $result !== false, null);
@@ -101,7 +103,9 @@ final class QueryProfilerPdo extends PDO
     public function query(string $query, ?int $fetchMode = null, mixed ...$fetchModeArgs): PDOStatement|false
     {
         $startedAt = microtime(true);
+        // Mirror PDO::query overload behavior while wrapping every path with profiler timing.
         try {
+            // Pass through the no-fetch-mode signature exactly when caller omits fetch mode.
             if ($fetchMode === null) {
                 $result = parent::query($query);
             } elseif ($fetchModeArgs === []) {
@@ -137,6 +141,7 @@ final class QueryProfilerPdo extends PDO
         bool $success,
         ?string $error
     ): void {
+        // Skip profiler writes entirely when collection is disabled for this connection/request.
         if ($this->queryProfiler === null || !$this->queryProfiler->isEnabled()) {
             return;
         }

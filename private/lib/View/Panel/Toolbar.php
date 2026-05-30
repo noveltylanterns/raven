@@ -31,6 +31,7 @@ final class Toolbar
     public static function render(array $config): string
     {
         $items = self::normalizeHtmlList($config['items'] ?? []);
+        // Skip wrapper markup entirely when no action fragments were supplied.
         if ($items === []) {
             return '';
         }
@@ -41,7 +42,10 @@ final class Toolbar
         ob_start();
         ?>
 <<?= $tag ?><?= $class !== '' ? ' class="' . e($class) . '"' : '' ?>>
-    <?php foreach ($items as $itemHtml): ?>
+    <?php
+    /* Render each trusted action fragment in caller-provided order. */
+    foreach ($items as $itemHtml):
+    ?>
         <?= $itemHtml ?>
     <?php endforeach; ?>
 </<?= $tag ?>>
@@ -58,13 +62,16 @@ final class Toolbar
      */
     private static function normalizeHtmlList(mixed $value): array
     {
+        // Non-array values cannot represent a toolbar action list.
         if (!is_array($value)) {
             return [];
         }
 
         $items = [];
+        // Filter to non-empty trusted HTML fragments while preserving order.
         foreach ($value as $item) {
             $html = trim((string) $item);
+            // Ignore empty fragment entries from conditional template assembly.
             if ($html === '') {
                 continue;
             }
@@ -84,6 +91,7 @@ final class Toolbar
     private static function normalizeTag(string $tag): string
     {
         $normalizedTag = strtolower(trim($tag));
+        // Fall back to <nav> when tag is blank or fails safe-tag validation.
         if ($normalizedTag === '' || !preg_match('/^[a-z][a-z0-9:-]*$/', $normalizedTag)) {
             return 'nav';
         }

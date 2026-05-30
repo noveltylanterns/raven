@@ -1,7 +1,5 @@
 # Raven CMS Tags
 
-***Note: This document was generated with ChatGPT Codex. I have not been able to personally verify every detail within matches the actual script. I do not plan on hammering these `docs/` files down until later releases, so use them with caution!***
-
 This document explains Raven's Tag system for both panel users and developers/agents.
 
 Maintenance note: keep this file updated whenever tag structure, tag routes, or Tag panel views change (`private/tpl/panel/tag/*`, tag controller/repository behavior, or tag public routing).
@@ -84,13 +82,14 @@ Delete behavior note:
   - `private/tpl/panel/tag/list.php`
   - `private/tpl/panel/tag/edit.php`
 - Panel controller:
-  - `private/sys/Controller/Panel/TaxonomyController.php`
+  - `private/sys/Controller/Panel/TagListController.php`
+  - `private/sys/Controller/Panel/TagEditController.php`
 - Persistence:
-  - `private/sys/Repository/TagRepository.php`
+  - `private/sys/Repository/TagRead.php, private/sys/Repository/TagWrite.php`
 
 ### Panel Routes
 
-Declared in `panel/index.php`:
+Declared in `private/sys/Router/Panel/TagRouter.php`:
 
 - `GET /tag` -> list
 - `GET /tag/edit` -> create form
@@ -107,39 +106,43 @@ All state-changing routes use CSRF validation.
 
 ### Controller Flow
 
-`TaxonomyController` tag handlers:
+Split tag handlers:
 
 - `tagList()`
-  - Requires login + `Manage Taxonomy` permission.
-  - Supports optional `?set={id}` filtering and renders set-aware rows from `TagRepository::listPageForPanel(...)`.
+  - Owned by `TagListController`.
+  - Requires login + tag route `view` permission.
+  - Supports optional `?set={id}` filtering and renders set-aware rows from `TagRead::listPage(...)`.
 - `tagEdit(?int $id)`
+  - Owned by `TagEditController`.
   - Loads existing row when id is provided.
   - Missing id row triggers flash error + redirect to `/tag`.
 - `tagSave(array $post, array $files = [])`
+  - Owned by `TagEditController`.
   - Validates CSRF.
   - Sanitizes/normalizes `id`, `name`, `slug`, `set_id`, `description` via `InputSanitizer`.
   - Requires non-empty `name`, valid `slug`, and valid set id.
-  - Saves text fields via `TagRepository::save(...)`.
-  - Processes optional `cover_image` and `preview_image` uploads (single-file each), optional remove flags, and writes image-path columns via `TagRepository::updateImagePaths(...)`.
+  - Saves text fields via `TagWrite::save(...)`.
+  - Processes optional `cover_image` and `preview_image` uploads (single-file each), optional remove flags, and writes image-path columns via `TagWrite::updateImageFiles(...)`.
   - Upload files/variants are stored under `public/uploads/tags/{id}/` using configured `media.images.*` rules.
 - `tagDelete(array $post)`
+  - Owned by `TagEditController`.
   - Validates CSRF.
   - Supports single delete (`id`) and bulk delete (`selected_ids[]`).
   - Removes associated stored cover/preview image files for deleted tags.
   - Reports deleted/failed counts for bulk operations.
-- `tagSetList()`, `tagSetEdit()`, `tagSetSave()`, `tagSetDelete()`
+- `tagSetList()` (in `TagListController`), `tagSetEdit()`, `tagSetSave()`, `tagSetDelete()` (in `TagEditController`)
   - Manage file-backed tag sets under `private/dat/tag-set/`.
   - Block deleting the stock `Default Tag Set`, sets with assigned tags, or sets still explicitly assigned to channels.
 
 ### Data Model And Repository Behavior
 
-`TagRepository` behavior:
+`TagRead` + `TagWrite` behavior:
 
 - `listAll()` returns tags with page counts via `page_tags` join.
 - Tag rows persist numeric `set_id` membership in the database for fast channel/page filtering.
-- `save(...)` handles create/update in one method.
-- `updateImagePaths(...)` persists cover/preview source + variant paths.
-- `deleteById(...)` runs in a transaction:
+- `TagWrite::save(...)` handles create/update in one method.
+- `TagWrite::updateImageFiles(...)` persists cover/preview source + variant paths.
+- `TagWrite::deleteById(...)` runs in a transaction:
   - deletes `page_tags` rows for that tag
   - deletes tag row
 
@@ -158,7 +161,7 @@ Storage detail:
 
 ### Security/Validation Expectations
 
-- Permission gate: `Manage Taxonomy`.
+- Permission gate: tag route permissions (`view`, `create`, `edit`, `delete`).
 - CSRF on POST actions.
 - Sanitization via centralized `InputSanitizer`.
 - Repository operations use prepared statements.

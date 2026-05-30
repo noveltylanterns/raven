@@ -40,23 +40,29 @@ final class Preferences
     {
         $interactive = [];
         $fallbackEmail = strtolower(trim($fallbackEmail));
+        // Use fallback email only when it survives strict address validation.
         if ($fallbackEmail === '' || filter_var($fallbackEmail, FILTER_VALIDATE_EMAIL) === false) {
             $fallbackEmail = '';
         }
 
+        // Evaluate each stored 2FA method independently and keep only interactive ones.
         foreach ($methods as $method) {
+            // Ignore malformed rows so one bad payload entry does not block others.
             if (!is_array($method)) {
                 continue;
             }
 
             $type   = Login2fa::normalizeType((string) ($method['type'] ?? ''));
             $status = Login2fa::normalizeStatus((string) ($method['status'] ?? ''), $type);
+            // TOTP methods are interactive only after confirmation.
             if ($type === 'totp') {
+                // Pending/unconfirmed seeds cannot be used at login challenge time.
                 if ($status !== 'confirmed') {
                     continue;
                 }
 
                 $secret = Totp::normalizeSecret((string) ($method['secret'] ?? ''));
+                // Keep only syntactically valid shared secrets.
                 if (!Totp::isValidSecret($secret)) {
                     continue;
                 }
@@ -69,12 +75,15 @@ final class Preferences
                 continue;
             }
 
+            // Recovery methods require confirmed status and a valid stored hash.
             if ($type === 'recovery') {
+                // Pending recovery setup is not yet eligible for challenges.
                 if ($status !== 'confirmed') {
                     continue;
                 }
 
                 $recoveryHash = trim((string) ($method['recovery_hash'] ?? ''));
+                // Invalid hash payloads are skipped to avoid unusable recovery entries.
                 if (!PhraseValidate::isValidHash($recoveryHash)) {
                     continue;
                 }
@@ -89,13 +98,16 @@ final class Preferences
                 continue;
             }
 
+            // WebAuthn methods require confirmed registration and complete credential material.
             if ($type === 'webauthn') {
+                // Pending registration entries are excluded from interactive options.
                 if ($status !== 'confirmed') {
                     continue;
                 }
 
                 $credentialId       = trim((string) ($method['credential_id'] ?? ''));
                 $credentialPublicKey = trim((string) ($method['credential_public_key'] ?? ''));
+                // Both credential id and public key must exist for challenge verification.
                 if ($credentialId === '' || $credentialPublicKey === '') {
                     continue;
                 }
@@ -110,12 +122,15 @@ final class Preferences
                 continue;
             }
 
+            // Email method can use its own address or a validated account fallback address.
             if ($type === 'email') {
                 $email = strtolower(trim((string) ($method['email'] ?? '')));
+                // Fill missing method email from validated account email when available.
                 if ($email === '' && $fallbackEmail !== '') {
                     $email = $fallbackEmail;
                 }
 
+                // Skip invalid destination addresses because email OTP would be undeliverable.
                 if ($email === '' || filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
                     continue;
                 }
@@ -152,18 +167,22 @@ final class Preferences
         bool $emailTaken
     ): array {
         $errors = [];
+        // Preferences require a non-empty email address.
         if ($email === '') {
             $errors[] = 'Email is required.';
         }
 
+        // Password length checks apply only when user submitted a replacement password.
         if ($password !== null && $password !== '' && strlen($password) < 8) {
             $errors[] = 'Password must be at least 8 characters.';
         }
 
+        // Surface caller-resolved username uniqueness conflicts.
         if ($usernameTaken) {
             $errors[] = 'Username is already in use.';
         }
 
+        // Surface caller-resolved email uniqueness conflicts.
         if ($emailTaken) {
             $errors[] = 'Email is already in use.';
         }
@@ -210,6 +229,7 @@ final class Preferences
             $username !== '' && $userRead->usernameExistsForOtherUser($userId, $username),
             $userRead->emailExistsForOtherUser($userId, $email)
         );
+        // Stop before persistence when validation failed.
         if ($errors !== []) {
             return ['ok' => false, 'errors' => $errors];
         }
@@ -288,6 +308,7 @@ final class Preferences
             'two_factor_methods_encoded' => self::encodeTwoFactorMethods($twoFactorMethods),
             'set_avatar' => (bool) ($payload['set_avatar'] ?? false),
             'avatar_path' => $payload['avatar_path'] ?? null,
+            // Preserve cover image only when payload provides a string-like value.
             'cover_image' => is_string($payload['cover_image'] ?? null)
                 ? trim((string) $payload['cover_image'])
                 : null,
@@ -302,6 +323,7 @@ final class Preferences
      */
     private static function encodeTwoFactorMethods(array $methods): ?string
     {
+        // Persist null for empty sets so preference storage remains compact.
         if ($methods === []) {
             return null;
         }

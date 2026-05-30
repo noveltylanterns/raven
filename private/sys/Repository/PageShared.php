@@ -30,13 +30,16 @@ final class PageShared
      */
     public static function normalizeIds(mixed $ids): array
     {
+        // Mixed caller payloads are normalized by rejecting non-array inputs early.
         if (!is_array($ids)) {
             return [];
         }
 
         $normalized = [];
+        // Cast each candidate id and use the value as the key for de-duplication.
         foreach ($ids as $id) {
             $value = (int) $id;
+            // Only positive ids represent valid persisted taxonomy references.
             if ($value > 0) {
                 $normalized[$value] = $value;
             }

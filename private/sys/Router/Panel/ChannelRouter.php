@@ -43,6 +43,7 @@ final class ChannelRouter
 
         $router->add('GET', '/channel/edit/{id}', static function (array $params) use ($panelChannelEditController, $input, $renderNotFound): void {
             $id = RouteValidator::intOrNotFound($input, $params['id'] ?? null, 1, $renderNotFound);
+            // Validation helper already rendered not-found for invalid ids.
             if ($id === null) {
                 return;
             }

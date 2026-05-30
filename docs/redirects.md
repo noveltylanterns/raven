@@ -1,7 +1,5 @@
 # Raven CMS Redirects
 
-***Note: This document was generated with ChatGPT Codex. I have not been able to personally verify every detail within matches the actual script. I do not plan on hammering these `docs/` files down until later releases, so use them with caution!***
-
 This document explains Raven's Redirect system for both panel users and developers/agents.
 
 Maintenance note: keep this file updated whenever redirect structure, redirect routes, or Redirect panel views change (`private/tpl/panel/redirect/*`, redirect controller/repository behavior, or public redirect resolution).
@@ -66,13 +64,13 @@ Fields/options:
   - `private/tpl/panel/redirect/list.php`
   - `private/tpl/panel/redirect/edit.php`
 - Panel controller:
-  - `private/sys/Controller/Panel/RedirectController.php`
+  - `private/sys/Controller/Panel/RedirectListController.php, private/sys/Controller/Panel/RedirectEditController.php`
 - Persistence:
-  - `private/sys/Repository/RedirectRepository.php`
+  - `private/sys/Repository/RedirectRead.php, private/sys/Repository/RedirectWrite.php`
 
 ### Panel Routes
 
-Declared in `panel/index.php`:
+Declared in `private/sys/Router/Panel/RedirectRouter.php`:
 
 - `GET /redirect` -> list
 - `GET /redirect/edit` -> create form
@@ -84,16 +82,19 @@ All state-changing routes use CSRF validation.
 
 ### Controller Flow
 
-`RedirectController` redirect handlers:
+Split redirect handlers:
 
 - `redirectList()`
-  - Requires login + `Manage Taxonomy` permission.
-  - Renders list with `RedirectRepository::listAll()`.
+  - Owned by `RedirectListController`.
+  - Requires login + redirect route `view` permission.
+  - Renders list with `RedirectRead::listAll()`.
 - `redirectEdit(?int $id)`
+  - Owned by `RedirectEditController`.
   - Loads existing row when id is provided.
-  - Provides channel options from `ChannelRepository::listAll()`.
+  - Provides channel options from `ChannelRead::listAll()`.
   - Missing id row triggers flash error + redirect to `/redirect`.
 - `redirectSave(array $post)`
+  - Owned by `RedirectEditController`.
   - Validates CSRF.
   - Sanitizes/normalizes posted fields via `InputSanitizer`.
   - Requires title + valid slug.
@@ -101,20 +102,21 @@ All state-changing routes use CSRF validation.
   - Blocks reserved root slugs (`isReservedPublicRootSlug`) when `channel_slug` is empty.
   - Validates posted `channel_slug` against actual channel list.
   - Validates target URL format (`isAllowedRedirectTargetUrl`).
-  - Saves via `RedirectRepository::save(...)`.
+  - Saves via `RedirectWrite::save(...)`.
 - `redirectDelete(array $post)`
+  - Owned by `RedirectEditController`.
   - Validates CSRF.
   - Supports single delete (`id`) and bulk delete (`selected_ids[]`).
   - Reports deleted/failed counts for bulk operations.
 
 ### Data Model And Repository Behavior
 
-`RedirectRepository` behavior:
+`RedirectRead` + `RedirectWrite` behavior:
 
-- `listAll()` and `findById()` join channel metadata for panel display.
-- `findActiveByPath(slug, channelSlug)` resolves active redirects for public routing.
-- `save(...)` handles create/update and enforces path uniqueness per `(channel, slug)`.
-- `deleteById(...)` removes one redirect row.
+- `RedirectRead::listAll()` and `RedirectRead::findById()` join channel metadata for panel display.
+- `RedirectRead::findActiveByPath(slug, channelSlug)` resolves active redirects for public routing.
+- `RedirectWrite::save(...)` handles create/update and enforces path uniqueness per `(channel, slug)`.
+- `RedirectWrite::deleteById(...)` removes one redirect row.
 
 Storage detail:
 
@@ -129,7 +131,7 @@ Storage detail:
 
 ### Security/Validation Expectations
 
-- Permission gate: `Manage Taxonomy`.
+- Permission gate: redirect route permissions (`view`, `create`, `edit`, `delete`).
 - CSRF on POST actions.
 - Sanitization via centralized `InputSanitizer`.
 - Repository operations use prepared statements.

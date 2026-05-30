@@ -47,15 +47,19 @@ final class TemplateDecorator
      */
     public function decoratePageListForTemplate(array $pages): array
     {
+        // Normalize each list row independently so malformed rows are skipped safely.
         foreach ($pages as $index => $page) {
+            // Ignore malformed page entries that are not associative arrays.
             if (!is_array($page)) {
                 continue;
             }
 
             $path = trim((string) ($page['url'] ?? ''));
+            // Derive fallback URL path from slug/channel fields when explicit URL is absent.
             if ($path === '') {
                 $slug = $this->input->slug((string) ($page['slug'] ?? ''));
                 $channelSlug = $this->input->slug((string) ($page['channel_slug'] ?? ''));
+                // Root pages with missing slugs resolve to site root.
                 if ($slug === null || $slug === '') {
                     $path = '/';
                 } elseif ($channelSlug === null || $channelSlug === '') {
@@ -99,6 +103,7 @@ final class TemplateDecorator
             || (int) ($page['display_title'] ?? 1) === 1;
         unset($page['show_title']);
 
+        // Keep legacy channel field normalized to a non-negative integer id.
         if (array_key_exists('channel', $page)) {
             $channelId = (int) ($page['channel'] ?? 0);
             $page['channel'] = max(0, $channelId);
@@ -108,12 +113,15 @@ final class TemplateDecorator
         $renderedBlocks = [];
         $displayIndex = 0;
 
+        // Process each rendered block row while preserving order for template output.
         foreach ($rawBlocks as $block) {
+            // Ignore malformed block entries.
             if (!is_array($block)) {
                 continue;
             }
 
             $html = trim((string) ($block['html'] ?? ''));
+            // Skip blocks that rendered to empty HTML.
             if ($html === '') {
                 continue;
             }
@@ -124,11 +132,13 @@ final class TemplateDecorator
                 'raven-page-content-block-' . $displayIndex,
             ];
 
+            // Add spacing class to every block after the first visible block.
             if ($displayIndex > 1) {
                 array_unshift($classNames, 'mt-3');
             }
 
             $customClass = trim((string) ($block['css_class'] ?? ''));
+            // Preserve caller-provided custom classes when present.
             if ($customClass !== '') {
                 $classNames[] = $customClass;
             }
@@ -153,7 +163,9 @@ final class TemplateDecorator
      */
     public function decorateGalleryImagesForTemplate(array $galleryImages): array
     {
+        // Normalize each gallery image row independently.
         foreach ($galleryImages as $index => $image) {
+            // Ignore malformed image rows.
             if (!is_array($image)) {
                 continue;
             }
@@ -192,7 +204,9 @@ final class TemplateDecorator
 
         $contacts = is_array($profile['contact'] ?? null) ? $profile['contact'] : [];
         $contactValues = [];
+        // Normalize contact rows and collect first value per contact type.
         foreach ($contacts as $index => $contact) {
+            // Ignore malformed contact rows.
             if (!is_array($contact)) {
                 continue;
             }
@@ -201,6 +215,7 @@ final class TemplateDecorator
             $contacts[$index]['is_external'] = preg_match('#^https?://#i', $href) === 1;
 
             $type = trim((string) ($contact['type'] ?? ''));
+            // Preserve the first non-empty value for each contact type key.
             if ($type !== '' && !array_key_exists($type, $contactValues)) {
                 $contactValues[$type] = trim((string) ($contact['value'] ?? ''));
             }
@@ -227,7 +242,9 @@ final class TemplateDecorator
      */
     public function decorateGroupMembersForTemplate(array $members): array
     {
+        // Normalize each member row independently.
         foreach ($members as $index => $member) {
+            // Ignore malformed member rows.
             if (!is_array($member)) {
                 continue;
             }
@@ -280,6 +297,7 @@ final class TemplateDecorator
         $site = is_array($data['site'] ?? null) ? $data['site'] : [];
 
         $siteName = trim((string) ($site['name'] ?? 'Raven CMS'));
+        // Enforce non-empty site name for downstream metadata defaults.
         if ($siteName === '') {
             $siteName = 'Raven CMS';
         }
@@ -288,17 +306,20 @@ final class TemplateDecorator
         $themeData = is_array($data['theme'] ?? null) ? $data['theme'] : [];
 
         $theme = trim((string) ($site['theme'] ?? $themeData['slug'] ?? 'raven'));
+        // Theme slug fallback prevents empty theme references in templates.
         if ($theme === '') {
             $theme = 'raven';
         }
 
         $themeActive = trim((string) ($site['theme_active'] ?? $themeData['active'] ?? $theme));
+        // Active theme fallback prevents missing stylesheet owner slugs.
         if ($themeActive === '') {
             $themeActive = 'raven';
         }
 
         $siteUrl = trim((string) ($site['url'] ?? ''));
         $themeUrl = trim((string) ($site['theme_url'] ?? $themeData['url'] ?? ''));
+        // Build theme asset URL lazily when absent but site URL is known.
         if ($themeUrl === '' && $siteUrl !== '') {
             $themeUrl = rtrim($siteUrl, '/') . '/theme/' . rawurlencode($themeActive);
         }
@@ -311,6 +332,7 @@ final class TemplateDecorator
         $panelData = is_array($data['panel'] ?? null) ? $data['panel'] : [];
         $panelSlug = trim((string) ($site['panel_path'] ?? $panelData['slug'] ?? 'panel'), '/');
         $panelUrl = trim((string) ($panelData['url'] ?? ''));
+        // Build panel URL lazily when absent but site URL is known.
         if ($panelUrl === '' && $siteUrl !== '') {
             $panelUrl = $panelSlug === '' ? $siteUrl : (rtrim($siteUrl, '/') . '/' . $panelSlug);
         }
@@ -330,16 +352,19 @@ final class TemplateDecorator
         $meta['robots'] = trim((string) ($site['robots'] ?? ''));
         $meta['image'] = trim((string) ($site['meta_image'] ?? ''));
         $meta['og_type'] = trim((string) ($site['og_type'] ?? ''));
+        // Default OpenGraph type maintains valid social metadata when unset.
         if ($meta['og_type'] === '') {
             $meta['og_type'] = 'website';
         }
         $meta['og_locale'] = trim((string) ($site['og_locale'] ?? ''));
+        // Default locale keeps metadata complete when unset.
         if ($meta['og_locale'] === '') {
             $meta['og_locale'] = 'en_US';
         }
         $meta['x_card'] = trim((string) ($site['twitter_card'] ?? ''));
         $meta['x_creator'] = trim((string) ($site['twitter_creator'] ?? ''));
         $meta['x_site'] = trim((string) ($site['twitter_site'] ?? ''));
+        // Fall back x_site to site name when no account handle is configured.
         if ($meta['x_site'] === '') {
             $meta['x_site'] = $siteName;
         }
@@ -360,7 +385,9 @@ final class TemplateDecorator
             $site['panel_path']
         );
 
+        // Normalize legacy desc/description fields across common resource payloads.
         foreach (['page', 'category', 'tag', 'channel'] as $root) {
+            // Skip entries that are not array payloads.
             if (!is_array($data[$root] ?? null)) {
                 continue;
             }
@@ -373,54 +400,66 @@ final class TemplateDecorator
         $pagination = is_array($data['pagination'] ?? null) ? $data['pagination'] : [];
         $pageNumber = max(1, (int) ($pagination['current'] ?? 1));
 
+        // Choose title/description from the first matching view context payload.
         if (is_array($data['page'] ?? null)) {
             $viewTitle = trim((string) ($data['page']['title'] ?? ''));
             $metaDescription = trim((string) ($data['page']['desc'] ?? ''));
         } elseif (is_array($data['category'] ?? null)) {
             $categoryName = trim((string) ($data['category']['name'] ?? ''));
+            // Category metadata is generated only when category name exists.
             if ($categoryName !== '') {
                 $viewTitle = 'Category: ' . $categoryName;
+                // Append page marker for paginated category listings.
                 if ($pageNumber > 1) {
                     $viewTitle .= ' (Page ' . $pageNumber . ')';
                 }
 
                 $metaDescription = trim((string) ($data['category']['desc'] ?? ''));
+                // Use generic description fallback when category description is blank.
                 if ($metaDescription === '') {
                     $metaDescription = 'Browse pages in category ' . $categoryName . '.';
                 }
             }
         } elseif (is_array($data['tag'] ?? null)) {
             $tagName = trim((string) ($data['tag']['name'] ?? ''));
+            // Tag metadata is generated only when tag name exists.
             if ($tagName !== '') {
                 $viewTitle = 'Tag: ' . $tagName;
+                // Append page marker for paginated tag listings.
                 if ($pageNumber > 1) {
                     $viewTitle .= ' (Page ' . $pageNumber . ')';
                 }
 
                 $metaDescription = trim((string) ($data['tag']['desc'] ?? ''));
+                // Use generic description fallback when tag description is blank.
                 if ($metaDescription === '') {
                     $metaDescription = 'Browse pages tagged ' . $tagName . '.';
                 }
             }
         } elseif (is_array($data['profile'] ?? null)) {
             $profileName = trim((string) ($data['profile']['name'] ?? ''));
+            // Fallback to username when display name is absent.
             if ($profileName === '') {
                 $profileName = trim((string) ($data['profile']['username'] ?? ''));
             }
+            // Profile metadata is emitted only when an identity label exists.
             if ($profileName !== '') {
                 $viewTitle = 'Profile: ' . $profileName;
                 $metaDescription = 'Public profile for ' . $profileName . '.';
             }
         } elseif (is_array($data['group'] ?? null)) {
             $groupName = trim((string) ($data['group']['name'] ?? ''));
+            // Group metadata is emitted only when group name exists.
             if ($groupName !== '') {
                 $viewTitle = 'Group: ' . $groupName;
                 $metaDescription = 'Members in group ' . $groupName . '.';
             }
         }
 
+        // Provide stock 404 metadata when route did not supply context-specific values.
         if ($viewTitle === '' && $statusCode === 404) {
             $viewTitle = 'Not Found';
+            // Ensure 404 metadata description is never empty.
             if ($metaDescription === '') {
                 $metaDescription = 'The requested page could not be found.';
             }
@@ -444,27 +483,32 @@ final class TemplateDecorator
     private function normalizedMetaUrl(string $url): string
     {
         $url = trim($url);
+        // Empty canonical URL input resolves to an empty output string.
         if ($url === '') {
             return '';
         }
 
         $parts = parse_url($url);
+        // Non-parseable URLs fall back to trailing-slash-normalized raw value.
         if (!is_array($parts)) {
             return rtrim($url, '/');
         }
 
         $scheme = isset($parts['scheme']) ? $parts['scheme'] . '://' : '';
         $host = trim((string) ($parts['host'] ?? ''));
+        // Hostless parse results fall back to raw trailing-slash normalization.
         if ($host === '') {
             return rtrim($url, '/');
         }
 
         $authority = $host;
+        // Preserve explicit port in canonical URL when present.
         if (isset($parts['port'])) {
             $authority .= ':' . $parts['port'];
         }
 
         $path = trim((string) ($parts['path'] ?? ''));
+        // Root path canonicalizes to empty suffix while deeper paths trim trailing slash.
         if ($path === '' || $path === '/') {
             $path = '';
         } else {
@@ -472,9 +516,11 @@ final class TemplateDecorator
         }
 
         $normalized = $scheme . $authority . $path;
+        // Preserve query string in canonical URL when present.
         if (isset($parts['query']) && $parts['query'] !== '') {
             $normalized .= '?' . $parts['query'];
         }
+        // Preserve fragment in canonical URL when present.
         if (isset($parts['fragment']) && $parts['fragment'] !== '') {
             $normalized .= '#' . $parts['fragment'];
         }
@@ -511,6 +557,7 @@ final class TemplateDecorator
     private function publicTemplateUsername(string $username): string
     {
         $normalized = trim($username);
+        // Empty usernames should never render into public templates.
         if ($normalized === '') {
             return '';
         }

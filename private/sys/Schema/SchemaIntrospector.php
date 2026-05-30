@@ -29,10 +29,12 @@ final class SchemaIntrospector
      */
     public function columnExists(PDO $db, string $driver, string $table, string $column): bool
     {
+        // SQLite column checks use PRAGMA table_info inspection.
         if ($driver === 'sqlite') {
             return $this->appColumnExistsSqlite($db, $table, $column);
         }
 
+        // MySQL column checks use information_schema.columns.
         if ($driver === 'mysql') {
             return $this->appColumnExistsMySql($db, $table, $column);
         }
@@ -53,10 +55,12 @@ final class SchemaIntrospector
      */
     public function indexExists(PDO $db, string $driver, string $table, string $indexName): bool
     {
+        // MySQL index checks use information_schema.statistics.
         if ($driver === 'mysql') {
             return $this->indexExistsMySql($db, $table, $indexName);
         }
 
+        // PostgreSQL index checks use pg_indexes.
         if ($driver === 'pgsql') {
             return $this->indexExistsPgSql($db, $table, $indexName);
         }
@@ -74,6 +78,7 @@ final class SchemaIntrospector
      */
     public function tableExists(PDO $db, string $driver, string $table): bool
     {
+        // SQLite table checks query sqlite_master.
         if ($driver === 'sqlite') {
             $stmt = $db->prepare(
                 'SELECT 1 FROM sqlite_master WHERE type = :type AND name = :name LIMIT 1'
@@ -83,6 +88,7 @@ final class SchemaIntrospector
             return $stmt->fetchColumn() !== false;
         }
 
+        // MySQL table checks query information_schema.tables.
         if ($driver === 'mysql') {
             $stmt = $db->prepare(
                 'SELECT 1
@@ -112,6 +118,7 @@ final class SchemaIntrospector
      */
     public function sqliteTableExists(PDO $db, string $schema, string $table): bool
     {
+        // Reject unsafe schema tokens before interpolating attached SQLite schema names.
         if (!preg_match('/^[a-z_][a-z0-9_]*$/', $schema)) {
             return false;
         }
@@ -227,11 +234,13 @@ final class SchemaIntrospector
         $schema = null;
         $tableName = $table;
 
+        // Support schema-qualified SQLite table names (e.g. attached_db.table).
         if (str_contains($table, '.')) {
             [$schemaPart, $tablePart] = explode('.', $table, 2);
             $schema = trim($schemaPart);
             $tableName = trim($tablePart);
 
+            // Reject unsafe schema/table tokens before PRAGMA interpolation.
             if (!preg_match('/^[a-z_][a-z0-9_]*$/i', $schema) || !preg_match('/^[a-z_][a-z0-9_]*$/i', $tableName)) {
                 return false;
             }
@@ -244,11 +253,13 @@ final class SchemaIntrospector
             : 'PRAGMA ' . $schema . '.table_info(' . $tableName . ')';
 
         $stmt = $db->query($pragma);
+        // Query failures are treated as "column missing" for safe idempotence.
         if ($stmt === false) {
             return false;
         }
 
         $rows = $stmt->fetchAll();
+        // Scan PRAGMA rows and match exact column name.
         foreach ($rows as $row) {
             if (($row['name'] ?? null) === $column) {
                 return true;

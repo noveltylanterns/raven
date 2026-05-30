@@ -34,11 +34,13 @@ final class PrefixResolver
     public static function normalize(InputSanitizer $input, string $configured, string $fallback, bool $allowBlank = false): string
     {
         $configured = trim($configured);
+        // Some features allow intentionally blank prefixes to disable their route base.
         if ($allowBlank && $configured === '') {
             return '';
         }
 
         $slug = $input->slug($configured);
+        // Invalid configured prefixes fall back to a known-safe default slug.
         if ($slug === null || $slug === '') {
             return $fallback;
         }

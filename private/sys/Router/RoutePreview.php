@@ -64,6 +64,7 @@ final class RoutePreview
     ): string {
         $routeMode = ChannelPolicy::normalizeRouteMode($channelPageRouteMode);
         $normalizedSlug = $this->input->slug($pageSlug);
+        // Slug-based modes cannot build previews when slug normalization fails.
         if (!ChannelPolicy::usesPageId($routeMode) && ($normalizedSlug === null || $normalizedSlug === '')) {
             return '/';
         }
@@ -78,10 +79,12 @@ final class RoutePreview
             $channelPageUrlSeparator,
             $contentSeparator
         );
+        // Slug-mode previews fall back to normalized slug when segment builder returns empty.
         if ($routeSegment === '' && !ChannelPolicy::usesPageId($routeMode)) {
             $routeSegment = $normalizedSlug;
         }
 
+        // Root-scope pages omit the channel segment from their preview path.
         if ($normalizedChannel === null || $normalizedChannel === '') {
             return '/' . $routeSegment;
         }
@@ -100,12 +103,15 @@ final class RoutePreview
         /** @var array<string, array{slug: string, priority: int, published_ts: int}> $best */
         $best = [];
 
+        // Scan candidate pages and keep best landing slug per channel.
         foreach ($pagesForRouting as $page) {
             $channelSlug = trim((string) ($page['channel_slug'] ?? ''));
+            // Landing maps apply only to channel-scoped pages.
             if ($channelSlug === '') {
                 continue;
             }
 
+            // Unpublished pages are never valid channel landing targets.
             if (($page['status'] ?? '') !== 'published') {
                 continue;
             }
@@ -116,12 +122,14 @@ final class RoutePreview
                 'index' => 1,
                 default => null,
             };
+            // Only home/index slugs participate in landing-page selection.
             if ($priority === null) {
                 continue;
             }
 
             $createdAt = trim((string) ($page['created'] ?? ''));
             $publishedTs = $createdAt !== '' ? (int) strtotime($createdAt) : 0;
+            // Clamp failed/negative timestamps to zero for deterministic comparisons.
             if ($publishedTs < 0) {
                 $publishedTs = 0;
             }
@@ -132,12 +140,14 @@ final class RoutePreview
                 'published_ts' => $publishedTs,
             ];
 
+            // First candidate for a channel becomes the baseline.
             if (!isset($best[$channelSlug])) {
                 $best[$channelSlug] = $candidate;
                 continue;
             }
 
             $current = $best[$channelSlug];
+            // Prefer higher-priority slug, then newer publish timestamp as tie-breaker.
             if (
                 $candidate['priority'] < $current['priority']
                 || (
@@ -150,6 +160,7 @@ final class RoutePreview
         }
 
         $result = [];
+        // Flatten the candidate structs to channel=>slug output map.
         foreach ($best as $channelSlug => $candidate) {
             $result[$channelSlug] = (string) ($candidate['slug'] ?? '');
         }
@@ -166,8 +177,10 @@ final class RoutePreview
     public function channelIndexTemplateExists(Config $config): bool
     {
         $themeSlug = $this->themeCatalog->activeSlugFromConfig($config);
+        // Walk theme inheritance from active theme toward parent fallbacks.
         foreach ($this->themeCatalog->inheritanceChain($themeSlug) as $candidateThemeSlug) {
             $candidate = $this->themeCatalog->root() . '/' . $candidateThemeSlug . '/tpl/channel/index.php';
+            // First template hit is enough to confirm channel index availability.
             if (is_file($candidate)) {
                 return true;
             }
@@ -195,8 +208,10 @@ final class RoutePreview
         ];
 
         $normalized = [];
+        // Normalize reserved prefixes to lowercase unique slugs.
         foreach ($prefixes as $prefix) {
             $clean = strtolower(trim((string) $prefix));
+            // Drop empty values so callers receive only actionable reserved paths.
             if ($clean !== '') {
                 $normalized[$clean] = $clean;
             }

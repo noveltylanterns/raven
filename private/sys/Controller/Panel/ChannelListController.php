@@ -51,6 +51,7 @@ final class ChannelListController
     public function channelList(): void
     {
         $this->context->requirePanelLogin();
+        // Enforce view permission before loading channel list payloads.
         if (!$this->context->requireRoutePermissionOrForbidden('channel', 'view')) {
             return;
         }
@@ -61,6 +62,7 @@ final class ChannelListController
         $totalItems = (int) ($pageResult['total'] ?? 0);
         $channelRows = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
         $pagination = Pagination::state($totalItems, $requestedPage, $perPage);
+        // Re-query using canonical page offset when requested page was clamped.
         if ($totalItems > 0 && $pagination['current'] !== $requestedPage) {
             $pageResult = $this->channelRead->listPage($perPage, $pagination['offset']);
             $channelRows = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];

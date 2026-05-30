@@ -68,16 +68,19 @@ final class CategoryListController
     public function categoryList(): void
     {
         $this->context->requirePanelLogin();
+        // Category list routes are disabled when taxonomy feature flag is off.
         if (!$this->categoryEnabled) {
             $this->context->renderPanelNotFound();
             return;
         }
+        // Enforce view permission before loading list payloads.
         if (!$this->context->requireRoutePermissionOrForbidden('category', 'view')) {
             return;
         }
 
         $categoryCountsBySetId = $this->categoryRead()->countsBySetId();
         $selectedSetId = $this->input->int($_GET['set'] ?? null, 0);
+        // Drop invalid/empty set filters so list view remains consistent.
         if (
             $selectedSetId !== null
             && (
@@ -94,6 +97,7 @@ final class CategoryListController
         $totalItems = (int) ($pageResult['total'] ?? 0);
         $categoryRows = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
         $pagination = Pagination::state($totalItems, $requestedPage, $perPage);
+        // Re-query using canonical page offset when requested page was clamped.
         if ($totalItems > 0 && $pagination['current'] !== $requestedPage) {
             $pageResult = $this->categoryRead()->listPage($perPage, $pagination['offset'], $selectedSetId);
             $categoryRows = is_array($pageResult['rows'] ?? null) ? $pageResult['rows'] : [];
@@ -103,6 +107,7 @@ final class CategoryListController
         $setOptions = [];
         foreach ($this->categorySetRepo()->listOptions() as $setOption) {
             $setId = (int) ($setOption['id'] ?? 0);
+            // Hide empty sets from list-filter tabs.
             if ((int) ($categoryCountsBySetId[$setId] ?? 0) < 1) {
                 continue;
             }
@@ -132,10 +137,12 @@ final class CategoryListController
     public function categorySetList(): void
     {
         $this->context->requirePanelLogin();
+        // Category-set list routes are disabled when taxonomy feature flag is off.
         if (!$this->categoryEnabled) {
             $this->context->renderPanelNotFound();
             return;
         }
+        // Enforce view permission before loading set list payloads.
         if (!$this->context->requireRoutePermissionOrForbidden('category', 'view')) {
             return;
         }
@@ -144,6 +151,7 @@ final class CategoryListController
         $countsBySetId = $this->categoryRead()->countsBySetId();
         $channelCountsBySetId = $this->channelRead->explicitTaxonomySetCounts('category');
         $setRows = [];
+        // Enrich each set row with category/channel usage counters.
         foreach ($this->categorySetRepo()->listAll() as $setRow) {
             $setId = (int) ($setRow['id'] ?? 0);
             $setRow['category_count'] = (int) ($countsBySetId[$setId] ?? 0);
@@ -168,11 +176,13 @@ final class CategoryListController
      */
     private function categoryRead(): CategoryRead
     {
+        // Reuse cached read repository when already resolved.
         if ($this->categoryRead instanceof CategoryRead) {
             return $this->categoryRead;
         }
 
         $repo = ($this->categoryReadResolver)();
+        // Resolver contract must return CategoryRead instance.
         if (!$repo instanceof CategoryRead) {
             throw new \RuntimeException('Panel category read resolver returned an invalid value.');
         }
@@ -189,11 +199,13 @@ final class CategoryListController
      */
     private function categorySetRepo(): SetRead
     {
+        // Reuse cached set-read repository when already resolved.
         if ($this->categorySetRepo instanceof SetRead) {
             return $this->categorySetRepo;
         }
 
         $repo = ($this->categorySetRepoResolver)();
+        // Resolver contract must return SetRead instance.
         if (!$repo instanceof SetRead) {
             throw new \RuntimeException('Panel category-set repository resolver returned an invalid value.');
         }

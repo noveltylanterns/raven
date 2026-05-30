@@ -114,6 +114,7 @@ final class Logger
      */
     public function log(string $severity, string $message, string $channel = 'system', array $context = []): void
     {
+        // Skip persistence entirely when the requested severity is disabled by config.
         if (!$this->isEnabled($severity)) {
             return;
         }
@@ -121,10 +122,12 @@ final class Logger
         $contextJson = $context !== []
             ? json_encode($context, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
             : null;
+        // Drop invalid JSON payloads instead of blocking the log write.
         if ($contextJson === false) {
             $contextJson = null;
         }
 
+        // Logging must remain best-effort so storage failures do not break application flows.
         try {
             $stmt = $this->db->prepare(
                 'INSERT INTO ' . $this->table . ' (logged_at, severity, channel, message, context)
@@ -142,6 +145,7 @@ final class Logger
             return;
         }
 
+        // Mirror accepted records to syslog only when the optional mirror feature is enabled.
         if ($this->syslogEnabled) {
             $priority = match ($severity) {
                 'error'  => LOG_ERR,
@@ -275,12 +279,14 @@ final class Logger
         $params = [];
 
         $severity = strtolower(trim((string) ($filters['severity'] ?? '')));
+        // Only recognized severities are admitted into the query predicate.
         if (in_array($severity, ['error', 'warn', 'info'], true)) {
             $conditions[] = 'severity = :severity';
             $params[':severity'] = $severity;
         }
 
         $search = trim((string) ($filters['search'] ?? ''));
+        // Apply substring filtering only when caller provides a non-empty search term.
         if ($search !== '') {
             // Substring search across message and channel.
             $conditions[] = '(message LIKE :search OR channel LIKE :search)';

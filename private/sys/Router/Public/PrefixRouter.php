@@ -55,11 +55,13 @@ final class PrefixRouter
         callable $publicRequestContext,
         InputSanitizer $input
     ): void {
+        // Skip registration when feature-level enablement is falsey.
         if (empty($routeConfig[$enabledKey])) {
             return;
         }
 
         $prefix = (string) ($routeConfig[$configKey] ?? '');
+        // Empty prefixes intentionally suppress route registration.
         if ($prefix === '') {
             return;
         }
@@ -70,6 +72,7 @@ final class PrefixRouter
             $slug = RouteValidator::slugOrNotFound($input, $params['slug'] ?? null, static function () use ($publicRequestContext): void {
                 $publicRequestContext()->notFound();
             });
+            // Validator already rendered not-found for invalid slugs.
             if ($slug === null) {
                 return;
             }
@@ -82,6 +85,7 @@ final class PrefixRouter
             };
             $slug = RouteValidator::slugOrNotFound($input, $params['slug'] ?? null, $notFound);
             $page = RouteValidator::intOrNotFound($input, $params['page'] ?? null, 1, $notFound);
+            // Both slug and page must validate before invoking the page-aware handler.
             if ($slug === null || $page === null) {
                 return;
             }

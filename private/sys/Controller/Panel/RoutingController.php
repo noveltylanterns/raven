@@ -107,6 +107,7 @@ final class RoutingController
     public function routing(): void
     {
         $this->context->requirePanelLogin();
+        // Routing inventory is view-permission gated.
         if (!$this->context->requireRoutePermissionOrForbidden('routing', 'view')) {
             return;
         }
@@ -141,6 +142,7 @@ final class RoutingController
     public function routingExport(): void
     {
         $this->context->requirePanelLogin();
+        // Routing export shares the same view permission as routing inventory.
         if (!$this->context->requireRoutePermissionOrForbidden('routing', 'view')) {
             return;
         }
@@ -150,6 +152,7 @@ final class RoutingController
         $this->csvHandler()->streamToOutput(
             $filename,
             (static function (array $rows): \Generator {
+                // Emit one CSV row per routing inventory entry.
                 foreach ($rows as $row) {
                     yield [
                         (string) ($row['type_label'] ?? ''),
@@ -173,11 +176,13 @@ final class RoutingController
      */
     private function taxonomyLookupRepo(): Taxonomy
     {
+        // Reuse cached taxonomy lookup parser once resolved.
         if ($this->taxonomyLookupRepo instanceof Taxonomy) {
             return $this->taxonomyLookupRepo;
         }
 
         $taxonomyLookupRepo = ($this->taxonomyLookupRepoResolver)();
+        // Resolver contract must return the taxonomy lookup parser service.
         if (!$taxonomyLookupRepo instanceof Taxonomy) {
             throw new \RuntimeException('Panel taxonomy lookup parser resolver returned an invalid value.');
         }
@@ -203,6 +208,7 @@ final class RoutingController
     {
         $includeCategories = $this->categoryRouteEnabled();
         $includeTags = $this->tagRouteEnabled();
+        // Skip taxonomy lookup storage when both public taxonomy routes are disabled.
         if (!$includeCategories && !$includeTags) {
             return [
                 'channel_options' => $this->channelRepo->listRoutingOptions(),
@@ -258,6 +264,7 @@ final class RoutingController
     private function profileRouteSegment(array $user): ?string
     {
         $userId = (int) ($user['id'] ?? 0);
+        // Route segments require a valid persisted user id.
         if ($userId <= 0) {
             return null;
         }
@@ -410,6 +417,7 @@ final class RoutingController
     private function routingFeedEditUrl(array $meta): string
     {
         $kind = strtolower(trim((string) ($meta['kind'] ?? '')));
+        // Global feed routes are managed through Configuration when permitted.
         if ($kind === 'global') {
             return $this->context->auth()->panelService()->canManageConfiguration()
                 ? $this->context->panelUrl('/configuration?tab=content')
@@ -417,6 +425,7 @@ final class RoutingController
         }
 
         $channelId = max(0, (int) ($meta['channel_id'] ?? 0));
+        // Channel feed routes are editable only with channel-edit permission.
         if ($kind === 'channel' && $channelId > 0 && $this->context->auth()->panelService()->hasPanelPermissionBit(PanelAccess::CHANNELS_EDIT)) {
             return $this->context->panelUrl('/channel/edit/' . $channelId);
         }
@@ -490,6 +499,7 @@ final class RoutingController
      */
     private function categoryRoutePrefix(): string
     {
+        // Empty prefix signals category routes are globally disabled.
         if (!$this->categoryRouteEnabled()) {
             return '';
         }
@@ -510,6 +520,7 @@ final class RoutingController
      */
     private function tagRoutePrefix(): string
     {
+        // Empty prefix signals tag routes are globally disabled.
         if (!$this->tagRouteEnabled()) {
             return '';
         }
@@ -530,6 +541,7 @@ final class RoutingController
      */
     private function profileRoutePrefix(): string
     {
+        // Empty prefix signals profile routes are globally disabled.
         if (!$this->profileRouteEnabled()) {
             return '';
         }
@@ -550,6 +562,7 @@ final class RoutingController
      */
     private function groupRoutePrefix(): string
     {
+        // Empty prefix signals group routes are globally disabled.
         if (!$this->groupRouteEnabled()) {
             return '';
         }
@@ -571,6 +584,7 @@ final class RoutingController
     private function slugifyGroupName(string $groupName): string
     {
         $slug = $this->input->slug($groupName);
+        // Return empty string when slug normalization cannot produce a route segment.
         if ($slug === null || $slug === '') {
             return '';
         }
@@ -583,6 +597,7 @@ final class RoutingController
      */
     private function feedParser(): FeedPolicy
     {
+        // Lazily construct feed parser for requests that inspect feed routes.
         if (!$this->feedParser instanceof FeedPolicy) {
             $this->feedParser = new FeedPolicy($this->config, $this->input);
         }
@@ -595,6 +610,7 @@ final class RoutingController
      */
     private function userPolicy(): UserPolicy
     {
+        // Lazily construct user routing policy for profile route calculations.
         if (!$this->userPolicy instanceof UserPolicy) {
             $this->userPolicy = new UserPolicy($this->config, $this->input);
         }
@@ -607,6 +623,7 @@ final class RoutingController
      */
     private function groupPolicy(): GroupPolicy
     {
+        // Lazily construct group routing policy for group route calculations.
         if (!$this->groupPolicy instanceof GroupPolicy) {
             $this->groupPolicy = new GroupPolicy($this->config, $this->input);
         }
@@ -619,6 +636,7 @@ final class RoutingController
      */
     private function routeProfiler(): RouteProfiler
     {
+        // Lazily construct routing profiler for inventory row generation.
         if (!$this->routeProfiler instanceof RouteProfiler) {
             $this->routeProfiler = new RouteProfiler($this->input);
         }
@@ -631,6 +649,7 @@ final class RoutingController
      */
     private function csvHandler(): Csv
     {
+        // Lazily construct CSV helper for routing export endpoint.
         if (!$this->csvHandler instanceof Csv) {
             $this->csvHandler = new Csv();
         }
@@ -643,6 +662,7 @@ final class RoutingController
      */
     private function routePreview(): RoutePreview
     {
+        // Lazily construct route preview helper for routing-row URL calculations.
         if (!$this->routePreview instanceof RoutePreview) {
             $this->routePreview = new RoutePreview(
                 $this->root,

@@ -80,6 +80,7 @@ class GroupRead
         $stmt->execute();
 
         $rows = $stmt->fetchAll() ?: [];
+        // Hydrate each row to enforce route-role rules and normalize scalar types.
         foreach ($rows as &$row) {
             $row = $this->hydrateGroupRow(is_array($row) ? $row : []);
         }
@@ -142,6 +143,7 @@ class GroupRead
         $stmt->execute();
 
         $rows = $stmt->fetchAll() ?: [];
+        // Hydrate each row to enforce route-role rules and normalize scalar types.
         foreach ($rows as &$row) {
             $row = $this->hydrateGroupRow(is_array($row) ? $row : []);
         }
@@ -213,7 +215,9 @@ class GroupRead
         $rows = $stmt->fetchAll() ?: [];
         $total = 0;
         $resultRows = [];
+        // Hydrate rows and extract total count once from the first CROSS JOIN row.
         foreach ($rows as $row) {
+            // Total value repeats per row; read once from first iteration.
             if ($total === 0) {
                 $total = (int) ($row['total_rows'] ?? 0);
             }
@@ -256,6 +260,7 @@ class GroupRead
 
         $rows = $stmt->fetchAll() ?: [];
         $result = [];
+        // Normalize option rows to strict scalar shape for select controls.
         foreach ($rows as $row) {
             $result[] = [
                 'id' => (int) $row['id'],
@@ -299,6 +304,7 @@ class GroupRead
         $stmt->execute([':id' => $id]);
 
         $row = $stmt->fetch();
+        // Hydrate raw group row when a record was found.
         if (is_array($row)) {
             $row = $this->hydrateGroupRow($row);
         }
@@ -377,6 +383,7 @@ class GroupRead
         $stmt->execute([':slug' => trim($slug)]);
 
         $rows = $stmt->fetchAll() ?: [];
+        // No rows means group slug is missing or route-disabled.
         if ($rows === []) {
             return null;
         }
@@ -394,8 +401,10 @@ class GroupRead
         ];
 
         $members = [];
+        // Build member list while skipping null user rows from LEFT JOIN.
         foreach ($rows as $row) {
             $userId = (int) ($row['user_id'] ?? 0);
+            // Ignore rows without a concrete user id.
             if ($userId < 1) {
                 continue;
             }
@@ -530,6 +539,7 @@ class GroupRead
      */
     private function hydrateGroupRow(array $row): array
     {
+        // Force route-disabled system roles to stay non-routable regardless of stored flag.
         if ($this->rolePolicy->isRouteDisabledRoleSlug((string) ($row['slug'] ?? ''))) {
             // Stock system roles cannot have public profile routes enabled.
             $row['route'] = 0;

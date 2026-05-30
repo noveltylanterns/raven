@@ -43,6 +43,7 @@ final class PageRouter
             };
             $type = RouteValidator::slugOrNotFound($input, (string) ($_POST['_rvn_form_type'] ?? ''), $notFound);
             $slug = RouteValidator::slugOrNotFound($input, (string) ($_POST['_rvn_form_slug'] ?? ''), $notFound);
+            // Both form-type and form-slug must validate before dispatching the submission.
             if ($type === null || $slug === null) {
                 return;
             }
@@ -61,6 +62,7 @@ final class PageRouter
             });
             $slugRaw = strtolower(trim((string) ($params['slug'] ?? '')));
 
+            // Reject malformed segments and reserved channel prefixes before controller dispatch.
             if (
                 $channel === null
                 || $slugRaw === ''

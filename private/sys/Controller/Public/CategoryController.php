@@ -80,6 +80,7 @@ final class CategoryController
      */
     public function category(string $categorySlug, int $pageNumber = 1): void
     {
+        // Category routes are disabled when category feature flag is off.
         if (!CategoryPolicy::categoryRouteEnabled($this->context->config())) {
             $this->context->notFound();
             return;
@@ -87,6 +88,7 @@ final class CategoryController
         $categoryPrefix = CategoryPolicy::categoryRoutePrefix($this->context->config(), $this->context->input());
 
         $category = $this->categoryRead->findBySlug($categorySlug);
+        // Unknown category slug returns not-found.
         if ($category === null) {
             $this->context->notFound();
             return;
@@ -99,6 +101,7 @@ final class CategoryController
         $total = (int) ($pageResult['total'] ?? 0);
         $totalPages = max(1, (int) ceil($total / $perPage));
 
+        // Out-of-range page numbers return not-found for non-empty result sets.
         if ($total > 0 && $pageNumber > $totalPages) {
             $this->context->notFound();
             return;
@@ -137,19 +140,23 @@ final class CategoryController
      */
     private function buildPageUrls(array $pages): array
     {
+        // Build route URLs for each category-page listing row.
         foreach ($pages as $index => $page) {
+            // Ignore malformed rows to avoid undefined-index warnings.
             if (!is_array($page)) {
                 continue;
             }
 
             $slug = $this->context->input()->slug((string) ($page['slug'] ?? ''));
             $pageId = (int) ($page['id'] ?? 0);
+            // Missing/invalid slug falls back to home path placeholder.
             if ($slug === null || $slug === '') {
                 $pages[$index]['url'] = '/';
                 continue;
             }
 
             $channelSlug = $this->context->input()->slug((string) ($page['channel_slug'] ?? ''));
+            // Root-scope page URL path when page has no channel slug.
             if ($channelSlug === null || $channelSlug === '') {
                 $rootSegment = PagePolicy::buildRouteSegment($this->context->input(), 
                     $slug,
@@ -208,6 +215,7 @@ final class CategoryController
      */
     private function themeTemplate(): ThemeTemplate
     {
+        // Lazily initialize theme-template resolver for category page rendering.
         if (!$this->themeTemplate instanceof ThemeTemplate) {
             $this->themeTemplate = new ThemeTemplate($this->context->input());
         }

@@ -64,13 +64,16 @@ final class InviteWrite
         $createdAt = gmdate('Y-m-d H:i:s');
         $manualRaw = is_string($manualToken) ? trim($manualToken) : '';
 
+        // Manual token mode validates and inserts caller-provided token value.
         if ($manualRaw !== '') {
             $normalizedToken = $this->read->normalizeSubmittedToken($manualRaw);
+            // Manual token must pass canonical format validation before insert.
             if ($normalizedToken === null) {
                 throw new RuntimeException('Manual token must be 8-64 letters/numbers (separators allowed).');
             }
 
             $displayToken = $normalizedToken;
+            // Duplicate token insert returns false so caller can choose a different value.
             if (!$this->insertTokenRecord($normalizedToken, $displayToken, $reusable, $expiresAt, $createdByUserId, $createdAt)) {
                 throw new RuntimeException('Invite token already exists. Choose a different token value.');
             }
@@ -82,6 +85,7 @@ final class InviteWrite
         for ($attempt = 0; $attempt < 8; $attempt++) {
             $normalizedToken = $this->read->generateNormalizedToken();
             $displayToken = $this->read->formatDisplayToken($normalizedToken);
+            // Stop retry loop once one generated token inserts successfully.
             if ($this->insertTokenRecord($normalizedToken, $displayToken, $reusable, $expiresAt, $createdByUserId, $createdAt)) {
                 return $displayToken;
             }
@@ -129,6 +133,7 @@ final class InviteWrite
         ?int $createdByUserId,
         string $createdAt
     ): bool {
+        // Duplicate collisions are expected under retries, so map unique-violations to false.
         try {
             $stmt = $this->authDb->prepare(
                 'INSERT INTO ' . $this->authTable('auth_invites') . ' (hash, value, hint, reusable, uses, expires, last_used, created, creator)
@@ -146,6 +151,7 @@ final class InviteWrite
 
             return true;
         } catch (PDOException $exception) {
+            // Treat unique-key violations as insert collision instead of hard failure.
             if ($this->looksLikeUniqueViolation($exception)) {
                 return false;
             }
@@ -165,10 +171,12 @@ final class InviteWrite
     public function consume(int $id, bool $reusable, int $now): bool
     {
         $id = max(0, $id);
+        // Non-positive ids are invalid consume targets.
         if ($id < 1) {
             return false;
         }
 
+        // Reusable invites only require expiry validation before incrementing use count.
         if ($reusable) {
             $stmt = $this->authDb->prepare(
                 'UPDATE ' . $this->authTable('auth_invites') . '
@@ -181,7 +189,7 @@ final class InviteWrite
             // Single-use guard: only update rows that have not been consumed yet.
             $stmt = $this->authDb->prepare(
                 'UPDATE ' . $this->authTable('auth_invites') . '
-                 SET uses = uses + 1,
+                SET uses = uses + 1,
                      last_used = :now
                  WHERE id = :id
                    AND uses = 0
@@ -261,14 +269,17 @@ final class InviteWrite
         $message = strtolower($exception->getMessage());
         $driverCode = (int) ($exception->errorInfo[1] ?? 0);
 
+        // PostgreSQL unique-violation SQLSTATE.
         if ($sqlState === '23505') {
             return true;
         }
 
+        // MySQL duplicate-entry SQLSTATE + driver code.
         if ($sqlState === '23000' && $driverCode === 1062) {
             return true;
         }
 
+        // SQLite and fallback message-based duplicate detection.
         if (
             $sqlState === '23000'
             || $driverCode === 19

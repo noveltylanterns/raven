@@ -42,9 +42,11 @@ final class SchemaAuth
      */
     public function ensureAuthSchema(PDO $authDb, string $driver, string $prefix): void
     {
+        // Bootstrap Delight schema only when the auth users table does not exist yet.
         if (!$this->introspector->tableExists($authDb, $driver, $prefix . 'users')) {
             $schema = $this->loadDelightSchema($driver);
 
+            // Missing vendor schema files are a hard bootstrap failure.
             if ($schema === null) {
                 throw new RuntimeException('Delight Auth SQL schema files are missing. Install composer dependencies before bootstrap.');
             }
@@ -73,6 +75,7 @@ final class SchemaAuth
     {
         $table = $prefix . 'auth_invites';
 
+        // SQLite uses CREATE TABLE/INDEX IF NOT EXISTS for idempotent bootstrap.
         if ($driver === 'sqlite') {
             $authDb->exec('CREATE TABLE IF NOT EXISTS ' . $table . ' (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -91,6 +94,7 @@ final class SchemaAuth
             return;
         }
 
+        // MySQL uses InnoDB + utf8mb4 DDL with explicit key definitions.
         if ($driver === 'mysql') {
             $authDb->exec('CREATE TABLE IF NOT EXISTS ' . $table . ' (
                 id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -139,36 +143,46 @@ final class SchemaAuth
     {
         $usersTable = $prefix . 'users';
 
+        // SQLite column migrations rely on repeated guarded ALTER TABLE statements.
         if ($driver === 'sqlite') {
             // SQLite ADD COLUMN is safe to call repeatedly; each path is guarded
             // by a column-existence check before issuing DDL.
             if (!$this->introspector->columnExists($db, 'sqlite', $usersTable, 'theme')) {
                 $db->exec('ALTER TABLE ' . $usersTable . ' ADD COLUMN theme TEXT NOT NULL DEFAULT \'default\'');
             }
+            // Add optional display-name column when missing.
             if (!$this->introspector->columnExists($db, 'sqlite', $usersTable, 'name')) {
                 $db->exec('ALTER TABLE ' . $usersTable . ' ADD COLUMN name TEXT NULL');
             }
+            // Add optional biography column when missing.
             if (!$this->introspector->columnExists($db, 'sqlite', $usersTable, 'bio')) {
                 $db->exec('ALTER TABLE ' . $usersTable . ' ADD COLUMN bio TEXT NULL');
             }
+            // Add avatar filename column when missing.
             if (!$this->introspector->columnExists($db, 'sqlite', $usersTable, 'avatar')) {
                 $db->exec('ALTER TABLE ' . $usersTable . ' ADD COLUMN avatar TEXT NULL');
             }
+            // Add cover-image filename column when missing.
             if (!$this->introspector->columnExists($db, 'sqlite', $usersTable, 'cover_image')) {
                 $db->exec('ALTER TABLE ' . $usersTable . ' ADD COLUMN cover_image TEXT NULL');
             }
+            // Add stable public user-string token column when missing.
             if (!$this->introspector->columnExists($db, 'sqlite', $usersTable, 'string')) {
                 $db->exec('ALTER TABLE ' . $usersTable . ' ADD COLUMN string TEXT NULL');
             }
+            // Add structured contact payload column when missing.
             if (!$this->introspector->columnExists($db, 'sqlite', $usersTable, 'contact')) {
                 $db->exec('ALTER TABLE ' . $usersTable . ' ADD COLUMN contact TEXT NULL');
             }
+            // Add 2FA state payload column when missing.
             if (!$this->introspector->columnExists($db, 'sqlite', $usersTable, 'two_factor')) {
                 $db->exec('ALTER TABLE ' . $usersTable . ' ADD COLUMN two_factor TEXT NULL');
             }
+            // Add primary-group pointer column when missing.
             if (!$this->introspector->columnExists($db, 'sqlite', $usersTable, 'group')) {
                 $db->exec('ALTER TABLE ' . $usersTable . ' ADD COLUMN "group" INTEGER NULL');
             }
+            // Add timezone preference column when missing.
             if (!$this->introspector->columnExists($db, 'sqlite', $usersTable, 'timezone')) {
                 $db->exec('ALTER TABLE ' . $usersTable . ' ADD COLUMN timezone TEXT NOT NULL DEFAULT \'\'');
             }
@@ -178,37 +192,49 @@ final class SchemaAuth
             return;
         }
 
+        // MySQL column migrations mirror SQLite fields with MySQL-native types.
         if ($driver === 'mysql') {
+            // Add theme column with default for pre-existing users.
             if (!$this->introspector->columnExists($db, 'mysql', $usersTable, 'theme')) {
                 $db->exec('ALTER TABLE ' . $usersTable . ' ADD COLUMN theme VARCHAR(50) NOT NULL DEFAULT \'default\'');
             }
+            // Add optional display-name column when missing.
             if (!$this->introspector->columnExists($db, 'mysql', $usersTable, 'name')) {
                 $db->exec('ALTER TABLE ' . $usersTable . ' ADD COLUMN name VARCHAR(160) NULL');
             }
+            // Add avatar filename column when missing.
             if (!$this->introspector->columnExists($db, 'mysql', $usersTable, 'avatar')) {
                 $db->exec('ALTER TABLE ' . $usersTable . ' ADD COLUMN avatar VARCHAR(255) NULL');
             }
+            // Add cover-image filename column when missing.
             if (!$this->introspector->columnExists($db, 'mysql', $usersTable, 'cover_image')) {
                 $db->exec('ALTER TABLE ' . $usersTable . ' ADD COLUMN cover_image VARCHAR(255) NULL');
             }
+            // Add structured contact payload column when missing.
             if (!$this->introspector->columnExists($db, 'mysql', $usersTable, 'contact')) {
                 $db->exec('ALTER TABLE ' . $usersTable . ' ADD COLUMN contact TEXT NULL');
             }
+            // Add 2FA state payload column when missing.
             if (!$this->introspector->columnExists($db, 'mysql', $usersTable, 'two_factor')) {
                 $db->exec('ALTER TABLE ' . $usersTable . ' ADD COLUMN two_factor LONGTEXT NULL');
             }
+            // Add optional biography column when missing.
             if (!$this->introspector->columnExists($db, 'mysql', $usersTable, 'bio')) {
                 $db->exec('ALTER TABLE ' . $usersTable . ' ADD COLUMN bio TEXT NULL');
             }
+            // Add stable public user-string token column when missing.
             if (!$this->introspector->columnExists($db, 'mysql', $usersTable, 'string')) {
                 $db->exec('ALTER TABLE ' . $usersTable . ' ADD COLUMN string VARCHAR(128) NULL');
             }
+            // Create unique index for string token when absent.
             if (!$this->introspector->indexExistsMySql($db, $usersTable, 'uniq_' . $usersTable . '_string')) {
                 $db->exec('ALTER TABLE ' . $usersTable . ' ADD UNIQUE INDEX uniq_' . $usersTable . '_string (string)');
             }
+            // Add primary-group pointer column when missing.
             if (!$this->introspector->columnExists($db, 'mysql', $usersTable, 'group')) {
                 $db->exec('ALTER TABLE ' . $usersTable . ' ADD COLUMN `group` BIGINT UNSIGNED NULL');
             }
+            // Add timezone preference column when missing.
             if (!$this->introspector->columnExists($db, 'mysql', $usersTable, 'timezone')) {
                 $db->exec('ALTER TABLE ' . $usersTable . ' ADD COLUMN timezone VARCHAR(64) NOT NULL DEFAULT \'\'');
             }
@@ -218,36 +244,47 @@ final class SchemaAuth
         }
 
         // PostgreSQL.
+        // Add theme column with default for pre-existing users.
         if (!$this->introspector->columnExists($db, 'pgsql', $usersTable, 'theme')) {
             $db->exec('ALTER TABLE ' . $usersTable . ' ADD COLUMN theme VARCHAR(50) NOT NULL DEFAULT \'default\'');
         }
+        // Add optional display-name column when missing.
         if (!$this->introspector->columnExists($db, 'pgsql', $usersTable, 'name')) {
             $db->exec('ALTER TABLE ' . $this->introspector->quotePgIdentifier($usersTable) . ' ADD COLUMN name VARCHAR(160) NULL');
         }
+        // Add avatar filename column when missing.
         if (!$this->introspector->columnExists($db, 'pgsql', $usersTable, 'avatar')) {
             $db->exec('ALTER TABLE ' . $this->introspector->quotePgIdentifier($usersTable) . ' ADD COLUMN avatar VARCHAR(255) NULL');
         }
+        // Add cover-image filename column when missing.
         if (!$this->introspector->columnExists($db, 'pgsql', $usersTable, 'cover_image')) {
             $db->exec('ALTER TABLE ' . $this->introspector->quotePgIdentifier($usersTable) . ' ADD COLUMN cover_image VARCHAR(255) NULL');
         }
+        // Add structured contact payload column when missing.
         if (!$this->introspector->columnExists($db, 'pgsql', $usersTable, 'contact')) {
             $db->exec('ALTER TABLE ' . $this->introspector->quotePgIdentifier($usersTable) . ' ADD COLUMN contact TEXT NULL');
         }
+        // Add 2FA state payload column when missing.
         if (!$this->introspector->columnExists($db, 'pgsql', $usersTable, 'two_factor')) {
             $db->exec('ALTER TABLE ' . $this->introspector->quotePgIdentifier($usersTable) . ' ADD COLUMN two_factor TEXT NULL');
         }
+        // Add optional biography column when missing.
         if (!$this->introspector->columnExists($db, 'pgsql', $usersTable, 'bio')) {
             $db->exec('ALTER TABLE ' . $this->introspector->quotePgIdentifier($usersTable) . ' ADD COLUMN bio TEXT NULL');
         }
+        // Add stable public user-string token column when missing.
         if (!$this->introspector->columnExists($db, 'pgsql', $usersTable, 'string')) {
             $db->exec('ALTER TABLE ' . $this->introspector->quotePgIdentifier($usersTable) . ' ADD COLUMN string VARCHAR(128) NULL');
         }
+        // Create unique index for string token when absent.
         if (!$this->introspector->indexExistsPgSql($db, $usersTable, 'uniq_' . $usersTable . '_string')) {
             $db->exec('CREATE UNIQUE INDEX IF NOT EXISTS ' . $this->introspector->quotePgIdentifier('uniq_' . $usersTable . '_string') . ' ON ' . $this->introspector->quotePgIdentifier($usersTable) . ' (string)');
         }
+        // Add primary-group pointer column when missing.
         if (!$this->introspector->columnExists($db, 'pgsql', $usersTable, 'group')) {
             $db->exec('ALTER TABLE ' . $this->introspector->quotePgIdentifier($usersTable) . ' ADD COLUMN "group" BIGINT NULL');
         }
+        // Add timezone preference column when missing.
         if (!$this->introspector->columnExists($db, 'pgsql', $usersTable, 'timezone')) {
             $db->exec('ALTER TABLE ' . $this->introspector->quotePgIdentifier($usersTable) . ' ADD COLUMN timezone VARCHAR(64) NOT NULL DEFAULT \'\'');
         }
@@ -265,11 +302,13 @@ final class SchemaAuth
         $root = dirname(__DIR__, 3);
         $dir = $root . '/composer/delight-im/auth/Database';
 
+        // Missing vendor schema directory means dependencies are not installed.
         if (!is_dir($dir)) {
             return null;
         }
 
         $files = glob($dir . '/*.sql');
+        // Glob failure is treated as schema-unavailable.
         if ($files === false) {
             return null;
         }
@@ -280,6 +319,7 @@ final class SchemaAuth
             default => 'post',
         };
 
+        // Choose the first schema file that matches the active driver needle.
         foreach ($files as $file) {
             if (stripos(basename($file), $needle) !== false) {
                 $sql = file_get_contents($file);
@@ -307,6 +347,7 @@ final class SchemaAuth
             'users_throttling',
         ];
 
+        // Rewrite each known Delight table token to the prefixed namespace.
         foreach ($tables as $table) {
             $sql = preg_replace(
                 '/(?<![a-zA-Z0-9_])([`"]?)' . preg_quote($table, '/') . '([`"]?)(?![a-zA-Z0-9_])/i',
@@ -328,16 +369,20 @@ final class SchemaAuth
     {
         $statements = preg_split('/;\s*(?:\n|$)/', $sql) ?: [];
 
+        // Execute statements one-by-one to isolate already-exists errors.
         foreach ($statements as $statement) {
             $statement = trim($statement);
 
+            // Skip empty chunks and comment-only lines from the split batch.
             if ($statement === '' || str_starts_with($statement, '--')) {
                 continue;
             }
 
+            // Existing-object errors are tolerated for idempotent bootstraps.
             try {
                 $db->exec($statement);
             } catch (\PDOException $exception) {
+                // Ignore duplicate-object errors so reruns remain safe.
                 if ($this->introspector->isAlreadyExistsError($exception)) {
                     continue;
                 }
