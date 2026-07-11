@@ -150,12 +150,21 @@ final class StorageProvisioner
             }
 
             $linkPath = $targetBin . '/' . $name;
-            $targetPath = $item->getRealPath();
+            // Resolve from private/bin so the alias remains portable across installations.
+            $targetPath = '../ext/' . $directoryName . '/bin/' . $name;
 
-            // Existing symlink already satisfies this command alias.
+            // Repair aliases created by older versions when their absolute target is stale
+            // or points at a different extension command; this also makes provisioning
+            // self-healing after an update moves the project tree.
             if (is_link($linkPath)) {
-                // Already linked; skip (idempotent).
-                continue;
+                if (readlink($linkPath) === $targetPath) {
+                    // The existing relative alias is already portable and correct.
+                    continue;
+                }
+
+                if (!unlink($linkPath)) {
+                    throw new RuntimeException('Failed to replace stale bin symlink for "' . $name . '" in private/bin/.');
+                }
             }
 
             // Never overwrite an existing non-symlink file at alias location.
