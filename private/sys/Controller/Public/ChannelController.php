@@ -579,7 +579,8 @@ final class ChannelController
             $this->pageBlocks = new PageBlocks(
                 dirname(__DIR__, 4),
                 $this->pageBlockParser(),
-                $this->pageMarkdown()
+                $this->pageMarkdown(),
+                $this->extensionServicesProvider
             );
         }
 

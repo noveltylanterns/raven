@@ -10,6 +10,6 @@ Extension references extracted from `private/ext/*` manifests, provider files, a
 | `cron` | Scheduled Tasks | `system` | 4 | 17 |
 | `database` | Database Manager | `system` | 2 | 0 |
 | `phpinfo` | PHP Info | `system` | 1 | 0 |
-| `repo` | Repositories | `module` | 7 | 100 |
+| `repo` | Repositories | `module` | 7 | 102 |
 | `signups` | Signup Sheets | `content` | 4 | 21 |
 | `smallweb` | Smallweb | `helper` | 2 | 42 |

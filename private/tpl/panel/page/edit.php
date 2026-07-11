@@ -507,10 +507,11 @@ if ($hasPersistedPage) {
                                         id="body_block_<?= (int) $bodyIndex ?>_path"
                                         name="<?= $isPathBlock ? 'content_blocks[' . (int) $bodyIndex . '][content]' : '' ?>"
                                         value="<?= e($isPathBlock ? $blockContent : '') ?>"
-                                        placeholder="/notes/example.md"
+                                        placeholder="/notes/example.md or repo://docs/notes/example.md?ref=main"
                                         data-rvn-body-content-path="1"
                                         <?= $isPathBlock ? '' : 'style="display:none;"' ?>
                                     >
+                                    <div class="form-text" data-rvn-body-path-help="1"<?= $isPathBlock ? '' : ' style="display:none;"' ?>>Use a local Markdown path or a repository reference such as <code>repo://docs/notes/example.md?ref=main</code>.</div>
                                     <div class="form-text mt-2" data-rvn-body-gallery-help="1"<?= $isGalleryBlock ? '' : ' style="display:none;"' ?>>
                                         Inserts this page's gallery in public output. Manage images from the Media tab.
                                     </div>
@@ -3395,6 +3396,7 @@ ob_start();
       var textarea = row.querySelector('textarea[data-rvn-body-content="1"]');
       var pathInput = row.querySelector('input[data-rvn-body-content-path="1"]');
       var galleryHelp = row.querySelector('[data-rvn-body-gallery-help="1"]');
+      var pathHelp = row.querySelector('[data-rvn-body-path-help="1"]');
       var labelNode = row.querySelector('[data-rvn-body-type-label="1"]');
 
       if (!(textarea instanceof HTMLTextAreaElement) || !(pathInput instanceof HTMLInputElement)) {
@@ -3413,6 +3415,9 @@ ob_start();
       pathInput.style.display = isPathType ? '' : 'none';
       if (galleryHelp instanceof HTMLElement) {
         galleryHelp.style.display = isGalleryType ? '' : 'none';
+      }
+      if (pathHelp instanceof HTMLElement) {
+        pathHelp.style.display = isPathType ? '' : 'none';
       }
     }
 

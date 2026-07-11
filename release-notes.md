@@ -4,6 +4,7 @@
 
 ### July 10, 2026
 - Fixed extension CLI symlinks so updater deployments do not ship workstation-specific absolute paths or trigger `open_basedir` failures.
+- Added stock repo-backed Markdown file references for page body blocks using `repo://{slug}/{path}.md`, with optional branch selection.
 
 ### May 20, 2026 — docs prep header normalization + docgen regeneration
 

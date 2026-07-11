@@ -11,6 +11,8 @@ declare(strict_types=1);
 
 namespace Raven\Lib\View\Public;
 
+use Closure;
+use Raven\Lib\Extension\Public\MarkdownFileLoader;
 use Raven\Lib\Parser\PageBlockParser;
 
 /**
@@ -21,6 +23,7 @@ final class PageBlocks
     private string $projectRoot;
     private PageBlockParser $pageBlockParser;
     private PageMarkdown $pageMarkdown;
+    private ?Closure $extensionServicesProvider;
 
     /**
      * Initializes the public page-block helper.
@@ -28,13 +31,22 @@ final class PageBlocks
      * @param string $projectRoot Absolute project root used to resolve local Markdown-file blocks safely.
      * @param PageBlockParser $pageBlockParser Shared page-block parser for type and CSS normalization.
      * @param PageMarkdown $pageMarkdown Shared Markdown renderer for Markdown body blocks.
+     * @param callable(?string=): array<string, mixed>|null $extensionServicesProvider Optional lazy extension-service resolver for external Markdown sources.
      * @return void
      */
-    public function __construct(string $projectRoot, PageBlockParser $pageBlockParser, PageMarkdown $pageMarkdown)
+    public function __construct(
+        string $projectRoot,
+        PageBlockParser $pageBlockParser,
+        PageMarkdown $pageMarkdown,
+        ?callable $extensionServicesProvider = null
+    )
     {
         $this->projectRoot = rtrim($projectRoot, DIRECTORY_SEPARATOR);
         $this->pageBlockParser = $pageBlockParser;
         $this->pageMarkdown = $pageMarkdown;
+        $this->extensionServicesProvider = $extensionServicesProvider !== null
+            ? Closure::fromCallable($extensionServicesProvider)
+            : null;
     }
 
     /**
@@ -195,21 +207,100 @@ final class PageBlocks
     }
 
     /**
-     * Renders one Markdown-file body block from a safe local project path.
+     * Renders one Markdown-file body block from a safe local or extension-provided path.
      *
-     * @param string $pathInput User-authored local Markdown path from the block payload.
+     * @param string $pathInput User-authored local or extension-backed Markdown path from the block payload.
      * @param callable(string): string $embeddedFormRenderer Callback that expands embedded forms/shortcodes in rendered HTML.
      * @return string Rendered HTML for the Markdown file, or an empty string when the file is unusable.
      */
     private function renderMarkdownFileBlock(string $pathInput, callable $embeddedFormRenderer): string
     {
-        $markdown = $this->loadLocalMarkdownFileForBlock($pathInput);
+        $markdown = $this->loadMarkdownFileForBlock($pathInput);
         // Abort file-backed block rendering when safe file load failed.
         if ($markdown === null) {
             return '';
         }
 
         return $this->renderMarkdownBlockContent($markdown, $embeddedFormRenderer);
+    }
+
+    /**
+     * Loads one Markdown source through an extension loader before falling back to local storage.
+     *
+     * @param string $pathInput User-authored local or extension-backed Markdown path.
+     * @return string|null File contents when a source is safe and readable, or null when rejected.
+     */
+    private function loadMarkdownFileForBlock(string $pathInput): ?string
+    {
+        $external = $this->loadExternalMarkdownFileForBlock($pathInput);
+        if ($external !== null) {
+            return $external;
+        }
+
+        return $this->loadLocalMarkdownFileForBlock($pathInput);
+    }
+
+    /**
+     * Loads a URI-like Markdown source through registered extension contracts.
+     *
+     * @param string $pathInput User-authored Markdown source reference.
+     * @return string|null Loaded Markdown contents, or null when no loader accepts the reference.
+     */
+    private function loadExternalMarkdownFileForBlock(string $pathInput): ?string
+    {
+        $reference = trim($pathInput);
+        // Local project paths do not need to boot extension services.
+        if (
+            $this->extensionServicesProvider === null
+            || preg_match('/^[A-Za-z][A-Za-z0-9+.-]*:\/\//', $reference) !== 1
+        ) {
+            return null;
+        }
+
+        try {
+            $services = ($this->extensionServicesProvider)();
+        } catch (\Throwable) {
+            // An unavailable optional extension must not break ordinary page rendering.
+            return null;
+        }
+
+        if (!is_array($services)) {
+            return null;
+        }
+
+        // Each extension may expose one or more objects under the shared loader contract.
+        foreach ($services as $serviceBucket) {
+            if (!is_array($serviceBucket)) {
+                continue;
+            }
+
+            $loaders = $serviceBucket['markdown_file_loaders'] ?? [];
+            if ($loaders instanceof MarkdownFileLoader) {
+                $loaders = [$loaders];
+            }
+            if (!is_array($loaders)) {
+                continue;
+            }
+
+            foreach ($loaders as $loader) {
+                if (!$loader instanceof MarkdownFileLoader) {
+                    continue;
+                }
+
+                try {
+                    $content = $loader->load($reference);
+                } catch (\Throwable) {
+                    // One unavailable loader should not prevent other providers from trying.
+                    continue;
+                }
+
+                if (is_string($content)) {
+                    return str_replace("\0", '', $content);
+                }
+            }
+        }
+
+        return null;
     }
 
     /**

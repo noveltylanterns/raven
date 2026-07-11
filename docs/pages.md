@@ -70,6 +70,15 @@ Core public page seams:
 - channel landing/root fallback (`/{slug}`)
 - channel-scoped pages (`/{channel}/{slug}`)
 
+Markdown file body blocks accept either a local project path or a repository-backed reference:
+
+- Local: `/notes/example.md`
+- Git mirror: `repo://docs/notes/example.md?ref=main`
+
+Repository references are resolved by enabled extensions through the public Markdown-file loader
+contract. The stock `repo` extension reads only Markdown text blobs from its mirrored bare
+repositories; it never exposes the bare repository directory as a direct filesystem path.
+
 Template resolution and fallback behavior are documented in:
 
 - `docs/appendix/templates/public.md`

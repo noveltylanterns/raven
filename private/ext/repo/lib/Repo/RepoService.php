@@ -12,13 +12,14 @@ declare(strict_types=1);
 namespace Raven\Ext\Repo;
 
 use Raven\Lib\Archive\Folder as ArchiveDelete;
+use Raven\Lib\Extension\Public\MarkdownFileLoader;
 use Raven\Lib\Format\Git;
 use RuntimeException;
 
 /**
  * Owns file-backed settings, registry CRUD, sync operations, and public read helpers.
  */
-final class RepoService
+final class RepoService implements MarkdownFileLoader
 {
     private const TEXT_PREVIEW_BYTES = 524288;
 
@@ -622,6 +623,54 @@ final class RepoService
             'ref' => $ref,
             'path' => $path,
         ];
+    }
+
+    /**
+     * Loads one Markdown file from a mirrored repository reference.
+     *
+     * References use `repo://{slug}/{path}.md` and may select a branch with
+     * `?ref={branch}` or `?branch={branch}`. Only text Markdown blobs within
+     * the configured mirror are eligible, so the bare repository never becomes
+     * a directly readable filesystem path.
+     *
+     * @param string $reference Repository-backed Markdown reference.
+     * @return string|null Markdown contents, or null when the reference is invalid or unavailable.
+     */
+    public function load(string $reference): ?string
+    {
+        $parsed = $this->parseMarkdownReference($reference);
+        if ($parsed === null) {
+            return null;
+        }
+
+        $repo = $this->getRepo($parsed['slug']);
+        if ($repo === null) {
+            return null;
+        }
+
+        $repoPath = (string) ($repo['repository_path'] ?? '');
+        if (!$this->isValidBareRepoPath($repoPath)) {
+            return null;
+        }
+
+        try {
+            $ref = $this->resolvePreferredRef($repo, $parsed['ref'], $repoPath);
+            $path = $parsed['path'];
+            if ($this->objectTypeAtPath($repoPath, $ref, $path) !== 'blob') {
+                return null;
+            }
+
+            $size = $this->objectSizeAtPath($repoPath, $ref, $path);
+            if ($size === null || $size > self::TEXT_PREVIEW_BYTES) {
+                return null;
+            }
+
+            $content = $this->runGitOutput(['show', $ref . ':' . $path], $repoPath);
+        } catch (\Throwable) {
+            return null;
+        }
+
+        return $this->isLikelyText($content) ? $content : null;
     }
 
     /**
@@ -1327,6 +1376,58 @@ final class RepoService
     {
         $value = strtolower(trim($value));
         return preg_match('/^[a-z0-9][a-z0-9_-]{0,119}$/', $value) === 1 ? $value : '';
+    }
+
+    /**
+     * Parses and validates one repository-backed Markdown reference.
+     *
+     * @param string $reference Raw URI-like reference from a page body block.
+     * @return array{slug: string, path: string, ref: string|null}|null Normalized reference, or null when invalid.
+     */
+    private function parseMarkdownReference(string $reference): ?array
+    {
+        $reference = trim($reference);
+        if (preg_match('/^repo:\/\//i', $reference) !== 1) {
+            return null;
+        }
+
+        $parts = parse_url($reference);
+        if (!is_array($parts) || strtolower((string) ($parts['scheme'] ?? '')) !== 'repo') {
+            return null;
+        }
+
+        // Userinfo and ports have no place in an internal repository reference.
+        if (
+            array_key_exists('user', $parts)
+            || array_key_exists('pass', $parts)
+            || array_key_exists('port', $parts)
+        ) {
+            return null;
+        }
+
+        $slug = $this->normalizeSlug((string) ($parts['host'] ?? ''));
+        $path = $this->sanitizePath(rawurldecode((string) ($parts['path'] ?? '')));
+        if ($slug === '' || $path === '' || preg_match('/\.(?:md|markdown)$/i', $path) !== 1) {
+            return null;
+        }
+
+        $query = [];
+        parse_str((string) ($parts['query'] ?? ''), $query);
+        $requestedRef = $query['ref'] ?? ($query['branch'] ?? null);
+        if (!is_scalar($requestedRef) && $requestedRef !== null) {
+            return null;
+        }
+
+        $ref = $requestedRef === null ? null : $this->normalizeRefName((string) $requestedRef);
+        if ($requestedRef !== null && $ref === '') {
+            return null;
+        }
+
+        return [
+            'slug' => $slug,
+            'path' => $path,
+            'ref' => $ref !== '' ? $ref : null,
+        ];
     }
 
     /**

@@ -84,6 +84,13 @@ return [
                 $publicRoot
             );
         };
+        $rawRepoServices['markdown_file_loaders'] = static function () use (&$rvn): array {
+            /** @var mixed $resolver */
+            $resolver = $rvn['extension_services_for'] ?? null;
+            $services = is_callable($resolver) ? $resolver('repo') : [];
+            $service = is_array($services) ? ($services['service'] ?? null) : null;
+            return $service instanceof RepoService ? [$service] : [];
+        };
 
         /** @var mixed $rawShortcodeRuntimes */
         $rawShortcodeRuntimes = $rawRepoServices['shortcode_runtimes'] ?? [];

@@ -11,6 +11,7 @@ This file captures anything vague, blocked, or likely to require Raven core work
 - Raven core now provides the `renderPublicExtension` helper for module routes. The repo extension no longer hand-builds its public wrapper output.
 - Raven core now provides `bin` storage. The repo extension now requests `bin => true` and ships `rvn-repo` as an extension-owned CLI companion.
 - Repo settings and registry now live in JSON files rather than mutable PHP-array includes, so this extension no longer depends on opcache coherence for those two runtime stores.
+- Raven core now exposes the generic `MarkdownFileLoader` contract so stock extensions can provide URI-like Markdown sources to public page body blocks. The repo extension registers its mirrored-file loader under `markdown_file_loaders`.
 
 ## Current Notes
 - Public Git cloning/downloading still depends on the extension maintaining bare repositories in the public bucket and running `git update-server-info` after syncs when clone-over-static-HTTP is expected.

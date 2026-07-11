@@ -25,6 +25,11 @@ This Raven `module` extension manages read-only Git repository mirrors with pane
 - `/repo/{slug}/raw`, `/repo/{slug}/download`, and `/repo/{slug}/archive` expose file and archive output for public-object modes.
 - `[repo ...]` shortcodes embed public repository trees or public files and link visitors back to the canonical `/repo/{slug}` browser.
 
+## Markdown File References
+- Page `Markdown File` blocks can load repository files with `repo://{slug}/{path}.md`.
+- Add `?ref={branch}` or `?branch={branch}` to select a branch; omitted refs use the repository's preferred branch.
+- The loader accepts Markdown text blobs only and enforces the same bounded preview size used by repository file previews.
+
 ## Scheduler And CLI
 - `cron.php` registers the extension's `auto-sync` scheduler job.
 - Raven's fallback scheduler can trigger due jobs from request traffic when `site.scheduler` is set to `panel` or `always`.

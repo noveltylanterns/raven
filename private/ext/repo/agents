@@ -66,6 +66,7 @@ Updated: 2026-03-29
 - [x] Registered the live repo shortcode runtime.
 - [x] Added `cron.php` scheduler support for automated sync passes.
 - [x] Enabled `bin` storage for the repo CLI companion.
+- [x] Added `repo://{slug}/{path}.md` Markdown-file loading for public page body blocks.
 - [x] Validate with lint/manual checks.
 
 ## Potential Long-Term Considerations

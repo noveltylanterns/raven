@@ -571,6 +571,12 @@ hand-copy the standard category/tag route patterns.
   - `render(array $definition, string $returnPath, string $csrfField, string $captchaMarkup): string`
   - `submit(string $slug, string $returnPath, callable $captchaValidator): void`
 
+### Markdown File Loader Contract
+- Extensions may provide external Markdown sources to public `Markdown File` body blocks.
+- Register loader objects under `extension_services.{extension}.markdown_file_loaders[]`.
+- Loader objects implement `private/lib/Extension/Public/MarkdownFileLoader.php` and return Markdown text or `null` for references they do not own.
+- URI-like references are passed unchanged to each loader, allowing extension-specific forms such as `repo://{slug}/{path}.md?ref={branch}`.
+
 ## Panel UI Integration Pattern
 - Extensions generally render via shared panel layout: `private/tpl/panel/wrapper.php`.
 - Typical render flow:
