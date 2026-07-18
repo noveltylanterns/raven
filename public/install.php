@@ -12,7 +12,7 @@
 declare(strict_types=1);
 
 use Raven\Core\Runtime\DatabaseFactory;
-use Raven\Lib\Database\Schema\SchemaManager;
+use Raven\Core\Schema\SchemaManager;
 use Raven\Core\Repository\GroupRead;
 use Raven\Core\Repository\UserRead;
 use Raven\Core\Repository\UserWrite;

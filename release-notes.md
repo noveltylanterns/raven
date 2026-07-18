@@ -2,6 +2,9 @@
 
 *The machine is supposed to be logging patches & mods to this file. Sometimes it does, sometimes it doesn't. It might be useful for historical architectural context to your Agent at one point.*
 
+### July 18, 2026
+- Fixed fresh installs failing to load the schema manager after its move into the core schema namespace.
+
 ### July 10, 2026
 - Fixed extension CLI symlinks so updater deployments do not ship workstation-specific absolute paths or trigger `open_basedir` failures.
 - Added stock repo-backed Markdown file references for page body blocks using `repo://{slug}/{path}.md`, with optional branch selection.
