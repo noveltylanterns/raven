@@ -16,8 +16,6 @@ use Raven\Core\Schema\SchemaManager;
 use Raven\Core\Repository\GroupRead;
 use Raven\Core\Repository\UserRead;
 use Raven\Core\Repository\UserWrite;
-use Raven\Lib\Parser\UserDataParser;
-use Raven\Lib\Security\InputSanitizer;
 
 /**
  * Escapes text for HTML output.
@@ -789,11 +787,10 @@ if ($isPost) {
 
             $userRead = new UserRead($authDb, $rvnDb, $driverName, $prefix);
             $users = new UserWrite($authDb, $rvnDb, $driverName, $prefix);
-            $userParser = new UserDataParser(new InputSanitizer(), $userRead);
             // Guard against re-running the installer on a populated database.
             // Without this check the installer could overwrite the existing admin
             // or add a duplicate that breaks login uniqueness constraints.
-            if ($userParser->listAll() !== []) {
+            if ($userRead->listAll() !== []) {
                 throw new RuntimeException('Installer can only create the initial admin on an empty user database.');
             }
 
