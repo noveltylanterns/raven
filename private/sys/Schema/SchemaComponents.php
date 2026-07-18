@@ -103,7 +103,7 @@ final class SchemaComponents
     {
         // Lazily construct installer once and reuse it.
         if ($this->schemaInstaller === null) {
-            $this->schemaInstaller = new SchemaInstaller();
+            $this->schemaInstaller = new SchemaInstaller($this->schemaIntrospector());
         }
 
         return $this->schemaInstaller;

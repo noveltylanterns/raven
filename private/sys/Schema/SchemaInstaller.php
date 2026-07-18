@@ -20,6 +20,18 @@ use Raven\Lib\Database\SqlTable;
  */
 final class SchemaInstaller
 {
+    private SchemaIntrospector $introspector;
+
+    /**
+     * Wires the schema introspector used to keep app seeding independent from lazy auth setup.
+     *
+     * @param SchemaIntrospector|null $introspector Shared schema inspection helper; defaults to a fresh instance.
+     */
+    public function __construct(?SchemaIntrospector $introspector = null)
+    {
+        $this->introspector = $introspector ?? new SchemaIntrospector();
+    }
+
     /**
      * Inserts missing stock groups, normalizes their IDs to canonical positions, and syncs permission masks.
      *
@@ -122,11 +134,16 @@ final class SchemaInstaller
         $pagesTable = SqlTable::appTable($driver, $prefix, 'pages');
         $usersTable = $prefix . 'users';
 
-        $userCountStmt = $db->query('SELECT COUNT(*) FROM ' . $usersTable);
-        $userCount = (int) (($userCountStmt?->fetchColumn()) ?: 0);
-        // Starter home page is only seeded on empty-user fresh installs.
-        if ($userCount > 0) {
-            return;
+        // Auth schema is lazy, so a public/app-only bootstrap may reach this seed
+        // before the users table exists. Treat that state like zero users rather
+        // than making app schema setup depend on opening the auth connection.
+        if ($this->introspector->tableExists($db, $driver, $usersTable)) {
+            $userCountStmt = $db->query('SELECT COUNT(*) FROM ' . $usersTable);
+            $userCount = (int) (($userCountStmt?->fetchColumn()) ?: 0);
+            // Starter home page is only seeded on empty-user fresh installs.
+            if ($userCount > 0) {
+                return;
+            }
         }
 
         $check = $db->prepare(

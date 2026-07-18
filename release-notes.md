@@ -4,6 +4,7 @@
 
 ### July 18, 2026
 - Fixed fresh installs failing to load the schema manager after its move into the core schema namespace.
+- Fixed app schema seeding from querying `rvn_users` before lazy auth schema creation on fresh installs.
 
 ### July 10, 2026
 - Fixed extension CLI symlinks so updater deployments do not ship workstation-specific absolute paths or trigger `open_basedir` failures.
