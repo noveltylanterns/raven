@@ -2579,7 +2579,7 @@ function raven_cli_command_extension(RavenCliContext $context, array $tokens): i
 	            }
 	
 	            // Guard stock packages that ship with Raven from accidental removal.
-	            if (in_array($slug, ['contact', 'cron', 'database', 'phpinfo', 'signups'], true)) {
+            if (in_array($slug, ['contact', 'cron', 'database', 'phpinfo', 'repo', 'signups', 'smallweb'], true)) {
 	                throw new RuntimeException('Stock extension cannot be uninstalled: ' . $slug);
 	            }
 	

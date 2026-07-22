@@ -60,6 +60,7 @@ Managed package content is updated from source:
 - Raven core files
 - stock themes
 - stock extensions
+- bundled stock extensions such as `repo` and `smallweb`
 
 When managed local files have local changes, Raven reports them in `Dry Run`.
 

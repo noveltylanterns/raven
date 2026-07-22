@@ -182,7 +182,7 @@ Notes:
 
 - `panel_path` and `panel_section` are legacy manifest keys and are ignored.
 - Panel route/nav identity comes from the extension directory slug.
-- Protected stock extensions are `contact`, `cron`, `database`, `phpinfo`, and `signups`. Bundled but removable extensions include `repo` and `smallweb`.
+- Protected stock extensions are `contact`, `cron`, `database`, `phpinfo`, `repo`, `signups`, and `smallweb`.
 - `ext.php` may request storage with an array contract:
   `local`, `table`, `tables`, `aux`, `panel`, `public`.
 - `local` provisions `private/dat/ext/{slug}/`.

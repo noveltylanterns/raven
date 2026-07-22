@@ -898,7 +898,7 @@ final class Update
     }
 
     /**
-     * Returns relative root paths for directories that are NOT in the stock list.
+     * Returns relative root paths for directories that are not in the stock list.
      *
      * Used to identify custom themes and extensions that should be protected from
      * the updater's delete pass.
@@ -929,7 +929,7 @@ final class Update
                 continue;
             }
 
-            // Stock roots are managed by update plan and are not custom-protected.
+            // Stock roots are managed by the update plan and are not custom-protected.
             if (in_array(strtolower($entry), $stockNames, true)) {
                 continue;
             }

@@ -499,7 +499,7 @@ final class Manager
      */
     public function stockExtensionDirectories(): array
     {
-        return ['contact', 'cron', 'database', 'phpinfo', 'signups'];
+        return ['contact', 'cron', 'database', 'phpinfo', 'repo', 'signups', 'smallweb'];
     }
 
     /**
