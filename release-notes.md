@@ -3,6 +3,9 @@
 *The machine is supposed to be logging patches & mods to this file. Sometimes it does, sometimes it doesn't. It might be useful for historical architectural context to your Agent at one point.*
 
 ### July 22, 2026
+- Repositioned the Smallweb Import/Export Data pane inside the protocol file-tree surface, above the lower action toolbar.
+- Added Smallweb webroot import/export forms with shared archive-format uploads, format-selectable downloads, CSRF-protected staging, wrapper-directory flattening, empty-archive rejection, and safe recursive copying.
+- Updated routing smoke fixtures for the moved ConfigWrite and public_profile_controller APIs, and refreshed route snapshots for the current runtime inventory.
 - Fixed theme and extension package uploads failing with a 500 because PHP upload temporary paths do not retain the original archive filename suffix; archive manifest inspection and extraction now use the validated client filename for type detection.
 - Fixed Smallweb panel routes calling `panel_editor_tabs()`'s lazy closure as an object, and initialized directory-modal state before settings-tab rendering to remove upload/page-management warnings and fatals.
 

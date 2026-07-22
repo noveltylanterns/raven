@@ -353,6 +353,56 @@ final class SmallwebService
         return $this->projectRoot . '/' . $protocol;
     }
 
+    /**
+     * Returns whether a protocol webroot contains at least one non-dot entry.
+     *
+     * @param string $protocol Protocol slug whose webroot should be checked.
+     * @return bool True when the webroot exists and is not empty.
+     */
+    public function hasProtocolContent(string $protocol): bool
+    {
+        if (!$this->isValidProtocol($protocol)) {
+            return false;
+        }
+
+        $entries = @scandir($this->getProtocolDir($protocol));
+        if ($entries === false) {
+            return false;
+        }
+
+        foreach ($entries as $entry) {
+            if ($entry !== '.' && $entry !== '..') {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Imports staged webroot entries into one protocol directory.
+     *
+     * Existing files with matching paths are replaced, while unrelated local
+     * entries remain in place so importing a partial archive is non-destructive.
+     *
+     * @param string $protocol Protocol slug receiving the staged webroot data.
+     * @param string $sourceDirectory Absolute staged directory containing extracted entries.
+     * @return bool True when every staged entry was copied successfully.
+     */
+    public function importProtocolDirectory(string $protocol, string $sourceDirectory): bool
+    {
+        if (!$this->isValidProtocol($protocol) || !is_dir($sourceDirectory)) {
+            return false;
+        }
+
+        $targetDirectory = $this->getProtocolDir($protocol);
+        if (!$this->ensureProtocolDirectory($protocol)) {
+            return false;
+        }
+
+        return $this->copyDirectoryContents($sourceDirectory, $targetDirectory);
+    }
+
     public function ensureProtocolDirectory(string $protocol): bool
     {
         if (!$this->isValidProtocol($protocol)) {
@@ -617,6 +667,58 @@ final class SmallwebService
             $dir .= '/' . trim($subdir, '/');
         }
         return $dir;
+    }
+
+    /**
+     * Copies one staged directory's entries into an existing protocol webroot.
+     *
+     * @param string $sourceDirectory Absolute source directory from archive staging.
+     * @param string $targetDirectory Absolute destination webroot directory.
+     * @return bool True when all files and directories were copied successfully.
+     */
+    private function copyDirectoryContents(string $sourceDirectory, string $targetDirectory): bool
+    {
+        $entries = @scandir($sourceDirectory);
+        if ($entries === false) {
+            return false;
+        }
+
+        foreach ($entries as $entry) {
+            if ($entry === '.' || $entry === '..') {
+                continue;
+            }
+
+            $sourcePath = $sourceDirectory . '/' . $entry;
+            $targetPath = $targetDirectory . '/' . $entry;
+
+            // Archive extraction must never introduce symlinks into webroots.
+            if (is_link($sourcePath)) {
+                return false;
+            }
+
+            if (is_dir($sourcePath)) {
+                if (is_file($targetPath) || !$this->folders->ensure($targetPath, 0775)) {
+                    return false;
+                }
+
+                if (!$this->copyDirectoryContents($sourcePath, $targetPath)) {
+                    return false;
+                }
+                continue;
+            }
+
+            if (!is_file($sourcePath) || is_dir($targetPath)) {
+                return false;
+            }
+
+            if (!@copy($sourcePath, $targetPath)) {
+                return false;
+            }
+
+            @chmod($targetPath, fileperms($sourcePath) & 0777);
+        }
+
+        return true;
     }
 
     // ── Protocol file CRUD ──

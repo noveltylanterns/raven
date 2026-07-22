@@ -39,10 +39,10 @@ spl_autoload_register(static function (string $class) use ($root): void {
 
 use Raven\Core\Config;
 use Raven\Core\Repository\ChannelRead;
+use Raven\Core\Repository\ConfigWrite;
 use Raven\Core\Repository\PageRead;
 use Raven\Core\Router\ChannelPolicy;
 use Raven\Core\Router\PagePolicy;
-use Raven\Lib\Scribe\ConfigScribe;
 use Raven\Lib\Security\InputSanitizer;
 
 final class RoutingSmokeRunner
@@ -93,21 +93,21 @@ final class RoutingSmokeRunner
         $this->assert((string) ($rootSlug['canonical_path'] ?? '') === '/hello-world', 'Global slug mode canonical root path mismatch.');
         $this->events[] = 'root_slug=ok';
 
-        ConfigScribe::persistValue($configPath, $config->all(), 'content.separator', '_');
+        ConfigWrite::persistValue($configPath, $config->all(), 'content.separator', '_');
         $config = new Config($configPath);
         $rootUnderscore = $this->resolvePublicPath($config, $input, $channels, $pages, 'hello_world', null);
         $this->assert((int) ($rootUnderscore['page']['id'] ?? 0) === 7, 'Underscore separator should resolve root slug page.');
         $this->assert((string) ($rootUnderscore['canonical_path'] ?? '') === '/hello_world', 'Underscore separator canonical root path mismatch.');
         $this->events[] = 'root_slug_separator=ok';
 
-        ConfigScribe::persistValue($configPath, $config->all(), 'content.separator', '-');
+        ConfigWrite::persistValue($configPath, $config->all(), 'content.separator', '-');
         $config = new Config($configPath);
         $inheritSlug = $this->resolvePublicPath($config, $input, $channels, $pages, 'smoke-post', 'news');
         $this->assert((int) ($inheritSlug['page']['id'] ?? 0) === 42, 'Inherited channel slug mode should resolve channel page by slug.');
         $this->assert((string) ($inheritSlug['canonical_path'] ?? '') === '/news/smoke-post', 'Inherited channel slug canonical path mismatch.');
         $this->events[] = 'channel_inherit_slug=ok';
 
-        ConfigScribe::persistValue($configPath, $config->all(), 'content.mode', 'id');
+        ConfigWrite::persistValue($configPath, $config->all(), 'content.mode', 'id');
         $config = new Config($configPath);
         $rootId = $this->resolvePublicPath($config, $input, $channels, $pages, '7', null);
         $this->assert((int) ($rootId['page']['id'] ?? 0) === 7, 'Global id mode should resolve root page by id.');

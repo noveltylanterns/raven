@@ -109,7 +109,7 @@ final class RouterInventorySmokeRunner
 
         $publicPageController = $this->requireFactory($rvn, 'public_page_controller');
         $publicAuthController = $this->requireFactory($rvn, 'public_auth_controller');
-        $publicUserController = $this->requireFactory($rvn, 'public_user_controller');
+        $publicProfileController = $this->requireFactory($rvn, 'public_profile_controller');
         $publicCategoryController = $this->requireFactory($rvn, 'public_category_controller');
         $publicChannelController = $this->requireFactory($rvn, 'public_channel_controller');
         $publicGroupController = $this->requireFactory($rvn, 'public_group_controller');
@@ -127,7 +127,7 @@ final class RouterInventorySmokeRunner
             $rvn,
             $publicAuthController,
             $publicPageController,
-            $publicUserController,
+            $publicProfileController,
             $publicCategoryController,
             $publicChannelController,
             $publicGroupController,

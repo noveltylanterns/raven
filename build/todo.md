@@ -89,6 +89,49 @@ A lot of these I will have to write myself, but generate examples I can work wit
 # Misc Bugs & Tweaks
 **Do not delete this heading!**
 
+## Smoke/Debug Reference-Retirement Audit
+
+Audit every smoke, debug, profiling, utility, and snapshot tool for references
+to classes, namespaces, service keys, factories, and method names that were
+removed or moved during the recent library refactor.
+
+- [ ] Inventory every executable under debug/ and every related fixture,
+  snapshot, helper, and command invoked by the maintenance checklist.
+- [ ] Audit smoke runners individually: auth-workflow.php, cli.php,
+  contact-workflow.php, docs.php, ext.php, input-sanitizer.php,
+  output-profiler.php, panel-permissions.php, router-inventory.php,
+  routing.php, security.php, security-aggressive.php, and themes.php.
+- [ ] Audit debug utilities individually: check-config-sync.php,
+  profile-panel-lists.php, profile-public-pages.php, and request-runner.php.
+- [ ] Audit maintenance/build diagnostics individually: prep-audit.php,
+  rvn-docs.php, CLI help probes, generated appendix checks, and every command
+  listed in the maintenance checklist.
+- [ ] Build a refactor-era rename map from release notes, git history, and
+  current namespaces; include moved libraries, repositories, parsers, scribes,
+  controllers, runtime factories, and service-container keys.
+- [ ] Search all smoke/debug sources for old namespaces, class names, method
+  names, factory keys, and comments that describe retired architecture.
+- [ ] Search shell commands, dynamically loaded PHP files, serialized fixtures,
+  JSON snapshots, and test data—not only direct use statements.
+- [ ] Classify each hit as live production dependency, diagnostic-only stale
+  reference, compatibility fallback, documentation text, or false positive.
+- [ ] Update stale diagnostic references to the current canonical class/library
+  and runtime-factory APIs; preserve compatibility aliases only when production
+  code still requires them.
+- [ ] Refresh affected route/config snapshots and generated fixtures only after
+  the underlying smoke tool runs successfully.
+- [ ] Run each corrected tool independently and record the first actionable
+  failure before moving to the next tool.
+- [ ] Run the complete debug smoke matrix, including routing, route inventory,
+  extension, security, input, auth, theme, CLI, docs, and workflow checks.
+- [ ] Run profiling/utilities that exercise the same refactored surfaces and
+  verify they no longer emit missing-class, missing-factory, or stale-method
+  errors.
+- [ ] Add a concise result note beside each completed checklist item and record
+  all fixes in the top same-day section of release-notes.md.
+- [ ] Re-run git diff --check, PHP lint for every changed diagnostic file,
+  snapshot checks, and the maintenance smoke commands before closing the audit.
+
 
 
 

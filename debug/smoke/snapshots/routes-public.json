@@ -1,6 +1,6 @@
 {
     "schema": 1,
-    "generated_at": "2026-05-02T21:50:25+00:00",
+    "generated_at": "2026-07-22T08:05:08+00:00",
     "scope": "public",
     "routes": [
         {
@@ -11,12 +11,12 @@
             "handler": {
                 "type": "closure",
                 "file": "private/sys/Router/Public/AuthRouter.php",
-                "line": 42,
+                "line": 32,
                 "static_uses": [
                     "publicAuthController"
                 ]
             },
-            "signature": "841a6c82b84715be4c85f0a32a9553c89dda5668"
+            "signature": "3f0fc3c41040b786fb2db152269b53e6d8bad3d9"
         },
         {
             "scope": "public",
@@ -26,12 +26,12 @@
             "handler": {
                 "type": "closure",
                 "file": "private/sys/Router/Public/AuthRouter.php",
-                "line": 46,
+                "line": 36,
                 "static_uses": [
                     "publicAuthController"
                 ]
             },
-            "signature": "41daebecb52c4c33f35d9af730cda3cfe14c29d5"
+            "signature": "f2fa306f6e5d9b5f3eb5c1e3ac107088ed29ba06"
         },
         {
             "scope": "public",
@@ -41,12 +41,12 @@
             "handler": {
                 "type": "closure",
                 "file": "private/sys/Router/Public/AuthRouter.php",
-                "line": 50,
+                "line": 40,
                 "static_uses": [
                     "publicAuthController"
                 ]
             },
-            "signature": "181a0fb9eecbeb7a06959c5130b4fa6220c98cbd"
+            "signature": "1d27c00bdeb843980f33f89f31439d84f2813c6f"
         },
         {
             "scope": "public",
@@ -56,12 +56,12 @@
             "handler": {
                 "type": "closure",
                 "file": "private/sys/Router/Public/AuthRouter.php",
-                "line": 54,
+                "line": 44,
                 "static_uses": [
                     "publicAuthController"
                 ]
             },
-            "signature": "c0909f31b0e650e71118a1b9f6ebbf6d13de075e"
+            "signature": "df98e4e017bb9ffd706761dad1b83abd86d879de"
         },
         {
             "scope": "public",
@@ -71,12 +71,12 @@
             "handler": {
                 "type": "closure",
                 "file": "private/sys/Router/Public/AuthRouter.php",
-                "line": 58,
+                "line": 48,
                 "static_uses": [
                     "publicAuthController"
                 ]
             },
-            "signature": "12674f189ec1f8dbd8ed2f3f0748c405c64d9506"
+            "signature": "c5729e8a34e154f6b63e5a218da921412c4e2b69"
         },
         {
             "scope": "public",
@@ -86,12 +86,12 @@
             "handler": {
                 "type": "closure",
                 "file": "private/sys/Router/Public/AuthRouter.php",
-                "line": 62,
+                "line": 52,
                 "static_uses": [
                     "publicAuthController"
                 ]
             },
-            "signature": "6511cb0dbaa5d9ebccd7617d83928e7f87a82007"
+            "signature": "fdfefbdc03ee03b75eb3a699cb0311abc7273155"
         },
         {
             "scope": "public",
@@ -101,12 +101,12 @@
             "handler": {
                 "type": "closure",
                 "file": "private/sys/Router/Public/AuthRouter.php",
-                "line": 66,
+                "line": 56,
                 "static_uses": [
                     "publicAuthController"
                 ]
             },
-            "signature": "156b712484d03794348e88ed327756ae318baa06"
+            "signature": "2fb656035403038ff5cd7f98cdcde631b79291d6"
         },
         {
             "scope": "public",
@@ -116,12 +116,12 @@
             "handler": {
                 "type": "closure",
                 "file": "private/sys/Router/Public/AuthRouter.php",
-                "line": 70,
+                "line": 60,
                 "static_uses": [
                     "publicAuthController"
                 ]
             },
-            "signature": "4497d070bb166d7bc2595981540519bce83e2dd8"
+            "signature": "e99dc1db8ee8635d1be3c7cfc76f94f43c3859c9"
         },
         {
             "scope": "public",
@@ -131,12 +131,12 @@
             "handler": {
                 "type": "closure",
                 "file": "private/sys/Router/Public/AuthRouter.php",
-                "line": 74,
+                "line": 64,
                 "static_uses": [
                     "publicAuthController"
                 ]
             },
-            "signature": "8ee68245f14ee80c097c3ab43bcd9c0bc01bd495"
+            "signature": "bf51372ce47cb2fa99985a7777b38a632642dd4a"
         },
         {
             "scope": "public",
@@ -237,14 +237,14 @@
             "handler": {
                 "type": "closure",
                 "file": "private/sys/Router/Public/PrefixRouter.php",
-                "line": 62,
+                "line": 71,
                 "static_uses": [
                     "input",
                     "onSlug",
                     "publicRequestContext"
                 ]
             },
-            "signature": "c215f3dfea944879329c1d3d1cdf0f2d88b68c2b"
+            "signature": "5eb2388ae0b298064b1fc367ebabf05b5c01a99d"
         },
         {
             "scope": "public",
@@ -254,14 +254,14 @@
             "handler": {
                 "type": "closure",
                 "file": "private/sys/Router/Public/PrefixRouter.php",
-                "line": 72,
+                "line": 82,
                 "static_uses": [
                     "input",
                     "onSlugPage",
                     "publicRequestContext"
                 ]
             },
-            "signature": "41b904b92426a73bb7bc6119118ab8885a601f5c"
+            "signature": "cf052a7f098fe36015eae2208e0f5c2ac377928c"
         },
         {
             "scope": "public",
@@ -271,7 +271,7 @@
             "handler": {
                 "type": "closure",
                 "file": "private/sys/Router/Public/ChannelRouter.php",
-                "line": 63,
+                "line": 39,
                 "static_uses": [
                     "input",
                     "publicChannelController",
@@ -279,7 +279,7 @@
                     "reservedPrefixes"
                 ]
             },
-            "signature": "3d2f6f788e1cf7b1cdb132eb4ca130cb1ef08f2a"
+            "signature": "ff85f3e574a3c8d4fa8cfffcfa4dd199cbf13047"
         },
         {
             "scope": "public",
@@ -289,12 +289,12 @@
             "handler": {
                 "type": "closure",
                 "file": "private/sys/Router/Public/FeedRouter.php",
-                "line": 75,
+                "line": 47,
                 "static_uses": [
                     "publicFeedController"
                 ]
             },
-            "signature": "f7418c1ee5477ab039dfbd3dc232b7f7a6ce11ec"
+            "signature": "ec0de8bfa3fb43c92ded3f7b42b2aed904ea7a13"
         },
         {
             "scope": "public",
@@ -304,7 +304,7 @@
             "handler": {
                 "type": "closure",
                 "file": "private/sys/Router/Public/FeedRouter.php",
-                "line": 79,
+                "line": 51,
                 "static_uses": [
                     "input",
                     "publicFeedController",
@@ -312,7 +312,7 @@
                     "reservedPrefixes"
                 ]
             },
-            "signature": "cbb443869740455017c4191e25ca4b877b49ce30"
+            "signature": "35a0004fc1ccc1d15bc2967e4a3b6100a674aae3"
         },
         {
             "scope": "public",
@@ -322,14 +322,14 @@
             "handler": {
                 "type": "closure",
                 "file": "private/sys/Router/Public/FeedRouter.php",
-                "line": 94,
+                "line": 68,
                 "static_uses": [
                     "input",
                     "publicFeedController",
                     "publicRequestContext"
                 ]
             },
-            "signature": "4f1b1439225ed754cac2d5542eb2db69c6913b1f"
+            "signature": "c3efbe37e21b53d67c3b5d6fc64fe4ee3e9cde32"
         },
         {
             "scope": "public",
@@ -339,14 +339,14 @@
             "handler": {
                 "type": "closure",
                 "file": "private/sys/Router/Public/FeedRouter.php",
-                "line": 107,
+                "line": 83,
                 "static_uses": [
                     "input",
                     "publicFeedController",
                     "publicRequestContext"
                 ]
             },
-            "signature": "e9742ab9bcba5da56c3e20a3a5b077d646d5a0df"
+            "signature": "61f569ee9ad4a447f4c7932703ae6b6f4dca23f6"
         },
         {
             "scope": "public",
@@ -356,12 +356,12 @@
             "handler": {
                 "type": "closure",
                 "file": "private/sys/Router/Public/FeedRouter.php",
-                "line": 121,
+                "line": 99,
                 "static_uses": [
                     "publicFeedController"
                 ]
             },
-            "signature": "a1076f96335c3129bd7d24378e607f854ae0a252"
+            "signature": "be9ae8e92b94b2e282192675c68e499abce683c2"
         },
         {
             "scope": "public",
@@ -371,7 +371,7 @@
             "handler": {
                 "type": "closure",
                 "file": "private/sys/Router/Public/FeedRouter.php",
-                "line": 125,
+                "line": 103,
                 "static_uses": [
                     "input",
                     "publicFeedController",
@@ -379,7 +379,7 @@
                     "reservedPrefixes"
                 ]
             },
-            "signature": "09bc1e51f6bbf9741298b6a8512e50a5e4a077a5"
+            "signature": "2e0be0ea481257fdbb2685a43ba63a7250e5cd78"
         },
         {
             "scope": "public",
@@ -389,14 +389,14 @@
             "handler": {
                 "type": "closure",
                 "file": "private/sys/Router/Public/FeedRouter.php",
-                "line": 140,
+                "line": 120,
                 "static_uses": [
                     "input",
                     "publicFeedController",
                     "publicRequestContext"
                 ]
             },
-            "signature": "7b9c19c269d71c4c5c5ba6182e2ecb2a4f51c322"
+            "signature": "84a0b548039209177ab5281bfecd14f0a7d6a341"
         },
         {
             "scope": "public",
@@ -406,124 +406,90 @@
             "handler": {
                 "type": "closure",
                 "file": "private/sys/Router/Public/FeedRouter.php",
-                "line": 153,
+                "line": 135,
                 "static_uses": [
                     "input",
                     "publicFeedController",
                     "publicRequestContext"
                 ]
             },
-            "signature": "008e6a66f7dc310b0164d749fb4fe61f5fc452e9"
+            "signature": "cf39f5a1b579f0d651756e4f72bac020b283dbbe"
         },
         {
             "scope": "public",
             "order": 26,
             "method": "GET",
-            "regex": "#^/user/(?P<username>[^/]+)$#",
-            "handler": {
-                "type": "closure",
-                "file": "private/sys/Router/Public/ProfileRouter.php",
-                "line": 63,
-                "static_uses": [
-                    "input",
-                    "publicRequestContext",
-                    "publicUserController"
-                ]
-            },
-            "signature": "d84c6b8e4bb1d0e11deab4d029d8e372629ecab2"
-        },
-        {
-            "scope": "public",
-            "order": 27,
-            "method": "GET",
-            "regex": "#^/group/(?P<slug>[^/]+)$#",
-            "handler": {
-                "type": "closure",
-                "file": "private/sys/Router/Public/GroupRouter.php",
-                "line": 64,
-                "static_uses": [
-                    "input",
-                    "publicGroupController",
-                    "publicRequestContext"
-                ]
-            },
-            "signature": "e88f3b1fbebdefa5b67eb25ebd3ef5ab17c1b29a"
-        },
-        {
-            "scope": "public",
-            "order": 28,
-            "method": "GET",
             "regex": "#^/tag/(?P<slug>[^/]+)$#",
             "handler": {
                 "type": "closure",
                 "file": "private/sys/Router/Public/PrefixRouter.php",
-                "line": 62,
+                "line": 71,
                 "static_uses": [
                     "input",
                     "onSlug",
                     "publicRequestContext"
                 ]
             },
-            "signature": "9597e2754c8e65b29de64378371a0e521d922d57"
+            "signature": "bd4a1d5d47d8c0e1b926363c0243b21c25a7d9e4"
         },
         {
             "scope": "public",
-            "order": 29,
+            "order": 27,
             "method": "GET",
             "regex": "#^/tag/(?P<slug>[^/]+)/(?P<page>[^/]+)$#",
             "handler": {
                 "type": "closure",
                 "file": "private/sys/Router/Public/PrefixRouter.php",
-                "line": 72,
+                "line": 82,
                 "static_uses": [
                     "input",
                     "onSlugPage",
                     "publicRequestContext"
                 ]
             },
-            "signature": "0137d8502b5effd56c44d7c53be9b72ee6d085e6"
+            "signature": "f711551d97f49018f7457ebecd6a511f5256f381"
         },
         {
             "scope": "public",
-            "order": 30,
+            "order": 28,
             "method": "POST",
             "regex": "#^/forms/submit$#",
             "handler": {
                 "type": "closure",
                 "file": "private/sys/Router/Public/PageRouter.php",
-                "line": 64,
+                "line": 40,
                 "static_uses": [
                     "input",
                     "publicPageController",
                     "publicRequestContext"
                 ]
             },
-            "signature": "b2df0e1f1ba31c8c901c9ef662b88ea95220c4fd"
+            "signature": "6e5da0dc94caae97e16930df9e3a401b66024292"
         },
         {
             "scope": "public",
-            "order": 31,
+            "order": 29,
             "method": "GET",
             "regex": "#^/$#",
             "handler": {
                 "type": "closure",
                 "file": "private/sys/Router/Public/PageRouter.php",
-                "line": 77,
+                "line": 54,
                 "static_uses": [
                     "publicPageController"
                 ]
             },
-            "signature": "37a5bce7437658a483d3f6faf627b8bf6aa55f9d"
+            "signature": "c86ee46362881e394b1adbedc3bf6870c10409c4"
         },
         {
             "scope": "public",
-            "order": 32,
+            "order": 30,
             "method": "GET",
             "regex": "#^/(?P<channel>[^/]+)/(?P<slug>[^/]+)$#",
             "handler": {
                 "type": "closure",
                 "file": "private/sys/Router/Public/PageRouter.php",
-                "line": 82,
+                "line": 59,
                 "static_uses": [
                     "input",
                     "publicPageController",
@@ -531,7 +497,7 @@
                     "reservedPrefixes"
                 ]
             },
-            "signature": "7909c1843a4bd035994342feecb39cdc9ca67e74"
+            "signature": "0f1daa12c53ae15ea3b01ac22f49f48129499774"
         }
     ]
 }

@@ -23,6 +23,12 @@ declare(strict_types=1);
 /** @var string $csrfField */
 /** @var array{name?: string, version?: string, author?: string, description?: string, docs?: string} $extensionMeta */
 /** @var \Raven\Ext\Smallweb\SmallwebService $svc */
+/** @var string $webrootImportPath */
+/** @var string $webrootExportPath */
+/** @var string $webrootArchiveAcceptAttribute */
+/** @var array<int, string> $webrootArchiveFormats */
+/** @var array<string, string> $webrootExportFormats */
+/** @var bool $hasWebrootContent */
 
 use Raven\Ext\Smallweb\SmallwebService;
 use Raven\Lib\View\Panel\Footer;
@@ -435,8 +441,71 @@ $smallwebSettingsToolbarItems = [
         <?php endif; ?>
         <?php endif; ?>
 
+        <?php if ($activeTab !== 'settings'): ?>
+        <section class="mt-4" aria-labelledby="sw-data-heading">
+            <h3 id="sw-data-heading">Import/Export Data</h3>
+            <p class="text-muted small">Import archive data into or export the current <?= e($protoScheme) ?>:// webroot for this tab.</p>
+            <div class="d-flex flex-wrap gap-2">
+                <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#sw-webroot-import-modal">
+                    <i class="bi bi-box-arrow-in-down me-2" aria-hidden="true"></i>Import Data
+                </button>
+                <div class="dropdown" data-rvn-portal-dropdown="1">
+                    <button
+                        type="button"
+                        class="btn btn-secondary dropdown-toggle"
+                        data-bs-toggle="dropdown"
+                        data-bs-display="static"
+                        aria-expanded="false"
+                        <?= !$hasWebrootContent ? 'disabled title="The webroot is empty."' : '' ?>
+                    >
+                        <i class="bi bi-download me-2" aria-hidden="true"></i>Export Data
+                    </button>
+                    <ul class="dropdown-menu" data-rvn-portal-dropdown-menu="1">
+                        <?php foreach ($webrootExportFormats as $formatValue => $formatLabel): ?>
+                            <li>
+                                <a class="dropdown-item" href="<?= e($webrootExportPath . '?format=' . rawurlencode($formatValue)) ?>"><?= e($formatLabel) ?></a>
+                            </li>
+                        <?php endforeach; ?>
+                    </ul>
+                </div>
+            </div>
+        </section>
+        <?php endif; ?>
+
     </div>
 </section>
+
+<?php if ($activeTab !== 'settings'): ?>
+<div class="modal fade" id="sw-webroot-import-modal" tabindex="-1" aria-labelledby="sw-webroot-import-modal-label" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title mb-0" id="sw-webroot-import-modal-label">Import Webroot Data</h3>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="post" action="<?= e($webrootImportPath) ?>" enctype="multipart/form-data">
+                <?= $csrfField ?>
+                <div class="modal-body">
+                    <label for="sw-webroot-archive" class="form-label">Webroot Archive</label>
+                    <input
+                        type="file"
+                        class="form-control"
+                        id="sw-webroot-archive"
+                        name="webroot_archive"
+                        accept="<?= e($webrootArchiveAcceptAttribute) ?>"
+                        required
+                    >
+                    <div class="form-text">Supported: <?= e(implode(', ', $webrootArchiveFormats)) ?>. Empty archives are rejected.</div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-box-arrow-in-down me-1" aria-hidden="true"></i>Import</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
 
 <?php if ($hasDirs && $activeTab !== 'settings'): ?>
 <!-- ══ New Folder Modal (must be outside rvnp-editor-layout to avoid stacking context issues) ══ -->

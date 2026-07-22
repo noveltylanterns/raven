@@ -10,9 +10,13 @@
 declare(strict_types=1);
 
 use Raven\Ext\Smallweb\SmallwebService;
+use Raven\Lib\Archive\Folder;
+use Raven\Lib\Archive\Install as ArchiveInstall;
+use Raven\Lib\Archive\Package as ArchivePackage;
 use Raven\Core\Router\RouteHandler;
 
 use Raven\Lib\Transport\Redirect;
+use Raven\Lib\Transport\Upload;
 
 /**
  * Registers Smallweb extension routes into the panel router.
@@ -68,6 +72,27 @@ return static function (RouteHandler $router, array $context): void {
     }
 
     $input = $rvn['input'];
+    $archivePackages = new ArchivePackage((string) $rvn['root']);
+    $archiveInstaller = new ArchiveInstall($input, new Upload(), $archivePackages);
+    $archiveFolders = new Folder();
+    $createImportDirectory = static function () use ($rvn, $archiveFolders): string {
+        $temporaryRoot = rtrim((string) $rvn['root'], '/') . '/.tmp';
+        if (!$archiveFolders->ensure($temporaryRoot, 0775)) {
+            throw new \RuntimeException('Failed to initialize the Smallweb import workspace.');
+        }
+
+        $temporaryPath = tempnam($temporaryRoot, 'smallweb-import-');
+        if (!is_string($temporaryPath) || $temporaryPath === '') {
+            throw new \RuntimeException('Failed to allocate the Smallweb import workspace.');
+        }
+
+        @unlink($temporaryPath);
+        if (!$archiveFolders->ensure($temporaryPath, 0775)) {
+            throw new \RuntimeException('Failed to create the Smallweb import workspace.');
+        }
+
+        return $temporaryPath;
+    };
     /** @var callable(?string=): array<string, mixed> $extensionServices */
     $extensionServices = is_callable($context['extensionServices'] ?? null)
         ? $context['extensionServices']
@@ -273,7 +298,8 @@ return static function (RouteHandler $router, array $context): void {
         $settingsSavePath,
         $panelUrl,
         $settingsViewFile,
-        $extensionMeta
+        $extensionMeta,
+        $archivePackages
     ): void {
         $requirePanelLogin();
         $protocol = strtolower(trim((string) ($params['protocol'] ?? '')));
@@ -298,6 +324,12 @@ return static function (RouteHandler $router, array $context): void {
             'flashError'       => $pullFlash('error'),
             'extensionMeta'    => $extensionMeta,
             'svc'              => $svc,
+            'webrootImportPath' => $panelUrl('/smallweb/' . $protocol . '/import'),
+            'webrootExportPath' => $panelUrl('/smallweb/' . $protocol . '/export'),
+            'webrootArchiveAcceptAttribute' => $archivePackages->accept(),
+            'webrootArchiveFormats' => $archivePackages->formatLabels(),
+            'webrootExportFormats' => $archivePackages->exportFormatOptions(),
+            'hasWebrootContent' => $svc->hasProtocolContent($protocol),
         ];
 
         if ($svc->protocolSupportsDirectories($protocol)) {
@@ -306,6 +338,134 @@ return static function (RouteHandler $router, array $context): void {
         }
 
         $renderView($viewData);
+    });
+
+    // ══════════════════════════════════════════════════════════════
+    //  POST /smallweb/{protocol}/import — Import webroot archive
+    // ══════════════════════════════════════════════════════════════
+
+    $router->add('POST', '/smallweb/{protocol}/import', static function (array $params) use (
+        $requirePanelLogin,
+        $requireEnabledProtocol,
+        $rvn,
+        $svc,
+        $flash,
+        $panelUrl,
+        $archiveInstaller,
+        $archivePackages,
+        $archiveFolders,
+        $createImportDirectory
+    ): void {
+        $requirePanelLogin();
+        $protocol = strtolower(trim((string) ($params['protocol'] ?? '')));
+        if (!$requireEnabledProtocol($protocol)) {
+            return;
+        }
+
+        $tabUrl = $rvn['panel_editor_tabs']->panelPathTabUrl($panelUrl, '/smallweb', $protocol);
+        if (!$rvn['csrf']->validate($_POST['_csrf'] ?? null)) {
+            $flash('error', 'Invalid CSRF token.');
+            Redirect::redirect($tabUrl);
+            return;
+        }
+
+        $upload = $archiveInstaller->validateUpload(
+            $_FILES['webroot_archive'] ?? null,
+            'Webroot archive',
+            'Smallweb'
+        );
+        if (!(bool) ($upload['ok'] ?? false)) {
+            $flash('error', (string) ($upload['error'] ?? 'Webroot import failed.'));
+            Redirect::redirect($tabUrl);
+            return;
+        }
+
+        $stagingDirectory = '';
+        try {
+            $stagingDirectory = $createImportDirectory();
+            $extractError = $archiveInstaller->extractTo(
+                (string) ($upload['tmp_path'] ?? ''),
+                $stagingDirectory,
+                static function (string $directory) use ($archiveFolders): void {
+                    $archiveFolders->removeTree($directory);
+                },
+                'Smallweb webroot',
+                (string) ($upload['archive_name'] ?? 'webroot.zip')
+            );
+            if ($extractError !== null) {
+                throw new \RuntimeException($extractError);
+            }
+
+            $flattenError = $archiveInstaller->flattenRoot($stagingDirectory);
+            if ($flattenError !== null) {
+                throw new \RuntimeException($flattenError);
+            }
+
+            // Reject archives that contain only an empty wrapper directory.
+            if (!$archivePackages->hasFiles($stagingDirectory)) {
+                throw new \RuntimeException('Uploaded webroot archive contains no data.');
+            }
+
+            if (!$svc->importProtocolDirectory($protocol, $stagingDirectory)) {
+                throw new \RuntimeException('Failed to import webroot data.');
+            }
+
+            $flash('success', 'Imported ' . $svc->protocolScheme($protocol) . ':// webroot data.');
+        } catch (\Throwable $exception) {
+            $flash('error', $exception->getMessage() !== '' ? $exception->getMessage() : 'Webroot import failed.');
+        } finally {
+            if ($stagingDirectory !== '') {
+                $archiveFolders->removeTree($stagingDirectory);
+            }
+        }
+
+        Redirect::redirect($tabUrl);
+    });
+
+    // ══════════════════════════════════════════════════════════════
+    //  GET /smallweb/{protocol}/export — Export webroot archive
+    // ══════════════════════════════════════════════════════════════
+
+    $router->add('GET', '/smallweb/{protocol}/export', static function (array $params) use (
+        $requirePanelLogin,
+        $requireEnabledProtocol,
+        $svc,
+        $flash,
+        $panelUrl,
+        $archivePackages
+    ): void {
+        $requirePanelLogin();
+        $protocol = strtolower(trim((string) ($params['protocol'] ?? '')));
+        if (!$requireEnabledProtocol($protocol)) {
+            return;
+        }
+
+        $tabUrl = $panelUrl('/smallweb/' . $protocol);
+        $webrootDirectory = $svc->getProtocolDir($protocol);
+        if (!$svc->hasProtocolContent($protocol)) {
+            $flash('error', 'Cannot export an empty ' . $svc->protocolScheme($protocol) . ':// webroot.');
+            Redirect::redirect($tabUrl);
+            return;
+        }
+
+        $format = strtolower(trim((string) ($_GET['format'] ?? 'zip')));
+        try {
+            $archive = $archivePackages->exportDir($webrootDirectory, $protocol, $format);
+        } catch (\RuntimeException $exception) {
+            $flash('error', 'Webroot export failed: ' . $exception->getMessage());
+            Redirect::redirect($tabUrl);
+            return;
+        }
+
+        $downloadFilename = $archivePackages->downloadName(
+            'smallweb-' . $protocol,
+            (string) ($archive['format'] ?? 'zip')
+        );
+        $archivePackages->streamDownload(
+            (string) ($archive['path'] ?? ''),
+            $downloadFilename,
+            (string) ($archive['mime_type'] ?? 'application/octet-stream')
+        );
     });
 
     // ══════════════════════════════════════════════════════════════

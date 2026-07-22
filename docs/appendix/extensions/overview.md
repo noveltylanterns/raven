@@ -12,4 +12,4 @@ Extension references extracted from `private/ext/*` manifests, provider files, a
 | `phpinfo` | PHP Info | `system` | 1 | 0 |
 | `repo` | Repositories | `module` | 7 | 102 |
 | `signups` | Signup Sheets | `content` | 4 | 21 |
-| `smallweb` | Smallweb | `helper` | 2 | 42 |
+| `smallweb` | Smallweb | `helper` | 2 | 44 |
