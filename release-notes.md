@@ -4,6 +4,7 @@
 
 ### July 22, 2026
 - Fixed theme and extension package uploads failing with a 500 because PHP upload temporary paths do not retain the original archive filename suffix; archive manifest inspection and extraction now use the validated client filename for type detection.
+- Fixed Smallweb panel routes calling `panel_editor_tabs()`'s lazy closure as an object, and initialized directory-modal state before settings-tab rendering to remove upload/page-management warnings and fatals.
 
 ### July 21, 2026
 - Fixed panel login forms on username-mode installs so the identifier input uses the configured mode and browser validation does not block username submissions.

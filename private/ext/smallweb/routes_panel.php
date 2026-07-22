@@ -33,8 +33,13 @@ return static function (RouteHandler $router, array $context): void {
     /** @var callable(string): string $panelUrl */
     $panelUrl = $context['panelUrl'] ?? static fn (string $suffix = ''): string => '/' . ltrim($suffix, '/');
 
-    // Shared EditorTabs instance from the panel container for protocol tab URL building.
+    // Resolve the lazy EditorTabs factory once because POST handlers need the concrete URL helper object.
     $editorTabs = $rvn['panel_editor_tabs'] ?? null;
+    if (is_callable($editorTabs)) {
+        $editorTabs = $editorTabs();
+    }
+    // Keep the route-local dependency payload consistent for handlers that read the service directly.
+    $rvn['panel_editor_tabs'] = $editorTabs;
 
     /** @var callable(): void $requirePanelLogin */
     $requirePanelLogin = $context['requirePanelLogin'] ?? static function (): void {};

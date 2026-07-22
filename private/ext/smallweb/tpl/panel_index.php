@@ -45,6 +45,10 @@ foreach (SmallwebService::SUPPORTED_PROTOCOLS as $proto) {
 
 $activeTab = $currentTab;
 
+// Keep settings-tab rendering safe because directory-only state is prepared below for protocol tabs.
+$hasDirs = false;
+$availableParentDirs = [];
+
 $formatSize = static function (int $bytes): string {
     if ($bytes < 1024) {
         return $bytes . ' B';
