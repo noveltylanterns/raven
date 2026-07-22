@@ -564,8 +564,8 @@ final class PublicRouteProfilerRunner
         $_SERVER['REQUEST_METHOD'] = 'GET';
         $_SERVER['REQUEST_URI'] = $uri;
         $_SERVER['QUERY_STRING'] = $query;
-        $_SERVER['HTTP_HOST'] = 'dev.lanterns.io';
-        $_SERVER['SERVER_NAME'] = 'dev.lanterns.io';
+        $_SERVER['HTTP_HOST'] = 'foundry.lanterns.io';
+        $_SERVER['SERVER_NAME'] = 'foundry.lanterns.io';
         $_SERVER['SERVER_PORT'] = '80';
         $_SERVER['HTTPS'] = '';
         $_SERVER['REMOTE_ADDR'] = '127.0.0.1';

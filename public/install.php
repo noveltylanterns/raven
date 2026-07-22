@@ -513,7 +513,8 @@ $existing = is_array($rawExisting) ? $rawExisting : [];
 
 $defaultConfig = $existing !== [] ? $existing : $template;
 $defaultSiteDomain = trim((string) ($defaultConfig['site']['domain'] ?? ''));
-if ($defaultSiteDomain === '') {
+// Treat the distribution token as unset so a fresh install inherits the actual request host.
+if ($defaultSiteDomain === '' || strtoupper($defaultSiteDomain) === 'SITE_DOMAIN') {
     $defaultSiteDomain = $detectedDomain;
 }
 $defaultTablePrefix = trim((string) ($defaultConfig['database']['prefix'] ?? ($defaultConfig['database']['table_prefix'] ?? '')));

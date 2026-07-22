@@ -254,7 +254,7 @@ final class ContactWorkflowSmokeRunner
             'script' => $scriptPath,
             'method' => strtoupper($method),
             'uri' => $uri,
-            'host' => 'dev.lanterns.io',
+            'host' => 'foundry.lanterns.io',
             'post' => $post,
             'cookies' => $this->cookies,
             'output' => $outputFile,

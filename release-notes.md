@@ -2,6 +2,10 @@
 
 *The machine is supposed to be logging patches & mods to this file. Sometimes it does, sometimes it doesn't. It might be useful for historical architectural context to your Agent at one point.*
 
+### July 21, 2026
+- Fixed panel login forms on username-mode installs so the identifier input uses the configured mode and browser validation does not block username submissions.
+- Fixed fresh-install domain detection so the `SITE_DOMAIN` distribution token is replaced by the request host; updated debug fixtures from the retired development host to `foundry.lanterns.io`.
+
 ### July 18, 2026
 - Fixed fresh installs failing to load the schema manager after its move into the core schema namespace.
 - Fixed app schema seeding from querying `rvn_users` before lazy auth schema creation on fresh installs.

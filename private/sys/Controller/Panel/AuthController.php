@@ -102,7 +102,9 @@ final class AuthController
             'site' => $this->siteData(),
             'csrfField' => $this->csrf->field(),
             'error' => $this->pullFlash('error'),
-            'identifierMode' => $identifierMode,
+            // Match the template's explicit variable name so username-mode installs render a
+            // text input instead of an HTML email input that browsers reject before POST.
+            'loginIdentifierMode' => $identifierMode,
             'loginIdentifierLabel' => $identifierMode === 'email' ? 'Email' : 'Username or Email',
             // Login screen must not expose authenticated panel navigation.
             'showSidebar' => false,

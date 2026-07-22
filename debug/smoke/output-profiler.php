@@ -368,7 +368,7 @@ final class OutputProfilerSmokeRunner
             'script' => $this->root . $script,
             'method' => strtoupper($method),
             'uri' => $uri,
-            'host' => 'dev.lanterns.io',
+            'host' => 'foundry.lanterns.io',
             'post' => $post,
             'cookies' => $cookies,
             'output' => $outputFile,
