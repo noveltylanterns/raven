@@ -136,12 +136,13 @@ final class Extract
      *
      * @param string $archivePath Absolute path to the source archive.
      * @param string $targetDir Absolute path to the destination directory.
+     * @param string|null $archiveName Original client filename used when the PHP temporary path has no suffix.
      * @return void
      * @throws RuntimeException When the archive type is unsupported or extraction fails.
      */
-    public function extractTo(string $archivePath, string $targetDir): void
+    public function extractTo(string $archivePath, string $targetDir, ?string $archiveName = null): void
     {
-        $type = $this->packageType($archivePath);
+        $type = $this->packageType($archivePath, $archiveName);
 
         match ($type) {
             'zip' => $this->zip->extractTo($archivePath, $targetDir),
@@ -196,12 +197,13 @@ final class Extract
      * @param string $archivePath Absolute path to the source archive.
      * @param string $entryName Archive-internal path to extract.
      * @param string $targetPath Absolute output path for the extracted file.
+     * @param string|null $archiveName Original client filename used when the PHP temporary path has no suffix.
      * @return void
      * @throws RuntimeException When the archive type is unsupported or extraction fails.
      */
-    public function extractFile(string $archivePath, string $entryName, string $targetPath): void
+    public function extractFile(string $archivePath, string $entryName, string $targetPath, ?string $archiveName = null): void
     {
-        $type = $this->packageType($archivePath);
+        $type = $this->packageType($archivePath, $archiveName);
 
         match ($type) {
             'zip' => $this->zip->extractFile($archivePath, $entryName, $targetPath),
@@ -265,12 +267,13 @@ final class Extract
      * Returns all entry names in a supported package archive.
      *
      * @param string $archivePath Absolute path to the source archive.
+     * @param string|null $archiveName Original client filename used when the PHP temporary path has no suffix.
      * @return array<int, string> Normalized archive-internal entry names.
      * @throws RuntimeException When the archive type is unsupported or inspection fails.
      */
-    public function listEntries(string $archivePath): array
+    public function listEntries(string $archivePath, ?string $archiveName = null): array
     {
-        $type = $this->packageType($archivePath);
+        $type = $this->packageType($archivePath, $archiveName);
 
         return match ($type) {
             'zip' => $this->zip->listEntries($archivePath),
@@ -302,11 +305,17 @@ final class Extract
      * @param string $archivePath Absolute path to the source archive.
      * @param string $manifestFilename Manifest basename to search for.
      * @param int $maxSlugLength Maximum slug length allowed by the caller.
+     * @param string|null $archiveName Original client filename used when the PHP temporary path has no suffix.
      * @return string|null Valid slug string, or null when no candidate manifest matches.
      */
-    public function manifestSlug(string $archivePath, string $manifestFilename, int $maxSlugLength): ?string
+    public function manifestSlug(
+        string $archivePath,
+        string $manifestFilename,
+        int $maxSlugLength,
+        ?string $archiveName = null
+    ): ?string
     {
-        $type = $this->packageType($archivePath);
+        $type = $this->packageType($archivePath, $archiveName);
         // ZIP already exposes a direct manifest helper with equivalent rules.
         if ($type === 'zip') {
             return $this->zip->manifestSlug($archivePath, $manifestFilename, $maxSlugLength);
@@ -321,12 +330,12 @@ final class Extract
         $slugPattern = '/^[a-z0-9][a-z0-9_-]{0,' . max(0, $maxSlugLength) . '}$/';
 
         // Probe root-first candidate manifest entries until one valid slug is found.
-        foreach ($this->manifestPaths($archivePath, $manifestFile) as $entryName) {
+        foreach ($this->manifestPaths($archivePath, $manifestFile, $archiveName) as $entryName) {
             $tmpManifestPath = $this->tempPath('.json');
 
             // Always cleanup the temporary extracted manifest file.
             try {
-                $this->extractFile($archivePath, $entryName, $tmpManifestPath);
+                $this->extractFile($archivePath, $entryName, $tmpManifestPath, $archiveName);
 
                 $raw = @file_get_contents($tmpManifestPath);
                 // Skip empty/failed manifest reads and continue scanning.
@@ -362,15 +371,16 @@ final class Extract
      *
      * @param string $archivePath Absolute path to the source archive.
      * @param string $manifestFilename Lowercase manifest basename to search for.
+     * @param string|null $archiveName Original client filename used when the PHP temporary path has no suffix.
      * @return array<int, string> Candidate manifest entry paths.
      */
-    private function manifestPaths(string $archivePath, string $manifestFilename): array
+    private function manifestPaths(string $archivePath, string $manifestFilename, ?string $archiveName = null): array
     {
         $rootEntries = [];
         $wrappedEntries = [];
 
         // Keep only root and one-wrapper-level manifest matches.
-        foreach ($this->listEntries($archivePath) as $entryName) {
+        foreach ($this->listEntries($archivePath, $archiveName) as $entryName) {
             $normalized = trim(str_replace('\\', '/', $entryName), '/');
             // Filter entries that do not match the requested manifest basename.
             if ($normalized === '' || strtolower((string) pathinfo($normalized, PATHINFO_BASENAME)) !== $manifestFilename) {
@@ -467,12 +477,16 @@ final class Extract
      * Returns one supported package-archive type or throws for unsupported names.
      *
      * @param string $archivePath Archive filename or absolute path.
+     * @param string|null $archiveName Original client filename used when the PHP temporary path has no suffix.
      * @return string Canonical archive type key.
      * @throws RuntimeException When the filename/path does not use a supported suffix.
      */
-    private function packageType(string $archivePath): string
+    private function packageType(string $archivePath, ?string $archiveName = null): string
     {
-        $type = $this->detectPackageType($archivePath);
+        // PHP upload temp paths omit the client suffix, so prefer the validated original filename when supplied.
+        $type = $this->detectPackageType(
+            is_string($archiveName) && trim($archiveName) !== '' ? $archiveName : $archivePath
+        );
         // Unsupported suffixes fail fast with a consistent archive-type error.
         if ($type === null) {
             throw new RuntimeException('Unsupported archive type: ' . $archivePath);

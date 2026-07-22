@@ -123,11 +123,12 @@ final class Package
      *
      * @param string $tmpPath Absolute path to the uploaded temporary archive file.
      * @param string $targetDirectory Absolute extraction target directory.
+     * @param string|null $archiveName Original client filename used for archive-type detection.
      * @return void
      */
-    public function extractUpload(string $tmpPath, string $targetDirectory): void
+    public function extractUpload(string $tmpPath, string $targetDirectory, ?string $archiveName = null): void
     {
-        $this->extract->extractTo($tmpPath, $targetDirectory);
+        $this->extract->extractTo($tmpPath, $targetDirectory, $archiveName);
     }
 
     /**
@@ -282,11 +283,17 @@ final class Package
      * @param string $archivePath Absolute path to the source archive.
      * @param string $manifestFilename Manifest basename such as `ext.json` or `theme.json`.
      * @param int $maxSlugLength Maximum allowed slug length.
+     * @param string|null $archiveName Original client filename used for archive-type detection.
      * @return string|null Valid slug string, or null when none can be resolved.
      */
-    public function manifestSlug(string $archivePath, string $manifestFilename, int $maxSlugLength): ?string
+    public function manifestSlug(
+        string $archivePath,
+        string $manifestFilename,
+        int $maxSlugLength,
+        ?string $archiveName = null
+    ): ?string
     {
-        return $this->extract->manifestSlug($archivePath, $manifestFilename, $maxSlugLength);
+        return $this->extract->manifestSlug($archivePath, $manifestFilename, $maxSlugLength, $archiveName);
     }
 
     /**

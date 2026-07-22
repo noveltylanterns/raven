@@ -2,6 +2,9 @@
 
 *The machine is supposed to be logging patches & mods to this file. Sometimes it does, sometimes it doesn't. It might be useful for historical architectural context to your Agent at one point.*
 
+### July 22, 2026
+- Fixed theme and extension package uploads failing with a 500 because PHP upload temporary paths do not retain the original archive filename suffix; archive manifest inspection and extraction now use the validated client filename for type detection.
+
 ### July 21, 2026
 - Fixed panel login forms on username-mode installs so the identifier input uses the configured mode and browser validation does not block username submissions.
 - Fixed fresh-install domain detection so the `SITE_DOMAIN` distribution token is replaced by the request host; updated debug fixtures from the retired development host to `foundry.lanterns.io`.

@@ -180,13 +180,20 @@ final class Install
      * @param string $targetDirectory Absolute target directory.
      * @param callable(string): void $cleanup Cleanup callback for failed extraction.
      * @param string $entityLabel Human-facing entity label for fallback errors.
+     * @param string|null $archiveName Original client filename used for archive-type detection.
      * @return string|null Null on success, or one human-facing error message.
      */
-    public function extractTo(string $tmpPath, string $targetDirectory, callable $cleanup, string $entityLabel): ?string
+    public function extractTo(
+        string $tmpPath,
+        string $targetDirectory,
+        callable $cleanup,
+        string $entityLabel,
+        ?string $archiveName = null
+    ): ?string
     {
         // Convert extraction failures into one user-facing install error.
         try {
-            $this->archives->extractUpload($tmpPath, $targetDirectory);
+            $this->archives->extractUpload($tmpPath, $targetDirectory, $archiveName);
         } catch (\Throwable $exception) {
             $cleanup($targetDirectory);
             return $exception->getMessage() !== '' ? $exception->getMessage() : ucfirst($entityLabel) . ' upload failed.';
@@ -261,11 +268,17 @@ final class Install
      * Supports manifests at archive root or one wrapper-directory deep.
      *
      * @param string $tmpPath Absolute path to the uploaded temporary archive.
+     * @param string|null $archiveName Original client filename used for archive-type detection.
      * @return string|null Valid extension slug, or null when none can be resolved.
      */
-    public function extensionSlug(string $tmpPath): ?string
+    public function extensionSlug(string $tmpPath, ?string $archiveName = null): ?string
     {
-        return $this->archives->manifestSlug($tmpPath, 'ext.json', 119);
+        // Manifest inspection is only a naming optimization; extraction remains the authoritative package validation step.
+        try {
+            return $this->archives->manifestSlug($tmpPath, 'ext.json', 119, $archiveName);
+        } catch (\Throwable) {
+            return null;
+        }
     }
 
     /**
@@ -274,11 +287,17 @@ final class Install
      * Supports manifests at archive root or one wrapper-directory deep.
      *
      * @param string $tmpPath Absolute path to the uploaded temporary archive.
+     * @param string|null $archiveName Original client filename used for archive-type detection.
      * @return string|null Valid theme slug, or null when none can be resolved.
      */
-    public function themeSlug(string $tmpPath): ?string
+    public function themeSlug(string $tmpPath, ?string $archiveName = null): ?string
     {
-        return $this->archives->manifestSlug($tmpPath, 'theme.json', 63);
+        // Manifest inspection is only a naming optimization; extraction remains the authoritative package validation step.
+        try {
+            return $this->archives->manifestSlug($tmpPath, 'theme.json', 63, $archiveName);
+        } catch (\Throwable) {
+            return null;
+        }
     }
 
     /**

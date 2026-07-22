@@ -350,7 +350,8 @@ final class ExtensionController
 
         $tmpPath = (string) ($upload['tmp_path'] ?? '');
         $archiveName = (string) ($upload['archive_name'] ?? 'extension-package.zip');
-        $derivedExtensionSlug = $this->packageInstaller()->extensionSlug($tmpPath);
+        // PHP temporary upload paths have no archive suffix, so retain the validated client filename for type detection.
+        $derivedExtensionSlug = $this->packageInstaller()->extensionSlug($tmpPath, $archiveName);
 
         $nameResult = $this->packageInstaller()->resolveInstallName(
             (string) ($post['upload_slug'] ?? ''),
@@ -397,7 +398,8 @@ final class ExtensionController
             function (string $directory): void {
                 $this->directoryTree()->removeTree($directory);
             },
-            'extension'
+            'extension',
+            $archiveName
         );
         // Extraction errors include archive-format and filesystem failures.
         if (is_string($extractError)) {

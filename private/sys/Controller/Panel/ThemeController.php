@@ -344,7 +344,8 @@ final class ThemeController
 
         $tmpPath = (string) ($upload['tmp_path'] ?? '');
         $archiveName = (string) ($upload['archive_name'] ?? 'theme-package.zip');
-        $derivedThemeSlug = $this->packageInstaller()->themeSlug($tmpPath);
+        // PHP temporary upload paths have no archive suffix, so retain the validated client filename for type detection.
+        $derivedThemeSlug = $this->packageInstaller()->themeSlug($tmpPath, $archiveName);
 
         $slugResult = $this->packageInstaller()->resolveInstallName(
             (string) ($post['upload_slug'] ?? ''),
@@ -394,7 +395,8 @@ final class ThemeController
             function (string $directory): void {
                 $this->directoryTree()->removeTree($directory);
             },
-            'theme'
+            'theme',
+            $archiveName
         );
         // Extraction errors include malformed archives and filesystem issues.
         if (is_string($extractError)) {
