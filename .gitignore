@@ -28,6 +28,7 @@
 /build/legacy/
 /private/ext/debug-*/
 /.codex
+/.log/
 
 # Editor swap/backup artifacts
 *.swp

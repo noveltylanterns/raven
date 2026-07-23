@@ -145,6 +145,7 @@ final class PanelPermissionsSmokeRunner
             $this->assertPluginAccessUserDenied($users['plugin_access']);
             $this->assertPluginManageUserNavAndAccess($users['plugin_manage']);
             $this->assertModuleAccessUserNavAndAccess($users['module_access']);
+            $this->assertGroupEditorSaveCompletes($users['admin']);
 
             $this->events[] = 'panel_nav_permissions=PASS';
             $this->events[] = 'run_id=' . $this->runId;
@@ -563,6 +564,48 @@ PHP;
             'Enabled Database Manager should remain visible to an Admin account.'
         );
         $this->events[] = 'admin_user_save_preserves_panel_access=ok';
+    }
+
+    /**
+     * Verifies that the panel group editor completes its post-save record reload.
+     *
+     * @param array{id:int,username:string,email:string,password:string} $user Temporary Admin account credentials.
+     * @return void
+     */
+    private function assertGroupEditorSaveCompletes(array $user): void
+    {
+        $groupId = (int) ($this->createdGroups[0] ?? 0);
+        $this->assert($groupId > 0, 'Group editor regression has no temporary group fixture.');
+
+        require_once $this->root . '/private/Raven.php';
+        $rvn = \Raven\Raven::boot();
+        $groupRead = new GroupRead($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix']);
+        $group = $groupRead->findById($groupId);
+        $this->assert(is_array($group), 'Group editor regression fixture could not be loaded.');
+
+        $client = $this->loginClient('group-regression', $user);
+        $editUri = '/' . $this->panelPath . '/group/edit/' . $groupId;
+        $editPage = $this->requestPanel($client, 'GET', $editUri . '?tab=basic');
+        $this->assert($editPage['status'] === 200, 'Group editor should return 200 for save regression.');
+        $csrf = $this->extractCsrf($editPage['body']);
+        $this->assert($csrf !== '', 'Group editor missing CSRF token for save regression.');
+
+        $save = $this->requestPanel($client, 'POST', '/' . $this->panelPath . '/group/save', [
+            '_csrf' => $csrf,
+            'id' => $groupId,
+            'tab' => 'basic',
+            'name' => 'Renamed Group Smoke ' . $this->runId,
+            'slug' => (string) ($group['slug'] ?? ''),
+            'permission_bits' => [PanelAccess::PANEL_LOGIN, PanelAccess::PAGES_VIEW],
+        ]);
+        $this->assert(in_array($save['status'], [302, 303], true), 'Group editor save should redirect successfully.');
+
+        $savedGroup = $groupRead->findById($groupId);
+        $this->assert(
+            is_array($savedGroup) && (string) ($savedGroup['name'] ?? '') === 'Renamed Group Smoke ' . $this->runId,
+            'Group editor save did not persist the submitted group name.'
+        );
+        $this->events[] = 'group_editor_save_completes=ok';
     }
 
     /**

@@ -4,6 +4,8 @@
 
 ### July 23, 2026
 - Fixed user-editor saves demoting Admin accounts to Guest when a display-name-only edit omitted the disabled primary-group control; Admin membership and panel access are now preserved, and the Database Manager sidebar entry returns when the account retains its configuration permission.
+- Fixed extension symlink-boundary checks emitting `open_basedir` warnings while probing inaccessible parent directories; resolver and shared security checks now skip protected ancestors and reject paths outside the active allowlist.
+- Fixed group-editor saves crashing after persistence because the controller still referenced the removed `groupDataParser`; post-save image reconciliation now reloads through `GroupRead`.
 
 ### July 22, 2026
 - Removed executable symlink support from extension loading and CLI storage; extension providers, class roots, and manifests must be symlink-free, while extension commands use regular root-contained launchers in `private/bin/`.

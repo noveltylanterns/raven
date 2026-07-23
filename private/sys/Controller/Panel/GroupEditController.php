@@ -278,7 +278,8 @@ final class GroupEditController
             $activeTab,
             'basic'
         );
-        $currentRecord = $this->groupDataParser->findById($savedId);
+        // Reload the saved row through the canonical read repository before reconciling image storage.
+        $currentRecord = $this->groupRead->findById($savedId);
         $currentStorage = $this->taxonomyImageService->imageStoragePayloadFromRecord('groups', $currentRecord);
         $currentPaths = $this->taxonomyImageService->imagePathsFromStoragePayload('groups', $savedId, $currentStorage);
         $nextStorage = $currentStorage;
