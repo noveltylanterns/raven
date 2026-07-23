@@ -99,6 +99,6 @@ Brothers, truly I tell you: ***There is a better way.***
 
 Documentation Index: [docs/readme.md](docs/readme.md)
 
-Official Site: [raven.lanterns.io](https://raven.lanterns.io)
+Official Site: [raven.lanterns.io](https://lanterns.io/raven)
 
 Packagist: [noveltylanterns/raven](https://packagist.org/packages/noveltylanterns/raven)

@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/debug/smoke/cli.php
  * Smoke checks for private/bin Raven CLI command suite.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -445,7 +445,7 @@ final class CliSmokeRunner
         }
 
         $targetSlug = $slugBase . '-unsafe-import';
-        $archivePath = sys_get_temp_dir() . '/rvn-cli-smoke-' . $this->runId . '-unsafe.zip';
+        $archivePath = $this->root . '/.tmp/rvn-cli-smoke-' . $this->runId . '-unsafe.zip';
         $outsideMarker = 'rvn-cli-smoke-' . $this->runId . '-escape.txt';
         $outsidePath = $this->root . '/private/ext/' . $outsideMarker;
         $targetPath = $this->root . '/private/ext/' . $targetSlug;

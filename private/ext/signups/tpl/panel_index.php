@@ -31,7 +31,7 @@ $extensionName = trim((string) ($extensionMeta['name'] ?? 'Signup Sheets'));
 $extensionVersion = trim((string) ($extensionMeta['version'] ?? ''));
 $extensionAuthor = trim((string) ($extensionMeta['author'] ?? ''));
 $extensionDescription = trim((string) ($extensionMeta['description'] ?? ''));
-$extensionDocsUrl = trim((string) ($extensionMeta['docs'] ?? 'https://raven.lanterns.io'));
+$extensionDocsUrl = trim((string) ($extensionMeta['docs'] ?? 'https://lanterns.io/raven'));
 $signupsIndexHeaderActions = [];
 if ($extensionDocsUrl !== '') {
     $signupsIndexHeaderActions[] = '<a href="' . e($extensionDocsUrl) . '" class="btn btn-primary btn-sm" target="_blank" rel="noopener noreferrer">'

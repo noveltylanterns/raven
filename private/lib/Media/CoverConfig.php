@@ -19,8 +19,8 @@ final class CoverConfig
     /**
      * Resolves one stored cover-image value to a public URL.
      *
-     * @param string $coverValue Stored cover-image path or external URL.
-     * @return string Public URL, or empty string when value is blank.
+     * @param string $coverValue Stored local cover-image path.
+     * @return string Same-origin public URL, or empty string for blank/invalid values.
      */
     public function publicUrl(string $coverValue): string
     {
@@ -30,8 +30,17 @@ final class CoverConfig
             return '';
         }
 
-        // Already-absolute URLs and rooted paths are returned unchanged.
-        if (preg_match('#^https?://#i', $normalized) === 1 || str_starts_with($normalized, '/')) {
+        // Any URI scheme or protocol-relative authority is legacy/external data
+        // and must never become a browser image request.
+        if (
+            preg_match('#^[A-Za-z][A-Za-z0-9+.-]*:#', $normalized) === 1
+            || str_starts_with($normalized, '//')
+        ) {
+            return '';
+        }
+
+        // Rooted local paths are already suitable for same-origin rendering.
+        if (str_starts_with($normalized, '/')) {
             return $normalized;
         }
 

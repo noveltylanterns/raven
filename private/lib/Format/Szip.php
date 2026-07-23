@@ -11,6 +11,7 @@ declare(strict_types=1);
 
 namespace Raven\Lib\Format;
 
+use Raven\Lib\Security\SymlinkGuard;
 use RuntimeException;
 
 /**
@@ -55,31 +56,29 @@ final class Szip
      */
     public function extractTo(string $archivePath, string $targetDir): void
     {
+        // Keep archive reads and direct extraction writes inside physical paths.
+        SymlinkGuard::assertSymlinkFreePath($archivePath, '7Z archive path');
+        SymlinkGuard::assertSymlinkFreePath($targetDir, '7Z extraction directory');
+
         // Archive source must point to an existing regular file.
         if (!is_file($archivePath)) {
             throw new RuntimeException('7Z archive not found: ' . $archivePath);
         }
 
-        // Ensure extraction target directory exists before running 7z.
-        if (!is_dir($targetDir) && !mkdir($targetDir, 0775, true) && !is_dir($targetDir)) {
-            throw new RuntimeException('Failed to create 7Z extraction target directory: ' . $targetDir);
-        }
+        // Extract into an isolated clean tree first so linked archive members or
+        // linked child destinations cannot escape the requested output tree.
+        $temporaryDirectory = $this->tempDir();
+        try {
+            $entries = $this->listEntries($archivePath);
+            $this->extractEntries($archivePath, $entries, $temporaryDirectory);
 
-        $result = $this->runBinary([
-            'x',
-            '-y',
-            '-bb0',
-            '-bd',
-            '-o' . $targetDir,
-            '--',
-            $archivePath,
-        ]);
+            if (!is_dir($targetDir) && !mkdir($targetDir, 0775, true) && !is_dir($targetDir)) {
+                throw new RuntimeException('Failed to create 7Z extraction target directory: ' . $targetDir);
+            }
 
-        // Non-zero 7z exit status is surfaced as a runtime exception.
-        if (!$result['ok']) {
-            throw new RuntimeException(
-                '7Z extraction failed: ' . ($result['stderr'] !== '' ? $result['stderr'] : $result['stdout'])
-            );
+            $this->copyTree($temporaryDirectory, $targetDir);
+        } finally {
+            $this->deleteTree($temporaryDirectory);
         }
     }
 
@@ -94,6 +93,10 @@ final class Szip
      */
     public function extractFile(string $archivePath, string $entryName, string $targetPath): void
     {
+        // Reject symlinked archive inputs and output paths before staging/writing.
+        SymlinkGuard::assertSymlinkFreePath($archivePath, '7Z archive path');
+        SymlinkGuard::assertSymlinkFreePath($targetPath, '7Z extraction path');
+
         $entry = $this->normalizeEntryName($entryName);
         $temporaryDirectory = $this->tempDir();
 
@@ -137,6 +140,10 @@ final class Szip
      */
     public function extractDir(string $archivePath, string $entryName, string $targetDir): void
     {
+        // Reject symlinked archive inputs and directory destinations before traversal.
+        SymlinkGuard::assertSymlinkFreePath($archivePath, '7Z archive path');
+        SymlinkGuard::assertSymlinkFreePath($targetDir, '7Z extraction directory');
+
         $directory = $this->normalizeDirEntry($entryName);
         $matches = $this->dirEntries($archivePath, $directory);
         // Requested directory prefix must resolve to at least one archive entry.
@@ -158,6 +165,10 @@ final class Szip
             }
 
             $targetPath = $targetDir . '/' . $relative;
+            // Skip linked child destinations while continuing other entries.
+            if (!SymlinkGuard::isSymlinkFreePath($targetPath)) {
+                continue;
+            }
 
             // Directory entries do not carry data, but keeping them explicit
             // preserves empty folders when the archive records them directly.
@@ -182,6 +193,8 @@ final class Szip
      */
     public function listEntries(string $archivePath): array
     {
+        SymlinkGuard::assertSymlinkFreePath($archivePath, '7Z archive path');
+
         // Archive source must point to an existing regular file.
         if (!is_file($archivePath)) {
             throw new RuntimeException('7Z archive not found: ' . $archivePath);
@@ -197,6 +210,31 @@ final class Szip
 
         $entries = [];
         $inEntries = false;
+        $currentPath = null;
+        $currentSymlink = false;
+        $symlinkPrefixes = [];
+
+        $flushEntry = function () use (&$entries, &$currentPath, &$currentSymlink, &$symlinkPrefixes): void {
+            if (!is_string($currentPath) || $currentPath === '') {
+                return;
+            }
+
+            $normalized = str_replace('\\', '/', $currentPath);
+            if ($currentSymlink) {
+                $symlinkPrefixes[] = trim($normalized, '/');
+                return;
+            }
+
+            foreach ($symlinkPrefixes as $prefix) {
+                if ($normalized === $prefix || str_starts_with($normalized, $prefix . '/')) {
+                    return;
+                }
+            }
+
+            if ($this->isSafeEntryPath($normalized)) {
+                $entries[] = $normalized;
+            }
+        };
 
         // Parse machine-readable listing output and keep safe entry paths only.
         foreach (preg_split("/\\r?\\n/", $result['stdout']) ?: [] as $line) {
@@ -207,23 +245,38 @@ final class Szip
                 continue;
             }
 
-            // Keep only path lines after entries section starts.
-            if (!$inEntries || !str_starts_with($trimmed, 'Path = ')) {
+            if (!$inEntries) {
                 continue;
             }
 
-            $entry = trim(substr($trimmed, 7));
-            // Skip empty path values emitted by 7z listing output.
-            if ($entry === '') {
+            if (str_starts_with($trimmed, 'Path = ')) {
+                $flushEntry();
+                $currentPath = trim(substr($trimmed, 7));
+                $currentSymlink = false;
                 continue;
             }
 
-            $normalized = str_replace('\\', '/', $entry);
-            // Keep only extraction-safe normalized entry paths.
-            if ($this->isSafeEntryPath($normalized)) {
-                $entries[] = $normalized;
+            if ($currentPath !== null && str_starts_with($trimmed, 'Attributes = ')) {
+                $attributes = trim(substr($trimmed, 13));
+                // 7-Zip renders Unix symlinks with an `l` file-type marker.
+                $currentSymlink = preg_match('/(?:^|\s)l[rwx-]{9}(?:\s|$)/', $attributes) === 1;
             }
         }
+
+        $flushEntry();
+
+        // Do not select a parent directory that contains a skipped symlink;
+        // 7-Zip would otherwise recurse into that directory and revisit it.
+        $entries = array_values(array_filter($entries, static function (string $entry) use ($symlinkPrefixes): bool {
+            $normalized = rtrim($entry, '/');
+            foreach ($symlinkPrefixes as $prefix) {
+                if ($normalized === $prefix || str_starts_with($prefix, $normalized . '/')) {
+                    return false;
+                }
+            }
+
+            return true;
+        }));
 
         return $entries;
     }
@@ -239,6 +292,10 @@ final class Szip
      */
     public function compressPath(string $sourcePath, string $outputPath, ?string $entryName = null): void
     {
+        // Do not let 7-Zip staging follow a source symlink outside the requested tree.
+        SymlinkGuard::assertSymlinkFreePath($sourcePath, '7Z source path');
+        SymlinkGuard::assertSymlinkFreePath($outputPath, '7Z output path');
+
         // Source path must exist before staging/compression.
         if (!file_exists($sourcePath)) {
             throw new RuntimeException('7Z source path not found: ' . $sourcePath);
@@ -285,6 +342,10 @@ final class Szip
      */
     public function addPath(string $archivePath, string $sourcePath, ?string $entryName = null): void
     {
+        // Do not let 7-Zip staging follow a source symlink outside the requested tree.
+        SymlinkGuard::assertSymlinkFreePath($archivePath, '7Z archive path');
+        SymlinkGuard::assertSymlinkFreePath($sourcePath, '7Z source path');
+
         // Source path must exist before staging/archive update.
         if (!file_exists($sourcePath)) {
             throw new RuntimeException('7Z source path not found: ' . $sourcePath);
@@ -356,6 +417,15 @@ final class Szip
      */
     private function extractEntries(string $archivePath, array $entries, string $targetDir): void
     {
+        SymlinkGuard::assertSymlinkFreePath($archivePath, '7Z archive path');
+        SymlinkGuard::assertSymlinkFreePath($targetDir, '7Z extraction directory');
+
+        // An archive containing only skipped members must not fall back to an
+        // unrestricted `7z x archive` invocation.
+        if ($entries === []) {
+            return;
+        }
+
         $command = [
             'x',
             '-y',
@@ -389,6 +459,8 @@ final class Szip
      */
     private function dirEntries(string $archivePath, string $directory): array
     {
+        SymlinkGuard::assertSymlinkFreePath($archivePath, '7Z archive path');
+
         $matches = [];
 
         // Keep entries that match the exact directory marker or its descendants.
@@ -423,6 +495,9 @@ final class Szip
      */
     private function stagePath(string $sourcePath, ?string $entryName): string
     {
+        // Keep the staging boundary defensive for internal callers as well as public methods.
+        SymlinkGuard::assertSymlinkFreePath($sourcePath, '7Z source path');
+
         $stagingDirectory = $this->tempDir();
         $stagedEntryPath = $this->stagedPath($sourcePath, $entryName);
         $destinationPath = $stagingDirectory . '/' . $stagedEntryPath;
@@ -558,7 +633,6 @@ final class Szip
     {
         $projectRoot = dirname(__DIR__, 3);
         $candidates = [
-            trim((string) sys_get_temp_dir()),
             $projectRoot . '/.tmp',
             $projectRoot . '/.tmp/archives',
         ];
@@ -568,6 +642,11 @@ final class Szip
         foreach ($candidates as $candidate) {
             // Skip empty candidate values.
             if ($candidate === '') {
+                continue;
+            }
+
+            // 7-Zip staging must not be redirected through a symlinked temp root.
+            if (!SymlinkGuard::isSymlinkFreePath($candidate)) {
                 continue;
             }
 
@@ -597,6 +676,9 @@ final class Szip
      */
     private function copyTree(string $sourceDir, string $targetDir): void
     {
+        // Never recurse through a symlinked source root into an external directory.
+        SymlinkGuard::assertSymlinkFreePath($sourceDir, '7Z source directory');
+
         // Ensure destination root exists before recursive copy.
         if (!is_dir($targetDir) && !mkdir($targetDir, 0775, true) && !is_dir($targetDir)) {
             throw new RuntimeException('Failed to create 7Z staging subdirectory.');
@@ -623,6 +705,10 @@ final class Szip
             }
 
             $destinationPath = $targetDir . '/' . str_replace('\\', '/', $relativePath);
+            // Skip destinations whose existing parent chain contains a symlink.
+            if (!SymlinkGuard::isSymlinkFreePath($destinationPath)) {
+                continue;
+            }
             // Ensure destination directory nodes exist before file copy.
             if ($item->isDir()) {
                 if (!is_dir($destinationPath) && !mkdir($destinationPath, 0775, true) && !is_dir($destinationPath)) {
@@ -652,6 +738,12 @@ final class Szip
      */
     private function deleteTree(string $directory): void
     {
+        // Remove a symlink node itself without resolving or traversing its target.
+        if (is_link($directory)) {
+            @unlink($directory);
+            return;
+        }
+
         // Missing/blank directory paths are treated as already cleaned.
         if ($directory === '' || !is_dir($directory)) {
             return;
@@ -665,6 +757,11 @@ final class Szip
         // Remove children first so parent directories can be deleted safely.
         foreach ($iterator as $item) {
             /** @var \SplFileInfo $item */
+            if ($item->isLink()) {
+                @unlink($item->getPathname());
+                continue;
+            }
+
             if ($item->isDir()) {
                 @rmdir($item->getPathname());
                 continue;

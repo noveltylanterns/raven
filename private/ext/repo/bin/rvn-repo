@@ -10,16 +10,16 @@
 
 declare(strict_types=1);
 
-use Raven\Repo\RepoService;
+use Raven\Ext\Repo\RepoService;
 
 // Resolve the real script location first, then walk upward until Raven's bootstrap
 // file is found so the tool works both from `private/ext/repo/bin/` and from the
-// `private/bin/` symlink provisioned by extension `bin` storage.
+// regular `private/bin/` launcher provisioned by extension `bin` storage.
 $scriptPath = realpath(__FILE__) ?: __FILE__;
 $root = '';
 $search = dirname($scriptPath);
 for ($depth = 0; $depth < 8; $depth += 1) {
-    if (is_file($search . '/private/raven.php')) {
+    if (is_file($search . '/private/Raven.php')) {
         $root = $search;
         break;
     }
@@ -35,7 +35,8 @@ if ($root === '') {
     fwrite(STDERR, "Could not locate the Raven project root.\n");
     exit(1);
 }
-$rvn = require $root . '/private/raven.php';
+require $root . '/private/Raven.php';
+$rvn = \Raven\Raven::boot();
 
 /** @var mixed $resolver */
 $resolver = $rvn['extension_services_for'] ?? null;
@@ -69,6 +70,12 @@ $printHelp = static function (): void {
     echo "  logs [--slug=<repo-slug>]\n";
     echo "  help\n";
 };
+
+// Treat conventional help flags as the help command so docs and operators get a successful probe.
+if (in_array('--help', $args, true) || in_array('-h', $args, true)) {
+    $printHelp();
+    exit(0);
+}
 
 switch ($command) {
     case 'list':

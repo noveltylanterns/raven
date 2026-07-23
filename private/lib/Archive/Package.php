@@ -11,6 +11,8 @@ declare(strict_types=1);
 
 namespace Raven\Lib\Archive;
 
+use Raven\Lib\Security\SymlinkGuard;
+
 /**
  * Shared archive-package helpers for package upload/export workflows.
  *
@@ -245,6 +247,9 @@ final class Package
      */
     public function streamDownload(string $path, string $downloadFilename, string $contentType): void
     {
+        // Never stream or remove a path that resolves through a symlink.
+        SymlinkGuard::assertSymlinkFreePath($path, 'Archive download path');
+
         while (ob_get_level() > 0) {
             ob_end_clean();
         }
@@ -331,7 +336,6 @@ final class Package
     private function tempPath(string $suffix = ''): string
     {
         $candidateDirectories = [
-            (string) sys_get_temp_dir(),
             $this->projectRoot . '/.tmp',
             $this->projectRoot . '/.tmp/exports',
         ];

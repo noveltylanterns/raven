@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/debug/smoke/router-inventory.php
  * Public/panel route inventory snapshot smoke runner.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -526,9 +526,35 @@ try {
         throw new RuntimeException('Snapshot directory option cannot be empty.');
     }
 
+    $canonicalRoot = realpath($root);
+    if ($canonicalRoot === false || !is_dir($canonicalRoot)) {
+        throw new RuntimeException('Unable to resolve Raven project root.');
+    }
+    $snapshotPath = str_starts_with($snapshotDirectory, DIRECTORY_SEPARATOR)
+        ? $snapshotDirectory
+        : $canonicalRoot . '/' . ltrim($snapshotDirectory, '/\\');
+    $snapshotName = basename($snapshotPath);
+    if ($snapshotName === '' || $snapshotName === '.' || $snapshotName === '..') {
+        throw new RuntimeException('Snapshot directory name is invalid.');
+    }
+    $resolvedSnapshot = realpath($snapshotPath);
+    $snapshotParent = realpath(dirname($snapshotPath));
+    $rootPrefix = rtrim($canonicalRoot, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR;
+    if (
+        $snapshotParent === false
+        || ($snapshotParent !== $canonicalRoot && !str_starts_with($snapshotParent, $rootPrefix))
+        || ($resolvedSnapshot !== false && ($resolvedSnapshot !== $canonicalRoot && !str_starts_with($resolvedSnapshot, $rootPrefix)))
+    ) {
+        throw new RuntimeException('Snapshot directory must resolve within the Raven project root.');
+    }
+
+    $safeSnapshotPath = $resolvedSnapshot !== false
+        ? $resolvedSnapshot
+        : $snapshotParent . '/' . $snapshotName;
+
     $runner = new RouterInventorySmokeRunner(
-        $root,
-        $root . '/' . ltrim($snapshotDirectory, '/'),
+        $canonicalRoot,
+        $safeSnapshotPath,
         !empty($options['write_snapshots']),
         !empty($options['check_snapshots'])
     );

@@ -3,6 +3,37 @@
 *The machine is supposed to be logging patches & mods to this file. Sometimes it does, sometimes it doesn't. It might be useful for historical architectural context to your Agent at one point.*
 
 ### July 22, 2026
+- Removed executable symlink support from extension loading and CLI storage; extension providers, class roots, and manifests must be symlink-free, while extension commands use regular root-contained launchers in `private/bin/`.
+- Repaired the repository extension CLI launcher after its stale bootstrap path and namespace reference prevented the shared `private/bin/rvn-repo --help` probe from reaching the extension command.
+- Preserved each extension storage bucket’s designated location while rejecting symlink escapes during storage provisioning, runtime discovery, and cleanup.
+- Hardened public-theme duplication so source roots, target roots, and copied target entries cannot traverse symlinks.
+- Corrected the theme smoke fixture to resolve public fallback status templates from `private/tpl/public`.
+- Hardened shared folder creation and cleanup helpers so symlinked paths are never followed during provisioning or recursive deletion.
+- Hardened updater scans, writes, and temporary cleanup to skip or remove symlink entries without following them, while preserving approved documentation aliases.
+- Hardened TAR creation and archive updates to reject symlinked source roots and clean staging links without traversal.
+- Hardened ZIP and 7-Zip creation/update paths to reject symlinked sources and clean staging links without traversal.
+- Hardened GZ, BZ2, XZ, and Zstandard file compression/decompression against symlinked source and target paths, with a shared `Security\\SymlinkGuard` policy.
+- Hardened ZIP, TAR, and 7-Zip extraction/listing paths against symlinked archive inputs and extraction destinations while preserving existing archive-entry traversal validation.
+- Hardened ZIP and 7-Zip archive member selection so symbolic-link members and linked parent selections are skipped during bulk jobs without aborting unrelated extraction.
+- Hardened TAR extraction by staging through a clean tree, skipping linked child destinations and TAR symlink members while preserving the compatible PharData extraction path.
+- Hardened package flattening, archive download streaming, and archive temporary-root selection against symlinked paths.
+- Hardened PHP-backed taxonomy set reads and writes so linked stores, records, and temporary targets cannot redirect execution or persistence outside Raven; linked children are skipped during reads.
+- Disabled Git repository hooks for all Raven Git invocations because updater and repository-mirror workflows do not use hooks.
+- Moved the bundled Bootstrap documentation helper's disposable `_site` staging from `/tmp` into Raven's project-local `.tmp/docs-prep/` tree.
+- Updated profiling and panel-permission smoke tools for the current panel authentication and extension-permission APIs after the library refactor.
+- Restored configured public output-profiler rendering by replacing its removed `AuthService` type check with the canonical `Gatekeeper` service check; profiler defaults remain off on fresh installs.
+- Moved smoke, profiling, repository-export, and archive staging off the system temporary directory into Raven's root `.tmp/` tree; debug request payloads, outputs, and executed scripts now reject paths outside that root.
+- Corrected the panel Raven CMS and documentation footer links to the canonical first-party `lanterns.io/raven` documentation path.
+- Updated bundled extension metadata, generated extension docs, and Raven header documentation links to the canonical first-party `lanterns.io/raven` path.
+- Removed legacy external URL support from user covers, metadata images, apple-touch icons, and panel brand logos; these fields now accept/render only local or same-origin paths.
+- Fixed the panel user editor 500 caused by its stale call to the removed `UserPolicy::profileRoutesEnabled()` method; it now uses the canonical `profileRouteEnabled()` API.
+- Purged legacy external user-cover URL output so cover previews and profile rendering accept only local/same-origin cover paths; URI-scheme and protocol-relative values now render blank.
+- Added a repository-wide security and external-resource independence audit plan
+  with a dated findings ledger for suspicious code, remote references, encoded
+  payloads, shell execution, and theme assets.
+- Restricted debug/smoke PHP includes and config/snapshot path inputs to the
+  resolved Raven project root, including symlink-escape rejection; generated
+  auth smoke code now runs from Raven-local `.tmp`.
 - Repositioned the Smallweb Import/Export Data pane inside the protocol file-tree surface, above the lower action toolbar.
 - Added Smallweb webroot import/export forms with shared archive-format uploads, format-selectable downloads, CSRF-protected staging, wrapper-directory flattening, empty-archive rejection, and safe recursive copying.
 - Updated routing smoke fixtures for the moved ConfigWrite and public_profile_controller APIs, and refreshed route snapshots for the current runtime inventory.

@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/debug/smoke/security.php
  * Security smoke checks for CSRF/auth/input/SQLi baseline protections.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -510,8 +510,8 @@ final class SecuritySmokeRunner
      */
     private function request(string $scriptPath, string $method, string $uri, array $post = []): array
     {
-        $payloadFile = tempnam('/tmp', 'raven-sec-payload-');
-        $outputFile = tempnam('/tmp', 'raven-sec-result-');
+        $payloadFile = tempnam($this->root . '/.tmp', 'raven-sec-payload-');
+        $outputFile = tempnam($this->root . '/.tmp', 'raven-sec-result-');
 
         if ($payloadFile === false || $outputFile === false) {
             throw new RuntimeException('Failed to allocate request payload temp files.');

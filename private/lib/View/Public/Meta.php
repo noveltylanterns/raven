@@ -64,6 +64,11 @@ final class Meta
             'current_url' => $this->requestContextResolver->currentRequestUrl($configuredDomain, $configuredProtocol),
             'theme_url' => $this->themeUrl($siteUrl, $publicThemeActive),
             'meta_image' => $this->resolvedConfiguredMetaImageUrl($config, $configuredDomain, $configuredProtocol),
+            'apple_touch_icon' => $this->absoluteMetaImageUrl(
+                (string) $config->get('meta.apple_touch_icon', ''),
+                $configuredDomain,
+                $configuredProtocol
+            ),
         ]);
 
         return $this->withRootFeedUrls($site);
@@ -161,12 +166,12 @@ final class Meta
     }
 
     /**
-     * Resolves a configured or stored image path into an absolute meta-image URL.
+     * Resolves a configured or stored local image path into a same-origin meta-image URL.
      *
-     * @param string $value Candidate configured URL or local path.
+     * @param string $value Candidate local path.
      * @param string $configuredDomain Configured site domain for absolute-path expansion.
      * @param string $configuredProtocol Configured preferred scheme override.
-     * @return string Absolute meta-image URL, or an empty string when unusable.
+     * @return string Same-origin meta-image URL, or an empty string when unusable.
      */
     public function absoluteMetaImageUrl(string $value, string $configuredDomain, string $configuredProtocol = ''): string
     {
@@ -176,15 +181,13 @@ final class Meta
             return '';
         }
 
-        // Protocol-relative URLs are rejected to avoid mixed-scheme ambiguity.
-        if (str_starts_with($value, '//')) {
+        // URI schemes and protocol-relative authorities are rejected so old or
+        // imported config cannot create offsite browser image requests.
+        if (
+            preg_match('#^[A-Za-z][A-Za-z0-9+.-]*:#', $value) === 1
+            || str_starts_with($value, '//')
+        ) {
             return '';
-        }
-
-        // Absolute URLs are accepted only for explicit http/https schemes.
-        if (filter_var($value, FILTER_VALIDATE_URL) !== false) {
-            $scheme = strtolower((string) parse_url($value, PHP_URL_SCHEME));
-            return in_array($scheme, ['http', 'https'], true) ? $value : '';
         }
 
         $path = str_starts_with($value, '/') ? $value : ('/' . ltrim($value, '/'));

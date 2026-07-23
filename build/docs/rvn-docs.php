@@ -5,7 +5,7 @@
  * RAVEN CMS
  * ~/build/docs/rvn-docs.php
  * Build-only doc generator entrypoint for appendix reference outputs.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

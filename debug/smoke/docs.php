@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/debug/smoke/docs.php
  * Smoke test for docs coverage vs config editor and panel module views.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -567,8 +567,8 @@ final class ConfigurationDocsSmokeRunner
      */
     private function request(string $scriptPath, string $method, string $uri, array $post = []): array
     {
-        $payloadFile = tempnam('/tmp', 'raven-docs-payload-');
-        $outputFile = tempnam('/tmp', 'raven-docs-result-');
+        $payloadFile = tempnam($this->root . '/.tmp', 'raven-docs-payload-');
+        $outputFile = tempnam($this->root . '/.tmp', 'raven-docs-result-');
         if ($payloadFile === false || $outputFile === false) {
             throw new RuntimeException('Failed to allocate temporary request files.');
         }

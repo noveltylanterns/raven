@@ -11,6 +11,8 @@ declare(strict_types=1);
 
 namespace Raven\Lib\Parser;
 
+use Raven\Lib\Security\SymlinkGuard;
+
 /**
  * Combined normalization policy and filesystem reader for taxonomy set records.
  *
@@ -300,7 +302,7 @@ final class SetParser
     public function loadRawByPath(string $path): array
     {
         // Only existing files are executable payload candidates.
-        if (!is_file($path)) {
+        if (!is_file($path) || !SymlinkGuard::isSymlinkFreePath($path)) {
             return [];
         }
 
@@ -374,7 +376,16 @@ final class SetParser
      */
     private function rawSetFilePaths(): array
     {
+        // A linked store must not redirect PHP data reads outside Raven.
+        if (!SymlinkGuard::isSymlinkFreePath($this->setDirectory)) {
+            return [];
+        }
+
         $paths = glob($this->setDirectory . '/*.php') ?: [];
+        $paths = array_values(array_filter(
+            $paths,
+            static fn (string $path): bool => SymlinkGuard::isSymlinkFreePath($path)
+        ));
         sort($paths, SORT_STRING);
         return $paths;
     }

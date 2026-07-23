@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/debug/smoke/panel-permissions.php
  * Panel navigation permission-matrix smoke for core + debug extensions.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -41,9 +41,9 @@ use Raven\Core\Config;
 use Raven\Core\Repository\GroupRead;
 use Raven\Core\Repository\GroupWrite;
 use Raven\Core\Repository\UserWrite;
-use Raven\Lib\Auth\Panel\Mask as PanelAccess;
-use Raven\Lib\Extension\Panel\ExtensionCatalogService;
-use Raven\Lib\Extension\Panel\ExtensionPermissionCatalogService;
+use Raven\Lib\Auth\Panel\PermissionBase as PanelAccess;
+use Raven\Lib\Extension\Panel\Manager as ExtensionCatalogService;
+use Raven\Lib\Extension\Panel\Permissions as ExtensionPermissionCatalogService;
 use Raven\Lib\Extension\Scaffold;
 use Raven\Lib\Extension\StateRead;
 use Raven\Lib\Security\InputSanitizer;
@@ -259,7 +259,7 @@ PHP;
  * RAVEN CMS
  * ~/private/ext/{$slug}/ext.php
  * Debug plugin smoke fixture for extension bootstrap compatibility.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -295,7 +295,7 @@ PHP;
  * RAVEN CMS
  * ~/private/ext/{$slug}/lib/routes_panel.php
  * Debug plugin smoke route registrar for extension bootstrap compatibility.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -382,7 +382,7 @@ PHP;
         $permissionCatalog = new ExtensionPermissionCatalogService($stateStore, $input);
         $catalogService = new ExtensionCatalogService($this->root, $stateStore, $permissionCatalog, $config, $input);
 
-        $permissionMap = $permissionCatalog->panelPermissionMapForDirectories(
+        $permissionMap = $permissionCatalog->extensionPermissionMap(
             [$this->pluginSlug, $this->moduleSlug],
             static function (string $extensionPath) use ($catalogService): array {
                 return $catalogService->readManifest(
@@ -740,8 +740,8 @@ PHP;
      */
     private function requestPanel(array &$client, string $method, string $uri, array $post = []): array
     {
-        $payloadFile = tempnam('/tmp', 'raven-nav-payload-');
-        $outputFile = tempnam('/tmp', 'raven-nav-result-');
+        $payloadFile = tempnam($this->root . '/.tmp', 'raven-nav-payload-');
+        $outputFile = tempnam($this->root . '/.tmp', 'raven-nav-result-');
         $this->assert($payloadFile !== false && $outputFile !== false, 'Failed to allocate nav smoke temp files.');
 
         $payload = [

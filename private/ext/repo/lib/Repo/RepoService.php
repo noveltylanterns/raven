@@ -608,7 +608,12 @@ final class RepoService implements MarkdownFileLoader
             throw new RuntimeException('The requested repository file was not found.');
         }
 
-        $tempPath = tempnam(sys_get_temp_dir(), 'rvn_repo_file_');
+        $tempRoot = $this->projectRoot . '/.tmp';
+        if (!is_dir($tempRoot) && !@mkdir($tempRoot, 0775, true) && !is_dir($tempRoot)) {
+            throw new RuntimeException('Failed to create Raven-local temporary directory.');
+        }
+
+        $tempPath = tempnam($tempRoot, 'rvn_repo_file_');
         if ($tempPath === false) {
             throw new RuntimeException('Failed to allocate a temporary file for repository output.');
         }
@@ -699,7 +704,12 @@ final class RepoService implements MarkdownFileLoader
         }
 
         $ref = $this->resolvePreferredRef($repo, $requestedRef, $repoPath);
-        $tempBase = tempnam(sys_get_temp_dir(), 'rvn_repo_archive_');
+        $tempRoot = $this->projectRoot . '/.tmp';
+        if (!is_dir($tempRoot) && !@mkdir($tempRoot, 0775, true) && !is_dir($tempRoot)) {
+            throw new RuntimeException('Failed to create Raven-local temporary directory.');
+        }
+
+        $tempBase = tempnam($tempRoot, 'rvn_repo_archive_');
         if ($tempBase === false) {
             throw new RuntimeException('Failed to allocate a temporary file for archive export.');
         }
@@ -1573,7 +1583,9 @@ final class RepoService implements MarkdownFileLoader
      */
     private function runGitOutput(array $arguments, ?string $cwd = null): string
     {
-        $command = array_merge(['git'], array_values($arguments));
+        // Repository mirror workflows do not use Git hooks; disable them even
+        // for the streaming helpers that bypass the shared Git value runner.
+        $command = array_merge(['git', '-c', 'core.hooksPath=/dev/null'], array_values($arguments));
         $descriptorSpec = [
             0 => ['pipe', 'r'],
             1 => ['pipe', 'w'],
@@ -1634,7 +1646,8 @@ final class RepoService implements MarkdownFileLoader
      */
     private function runGitOutputToFile(array $arguments, string $cwd, string $target): void
     {
-        $command = array_merge(['git'], array_values($arguments));
+        // Keep file-output Git commands under the same no-hooks policy.
+        $command = array_merge(['git', '-c', 'core.hooksPath=/dev/null'], array_values($arguments));
         $descriptorSpec = [
             0 => ['pipe', 'r'],
             1 => ['file', $target, 'w'],

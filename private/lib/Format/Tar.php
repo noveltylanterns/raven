@@ -12,6 +12,7 @@ declare(strict_types=1);
 namespace Raven\Lib\Format;
 
 use PharData;
+use Raven\Lib\Security\SymlinkGuard;
 use RuntimeException;
 
 /**
@@ -54,16 +55,30 @@ final class Tar
      */
     public function extractTo(string $archivePath, string $targetDir, ?string $subDir = null): void
     {
+        // Keep archive reads and direct extraction writes inside physical paths.
+        SymlinkGuard::assertSymlinkFreePath($archivePath, 'TAR archive path');
+        SymlinkGuard::assertSymlinkFreePath($targetDir, 'TAR extraction directory');
+
         // Wrap PharData open/extract errors in a Raven-format runtime exception.
+        $temporaryDirectory = $this->tempDir();
         try {
             $phar = new PharData($archivePath);
-            $phar->extractTo($targetDir, $subDir, true);
+            $phar->extractTo($temporaryDirectory, $subDir, true);
+
+            // The direct PharData target can contain linked members or follow a
+            // pre-existing child link, so rebuild the result through a clean tree.
+            if (!is_dir($targetDir) && !mkdir($targetDir, 0775, true) && !is_dir($targetDir)) {
+                throw new RuntimeException('Failed to recreate TAR extraction target directory.');
+            }
+            $this->copyTree($temporaryDirectory, $targetDir);
         } catch (\Throwable $e) {
             throw new RuntimeException(
                 'Failed to extract TAR archive "' . basename($archivePath) . '": ' . $e->getMessage(),
                 0,
                 $e
             );
+        } finally {
+            $this->deleteTree($temporaryDirectory);
         }
     }
 
@@ -81,6 +96,10 @@ final class Tar
      */
     public function extractFile(string $archivePath, string $entryName, string $targetPath): void
     {
+        // Reject symlinked archive inputs and output paths before reading/writing.
+        SymlinkGuard::assertSymlinkFreePath($archivePath, 'TAR archive path');
+        SymlinkGuard::assertSymlinkFreePath($targetPath, 'TAR extraction path');
+
         $entry = $this->normalizeEntryName($entryName);
 
         // Wrap PharData open errors in a Raven-format runtime exception.
@@ -97,6 +116,10 @@ final class Tar
         // PharData exposes entries via ArrayAccess keyed by entry name.
         if (!isset($phar[$entry])) {
             throw new RuntimeException('Entry "' . $entry . '" not found in TAR archive.');
+        }
+
+        if (isset($this->symlinkEntries($archivePath)[$entry])) {
+            throw new RuntimeException('Entry "' . $entry . '" is a symbolic link and cannot be extracted directly.');
         }
 
         $contents = file_get_contents('phar://' . $archivePath . '/' . $entry);
@@ -119,6 +142,10 @@ final class Tar
      */
     public function extractDir(string $archivePath, string $entryName, string $targetDir): void
     {
+        // Reject symlinked archive inputs and directory destinations before traversal.
+        SymlinkGuard::assertSymlinkFreePath($archivePath, 'TAR archive path');
+        SymlinkGuard::assertSymlinkFreePath($targetDir, 'TAR extraction directory');
+
         $directory = $this->normalizeDirEntry($entryName);
         $matches = [];
 
@@ -151,6 +178,10 @@ final class Tar
             }
 
             $targetPath = $targetDir . '/' . $relative;
+            // Skip linked child destinations while continuing other entries.
+            if (!SymlinkGuard::isSymlinkFreePath($targetPath)) {
+                continue;
+            }
             // Ensure empty directory entries are created.
             if (str_ends_with($match, '/')) {
                 if (!is_dir($targetPath) && !mkdir($targetPath, 0775, true) && !is_dir($targetPath)) {
@@ -174,6 +205,10 @@ final class Tar
      */
     public function compressPath(string $sourcePath, string $outputPath, ?string $entryName = null): void
     {
+        // Reject symlinked source and output paths before TAR resolution can follow them.
+        SymlinkGuard::assertSymlinkFreePath($sourcePath, 'TAR source path');
+        SymlinkGuard::assertSymlinkFreePath($outputPath, 'TAR output path');
+
         // Source path must exist before staging/compression.
         if (!file_exists($sourcePath)) {
             throw new RuntimeException('TAR source path could not be resolved: ' . $sourcePath);
@@ -396,6 +431,10 @@ final class Tar
      */
     public function addPath(string $archivePath, string $sourcePath, ?string $entryName = null): void
     {
+        // Reject symlinked source and archive paths before staging can follow them.
+        SymlinkGuard::assertSymlinkFreePath($sourcePath, 'TAR source path');
+        SymlinkGuard::assertSymlinkFreePath($archivePath, 'TAR archive path');
+
         // Source path must exist before staging/archive update.
         if (!file_exists($sourcePath)) {
             throw new RuntimeException('TAR source path could not be resolved: ' . $sourcePath);
@@ -443,15 +482,41 @@ final class Tar
      */
     public function listEntries(string $archivePath): array
     {
+        SymlinkGuard::assertSymlinkFreePath($archivePath, 'TAR archive path');
+        $symlinkEntries = $this->symlinkEntries($archivePath);
+
         // Wrap PharData read/list errors in a Raven-format runtime exception.
         try {
             $phar = new PharData($archivePath);
             $entries = [];
+            $skippedLinkPrefixes = [];
             // Traverse archive entries and collect normalized entry paths.
             foreach (new \RecursiveIteratorIterator($phar, \RecursiveIteratorIterator::SELF_FIRST) as $file) {
                 // Keep only PharFileInfo entries returned by the iterator.
                 if ($file instanceof \PharFileInfo) {
                     $entryPath = $this->pharEntryPath($file, $archivePath);
+                    $normalizedPath = trim(str_replace('\\', '/', $entryPath), '/');
+                    if ($normalizedPath === '' || !$this->isSafeEntryPath($normalizedPath)) {
+                        continue;
+                    }
+
+                    if (isset($symlinkEntries[$normalizedPath])) {
+                        continue;
+                    }
+
+                    foreach ($skippedLinkPrefixes as $prefix) {
+                        if ($normalizedPath === $prefix || str_starts_with($normalizedPath, $prefix . '/')) {
+                            continue 2;
+                        }
+                    }
+
+                    if ($file->isLink()) {
+                        if ($file->isDir()) {
+                            $skippedLinkPrefixes[] = $normalizedPath;
+                        }
+                        continue;
+                    }
+
                     // Skip entries that normalize to empty relative paths.
                     if ($entryPath !== '') {
                         // Preserve explicit directory markers with trailing slash.
@@ -471,6 +536,46 @@ final class Tar
                 $e
             );
         }
+    }
+
+    /**
+     * Returns symlink member names reported by the system TAR listing.
+     *
+     * PharData normalizes some TAR symlinks as regular file metadata, so the
+     * system listing remains the authoritative member-type check for archives
+     * created by Raven's TAR binary.
+     *
+     * @param string $archivePath Absolute path to the TAR archive.
+     * @return array<string, bool> Relative symlink member names.
+     */
+    private function symlinkEntries(string $archivePath): array
+    {
+        $result = $this->runBinary(['-t', '-v', '-f', $archivePath]);
+        if (!$result['ok']) {
+            return [];
+        }
+
+        $entries = [];
+        foreach (preg_split("/\r?\n/", $result['stdout']) ?: [] as $line) {
+            $line = trim($line);
+            if ($line === '' || !str_starts_with($line, 'l')) {
+                continue;
+            }
+
+            $parts = preg_split('/\s+/', $line, 6);
+            $entry = is_array($parts) && isset($parts[5]) ? trim((string) $parts[5]) : '';
+            $targetSeparator = strpos($entry, ' -> ');
+            if ($targetSeparator !== false) {
+                $entry = substr($entry, 0, $targetSeparator);
+            }
+
+            $entry = trim(str_replace('\\', '/', $entry), '/');
+            if ($entry !== '' && $this->isSafeEntryPath($entry)) {
+                $entries[$entry] = true;
+            }
+        }
+
+        return $entries;
     }
 
     /**
@@ -526,6 +631,8 @@ final class Tar
         // Build temporary tar then apply outer compression; clean up temp file in finally.
         try {
             // Source path must exist before staging/compression.
+            SymlinkGuard::assertSymlinkFreePath($sourcePath, $label . ' source path');
+            SymlinkGuard::assertSymlinkFreePath($outputPath, $label . ' output path');
             if (!file_exists($sourcePath)) {
                 throw new RuntimeException('TAR source path could not be resolved: ' . $sourcePath);
             }
@@ -582,7 +689,6 @@ final class Tar
     {
         $projectRoot = dirname(__DIR__, 3);
         $candidates = [
-            trim((string) sys_get_temp_dir()),
             $projectRoot . '/.tmp',
             $projectRoot . '/.tmp/archives',
         ];
@@ -592,6 +698,11 @@ final class Tar
         foreach ($candidates as $candidate) {
             // Skip empty candidate values.
             if ($candidate === '') {
+                continue;
+            }
+
+            // TAR staging must not be redirected through a symlinked temp root.
+            if (!SymlinkGuard::isSymlinkFreePath($candidate)) {
                 continue;
             }
 
@@ -762,7 +873,7 @@ final class Tar
      */
     private function tempDir(): string
     {
-        // Probe each writable temp root so environments without /tmp still succeed.
+        // Probe Raven-local temp roots so archive work stays out of daemon state.
         foreach ($this->tempRoots() as $directory) {
             for ($attempt = 0; $attempt < 5; $attempt++) {
                 $path = $directory . '/rvn-tar-stage-' . bin2hex(random_bytes(6));
@@ -820,6 +931,10 @@ final class Tar
             }
 
             $destinationPath = $targetDir . '/' . str_replace('\\', '/', $relativePath);
+            // Skip linked child destinations while continuing other entries.
+            if (!SymlinkGuard::isSymlinkFreePath($destinationPath)) {
+                continue;
+            }
             // Directories are created and tracked so their original mode/mtime can be restored later.
             if ($item->isDir()) {
                 if (!is_dir($destinationPath) && !mkdir($destinationPath, 0775, true) && !is_dir($destinationPath)) {
@@ -886,6 +1001,12 @@ final class Tar
      */
     private function deleteTree(string $directory): void
     {
+        // Remove a symlink entry itself without traversing its target.
+        if (is_link($directory)) {
+            @unlink($directory);
+            return;
+        }
+
         // Empty or missing roots indicate cleanup already happened, so nothing needs deleting.
         if ($directory === '' || !is_dir($directory)) {
             return;
@@ -900,6 +1021,12 @@ final class Tar
         foreach ($iterator as $item) {
             /** @var \SplFileInfo $item */
             $path = $item->getPathname();
+            // Remove linked children without following them during staging cleanup.
+            if ($item->isLink()) {
+                @unlink($path);
+                continue;
+            }
+
             if ($item->isDir()) {
                 @rmdir($path);
                 continue;
@@ -963,6 +1090,8 @@ final class Tar
      */
     private function writeExtractedEntry(string $targetPath, string $contents): void
     {
+        SymlinkGuard::assertSymlinkFreePath($targetPath, 'TAR extraction path');
+
         $directory = dirname($targetPath);
         // Individual extracted files can be nested, so create missing parents before writing.
         if (!is_dir($directory) && !mkdir($directory, 0775, true) && !is_dir($directory)) {

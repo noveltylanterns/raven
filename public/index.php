@@ -107,7 +107,7 @@ $canRenderPublicProfiler = static function () use ($rvn, $isPublicAuthHelperPath
         $auth = $auth();
     }
 
-    if (!$auth instanceof \Raven\Lib\Auth\AuthService) {
+    if (!$auth instanceof \Raven\Core\Gatekeeper) {
         return false;
     }
 

@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/debug/smoke/themes.php
  * Smoke checks for public-theme brace-tag rendering behavior.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -237,7 +237,7 @@ PHP;
                     null,
                     fn (string $file, array $payload): string => $engine->renderFile($file, $payload),
                     $root,
-                    $this->root . '/private/tpl'
+                    $this->root . '/private/tpl/public'
                 );
                 $expected = (string) ($fixture['expect'] ?? '');
                 $this->assert(str_contains($output, $expected), 'Redirect tag did not resolve expected message view: ' . $name);

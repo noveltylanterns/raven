@@ -18,6 +18,7 @@ use Raven\Lib\Format\Tar;
 use Raven\Lib\Format\Xz;
 use Raven\Lib\Format\Zip;
 use Raven\Lib\Format\Zst;
+use Raven\Lib\Security\SymlinkGuard;
 use RuntimeException;
 
 /**
@@ -596,7 +597,6 @@ final class Extract
     {
         $projectRoot = dirname(__DIR__, 3);
         $candidates = [
-            trim((string) sys_get_temp_dir()),
             $projectRoot . '/.tmp',
             $projectRoot . '/.tmp/archives',
         ];
@@ -606,6 +606,11 @@ final class Extract
         foreach ($candidates as $candidate) {
             // Ignore empty candidate roots from environment lookups.
             if ($candidate === '') {
+                continue;
+            }
+
+            // Temporary extraction work must not be redirected through a symlinked root.
+            if (!SymlinkGuard::isSymlinkFreePath($candidate)) {
                 continue;
             }
 

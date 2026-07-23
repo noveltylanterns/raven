@@ -35,7 +35,7 @@ This Raven `module` extension manages read-only Git repository mirrors with pane
 - Raven's fallback scheduler can trigger due jobs from request traffic when `site.scheduler` is set to `panel` or `always`.
 - When `site.scheduler` is `off`, point server cron at `php private/bin/rvn-cron run` or invoke that command manually.
 - Inspect scheduler state with `php private/bin/rvn-cron status`.
-- Use the repo companion at `php private/ext/repo/bin/rvn-repo help` or, after bin provisioning, `php private/bin/rvn-repo help`.
+- Use the repo companion at `php private/bin/rvn-repo help` after bin storage provisioning; the launcher is a regular file rooted to the extension-local command.
 
 ## Current Notes
 - See `AGENTS.md` for local implementation progress and session guidance.

@@ -233,6 +233,11 @@ final class Registry
         // Preserve state-file order while filtering to existing/valid directories.
         foreach (array_keys(self::enabledMap($root)) as $directory) {
             $extensionRoot = rtrim($root, '/') . '/private/ext/' . $directory;
+            // Do not activate extension directories that contain any symlink component.
+            if (!Resolver::isSafeExtensionRoot($extensionRoot)) {
+                continue;
+            }
+
             // Skip enabled entries that no longer exist on disk.
             if (!is_dir($extensionRoot)) {
                 continue;
@@ -600,12 +605,12 @@ final class Registry
             }
 
             $storage = is_array($bootstrap['storage'] ?? null) ? (array) $bootstrap['storage'] : [];
-            $this->extensionStorage[$directory] = [
+            $storageMap = [
                 'local'  => !empty($storage['local']) ? ($this->root . '/private/dat/ext/' . $directory) : '',
                 'aux'    => [],
                 'panel'  => !empty($storage['panel']) ? ($this->root . '/panel/ext/' . $directory) : '',
                 'public' => !empty($storage['public']) ? ($this->root . '/public/uploads/ext/' . $directory) : '',
-                // Bin storage resolves to the extension's own bin/ directory; private/bin/ contains the symlinks.
+                // Bin storage resolves to the extension's own bin/ directory; private/bin/ contains regular launchers.
                 'bin'    => !empty($storage['bin']) ? ($this->root . '/private/ext/' . $directory . '/bin') : '',
             ];
 
@@ -616,8 +621,25 @@ final class Registry
                     continue;
                 }
 
-                $this->extensionStorage[$directory]['aux'][$auxDirectory] = $this->root . '/' . $auxDirectory;
+                $storageMap['aux'][$auxDirectory] = $this->root . '/' . $auxDirectory;
             }
+
+            // Keep each bucket in its designated location while refusing symlink escapes.
+            $storagePaths = array_values($storageMap['aux']);
+            foreach (['local', 'panel', 'public', 'bin'] as $storageKey) {
+                $storagePath = (string) ($storageMap[$storageKey] ?? '');
+                if ($storagePath !== '') {
+                    $storagePaths[] = $storagePath;
+                }
+            }
+            foreach ($storagePaths as $storagePath) {
+                if (!Resolver::isSymlinkFreePath($storagePath)) {
+                    error_log('Raven extension storage path contains an unsupported symlink for extension "' . $directory . '".');
+                    continue 2;
+                }
+            }
+
+            $this->extensionStorage[$directory] = $storageMap;
 
             $provider = $bootstrap['boot'] ?? null;
             // Keep only callable bootstrap providers in the runtime boot map.

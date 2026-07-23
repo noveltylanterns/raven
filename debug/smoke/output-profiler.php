@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/debug/smoke/output-profiler.php
  * No-NPM smoke matrix for output profiler visibility and injection behavior.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -284,7 +284,7 @@ final class OutputProfilerSmokeRunner
         if ($this->tempUserId <= 0) {
             throw new RuntimeException('Failed to create temporary super user.');
         }
-        $canManageConfiguration = $rvn['auth']->canManageConfiguration($this->tempUserId);
+        $canManageConfiguration = $rvn['auth']->panelService()->canManageConfiguration($this->tempUserId);
         $this->events[] = 'temp_user_can_manage_configuration=' . ($canManageConfiguration ? '1' : '0');
         if (!$canManageConfiguration) {
             throw new RuntimeException('Temporary super user is missing Manage System Configuration permission.');
@@ -358,8 +358,8 @@ final class OutputProfilerSmokeRunner
      */
     private function request(string $script, string $method, string $uri, array &$cookies, array $post = []): array
     {
-        $payloadFile = tempnam('/tmp', 'raven-debug-payload-');
-        $outputFile = tempnam('/tmp', 'raven-debug-result-');
+        $payloadFile = tempnam($this->root . '/.tmp', 'raven-debug-payload-');
+        $outputFile = tempnam($this->root . '/.tmp', 'raven-debug-result-');
         if ($payloadFile === false || $outputFile === false) {
             throw new RuntimeException('Failed to allocate temporary request files.');
         }

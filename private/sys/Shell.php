@@ -1067,12 +1067,19 @@ function raven_cli_parse_typed_value(string $raw, string $type, mixed $existingV
  */
 function raven_cli_run_process(array $command, string $cwd): array
 {
+    $processCommand = array_values($command);
+    // Raven's CLI only uses this helper for Git metadata probes; keep hooks
+    // disabled here too so this path cannot bypass the shared Git policy.
+    if (basename((string) ($processCommand[0] ?? '')) === 'git') {
+        array_splice($processCommand, 1, 0, ['-c', 'core.hooksPath=/dev/null']);
+    }
+
     $descriptorSpec = [
         1 => ['pipe', 'w'],
         2 => ['pipe', 'w'],
     ];
 
-    $process = proc_open($command, $descriptorSpec, $pipes, $cwd);
+    $process = proc_open($processCommand, $descriptorSpec, $pipes, $cwd);
     // Process-open failure returns a synthetic non-zero result payload.
     if (!is_resource($process)) {
         return [

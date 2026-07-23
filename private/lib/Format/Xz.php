@@ -11,6 +11,7 @@ declare(strict_types=1);
 
 namespace Raven\Lib\Format;
 
+use Raven\Lib\Security\SymlinkGuard;
 use RuntimeException;
 
 /**
@@ -61,6 +62,10 @@ final class Xz
      */
     public function compress(string $sourcePath, string $targetPath, int $level = 6): void
     {
+        // Keep both source reads and destination writes inside non-symlinked paths.
+        SymlinkGuard::assertSymlinkFreePath($sourcePath, 'XZ source path');
+        SymlinkGuard::assertSymlinkFreePath($targetPath, 'XZ target path');
+
         // Compression is file-based, so fail before spawning xz when the source is missing.
         if (!is_file($sourcePath)) {
             throw new RuntimeException('XZ source file not found: ' . $sourcePath);
@@ -103,6 +108,10 @@ final class Xz
      */
     public function decompress(string $sourcePath, string $targetPath): void
     {
+        // Keep both compressed reads and decompressed writes inside non-symlinked paths.
+        SymlinkGuard::assertSymlinkFreePath($sourcePath, 'XZ source path');
+        SymlinkGuard::assertSymlinkFreePath($targetPath, 'XZ target path');
+
         // Decompression also requires one real source file before launching xz.
         if (!is_file($sourcePath)) {
             throw new RuntimeException('XZ source file not found: ' . $sourcePath);

@@ -1,1 +1,33 @@
-../ext/repo/bin/rvn-repo
+#!/usr/bin/env php
+<?php
+
+/**
+ * RAVEN EXTENSION BIN LAUNCHER: repo/rvn-repo
+ * Generated local launcher; the executable remains in the extension bin directory.
+ */
+
+declare(strict_types=1);
+
+$projectRoot = dirname(__DIR__, 2);
+$extensionBin = $projectRoot . '/private/ext/repo/bin';
+$targetPath = $extensionBin . '/rvn-repo';
+$resolvedRoot = realpath($projectRoot);
+$resolvedBin = realpath($extensionBin);
+$resolvedTarget = realpath($targetPath);
+$rootPrefix = $resolvedRoot === false ? '' : rtrim(str_replace('\\', '/', $resolvedRoot), '/') . '/';
+$binPrefix = $resolvedBin === false ? '' : rtrim(str_replace('\\', '/', $resolvedBin), '/') . '/';
+$normalizedTarget = $resolvedTarget === false ? '' : str_replace('\\', '/', $resolvedTarget);
+if (
+    $resolvedRoot === false
+    || $resolvedBin === false
+    || $resolvedTarget === false
+    || is_link($extensionBin)
+    || is_link($targetPath)
+    || !str_starts_with($normalizedTarget, $rootPrefix)
+    || !str_starts_with($normalizedTarget, $binPrefix)
+) {
+    fwrite(STDERR, "Extension bin launcher target is unavailable or outside Raven.\n");
+    exit(1);
+}
+
+require $resolvedTarget;

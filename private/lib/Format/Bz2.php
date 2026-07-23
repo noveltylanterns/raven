@@ -11,6 +11,7 @@ declare(strict_types=1);
 
 namespace Raven\Lib\Format;
 
+use Raven\Lib\Security\SymlinkGuard;
 use RuntimeException;
 
 /**
@@ -50,6 +51,10 @@ final class Bz2
      */
     public function compress(string $sourcePath, string $targetPath, int $blockSize = 9): void
     {
+        // Keep both source reads and destination writes inside non-symlinked paths.
+        SymlinkGuard::assertSymlinkFreePath($sourcePath, 'BZ2 source path');
+        SymlinkGuard::assertSymlinkFreePath($targetPath, 'BZ2 target path');
+
         // BZ2 compression requires the PHP bz2 extension.
         if (!$this->isAvailable()) {
             throw new RuntimeException('PHP bz2 extension is not available.');
@@ -120,6 +125,10 @@ final class Bz2
      */
     public function decompress(string $sourcePath, string $targetPath): void
     {
+        // Keep both compressed reads and decompressed writes inside non-symlinked paths.
+        SymlinkGuard::assertSymlinkFreePath($sourcePath, 'BZ2 source path');
+        SymlinkGuard::assertSymlinkFreePath($targetPath, 'BZ2 target path');
+
         // BZ2 decompression requires the PHP bz2 extension.
         if (!$this->isAvailable()) {
             throw new RuntimeException('PHP bz2 extension is not available.');

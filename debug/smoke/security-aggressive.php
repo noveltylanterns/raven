@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/debug/smoke/security-aggressive.php
  * Aggressive hostile-behavior smoke checks for auth, routing, uploads, and panel surface abuse.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -562,8 +562,8 @@ final class AggressiveSecuritySmokeRunner
      */
     private function request(string $scriptPath, string $method, string $uri, array $post = []): array
     {
-        $payloadFile = tempnam('/tmp', 'raven-agg-payload-');
-        $outputFile = tempnam('/tmp', 'raven-agg-result-');
+        $payloadFile = tempnam($this->root . '/.tmp', 'raven-agg-payload-');
+        $outputFile = tempnam($this->root . '/.tmp', 'raven-agg-result-');
 
         if ($payloadFile === false || $outputFile === false) {
             throw new RuntimeException('Failed to allocate request payload temp files.');

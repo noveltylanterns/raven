@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/debug/smoke/routing.php
  * Smoke checks for root/channel public route resolution behavior.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

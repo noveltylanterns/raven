@@ -11,6 +11,7 @@ declare(strict_types=1);
 
 namespace Raven\Lib\Format;
 
+use Raven\Lib\Security\SymlinkGuard;
 use RuntimeException;
 use ZipArchive;
 
@@ -85,6 +86,10 @@ final class Zip
      */
     public function extractTo(string $archivePath, string $targetDir): void
     {
+        // Keep archive reads and direct extraction writes inside physical paths.
+        SymlinkGuard::assertSymlinkFreePath($archivePath, 'ZIP archive path');
+        SymlinkGuard::assertSymlinkFreePath($targetDir, 'ZIP extraction directory');
+
         $zip = $this->open($archivePath);
 
         // Keep archive handles balanced even when validation or extraction fails.
@@ -102,9 +107,43 @@ final class Zip
                 }
             }
 
-            // Delegate final write-out to ZipArchive once pre-validation has passed.
-            if (!$zip->extractTo($targetDir)) {
-                throw new RuntimeException('Failed to extract ZIP archive to target directory.');
+            // Write entries individually so linked archive members and linked child
+            // destinations can be skipped without aborting the whole extraction.
+            for ($i = 0; $i < $zip->numFiles; $i++) {
+                if ($this->isSymlinkEntry($zip, $i)) {
+                    continue;
+                }
+
+                $name = $zip->getNameIndex($i);
+                if (!is_string($name)) {
+                    continue;
+                }
+
+                $normalized = str_replace('\\', '/', trim($name, '/'));
+                if ($normalized === '') {
+                    continue;
+                }
+
+                $targetPath = rtrim($targetDir, '/\\') . '/' . $normalized;
+                // Existing linked child directories are a local hazard; skip only
+                // that member and let the remaining archive continue.
+                if (!SymlinkGuard::isSymlinkFreePath($targetPath)) {
+                    continue;
+                }
+
+                if (str_ends_with($name, '/')) {
+                    if (!is_dir($targetPath) && !mkdir($targetPath, 0775, true) && !is_dir($targetPath)) {
+                        throw new RuntimeException('Failed to create directory for extracted ZIP entry.');
+                    }
+                    continue;
+                }
+
+                $contents = $zip->getFromIndex($i);
+                if ($contents === false) {
+                    throw new RuntimeException('Failed to read ZIP archive entry: ' . $name);
+                }
+
+                $this->writeExtractedEntry($targetPath, $contents, 'ZIP');
             }
         } finally {
             $zip->close();
@@ -126,6 +165,10 @@ final class Zip
      */
     public function extractFile(string $archivePath, string $entryName, string $targetPath): void
     {
+        // Reject symlinked archive inputs and output paths before reading/writing.
+        SymlinkGuard::assertSymlinkFreePath($archivePath, 'ZIP archive path');
+        SymlinkGuard::assertSymlinkFreePath($targetPath, 'ZIP extraction path');
+
         $entry = $this->normalizeEntryName($entryName);
         $zip = $this->open($archivePath);
 
@@ -154,6 +197,10 @@ final class Zip
      */
     public function extractDir(string $archivePath, string $entryName, string $targetDir): void
     {
+        // Reject symlinked archive inputs and directory destinations before traversal.
+        SymlinkGuard::assertSymlinkFreePath($archivePath, 'ZIP archive path');
+        SymlinkGuard::assertSymlinkFreePath($targetDir, 'ZIP extraction directory');
+
         $directory = $this->normalizeDirEntry($entryName);
         $zip = $this->open($archivePath);
 
@@ -164,7 +211,7 @@ final class Zip
             for ($i = 0; $i < $zip->numFiles; $i++) {
                 $name = $zip->getNameIndex($i);
                 // Ignore invalid names instead of extracting them into caller paths.
-                if (!is_string($name) || !$this->isSafeEntryPath($name)) {
+                if (!is_string($name) || !$this->isSafeEntryPath($name) || $this->isSymlinkEntry($zip, $i)) {
                     continue;
                 }
 
@@ -195,6 +242,10 @@ final class Zip
                 }
 
                 $targetPath = $targetDir . '/' . $relative;
+                // Skip linked child destinations while continuing other entries.
+                if (!SymlinkGuard::isSymlinkFreePath($targetPath)) {
+                    continue;
+                }
                 // Preserve directory entries so empty subfolders are recreated on disk.
                 if (str_ends_with($match, '/')) {
                     // Create nested folders lazily as directory markers are encountered.
@@ -229,6 +280,10 @@ final class Zip
     public function compressPath(string $sourcePath, string $entryName, string $outputPath): void
     {
         $this->assertAvailable();
+
+        // Do not let archive creation follow symlinked source or output paths.
+        SymlinkGuard::assertSymlinkFreePath($sourcePath, 'ZIP source path');
+        SymlinkGuard::assertSymlinkFreePath($outputPath, 'ZIP output path');
 
         // Source presence is validated before archive creation to avoid empty output artifacts.
         if (!file_exists($sourcePath)) {
@@ -312,6 +367,10 @@ final class Zip
     {
         $this->assertAvailable();
 
+        // Do not let archive updates follow symlinked source or archive paths.
+        SymlinkGuard::assertSymlinkFreePath($archivePath, 'ZIP archive path');
+        SymlinkGuard::assertSymlinkFreePath($sourcePath, 'ZIP source path');
+
         // Reject unresolved sources before attempting to open or mutate the archive.
         if (!file_exists($sourcePath)) {
             throw new RuntimeException('ZIP source path not found: ' . $sourcePath);
@@ -394,6 +453,10 @@ final class Zip
 
             // Candidate indexes are already ordered by preferred manifest depth.
             foreach ($indexes as $index) {
+                if ($this->isSymlinkEntry($zip, $index)) {
+                    continue;
+                }
+
                 $raw = $zip->getFromIndex($index);
                 // Ignore missing or blank manifest payloads.
                 if (!is_string($raw) || trim($raw) === '') {
@@ -429,6 +492,7 @@ final class Zip
     private function open(string $archivePath): ZipArchive
     {
         $this->assertAvailable();
+        SymlinkGuard::assertSymlinkFreePath($archivePath, 'ZIP archive path');
 
         $zip = new ZipArchive();
         // Reading flows require a successfully opened archive handle.
@@ -486,6 +550,26 @@ final class Zip
     }
 
     /**
+     * Returns whether a ZIP member carries Unix symbolic-link metadata.
+     *
+     * @param ZipArchive $zip Open ZIP archive handle.
+     * @param int $index Zero-based member index.
+     * @return bool True when the member is marked as a Unix symbolic link.
+     */
+    private function isSymlinkEntry(ZipArchive $zip, int $index): bool
+    {
+        $opsys = 0;
+        $attributes = 0;
+        if (!$zip->getExternalAttributesIndex($index, $opsys, $attributes)) {
+            return false;
+        }
+
+        // Unix file type bits 0120000 identify symbolic links.
+        return $opsys === ZipArchive::OPSYS_UNIX
+            && (($attributes >> 16) & 0170000) === 0120000;
+    }
+
+    /**
      * Throws when the PHP zip extension is unavailable.
      *
      * @return void
@@ -540,6 +624,9 @@ final class Zip
      */
     private function addPathToArchive(ZipArchive $zip, string $sourcePath, string $entryName): void
     {
+        // Keep this internal boundary defensive for callers that bypass public helpers.
+        SymlinkGuard::assertSymlinkFreePath($sourcePath, 'ZIP source path');
+
         $entry = $this->normalizeEntryName($entryName);
 
         // Directory sources are expanded recursively into archive members.
@@ -565,6 +652,9 @@ final class Zip
      */
     private function addDirTree(ZipArchive $zip, string $sourceDir, string $entryRoot): void
     {
+        // Realpath would otherwise resolve a symlinked root outside the requested tree.
+        SymlinkGuard::assertSymlinkFreePath($sourceDir, 'ZIP source directory');
+
         $sourceRoot = realpath($sourceDir);
         // Realpath resolution guarantees stable prefixes while iterating child entries.
         if ($sourceRoot === false || !is_dir($sourceRoot)) {
@@ -624,6 +714,8 @@ final class Zip
      */
     private function writeExtractedEntry(string $targetPath, string $contents, string $label): void
     {
+        SymlinkGuard::assertSymlinkFreePath($targetPath, $label . ' extraction path');
+
         $directory = dirname($targetPath);
         // Create missing destination parents before writing extracted file content.
         if (!is_dir($directory) && !mkdir($directory, 0775, true) && !is_dir($directory)) {

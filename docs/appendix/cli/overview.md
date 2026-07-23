@@ -13,7 +13,7 @@ This appendix family documents `private/bin/rvn-*` command help output.
 - `ext` -> `ok` -> `docs/appendix/cli/ext.md`
 - `group` -> `ok` -> `docs/appendix/cli/group.md`
 - `redir` -> `ok` -> `docs/appendix/cli/redir.md`
-- `repo` -> `error` -> `docs/appendix/cli/repo.md`
+- `repo` -> `ok` -> `docs/appendix/cli/repo.md`
 - `sys` -> `ok` -> `docs/appendix/cli/sys.md`
 - `tag` -> `ok` -> `docs/appendix/cli/tag.md`
 - `theme` -> `ok` -> `docs/appendix/cli/theme.md`

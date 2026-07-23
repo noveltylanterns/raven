@@ -2,7 +2,7 @@
  * RAVEN CMS
  * ~/panel/ext/database/externals/jush/modules/jush.js
  * Minimal Jush compatibility shim for Adminer UI behavior.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 (function (window) {

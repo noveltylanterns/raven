@@ -57,7 +57,7 @@ final class StorageCleaner
      * Deletes all extension-owned storage that was requested in the bootstrap storage contract.
      *
      * Removes local data directories, aux directories, panel/public asset directories, bin
-     * symlinks, and database tables according to the flags set in `$storage`. Only paths
+     * launchers, and database tables according to the flags set in `$storage`. Only paths
      * that were provisioned by the contract are touched; unrelated directories are never deleted.
      *
      * @param string $directoryName Extension directory name (slug).
@@ -106,9 +106,9 @@ final class StorageCleaner
             $this->deleteDirectory($this->projectRoot . '/public/uploads/ext/' . $directoryName, 'public/uploads/ext/' . $directoryName);
         }
 
-        // Remove bin symlink aliases when bin storage was requested.
+        // Remove extension-owned bin launchers when bin storage was requested.
         if (!empty($storage['bin'])) {
-            $this->removeBinSymlinks($directoryName);
+            $this->removeBinLaunchers($directoryName);
         }
 
         // Drop extension-owned tables when table storage was requested.
@@ -118,14 +118,15 @@ final class StorageCleaner
     }
 
     /**
-     * Removes symlinks from private/bin/ that point into the extension's bin/ directory.
+     * Removes generated launchers and legacy symlinks from private/bin.
      *
-     * Only removes symlinks whose target resolves inside the extension's own bin/ directory,
-     * so there is no risk of accidentally removing unrelated entries that happen to share a name.
+     * Only entries owned by the requested extension are removed; unrelated operator files and
+     * first-party documentation aliases elsewhere in the project remain untouched.
      *
      * @param string $directoryName Extension directory name.
+     * @return void
      */
-    private function removeBinSymlinks(string $directoryName): void
+    private function removeBinLaunchers(string $directoryName): void
     {
         $targetBin = $this->projectRoot . '/private/bin';
         $extensionBin = $this->projectRoot . '/private/ext/' . $directoryName . '/bin';
@@ -136,26 +137,39 @@ final class StorageCleaner
         }
 
         $iterator = new \DirectoryIterator($targetBin);
-        // Scan private/bin entries and remove only extension-owned symlink aliases.
+        // Scan private/bin entries and remove only extension-owned launchers or old aliases.
         foreach ($iterator as $item) {
-            // Skip dot entries and non-symlink files.
-            if ($item->isDot() || !$item->isLink()) {
+            // Skip dot entries.
+            if ($item->isDot()) {
                 continue;
             }
 
-            $realTarget = realpath($item->getPathname());
+            $path = $item->getPathname();
+            if (!$item->isLink()) {
+                $content = is_file($path) ? file_get_contents($path) : false;
+                if ($content === false || !str_contains($content, 'RAVEN EXTENSION BIN LAUNCHER: ' . $directoryName . '/' . $item->getFilename())) {
+                    continue;
+                }
+                if (!unlink($path)) {
+                    throw new RuntimeException('Failed to remove extension bin launcher: ' . $path);
+                }
+                continue;
+            }
+
+            $realTarget = realpath($path);
             // Resolve dangling links by raw target string instead of realpath().
             if ($realTarget === false) {
-                // Dangling symlink — check by reading the link target string instead.
-                $linkTarget = (string) readlink($item->getPathname());
-                if (!str_starts_with($linkTarget, $extensionBin . '/')) {
+                $linkTarget = (string) readlink($path);
+                if (!str_starts_with($linkTarget, '../ext/' . $directoryName . '/bin/')) {
                     continue;
                 }
             } elseif (!str_starts_with($realTarget, $extensionBin . '/') && $realTarget !== $extensionBin) {
                 continue;
             }
 
-            unlink($item->getPathname());
+            if (!unlink($path)) {
+                throw new RuntimeException('Failed to remove legacy extension bin symlink: ' . $path);
+            }
         }
     }
 
@@ -170,6 +184,14 @@ final class StorageCleaner
      */
     private function deleteDirectory(string $path, string $label): void
     {
+        // Remove a bucket symlink itself without ever traversing into its target.
+        if (is_link($path)) {
+            if (!unlink($path)) {
+                throw new RuntimeException('Failed to remove symlinked ' . $label . ' bucket.');
+            }
+            return;
+        }
+
         // Missing directories are already effectively cleaned.
         if (!is_dir($path)) {
             return;

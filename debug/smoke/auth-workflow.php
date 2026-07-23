@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/debug/smoke/auth-workflow.php
  * End-to-end smoke for shared panel/public login and 2FA workflows.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -452,8 +452,8 @@ final class AuthWorkflowSmokeRunner
      */
     private function request(string $scriptPath, string $method, string $uri, array $post = []): array
     {
-        $payloadFile = tempnam('/tmp', 'raven-auth-payload-');
-        $outputFile = tempnam('/tmp', 'raven-auth-result-');
+        $payloadFile = tempnam($this->root . '/.tmp', 'raven-auth-payload-');
+        $outputFile = tempnam($this->root . '/.tmp', 'raven-auth-result-');
 
         if ($payloadFile === false || $outputFile === false) {
             throw new RuntimeException('Failed to allocate auth smoke temp files.');
@@ -569,7 +569,12 @@ final class AuthWorkflowSmokeRunner
             throw new RuntimeException('Cannot inspect auth session without a session id.');
         }
 
-        $scriptFile = tempnam('/tmp', 'raven-auth-state-');
+        $debugTempRoot = $this->root . '/.tmp';
+        if (!is_dir($debugTempRoot) && !mkdir($debugTempRoot, 0700, true) && !is_dir($debugTempRoot)) {
+            throw new RuntimeException('Failed to prepare Raven-local auth smoke temp directory.');
+        }
+
+        $scriptFile = tempnam($debugTempRoot, 'raven-auth-state-');
         if ($scriptFile === false) {
             throw new RuntimeException('Failed to allocate auth session inspection script.');
         }
@@ -592,7 +597,21 @@ $_SERVER = [
     'REMOTE_ADDR' => '127.0.0.1',
 ];
 
-require_once $argv[1] . '/private/Raven.php';
+$projectRoot = realpath((string) ($argv[1] ?? ''));
+$rootPrefix = $projectRoot !== false ? rtrim($projectRoot, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR : '';
+$bootstrapPath = $projectRoot !== false ? realpath($projectRoot . '/private/Raven.php') : false;
+if (
+    $projectRoot === false
+    || !is_dir($projectRoot)
+    || $bootstrapPath === false
+    || !is_file($bootstrapPath)
+    || !str_starts_with($bootstrapPath, $rootPrefix)
+) {
+    fwrite(STDERR, "Auth smoke bootstrap must resolve inside the Raven project root.\n");
+    exit(2);
+}
+
+require_once $bootstrapPath;
 $rvn = \Raven\Raven::boot();
 $auth = is_callable($rvn['auth'] ?? null) ? ($rvn['auth'])() : $rvn['auth'];
 

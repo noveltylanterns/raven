@@ -1198,6 +1198,7 @@ Heuristic mapping of schema keys to repository/controller/template files.
     - `private/sys/Schema/SchemaAuth.php`
     - `private/tpl/panel/user/edit.php`
   - `username`
+    - `private/sys/Controller/Panel/AuthController.php`
     - `private/sys/Controller/Panel/ConfigController.php`
     - `private/sys/Controller/Panel/UserEditController.php`
     - `private/sys/Controller/Panel/UserListController.php`
@@ -1205,7 +1206,6 @@ Heuristic mapping of schema keys to repository/controller/template files.
     - `private/sys/Debug/RouteProfiler.php`
     - `private/sys/Gatekeeper.php`
     - `private/sys/Repository/AuthWrite.php`
-    - `private/sys/Repository/GroupRead.php`
   - `verified`
     - `private/sys/Controller/Panel/AuthController.php`
     - `private/sys/Controller/Public/AuthController.php`

@@ -52,7 +52,10 @@ final class Git
      */
     public function run(array $arguments, ?string $cwd = null, ?string $stdin = null): array
     {
-        $command = array_merge([$this->binary], array_values(array_map(
+        // Raven uses Git only for repository inspection, synchronization, and export;
+        // repository hooks are not part of any supported workflow, so disable them
+        // for every command before a remote or local repository can provide one.
+        $command = array_merge([$this->binary, '-c', 'core.hooksPath=/dev/null'], array_values(array_map(
             static fn (string $argument): string => $argument,
             $arguments
         )));

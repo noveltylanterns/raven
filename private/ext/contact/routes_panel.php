@@ -143,7 +143,7 @@ return static function (RouteHandler $router, array $context): void {
         'version' => '',
         'author' => '',
         'description' => '',
-        'docs' => 'https://raven.lanterns.io',
+        'docs' => 'https://lanterns.io/raven',
     ];
     if (is_file($extensionManifestFile)) {
         $manifestRaw = file_get_contents($extensionManifestFile);

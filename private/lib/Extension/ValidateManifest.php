@@ -106,8 +106,9 @@ final class ValidateManifest
         }
 
         $manifestPath = rtrim($root, '/') . '/private/ext/' . $directoryName . '/ext.json';
-        // Missing ext.json means manifest validation fails.
-        if (!is_file($manifestPath)) {
+        // Manifest files are local metadata and must not be symlinked outside the extension root.
+        $manifestPath = Resolver::safeFilePath(dirname($manifestPath), 'ext.json');
+        if ($manifestPath === null) {
             return null;
         }
 

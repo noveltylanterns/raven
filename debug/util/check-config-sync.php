@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/debug/util/check-config-sync.php
  * CLI check for config.php and config.php.dist key-tree parity.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 // Inline note: This script intentionally compares structure, not secret values.
@@ -64,6 +64,32 @@ function loadConfigFile(string $path): array
 }
 
 /**
+ * Resolves one config path and rejects files outside the Raven project root.
+ *
+ * @param string $path User-supplied or default config path.
+ * @param string $projectRoot Canonical Raven project root.
+ * @return string Canonical in-project config file path.
+ */
+function resolveConfigPathWithinRoot(string $path, string $projectRoot): string
+{
+    $candidate = trim($path);
+    $candidatePath = str_starts_with($candidate, DIRECTORY_SEPARATOR)
+        ? $candidate
+        : $projectRoot . '/' . ltrim($candidate, '/\\');
+    $resolved = realpath($candidatePath);
+    $rootPrefix = rtrim($projectRoot, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR;
+    if (
+        $resolved === false
+        || !is_file($resolved)
+        || ($resolved !== $projectRoot && !str_starts_with($resolved, $rootPrefix))
+    ) {
+        throw new RuntimeException('Config path must resolve to a file within the Raven project root.');
+    }
+
+    return $resolved;
+}
+
+/**
  * Prints one list block with consistent formatting.
  *
  * @param array<int, string> $lines
@@ -77,10 +103,21 @@ function printBlock(string $title, array $lines): void
 }
 
 $projectRoot = dirname(__DIR__, 2);
-$configPath = $argv[1] ?? ($projectRoot . '/private/dat/config.php');
-$distPath = $argv[2] ?? ($projectRoot . '/private/dat/config.php.dist');
+$canonicalRoot = realpath($projectRoot);
+if ($canonicalRoot === false || !is_dir($canonicalRoot)) {
+    fwrite(STDERR, 'Config sync check failed: unable to resolve Raven project root.' . PHP_EOL);
+    exit(1);
+}
 
 try {
+    $configPath = resolveConfigPathWithinRoot(
+        (string) ($argv[1] ?? ($canonicalRoot . '/private/dat/config.php')),
+        $canonicalRoot
+    );
+    $distPath = resolveConfigPathWithinRoot(
+        (string) ($argv[2] ?? ($canonicalRoot . '/private/dat/config.php.dist')),
+        $canonicalRoot
+    );
     $config = loadConfigFile($configPath);
     $dist = loadConfigFile($distPath);
 } catch (Throwable $exception) {

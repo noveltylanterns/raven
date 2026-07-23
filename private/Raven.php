@@ -44,7 +44,7 @@ final class Raven
         // the top of panel/index.php or public/index.php.
         return (static function (): array {
     $root = dirname(__DIR__);
-    // These three files are required before the spl_autoload_register below
+    // These bootstrap files are required before the spl_autoload_register below
     // because enabledDirectories() needs them immediately at call time.
     require_once $root . '/private/lib/Extension/Registry.php';
     require_once $root . '/private/lib/Extension/Resolver.php';

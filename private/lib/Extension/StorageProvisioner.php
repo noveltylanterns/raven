@@ -94,6 +94,11 @@ final class StorageProvisioner
         }
 
         $targetPath = $this->projectRoot . '/' . $directoryName;
+        // Preserve the aux bucket's designated root while rejecting symlink escapes.
+        if (!Resolver::isSymlinkFreePath($targetPath)) {
+            throw new RuntimeException('Aux storage path contains an unsupported symlink.');
+        }
+
         // Prevent replacing existing files with directory targets.
         if (is_file($targetPath)) {
             throw new RuntimeException('Failed to create aux/' . $directoryName . ' directory because a file already exists there.');
@@ -108,83 +113,130 @@ final class StorageProvisioner
     }
 
     /**
-     * Creates symlinks in private/bin/ pointing to executables in the extension's bin/ directory.
+     * Provisions regular private/bin launchers for extension-local CLI commands.
      *
-     * @param string $directoryName Extension directory name (used for path construction only; symlink names come from the bin/ contents).
-     * @throws RuntimeException If the symlink source directory exists but a symlink cannot be created.
+     * @param string $directoryName Extension directory name whose commands should be exposed.
+     * @return void
+     * @throws RuntimeException When the extension directory name is invalid or a launcher cannot be written.
      */
-    public function ensureBinSymlinks(string $directoryName): void
+    public function ensureBinStorage(string $directoryName): void
     {
-        // Bin symlink provisioning requires a safe extension directory slug.
+        // Bin storage provisioning requires a safe extension directory slug.
         if (!$this->manifestValidator->isSafeDirectoryName($directoryName)) {
             throw new RuntimeException('Invalid extension directory name for bin storage.');
         }
 
         $sourceBin = $this->projectRoot . '/private/ext/' . $directoryName . '/bin';
-        // No extension bin directory means nothing to symlink.
+        // No extension bin directory means there are no commands to expose.
         if (!is_dir($sourceBin)) {
-            // No bin/ directory in the extension; nothing to link.
             return;
         }
 
+        // Extension executable roots must not contain links, even when the target stays local.
+        if (is_link($sourceBin) || !Resolver::isSafeExtensionRoot(dirname($sourceBin))) {
+            throw new RuntimeException('Extension bin storage contains an unsupported symlink.');
+        }
+
         $targetBin = $this->projectRoot . '/private/bin';
-        // Ensure shared private/bin target directory exists.
+        // Ensure the shared launcher bucket exists without creating any symlink.
         if (!is_dir($targetBin) && !mkdir($targetBin, 0775, true) && !is_dir($targetBin)) {
             throw new RuntimeException('Failed to ensure private/bin directory for extension bin storage.');
         }
 
-        // Create one symlink per file in the extension bin/ directory.
-        // Only files are linked; subdirectories are ignored since CLI commands are single files.
-        $iterator = new \DirectoryIterator($sourceBin);
-        // Create symlinks for each eligible source-bin file.
-        foreach ($iterator as $item) {
-            // Skip dot entries and nested directories.
+        // Create one ordinary launcher per extension-owned command.
+        foreach (new \DirectoryIterator($sourceBin) as $item) {
             if ($item->isDot() || $item->isDir()) {
                 continue;
             }
 
             $name = $item->getFilename();
-            // Guard against traversal via unexpected filenames.
+            // Guard launcher names against traversal and shell-metacharacter surprises.
             if (preg_match('/^[A-Za-z0-9][A-Za-z0-9_-]{0,119}$/', $name) !== 1) {
                 continue;
             }
 
-            $linkPath = $targetBin . '/' . $name;
-            // Resolve from private/bin so the alias remains portable across installations.
-            $targetPath = '../ext/' . $directoryName . '/bin/' . $name;
-
-            // Repair aliases created by older versions when their absolute target is stale
-            // or points at a different extension command; this also makes provisioning
-            // self-healing after an update moves the project tree.
-            if (is_link($linkPath)) {
-                if (readlink($linkPath) === $targetPath) {
-                    // The existing relative alias is already portable and correct.
-                    continue;
-                }
-
-                if (!unlink($linkPath)) {
-                    throw new RuntimeException('Failed to replace stale bin symlink for "' . $name . '" in private/bin/.');
-                }
+            $sourcePath = $sourceBin . '/' . $name;
+            if (!is_file($sourcePath) || is_link($sourcePath)) {
+                throw new RuntimeException('Extension bin command must be a regular file: ' . $sourcePath);
             }
 
-            // Never overwrite an existing non-symlink file at alias location.
-            if (file_exists($linkPath)) {
-                // A real file already occupies the name; do not clobber it.
-                throw new RuntimeException('Cannot create bin symlink for "' . $name . '": a non-symlink file already exists at private/bin/' . $name . '.');
+            $launcherPath = $targetBin . '/' . $name;
+            $launcherContent = $this->binLauncherContent($directoryName, $name);
+            $existing = is_file($launcherPath) ? file_get_contents($launcherPath) : false;
+
+            // Never replace stock commands or unrelated operator files.
+            if (is_link($launcherPath)) {
+                throw new RuntimeException('Cannot create bin launcher over a symlink: ' . $launcherPath);
+            }
+            if (file_exists($launcherPath) && ($existing === false || !str_contains($existing, 'RAVEN EXTENSION BIN LAUNCHER: ' . $directoryName . '/' . $name))) {
+                throw new RuntimeException('Cannot create bin launcher over an existing file: ' . $launcherPath);
             }
 
-            // Create alias symlink from private/bin to extension bin executable.
-            if (!symlink($targetPath, $linkPath)) {
-                throw new RuntimeException('Failed to create bin symlink for "' . $name . '" in private/bin/.');
+            if ($existing !== $launcherContent && file_put_contents($launcherPath, $launcherContent, LOCK_EX) === false) {
+                throw new RuntimeException('Failed to write extension bin launcher: ' . $launcherPath);
             }
+
+            @chmod($launcherPath, 0755);
         }
+    }
+
+    /**
+     * Builds one root-contained launcher for an extension-local CLI command.
+     *
+     * @param string $directoryName Extension directory name.
+     * @param string $commandName   Command filename.
+     * @return string Launcher PHP source.
+     */
+    private function binLauncherContent(string $directoryName, string $commandName): string
+    {
+        $template = <<<'PHP'
+#!/usr/bin/env php
+<?php
+
+/**
+ * RAVEN EXTENSION BIN LAUNCHER: __DIRECTORY__/__COMMAND__
+ * Generated local launcher; the executable remains in the extension bin directory.
+ */
+
+declare(strict_types=1);
+
+$projectRoot = dirname(__DIR__, 2);
+$extensionBin = $projectRoot . '/private/ext/__DIRECTORY__/bin';
+$targetPath = $extensionBin . '/__COMMAND__';
+$resolvedRoot = realpath($projectRoot);
+$resolvedBin = realpath($extensionBin);
+$resolvedTarget = realpath($targetPath);
+$rootPrefix = $resolvedRoot === false ? '' : rtrim(str_replace('\\', '/', $resolvedRoot), '/') . '/';
+$binPrefix = $resolvedBin === false ? '' : rtrim(str_replace('\\', '/', $resolvedBin), '/') . '/';
+$normalizedTarget = $resolvedTarget === false ? '' : str_replace('\\', '/', $resolvedTarget);
+if (
+    $resolvedRoot === false
+    || $resolvedBin === false
+    || $resolvedTarget === false
+    || is_link($extensionBin)
+    || is_link($targetPath)
+    || !str_starts_with($normalizedTarget, $rootPrefix)
+    || !str_starts_with($normalizedTarget, $binPrefix)
+) {
+    fwrite(STDERR, "Extension bin launcher target is unavailable or outside Raven.\n");
+    exit(1);
+}
+
+require $resolvedTarget;
+PHP;
+
+        return str_replace(
+            ['__DIRECTORY__', '__COMMAND__'],
+            [$directoryName, $commandName],
+            $template
+        ) . "\n";
     }
 
     /**
      * Provisions all storage declared in one extension bootstrap contract.
      *
      * Creates local data directories, aux directories, panel/public asset directories,
-     * and bin symlinks as specified. Does not run database schema migrations — those
+     * and regular private/bin launchers as specified. Does not run database schema migrations — those
      * are handled separately via the extension schema provider.
      *
      * @param string $directoryName Extension directory name (slug).
@@ -199,7 +251,7 @@ final class StorageProvisioner
      * } $storage Storage contract flags from Bootstrap::resolve().
      * @return void
      *
-     * @throws RuntimeException When any storage directory or symlink cannot be provisioned.
+     * @throws RuntimeException When any storage directory or launcher cannot be provisioned.
      */
     public function provision(string $directoryName, array $storage): void
     {
@@ -235,9 +287,9 @@ final class StorageProvisioner
             $this->syncBundledAssets($directoryName, 'public', $target);
         }
 
-        // Provision private/bin symlink aliases when requested by contract.
+        // Remove legacy private/bin aliases when extension CLI storage is requested.
         if (!empty($storage['bin'])) {
-            $this->ensureBinSymlinks($directoryName);
+            $this->ensureBinStorage($directoryName);
         }
     }
 
@@ -258,12 +310,21 @@ final class StorageProvisioner
             throw new RuntimeException('Invalid extension directory name for ' . $label . ' storage.');
         }
 
+        // Each storage bucket keeps its designated Raven location but may not traverse a symlink.
+        if (!Resolver::isSymlinkFreePath($basePath)) {
+            throw new RuntimeException($label . ' storage base contains an unsupported symlink.');
+        }
+
         // Ensure base path exists before creating extension-specific child directory.
         if (!is_dir($basePath) && !mkdir($basePath, 0775, true) && !is_dir($basePath)) {
             throw new RuntimeException('Failed to create ' . $label . ' directory.');
         }
 
         $targetPath = $basePath . '/' . $directoryName;
+        if (!Resolver::isSymlinkFreePath($targetPath)) {
+            throw new RuntimeException($label . ' storage path contains an unsupported symlink.');
+        }
+
         // Ensure extension-specific storage directory exists.
         if (!is_dir($targetPath) && !mkdir($targetPath, 0775, true) && !is_dir($targetPath)) {
             throw new RuntimeException('Failed to create ' . $label . '/' . $directoryName . ' directory.');
@@ -293,6 +354,11 @@ final class StorageProvisioner
             return;
         }
 
+        // Bundled asset sources must remain physically inside the extension tree.
+        if (!Resolver::isSymlinkFreePath($sourceRoot)) {
+            throw new RuntimeException('Extension ' . $scope . ' asset source contains an unsupported symlink.');
+        }
+
         $iterator = new \RecursiveIteratorIterator(
             new \RecursiveDirectoryIterator($sourceRoot, \FilesystemIterator::SKIP_DOTS),
             \RecursiveIteratorIterator::SELF_FIRST
@@ -300,6 +366,11 @@ final class StorageProvisioner
 
         // Mirror every file/directory from source assets into target storage root.
         foreach ($iterator as $item) {
+            // Reject linked source entries before isDir()/copy() can follow them.
+            if (!Resolver::isSymlinkFreePath($item->getPathname())) {
+                throw new RuntimeException('Extension ' . $scope . ' asset source contains an unsupported symlink.');
+            }
+
             $relative = substr($item->getPathname(), strlen($sourceRoot) + 1);
             // Skip unresolved/empty relative paths.
             if (!is_string($relative) || $relative === '') {
@@ -307,6 +378,9 @@ final class StorageProvisioner
             }
 
             $targetPath = $targetRoot . '/' . str_replace('\\', '/', $relative);
+            if (!Resolver::isSymlinkFreePath($targetPath)) {
+                throw new RuntimeException('Extension ' . $scope . ' asset path contains an unsupported symlink.');
+            }
             // Create destination directory nodes before copying nested files.
             if ($item->isDir()) {
                 if (!is_dir($targetPath) && !mkdir($targetPath, 0775, true) && !is_dir($targetPath)) {

@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/build/docs/lib/ReferenceGenerator.php
  * Deterministic appendix-doc generator scaffold used by the build docs CLI.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);

@@ -266,12 +266,12 @@ $showPoweredByRaven = $panelBrandNameInput !== '';
 $panelBrandName = $panelBrandNameInput !== '' ? $panelBrandNameInput : 'Raven CMS';
 $panelBrandLogoRaw = trim((string) ($site['panel_brand_logo'] ?? ''));
 $panelBrandLogoUrl = $panelBase . '/theme/img/logo-white_sm.png';
-if ($panelBrandLogoRaw !== '') {
-    if (preg_match('/^https?:\/\//i', $panelBrandLogoRaw) === 1) {
-        $panelBrandLogoUrl = $panelBrandLogoRaw;
-    } else {
-        $panelBrandLogoUrl = '/' . ltrim($panelBrandLogoRaw, '/');
-    }
+if (
+    $panelBrandLogoRaw !== ''
+    && preg_match('#^[A-Za-z][A-Za-z0-9+.-]*:#', $panelBrandLogoRaw) !== 1
+    && !str_starts_with($panelBrandLogoRaw, '//')
+) {
+    $panelBrandLogoUrl = '/' . ltrim($panelBrandLogoRaw, '/');
 }
 $projectRoot = dirname(__DIR__, 3);
 $panelThemeCustomCssPath = $projectRoot . '/panel/theme/css/custom.css';

@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/private/dat/config.php.dist
  * Distribution template for runtime configuration values.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 // Inline note: Copy this file to `private/dat/config.php` and replace placeholder values.
@@ -27,8 +27,8 @@ return array (
   ),
   'meta' =>
   array (
-    'apple_touch_icon' => 'https://SITE_DOMAIN/theme/logo.png',
-    'image' => 'https://SITE_DOMAIN/theme/logo.png',
+    'apple_touch_icon' => '/theme/logo.png',
+    'image' => '/theme/logo.png',
     'robots' => 'index,follow',
     'twitter' =>
     array (

@@ -11,6 +11,7 @@ declare(strict_types=1);
 namespace Raven\Core\Repository;
 
 use Raven\Lib\Parser\SetParser;
+use Raven\Lib\Security\SymlinkGuard;
 use RuntimeException;
 
 /**
@@ -193,10 +194,12 @@ final class SetWrite
             $id === SetParser::DEFAULT_SET_ID ? SetParser::DEFAULT_SET_SLUG : ''
         );
         $path = self::pathForRecord($normalizedDir, $id, $slug);
+        SymlinkGuard::assertSymlinkFreePath($path, 'Taxonomy set target');
         $content = "<?php\n\ndeclare(strict_types=1);\n\nreturn " . var_export($record, true) . ";\n";
 
         // Write to a temp file first so the final rename is atomic.
         $tmpPath = $path . '.tmp';
+        SymlinkGuard::assertSymlinkFreePath($tmpPath, 'Taxonomy set temporary target');
         // Fail fast when the temp write cannot be completed safely.
         if (file_put_contents($tmpPath, $content, LOCK_EX) === false) {
             throw new RuntimeException('Failed to write taxonomy set file.');
@@ -281,6 +284,9 @@ final class SetWrite
      */
     private static function ensureDirectory(string $setDirectory): void
     {
+        // Set storage is executable PHP data and must remain physically local.
+        SymlinkGuard::assertSymlinkFreePath($setDirectory, 'Taxonomy set directory');
+
         // Existing directories require no initialization work.
         if (is_dir($setDirectory)) {
             return;
@@ -339,7 +345,7 @@ final class SetWrite
     private static function loadRawByPath(string $path): array
     {
         // Non-existent paths are treated as absent records, not hard failures.
-        if (!is_file($path)) {
+        if (!is_file($path) || !SymlinkGuard::isSymlinkFreePath($path)) {
             return [];
         }
 
@@ -379,7 +385,16 @@ final class SetWrite
      */
     private static function rawSetFilePaths(string $setDirectory): array
     {
+        // A linked store must not redirect PHP data reads or cleanup elsewhere.
+        if (!SymlinkGuard::isSymlinkFreePath($setDirectory)) {
+            return [];
+        }
+
         $paths = glob($setDirectory . '/*.php') ?: [];
+        $paths = array_values(array_filter(
+            $paths,
+            static fn (string $path): bool => SymlinkGuard::isSymlinkFreePath($path)
+        ));
         sort($paths, SORT_STRING);
         return $paths;
     }
@@ -398,7 +413,9 @@ final class SetWrite
 
         // Fast-path canonical filename matches for the requested id pattern.
         foreach (glob($setDirectory . '/' . $normalizedId . '_*.php') ?: [] as $path) {
-            $paths[] = $path;
+            if (SymlinkGuard::isSymlinkFreePath($path)) {
+                $paths[] = $path;
+            }
         }
 
         // Backfill any non-canonical legacy filenames that still map to the same id.

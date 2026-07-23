@@ -12,6 +12,7 @@ declare(strict_types=1);
 namespace Raven\Lib\Archive;
 
 use Raven\Lib\Security\InputSanitizer;
+use Raven\Lib\Security\SymlinkGuard;
 use Raven\Lib\Transport\Upload;
 
 /**
@@ -216,6 +217,9 @@ final class Install
      */
     public function flattenRoot(string $targetDirectory): ?string
     {
+        // Package normalization must remain inside the real extraction target.
+        SymlinkGuard::assertSymlinkFreePath($targetDirectory, 'Package extraction directory');
+
         $entries = $this->entries($targetDirectory);
         // Abort when the extraction target cannot be enumerated.
         if ($entries === null) {
@@ -228,6 +232,11 @@ final class Install
         }
 
         $innerRoot = $targetDirectory . '/' . $entries[0];
+        // A linked wrapper root must not redirect package normalization elsewhere.
+        if (!SymlinkGuard::isSymlinkFreePath($innerRoot)) {
+            return 'Extracted package wrapper contains a symbolic link.';
+        }
+
         // Flattening applies only when the sole top-level entry is a directory.
         if (!is_dir($innerRoot)) {
             return null;
@@ -243,6 +252,11 @@ final class Install
         foreach ($innerEntries as $entry) {
             $sourcePath = $innerRoot . '/' . $entry;
             $destinationPath = $targetDirectory . '/' . $entry;
+            // Skip linked child entries without aborting unrelated package contents.
+            if (!SymlinkGuard::isSymlinkFreePath($sourcePath)
+                || !SymlinkGuard::isSymlinkFreePath($destinationPath)) {
+                continue;
+            }
             // Abort flattening when a destination path already exists.
             if (file_exists($destinationPath)) {
                 return 'Extracted package contains conflicting file paths.';

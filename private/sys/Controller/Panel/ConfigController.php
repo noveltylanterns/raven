@@ -1198,12 +1198,13 @@ final class ConfigController
             return $this->input->text($value, 120);
         }
 
-        // These fields accept absolute URLs or site-root-relative asset paths.
+        // These fields accept only site-root-relative asset paths; the editor
+        // displays the current origin as a visual prefix for that local path.
         if (in_array($path, ['meta.image', 'meta.apple_touch_icon', 'panel.brand_logo'], true)) {
             $siteProtocol = (string) ConfigRead::get($workingConfig, 'site.protocol', $this->config->get('site.protocol', 'https'));
             $siteDomain = (string) ConfigRead::get($workingConfig, 'site.domain', $this->config->get('site.domain', ''));
 
-            return $this->normalizeMetaAbsoluteUrlPathValue($siteProtocol, $siteDomain, $value);
+            return $this->normalizeMetaAbsoluteUrlPathValue($siteProtocol, $siteDomain, $value, false);
         }
 
         // Normalize panel theme selection.
@@ -2294,11 +2295,10 @@ final class ConfigController
             return '';
         }
 
-        // Absolute URLs are validated directly when caller allows external links.
+        // Full URLs are rejected for local-only image and logo configuration.
         if (preg_match('/^https?:\/\//i', $rawPathOrUrl) === 1) {
-            // Some fields only allow local paths to preserve origin consistency.
             if (!$allowAbsoluteUrlPaste) {
-                throw new \RuntimeException('OpenGraph Image must be a local file path relative to site.domain, not a full URL.');
+                throw new \RuntimeException('Image and logo fields must use a local file path relative to site.domain, not a full URL.');
             }
             // Reject malformed URLs before persisting metadata.
             if (filter_var($rawPathOrUrl, FILTER_VALIDATE_URL) === false) {

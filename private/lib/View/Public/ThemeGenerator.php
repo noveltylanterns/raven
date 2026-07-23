@@ -11,6 +11,8 @@ declare(strict_types=1);
 
 namespace Raven\Lib\View\Public;
 
+use Raven\Lib\Extension\Resolver;
+
 /**
  * Shared public-theme generator for create and duplicate workflows.
  */
@@ -213,10 +215,20 @@ final class ThemeGenerator
             throw new \RuntimeException('Clone source directory not found: ' . $sourceDirectory);
         }
 
+        // Theme clone sources must not redirect through a symlinked root.
+        if (!Resolver::isSymlinkFreePath($sourceDirectory)) {
+            throw new \RuntimeException('Theme clone source root contains an unsupported symlink.');
+        }
+
         $sourceRoot = realpath($sourceDirectory);
         // Abort when source directory cannot be resolved to a concrete path.
         if ($sourceRoot === false || !is_dir($sourceRoot)) {
             throw new \RuntimeException('Failed to resolve clone source directory.');
+        }
+
+        // Theme clone destinations retain their requested location but may not be symlinked.
+        if (!Resolver::isSymlinkFreePath($targetDirectory)) {
+            throw new \RuntimeException('Theme clone target root contains an unsupported symlink.');
         }
 
         // Create clone target directory tree before writing copied files.
@@ -244,6 +256,10 @@ final class ThemeGenerator
             }
 
             $targetPath = rtrim($targetDirectory, '/\\') . '/' . str_replace('\\', '/', $relativePath);
+            if (!Resolver::isSymlinkFreePath($targetPath)) {
+                throw new \RuntimeException('Theme clone target contains an unsupported symlink: ' . $targetPath);
+            }
+
             // Create target directories recursively before descending/copying.
             if ($item->isDir()) {
                 // Ensure directory exists even when source tree has nested levels.
@@ -466,22 +482,29 @@ final class ThemeGenerator
     }
 
     /**
-     * Writes or replaces one relative symlink.
+     * Writes one approved local documentation alias.
      *
-     * @param string $linkPath Absolute link path to create.
-     * @param string $target Relative symlink target.
+     * @param string $linkPath Absolute path to an `AGENTS.md` or `CLAUDE.md` alias.
+     * @param string $target Relative target; must be the local `agents` file.
      * @return void
      */
     private function writeRelativeSymlink(string $linkPath, string $target): void
     {
-        // Remove stale file/link at target path before writing replacement symlink.
+        if (
+            $target !== 'agents'
+            || !in_array(basename($linkPath), ['AGENTS.md', 'CLAUDE.md'], true)
+        ) {
+            throw new \RuntimeException('Only local AGENTS.md and CLAUDE.md aliases may be created.');
+        }
+
+        // Remove stale file/link at target path before writing the approved alias.
         if (is_link($linkPath) || is_file($linkPath)) {
             @unlink($linkPath);
         }
 
-        // Symlink creation failures are fatal to keep guidance links consistent.
+        // Alias creation failures are fatal to keep guidance links consistent.
         if (!@symlink($target, $linkPath)) {
-            throw new \RuntimeException('Failed to write symlink: ' . $linkPath);
+            throw new \RuntimeException('Failed to write documentation alias: ' . $linkPath);
         }
     }
 }

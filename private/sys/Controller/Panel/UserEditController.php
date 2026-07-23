@@ -847,7 +847,7 @@ final class UserEditController
      */
     private function profileRoutesEnabled(): bool
     {
-        return $this->groupParser->profileRoutesEnabled();
+        return $this->groupParser->profileRouteEnabled();
     }
 
     /**

@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/debug/smoke/contact-workflow.php
  * No-NPM end-to-end smoke check for Contact form panel/public workflow.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -244,8 +244,8 @@ final class ContactWorkflowSmokeRunner
      */
     private function request(string $scriptPath, string $method, string $uri, array $post = []): array
     {
-        $payloadFile = tempnam('/tmp', 'raven-smoke-payload-');
-        $outputFile = tempnam('/tmp', 'raven-smoke-result-');
+        $payloadFile = tempnam($this->root . '/.tmp', 'raven-smoke-payload-');
+        $outputFile = tempnam($this->root . '/.tmp', 'raven-smoke-result-');
         if ($payloadFile === false || $outputFile === false) {
             throw new RuntimeException('Failed to allocate temporary request files.');
         }

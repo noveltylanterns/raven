@@ -19,7 +19,7 @@ Updated: 2026-03-29
 - Requested storage buckets in `ext.php`:
   - `local` => `private/dat/ext/repo/`
   - `public` => `public/uploads/ext/repo/`
-  - `bin` => `private/bin/rvn-repo` symlink lifecycle for the extension CLI
+  - `bin` => regular `private/bin/rvn-repo` launcher for the extension CLI
 
 ## Current Build Direction
 - Keep the extension self-contained under `private/ext/repo/`.
@@ -50,7 +50,7 @@ Updated: 2026-03-29
 - Auto-update settings now run through Raven's shared scheduler via `cron.php`, request-driven fallback scheduling controlled by `site.scheduler`, or explicit `private/bin/rvn-cron` runs.
 - `[repo ...]` embeds now render through a generic content shortcode runtime registered under `shortcode_runtimes`.
 - Public module routes now render through Raven's `renderPublicExtension` helper rather than hand-building wrapper output.
-- The extension CLI lives at `private/ext/repo/bin/rvn-repo` and participates in Raven's `bin` storage symlink lifecycle.
+- The extension CLI source lives at `private/ext/repo/bin/rvn-repo`; Raven provisions a regular root-contained launcher at `private/bin/rvn-repo`.
 
 ## Progress Tracker
 - [x] Received authoritative feature spec.

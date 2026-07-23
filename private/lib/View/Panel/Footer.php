@@ -111,9 +111,9 @@ final class Footer
         ?>
 <footer class="rvnp-footer">
     <p class="small text-muted mb-0">
-        Powered by <a href="https://raven.lanterns.io" target="_blank" rel="noopener noreferrer">Raven CMS</a>
+        Powered by <a href="https://lanterns.io/raven" target="_blank" rel="noopener noreferrer">Raven CMS</a>
         <span aria-hidden="true">&middot;</span>
-        <a href="https://raven.lanterns.io" target="_blank" rel="noopener noreferrer">Documentation</a>
+        <a href="https://lanterns.io/raven" target="_blank" rel="noopener noreferrer">Documentation</a>
     </p>
 </footer>
 <?php

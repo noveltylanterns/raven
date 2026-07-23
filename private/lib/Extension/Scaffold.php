@@ -463,7 +463,7 @@ return static function (RouteHandler $router, array $context): void {
         'version' => '',
         'author' => '',
         'description' => '',
-        'docs' => 'https://raven.lanterns.io',
+        'docs' => 'https://lanterns.io/raven',
     ];
     if (is_file($extensionManifestFile)) {
         $manifestRaw = file_get_contents($extensionManifestFile);
@@ -904,7 +904,7 @@ $extensionName = trim((string) ($extensionMeta['name'] ?? 'Extension'));
 $extensionVersion = trim((string) ($extensionMeta['version'] ?? ''));
 $extensionAuthor = trim((string) ($extensionMeta['author'] ?? ''));
 $extensionDescription = trim((string) ($extensionMeta['description'] ?? ''));
-$extensionDocsUrl = trim((string) ($extensionMeta['docs'] ?? 'https://raven.lanterns.io'));
+$extensionDocsUrl = trim((string) ($extensionMeta['docs'] ?? 'https://lanterns.io/raven'));
 ?>
 <div class="card mb-3">
     <div class="card-body">
@@ -1042,22 +1042,29 @@ MARKDOWN;
     }
 
     /**
-     * Writes or replaces one relative symlink.
+     * Writes one approved local documentation alias.
      *
-     * @param string $linkPath Absolute path to the symlink entry.
-     * @param string $target Relative symlink target.
+     * @param string $linkPath Absolute path to an `AGENTS.md` or `CLAUDE.md` alias.
+     * @param string $target Relative target; must be the local `agents` file.
      * @return void
      */
     private function writeRelativeSymlink(string $linkPath, string $target): void
     {
-        // Remove existing file/symlink before recreating the requested alias.
+        if (
+            $target !== 'agents'
+            || !in_array(basename($linkPath), ['AGENTS.md', 'CLAUDE.md'], true)
+        ) {
+            throw new \RuntimeException('Only local AGENTS.md and CLAUDE.md aliases may be created.');
+        }
+
+        // Remove existing file/symlink before recreating the approved alias.
         if (is_link($linkPath) || is_file($linkPath)) {
             @unlink($linkPath);
         }
 
-        // Fail fast when the symlink cannot be created.
+        // Fail fast when the local documentation alias cannot be created.
         if (!@symlink($target, $linkPath)) {
-            throw new \RuntimeException('Failed to write symlink: ' . $linkPath);
+            throw new \RuntimeException('Failed to write documentation alias: ' . $linkPath);
         }
     }
 

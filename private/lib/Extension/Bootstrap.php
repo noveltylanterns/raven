@@ -64,12 +64,23 @@ final class Bootstrap
         }
 
         $extensionRoot = rtrim($root, '/\\') . '/private/ext/' . $directoryName;
-        $providerPath = $extensionRoot . '/ext.php';
+        // Refuse extension roots that contain links before resolving executable providers.
+        if (!Resolver::isSafeExtensionRoot($extensionRoot)) {
+            return [
+                'valid' => false,
+                'error' => 'Extension root contains an unsupported symlink.',
+                'boot' => null,
+                'scheduler' => false,
+                'storage' => $this->emptyStorage(),
+            ];
+        }
+
+        $providerPath = Resolver::providerPath($extensionRoot, 'ext.php');
         $manifest = is_array($manifest) ? $manifest : ($this->manifestValidator->readManifest($root, $directoryName) ?? []);
         $type = strtolower(trim((string) ($manifest['type'] ?? 'content')));
 
         // Missing ext.php is valid and simply means no runtime bootstrap contract.
-        if (!is_file($providerPath)) {
+        if ($providerPath === null) {
             return [
                 'valid' => true,
                 'error' => '',

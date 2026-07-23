@@ -28,6 +28,11 @@ final class Folder
      */
     public function ensure(string $directory, int $mode = 0775): bool
     {
+        // Never follow a symlink while provisioning a directory path.
+        if (is_link($directory)) {
+            return false;
+        }
+
         // Create the directory recursively when it does not already exist.
         if (!is_dir($directory) && !@mkdir($directory, $mode, true) && !is_dir($directory)) {
             return false;
@@ -46,6 +51,11 @@ final class Folder
      */
     public function create(string $directory, int $mode = 0775): bool
     {
+        // Refuse symlink targets so creation cannot modify a redirected directory.
+        if (is_link($directory)) {
+            return false;
+        }
+
         // Refuse to create when a file/dir already occupies the target path.
         if (is_dir($directory) || is_file($directory)) {
             return false;
@@ -68,6 +78,11 @@ final class Folder
      */
     public function removeEmpty(string $directory): bool
     {
+        // Remove a symlink entry itself without ever inspecting its target.
+        if (is_link($directory)) {
+            return @unlink($directory);
+        }
+
         // Missing directories are treated as already-removed for idempotence.
         if (!is_dir($directory)) {
             return true;
@@ -100,6 +115,12 @@ final class Folder
      */
     public function removeTree(string $directory): void
     {
+        // Remove a symlink entry itself without ever traversing its target.
+        if (is_link($directory)) {
+            @unlink($directory);
+            return;
+        }
+
         // Missing directories are treated as no-op for idempotence.
         if (!is_dir($directory)) {
             return;
@@ -113,7 +134,14 @@ final class Folder
 
         // Remove children before parent directories to satisfy filesystem constraints.
         foreach ($iterator as $item) {
-            $item->isDir() ? @rmdir($item->getPathname()) : @unlink($item->getPathname());
+            $path = $item->getPathname();
+            // Symlinked children are removed as entries, never traversed or chmodded.
+            if ($item->isLink()) {
+                @unlink($path);
+                continue;
+            }
+
+            $item->isDir() ? @rmdir($path) : @unlink($path);
         }
 
         @rmdir($directory);

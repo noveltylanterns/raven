@@ -378,7 +378,7 @@ final class Update
 
         $pathUniverse = array_values(array_unique(array_merge(array_keys($sourceFiles), array_keys($localFiles))));
         $ignoredPaths = $this->ignoredPaths($pathUniverse);
-        $extensionBinAliases = $this->extensionBinAliases(
+        $extensionBinLaunchers = $this->extensionBinLaunchers(
             $this->root . '/private/bin',
             'private/bin'
         );
@@ -387,7 +387,7 @@ final class Update
         $actions = [];
         // Walk source files first to generate create/update/skip actions.
         foreach ($sourceFiles as $relativePath => $sourcePath) {
-            $protectedReason = $this->protectedPathReason($relativePath, $ignoredPaths, $customThemeRoots, $customExtensionRoots, $extensionBinAliases);
+            $protectedReason = $this->protectedPathReason($relativePath, $ignoredPaths, $customThemeRoots, $customExtensionRoots, $extensionBinLaunchers);
             $localPath = $localFiles[$relativePath] ?? null;
             $localModified = isset($dirtyPaths[$relativePath]);
 
@@ -424,7 +424,7 @@ final class Update
                 continue;
             }
 
-            $protectedReason = $this->protectedPathReason($relativePath, $ignoredPaths, $customThemeRoots, $customExtensionRoots, $extensionBinAliases);
+            $protectedReason = $this->protectedPathReason($relativePath, $ignoredPaths, $customThemeRoots, $customExtensionRoots, $extensionBinLaunchers);
             $localModified = isset($dirtyPaths[$relativePath]);
             // Protected paths are always skipped from delete planning.
             if ($protectedReason !== null) {
@@ -507,7 +507,7 @@ final class Update
             // Delete operations remove the local file and remember parent dirs for pruning.
             if ($operation === 'delete') {
                 // Throw when a managed file delete fails.
-                if (is_file($targetPath) && !unlink($targetPath)) {
+                if ((is_file($targetPath) || is_link($targetPath)) && !unlink($targetPath)) {
                     throw new RuntimeException('Failed to delete ' . $relativePath . '.');
                 }
                 $deletedDirectories[] = str_replace('\\', '/', dirname($targetPath));
@@ -518,6 +518,11 @@ final class Update
             // Create/update operations require the source file to exist.
             if (!is_file($sourcePath)) {
                 throw new RuntimeException('Source file missing for ' . $relativePath . '.');
+            }
+
+            // Never copy through a local symlink into an unintended destination.
+            if (is_link($targetPath)) {
+                throw new RuntimeException('Refusing to overwrite symlinked update target: ' . $relativePath . '.');
             }
 
             // Abort when a target directory conflicts with the file path.
@@ -942,44 +947,39 @@ final class Update
     }
 
     /**
-     * Returns a map of relative paths for symlinks present in private/bin/.
+     * Returns generated regular launcher paths present in private/bin.
      *
-     * Extension bin commands are symlinks created by StorageProvisioner::ensureBinSymlinks().
-     * Stock CLI scripts are regular files. Scanning for symlinks here lets the updater
-     * distinguish between the two without any extension-registry coupling.
+     * Extension CLI commands use ordinary root-contained launchers so the updater must preserve
+     * them as local runtime state without granting any special treatment to symlinks.
      *
      * @param string $absoluteBinDir Absolute path to the private/bin directory.
-     * @param string $relativeBinDir Relative prefix for result keys (e.g. `private/bin`).
-     * @return array<string, bool> Map of relative path => true for each symlink found.
+     * @param string $relativeBinDir Relative prefix for result keys.
+     * @return array<string, bool> Map of generated launcher paths.
      */
-    private function extensionBinAliases(string $absoluteBinDir, string $relativeBinDir): array
+    private function extensionBinLaunchers(string $absoluteBinDir, string $relativeBinDir): array
     {
-        // Missing bin directories produce no alias map.
         if (!is_dir($absoluteBinDir)) {
             return [];
         }
 
-        $aliases = [];
-        $entries = scandir($absoluteBinDir) ?: [];
-        // Keep only symlink entries because extension aliases are provisioned symlinks.
-        foreach ($entries as $entry) {
-            if ($entry === '.' || $entry === '..') {
+        $launchers = [];
+        foreach (new \DirectoryIterator($absoluteBinDir) as $item) {
+            if ($item->isDot() || $item->isLink() || !$item->isFile()) {
                 continue;
             }
 
-            // Only symlinks are extension aliases; regular files are stock scripts.
-            if (!is_link($absoluteBinDir . '/' . $entry)) {
+            $content = file_get_contents($item->getPathname());
+            if ($content === false || !str_contains($content, 'RAVEN EXTENSION BIN LAUNCHER: ')) {
                 continue;
             }
 
-            $relative = $this->normalizeRelativePath($relativeBinDir . '/' . $entry);
-            // Keep only non-empty normalized alias paths.
+            $relative = $this->normalizeRelativePath($relativeBinDir . '/' . $item->getFilename());
             if ($relative !== '') {
-                $aliases[$relative] = true;
+                $launchers[$relative] = true;
             }
         }
 
-        return $aliases;
+        return $launchers;
     }
 
     /**
@@ -989,7 +989,7 @@ final class Update
      * @param array<string, bool> $ignoredPaths .gitignore-matched paths.
      * @param array<int, string> $customThemeRoots Custom theme root prefixes.
      * @param array<int, string> $customExtensionRoots Custom extension root prefixes.
-     * @param array<string, bool> $extensionBinAliases Pre-computed map of extension bin symlink paths.
+     * @param array<string, bool> $extensionBinLaunchers Generated extension bin launcher paths.
      * @return string|null Protection reason, or null when the path is safe to update.
      */
     private function protectedPathReason(
@@ -997,11 +997,16 @@ final class Update
         array $ignoredPaths,
         array $customThemeRoots,
         array $customExtensionRoots,
-        array $extensionBinAliases
+        array $extensionBinLaunchers
     ): ?string {
         // .gitignore wins first: ignored paths are never touched by updater actions.
         if (isset($ignoredPaths[$path])) {
             return 'Protected by .gitignore.';
+        }
+
+        // Preserve only the approved same-directory AGENTS.md/CLAUDE.md aliases.
+        if ($this->isApprovedGuideAlias($path)) {
+            return 'Protected first-party documentation alias.';
         }
 
         // Protect custom theme trees from core updater deletes/replacements.
@@ -1018,9 +1023,9 @@ final class Update
             }
         }
 
-        // Protect extension-provisioned bin symlink aliases.
-        if (isset($extensionBinAliases[$path])) {
-            return 'Protected extension bin alias.';
+        // Preserve generated regular launchers while never preserving symlinks.
+        if (isset($extensionBinLaunchers[$path])) {
+            return 'Protected extension bin launcher.';
         }
 
         return null;
@@ -1087,6 +1092,25 @@ final class Update
     }
 
     /**
+     * Returns whether a local path is an approved first-party documentation alias.
+     *
+     * @param string $path Relative repository path.
+     * @return bool True only for an AGENTS.md or CLAUDE.md link targeting local `agents`.
+     */
+    private function isApprovedGuideAlias(string $path): bool
+    {
+        $basename = basename($path);
+        if (!in_array($basename, ['AGENTS.md', 'CLAUDE.md'], true)) {
+            return false;
+        }
+
+        $absolute = $this->root . '/' . $path;
+        return is_link($absolute)
+            && readlink($absolute) === 'agents'
+            && is_file(dirname($absolute) . '/agents');
+    }
+
+    /**
      * Creates and returns a unique temporary directory path under .tmp/update.
      *
      * @return string Absolute temporary directory path (not yet created on disk).
@@ -1147,6 +1171,12 @@ final class Update
      */
     private function deleteTree(string $directory): void
     {
+        // Remove a symlink entry itself without traversing its target.
+        if (is_link($directory)) {
+            @unlink($directory);
+            return;
+        }
+
         // Missing/blank directories are treated as already cleaned.
         if ($directory === '' || !is_dir($directory)) {
             return;
@@ -1160,6 +1190,12 @@ final class Update
         // Remove children before parents to satisfy filesystem constraints.
         foreach ($iterator as $item) {
             $path = $item->getPathname();
+            // Remove symlink entries themselves and never recurse through their targets.
+            if ($item->isLink()) {
+                @unlink($path);
+                continue;
+            }
+
             // Remove directory nodes with rmdir and file nodes with unlink.
             if ($item->isDir()) {
                 @rmdir($path);

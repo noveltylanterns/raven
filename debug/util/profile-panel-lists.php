@@ -4,7 +4,7 @@
  * RAVEN CMS
  * ~/debug/util/profile-panel-lists.php
  * Query/timing profiler for panel list endpoints and list-query flows.
- * Docs: https://raven.lanterns.io
+ * Docs: https://lanterns.io/raven
  */
 
 declare(strict_types=1);
@@ -602,8 +602,8 @@ final class PanelListProfilerRunner
      */
     private function request(string $script, string $method, string $uri, array $post = []): array
     {
-        $payloadFile = tempnam('/tmp', 'raven-prof-payload-');
-        $outputFile = tempnam('/tmp', 'raven-prof-result-');
+        $payloadFile = tempnam($this->root . '/.tmp', 'raven-prof-payload-');
+        $outputFile = tempnam($this->root . '/.tmp', 'raven-prof-result-');
         if ($payloadFile === false || $outputFile === false) {
             throw new RuntimeException('Failed to allocate temporary request files.');
         }
