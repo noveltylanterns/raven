@@ -433,10 +433,13 @@ final class SharedController
 
         // Cache key guard: skip all session writes, filesystem stats, and the channel
         // DB query when nothing that affects nav content has changed since the last
-        // request. The key captures the full permission state, the active extension set,
-        // and the category/tag flags. Channel list staleness is accepted — the nav
-        // shortcuts self-heal on the next permission or extension change.
+        // request. The key captures the panel URL source, full permission state, active
+        // extension set, and category/tag flags. Including the panel URL is required
+        // because extension sidebar paths are stored in this session cache; otherwise a
+        // newly configured custom panel path would continue emitting stale `/panel/*`
+        // links until another nav-affecting setting changed.
         $navCacheKey = md5(implode('|', [
+            'panel:' . $panelUrl(''),
             implode(',', array_keys($enabledExtensionManifests)),
             (string) $rvn['auth']->panelService()->panelPermissionMask(),
             $categoryEnabled ? '1' : '0',

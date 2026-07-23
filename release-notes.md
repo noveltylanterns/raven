@@ -3,6 +3,8 @@
 *The machine is supposed to be logging patches & mods to this file. Sometimes it does, sometimes it doesn't. It might be useful for historical architectural context to your Agent at one point.*
 
 ### July 23, 2026
+
+- Fixed cached extension sidebar navigation retaining `/panel/*` URLs after an installation changes `panel.path`; the navigation cache now invalidates whenever the configured panel URL changes, keeping extension links on the active custom panel prefix.
 - Removed the obsolete page-image table migration shim and closed the retired EditorMedia compatibility fallback after auditing the canonical media schema and surviving gallery references.
 - Reorganized the Config Editor Debug tab so all `logging.*` controls appear together in a dedicated Event Logger section above Output Profiler Visibility.
 - Fixed user-editor saves demoting Admin accounts to Guest when a display-name-only edit omitted the disabled primary-group control; Admin membership and panel access are now preserved, and the Database Manager sidebar entry returns when the account retains its configuration permission.
