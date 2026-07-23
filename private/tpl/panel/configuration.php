@@ -86,6 +86,7 @@ $contentTagsConfigFields = [];
 $databaseConfigFields = [];
 $databaseTablePrefixField = null;
 $debugConfigFields = [];
+$loggingConfigFields = [];
 $mediaUploadConfigFields = [];
 $mediaImageSizeConfigFields = [];
 $avatarConfigFields = [];
@@ -159,10 +160,10 @@ foreach ($configFields as $field) {
         continue;
     }
 
-    // Logging settings live in their own config section but appear in the Debug tab
-    // so all diagnostic controls are in one place.
+    // Keep logger controls in a separate bucket so the Debug tab can give them
+    // their own heading without changing their top-level config ownership.
     if (str_starts_with($path, 'logging.')) {
-        $debugConfigFields[] = $field;
+        $loggingConfigFields[] = $field;
         continue;
     }
 
@@ -229,12 +230,6 @@ if ($debugConfigFields !== []) {
         'debug.show_trace' => 50,
         'debug.show_request' => 60,
         'debug.show_environment' => 70,
-        // Logging settings follow the profiler section in the same tab.
-        'logging.errors' => 100,
-        'logging.warnings' => 110,
-        'logging.info' => 120,
-        'logging.retention_days' => 130,
-        'logging.syslog' => 140,
     ];
 
     usort(
@@ -244,6 +239,31 @@ if ($debugConfigFields !== []) {
             $rightPath = (string) ($right['path'] ?? '');
             $leftRank = (int) ($debugOrder[$leftPath] ?? 1000);
             $rightRank = (int) ($debugOrder[$rightPath] ?? 1000);
+
+            if ($leftRank !== $rightRank) {
+                return $leftRank <=> $rightRank;
+            }
+
+            return strcasecmp($leftPath, $rightPath);
+        }
+    );
+}
+
+$loggingOrder = [
+    'logging.errors' => 10,
+    'logging.warnings' => 20,
+    'logging.info' => 30,
+    'logging.syslog' => 40,
+    'logging.retention_days' => 50,
+];
+if ($loggingConfigFields !== []) {
+    usort(
+        $loggingConfigFields,
+        static function (array $left, array $right) use ($loggingOrder): int {
+            $leftPath = (string) ($left['path'] ?? '');
+            $rightPath = (string) ($right['path'] ?? '');
+            $leftRank = (int) ($loggingOrder[$leftPath] ?? 1000);
+            $rightRank = (int) ($loggingOrder[$rightPath] ?? 1000);
 
             if ($leftRank !== $rightRank) {
                 return $leftRank <=> $rightRank;
@@ -1304,21 +1324,32 @@ $configurationToolbarItems = [
                             aria-labelledby="config-debug-tab"
                             tabindex="0"
                         >
-                            <?php if ($debugConfigFields === []): ?>
+                            <?php if ($debugConfigFields === [] && $loggingConfigFields === []): ?>
                                 <p class="text-muted mb-0">No configuration fields available.</p>
                             <?php else: ?>
+                                <?php if ($loggingConfigFields !== []): ?>
+                                    <h3>Event Logger</h3>
+                                    <h5>Logging Options</h5>
+                                    <?php foreach ($loggingConfigFields as $loggingField): ?>
+                                        <?php $renderConfigField($loggingField); ?>
+                                    <?php endforeach; ?>
+                                <?php endif; ?>
+
                                 <?php if ($debugVisibilityConfigFields !== []): ?>
-                                    <h3>Output Profiler Visibility</h3>
+                                    <?php if ($loggingConfigFields !== []): ?>
+                                        <hr class="my-4">
+                                    <?php endif; ?>
+                                    <h3>Output Profiler</h3>
+                                    <h5>Display Visibility</h5>
                                     <?php foreach ($debugVisibilityConfigFields as $debugField): ?>
                                         <?php $renderConfigField($debugField); ?>
                                     <?php endforeach; ?>
                                 <?php endif; ?>
 
                                 <?php if ($debugSectionsConfigFields !== []): ?>
-                                    <?php if ($debugVisibilityConfigFields !== []): ?>
-                                        <hr class="my-4">
+                                    <?php if ($loggingConfigFields !== [] || $debugVisibilityConfigFields !== []): ?>
                                     <?php endif; ?>
-                                    <h3>Expanded Profiler Sections</h3>
+                                    <h5>Expanded Profiler Sections</h5>
                                     <?php foreach ($debugSectionsConfigFields as $debugField): ?>
                                         <?php $renderConfigField($debugField); ?>
                                     <?php endforeach; ?>

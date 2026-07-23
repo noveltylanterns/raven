@@ -3,6 +3,7 @@
 *The machine is supposed to be logging patches & mods to this file. Sometimes it does, sometimes it doesn't. It might be useful for historical architectural context to your Agent at one point.*
 
 ### July 23, 2026
+- Reorganized the Config Editor Debug tab so all `logging.*` controls appear together in a dedicated Event Logger section above Output Profiler Visibility.
 - Fixed user-editor saves demoting Admin accounts to Guest when a display-name-only edit omitted the disabled primary-group control; Admin membership and panel access are now preserved, and the Database Manager sidebar entry returns when the account retains its configuration permission.
 - Fixed extension symlink-boundary checks emitting `open_basedir` warnings while probing inaccessible parent directories; resolver and shared security checks now skip protected ancestors and reject paths outside the active allowlist.
 - Fixed group-editor saves crashing after persistence because the controller still referenced the removed `groupDataParser`; post-save image reconciliation now reloads through `GroupRead`.
