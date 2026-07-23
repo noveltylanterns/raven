@@ -58,7 +58,7 @@ final class SchemaComponents
     {
         // Lazily construct bootstrapper once and reuse it for all callers.
         if ($this->schemaBootstrap === null) {
-            $this->schemaBootstrap = new SchemaBootstrap($this->schemaIntrospector());
+            $this->schemaBootstrap = new SchemaBootstrap();
         }
 
         return $this->schemaBootstrap;

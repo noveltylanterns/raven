@@ -17,7 +17,7 @@ use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\Transport\Upload;
 
 /**
- * Gallery data helpers for the page editor: DB row hydration and POST payload normalization.
+ * Gallery POST-payload helpers for the page editor.
  */
 final class EditorMedia
 {

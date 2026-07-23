@@ -131,13 +131,12 @@ removed or moved during the recent library refactor.
 
 # Legacy Fallback Log
 Running ledger of backward-friendly and legacy shims added during the cleanup work,
-so they can be removed later once the new schema/contracts are fully settled. Items below
-are the remaining classified legacy/compatibility lanes after the current purge pass.
+so they can be removed later once the new schema/contracts are fully settled. No remaining
+legacy fallback items are currently open.
 
 ---
 
-- **SchemaBootstrap::renameLegacyMediaTables()** — migration shim that renames `{prefix}page_images` → `{prefix}media` and `{prefix}page_image_variants` → `{prefix}media_variants` on first bootstrap after the namespace rename. Safe to remove once all active installs have been through a bootstrap with the new table names. Check before pruning. Audited on 2026-05-06; intentionally retained as the sole remaining Schema compatibility path.
-
-- **EditorMedia::hydrate() + stripEditorMediaColumns()** — both methods had zero callers as of 2026-05-07 and have been commented out in `lib/View/Panel/EditorMedia.php`. Delete the commented block once confirmed nothing depends on them at runtime (e.g. extension or theme code calling them dynamically).
+- Closed 2026-07-23: removed the obsolete page-image table rename migration after confirming Foundry uses only the canonical media tables.
+- Closed 2026-07-23: confirmed the dead `EditorMedia` hydration/column-stripping block was already absent and removed its remaining stale references.
 
 ---

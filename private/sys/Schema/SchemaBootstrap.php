@@ -18,18 +18,6 @@ use PDO;
  */
 final class SchemaBootstrap
 {
-    private SchemaIntrospector $introspector;
-
-    /**
-     * Accepts an optional introspector used for legacy-table rename checks.
-     *
-     * @param SchemaIntrospector|null $introspector Cross-driver schema inspection helper; defaults to a fresh instance.
-     */
-    public function __construct(?SchemaIntrospector $introspector = null)
-    {
-        $this->introspector = $introspector ?? new SchemaIntrospector();
-    }
-
     /**
      * Creates or normalizes the base Raven app schema for one database driver.
      *
@@ -40,8 +28,6 @@ final class SchemaBootstrap
      */
     public function ensureSchema(PDO $db, string $driver, string $prefix): void
     {
-        $this->renameLegacyMediaTables($db, $driver, $prefix);
-
         // SQLite bootstrap path uses text-friendly types and IF NOT EXISTS semantics.
         if ($driver === 'sqlite') {
             $pagesTable = $prefix . 'pages';
@@ -517,57 +503,6 @@ final class SchemaBootstrap
         $db->exec('CREATE INDEX IF NOT EXISTS idx_' . $prefix . 'auth_failures_last_failed ON ' . $prefix . 'auth_failures (last_failed)');
         // Shortcode registry is extension-owned via `{slug}/shortcodes.php`; drop deprecated table when present.
         $db->exec('DROP TABLE IF EXISTS ' . $prefix . 'shortcodes');
-    }
-
-    /**
-     * Renames legacy page-image tables to the new media-table names before schema creation runs.
-     *
-     * This keeps existing installs on the live data set instead of creating new empty
-     * `media` tables beside populated legacy `page_images` tables after the namespace rename.
-     *
-     * @param PDO    $db     App database connection.
-     * @param string $driver Active PDO driver name.
-     * @param string $prefix Active Raven table prefix.
-     * @return void
-     */
-    private function renameLegacyMediaTables(PDO $db, string $driver, string $prefix): void
-    {
-        $this->renameLegacyTable($db, $driver, $prefix . 'page_images', $prefix . 'media');
-        $this->renameLegacyTable($db, $driver, $prefix . 'page_image_variants', $prefix . 'media_variants');
-    }
-
-    /**
-     * Renames one legacy table only when the old name exists and the new name does not.
-     *
-     * @param PDO    $db       App database connection.
-     * @param string $driver   Active PDO driver name.
-     * @param string $fromName Legacy physical table name.
-     * @param string $toName   Replacement physical table name.
-     * @return void
-     */
-    private function renameLegacyTable(PDO $db, string $driver, string $fromName, string $toName): void
-    {
-        // Rename only when legacy table exists and replacement table does not.
-        if (!$this->introspector->tableExists($db, $driver, $fromName) || $this->introspector->tableExists($db, $driver, $toName)) {
-            return;
-        }
-
-        // MySQL supports direct RENAME TABLE syntax.
-        if ($driver === 'mysql') {
-            $db->exec('RENAME TABLE ' . $fromName . ' TO ' . $toName);
-            return;
-        }
-
-        // PostgreSQL rename path requires quoted identifiers.
-        if ($driver === 'pgsql') {
-            $db->exec(
-                'ALTER TABLE ' . $this->introspector->quotePgIdentifier($fromName) . '
-                 RENAME TO ' . $this->introspector->quotePgIdentifier($toName)
-            );
-            return;
-        }
-
-        $db->exec('ALTER TABLE ' . $fromName . ' RENAME TO ' . $toName);
     }
 
 }
