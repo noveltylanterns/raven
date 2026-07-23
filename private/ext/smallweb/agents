@@ -11,5 +11,7 @@ If any part of Raven's generic extension-building process is vague or unclear, n
 - Imports accept the shared Raven package archive formats, reject empty archives,
   flatten a single wrapper directory, and merge extracted files into the
   selected protocol without deleting unrelated local entries.
+- Bare `.tar` uploads are normalized through the shared TAR handler because PHP upload
+  temporary paths do not retain the original filename suffix.
 - Exports use the shared directory archive formats and are unavailable when the
   selected webroot is empty.

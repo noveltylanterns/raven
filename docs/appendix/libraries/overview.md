@@ -10,7 +10,7 @@ Library references extracted from `private/lib/*` public/protected methods and g
 - `auth` (150 symbols)
 - `database` (22 symbols)
 - `extension` (120 symbols)
-- `format` (89 symbols)
+- `format` (92 symbols)
 - `mail` (17 symbols)
 - `media` (74 symbols)
 - `parser` (49 symbols)

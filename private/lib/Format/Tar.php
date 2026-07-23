@@ -62,15 +62,17 @@ final class Tar
         // Wrap PharData open/extract errors in a Raven-format runtime exception.
         $temporaryDirectory = $this->tempDir();
         try {
-            $phar = new PharData($archivePath);
-            $phar->extractTo($temporaryDirectory, $subDir, true);
+            $this->withPharArchive($archivePath, function (string $pharArchivePath) use ($targetDir, $subDir, $temporaryDirectory): void {
+                $phar = new PharData($pharArchivePath);
+                $phar->extractTo($temporaryDirectory, $subDir, true);
 
-            // The direct PharData target can contain linked members or follow a
-            // pre-existing child link, so rebuild the result through a clean tree.
-            if (!is_dir($targetDir) && !mkdir($targetDir, 0775, true) && !is_dir($targetDir)) {
-                throw new RuntimeException('Failed to recreate TAR extraction target directory.');
-            }
-            $this->copyTree($temporaryDirectory, $targetDir);
+                // The direct PharData target can contain linked members or follow a
+                // pre-existing child link, so rebuild the result through a clean tree.
+                if (!is_dir($targetDir) && !mkdir($targetDir, 0775, true) && !is_dir($targetDir)) {
+                    throw new RuntimeException('Failed to recreate TAR extraction target directory.');
+                }
+                $this->copyTree($temporaryDirectory, $targetDir);
+            });
         } catch (\Throwable $e) {
             throw new RuntimeException(
                 'Failed to extract TAR archive "' . basename($archivePath) . '": ' . $e->getMessage(),
@@ -104,7 +106,25 @@ final class Tar
 
         // Wrap PharData open errors in a Raven-format runtime exception.
         try {
-            $phar = new PharData($archivePath);
+            $this->withPharArchive($archivePath, function (string $pharArchivePath) use ($entry, $targetPath): void {
+                $phar = new PharData($pharArchivePath);
+                // PharData exposes entries via ArrayAccess keyed by entry name.
+                if (!isset($phar[$entry])) {
+                    throw new RuntimeException('Entry "' . $entry . '" not found in TAR archive.');
+                }
+
+                if (isset($this->symlinkEntries($pharArchivePath)[$entry])) {
+                    throw new RuntimeException('Entry "' . $entry . '" is a symbolic link and cannot be extracted directly.');
+                }
+
+                $contents = file_get_contents('phar://' . $pharArchivePath . '/' . $entry);
+                // Entry content must be readable through the phar stream wrapper.
+                if ($contents === false) {
+                    throw new RuntimeException('Failed to read entry "' . $entry . '" from TAR archive.');
+                }
+
+                $this->writeExtractedEntry($targetPath, $contents);
+            });
         } catch (\Throwable $e) {
             throw new RuntimeException(
                 'Failed to open TAR archive "' . basename($archivePath) . '": ' . $e->getMessage(),
@@ -113,22 +133,6 @@ final class Tar
             );
         }
 
-        // PharData exposes entries via ArrayAccess keyed by entry name.
-        if (!isset($phar[$entry])) {
-            throw new RuntimeException('Entry "' . $entry . '" not found in TAR archive.');
-        }
-
-        if (isset($this->symlinkEntries($archivePath)[$entry])) {
-            throw new RuntimeException('Entry "' . $entry . '" is a symbolic link and cannot be extracted directly.');
-        }
-
-        $contents = file_get_contents('phar://' . $archivePath . '/' . $entry);
-        // Entry content must be readable through the phar stream wrapper.
-        if ($contents === false) {
-            throw new RuntimeException('Failed to read entry "' . $entry . '" from TAR archive.');
-        }
-
-        $this->writeExtractedEntry($targetPath, $contents);
     }
 
     /**
@@ -487,48 +491,50 @@ final class Tar
 
         // Wrap PharData read/list errors in a Raven-format runtime exception.
         try {
-            $phar = new PharData($archivePath);
-            $entries = [];
-            $skippedLinkPrefixes = [];
-            // Traverse archive entries and collect normalized entry paths.
-            foreach (new \RecursiveIteratorIterator($phar, \RecursiveIteratorIterator::SELF_FIRST) as $file) {
-                // Keep only PharFileInfo entries returned by the iterator.
-                if ($file instanceof \PharFileInfo) {
-                    $entryPath = $this->pharEntryPath($file, $archivePath);
-                    $normalizedPath = trim(str_replace('\\', '/', $entryPath), '/');
-                    if ($normalizedPath === '' || !$this->isSafeEntryPath($normalizedPath)) {
-                        continue;
-                    }
-
-                    if (isset($symlinkEntries[$normalizedPath])) {
-                        continue;
-                    }
-
-                    foreach ($skippedLinkPrefixes as $prefix) {
-                        if ($normalizedPath === $prefix || str_starts_with($normalizedPath, $prefix . '/')) {
-                            continue 2;
+            return $this->withPharArchive($archivePath, function (string $pharArchivePath) use ($archivePath, $symlinkEntries): array {
+                $phar = new PharData($pharArchivePath);
+                $entries = [];
+                $skippedLinkPrefixes = [];
+                // Traverse archive entries and collect normalized entry paths.
+                foreach (new \RecursiveIteratorIterator($phar, \RecursiveIteratorIterator::SELF_FIRST) as $file) {
+                    // Keep only PharFileInfo entries returned by the iterator.
+                    if ($file instanceof \PharFileInfo) {
+                        $entryPath = $this->pharEntryPath($file, $pharArchivePath);
+                        $normalizedPath = trim(str_replace('\\', '/', $entryPath), '/');
+                        if ($normalizedPath === '' || !$this->isSafeEntryPath($normalizedPath)) {
+                            continue;
                         }
-                    }
 
-                    if ($file->isLink()) {
-                        if ($file->isDir()) {
-                            $skippedLinkPrefixes[] = $normalizedPath;
+                        if (isset($symlinkEntries[$normalizedPath])) {
+                            continue;
                         }
-                        continue;
-                    }
 
-                    // Skip entries that normalize to empty relative paths.
-                    if ($entryPath !== '') {
-                        // Preserve explicit directory markers with trailing slash.
-                        if ($file->isDir()) {
-                            $entryPath = rtrim($entryPath, '/') . '/';
+                        foreach ($skippedLinkPrefixes as $prefix) {
+                            if ($normalizedPath === $prefix || str_starts_with($normalizedPath, $prefix . '/')) {
+                                continue 2;
+                            }
                         }
-                        $entries[] = $entryPath;
+
+                        if ($file->isLink()) {
+                            if ($file->isDir()) {
+                                $skippedLinkPrefixes[] = $normalizedPath;
+                            }
+                            continue;
+                        }
+
+                        // Skip entries that normalize to empty relative paths.
+                        if ($entryPath !== '') {
+                            // Preserve explicit directory markers with trailing slash.
+                            if ($file->isDir()) {
+                                $entryPath = rtrim($entryPath, '/') . '/';
+                            }
+                            $entries[] = $entryPath;
+                        }
                     }
                 }
-            }
 
-            return $entries;
+                return $entries;
+            });
         } catch (\Throwable $e) {
             throw new RuntimeException(
                 'Failed to list entries in TAR archive "' . basename($archivePath) . '": ' . $e->getMessage(),
@@ -754,6 +760,38 @@ final class Tar
         }
 
         return ltrim($file->getFilename(), '/');
+    }
+
+    /**
+     * Runs one PharData operation against an archive path with a Phar-compatible suffix.
+     *
+     * PHP upload temporary files commonly have no filename suffix. PharData requires a
+     * recognized archive extension even when the underlying bytes are a valid TAR, so a
+     * suffixless upload is copied to a temporary `.tar` path for the duration of the read.
+     *
+     * @template T
+     * @param string $archivePath Absolute source TAR path, possibly suffixless.
+     * @param callable(string): T $operation Callback receiving the Phar-compatible path.
+     * @return T Callback result.
+     * @throws RuntimeException When the temporary TAR copy cannot be prepared.
+     */
+    private function withPharArchive(string $archivePath, callable $operation): mixed
+    {
+        $lowerPath = strtolower($archivePath);
+        if (str_ends_with($lowerPath, '.tar') || str_ends_with($lowerPath, '.tar.gz')) {
+            return $operation($archivePath);
+        }
+
+        $temporaryTarPath = $this->tempTar();
+        try {
+            if (!@copy($archivePath, $temporaryTarPath)) {
+                throw new RuntimeException('Failed to prepare suffixless TAR upload for PharData.');
+            }
+
+            return $operation($temporaryTarPath);
+        } finally {
+            @unlink($temporaryTarPath);
+        }
     }
 
     /**
