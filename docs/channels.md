@@ -200,6 +200,7 @@ When channel behavior changes, update this document in the same task. That inclu
 - `/{channel}/{YYYY-MM-DD}-{page-id}`
 - `/{channel}/{YYYY-MM}-{page-id}`
 - `Rich Text (TinyMCE)`
+- `Code`
 - `Plaintext`
 - `Markdown`
 - `Auto`

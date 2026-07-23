@@ -41,6 +41,12 @@ The page editor is split into three main areas:
 
 New pages must be saved before gallery operations are available.
 
+The panel editor exposes these corresponding field controls:
+
+- `Display title?`, `Description`, `Publish At`, and `Expire At`
+- `Upload Image`, `Select`, `Alt / Title`, and `Caption`
+- `Include in gallery` and `Use as cover image`
+
 ## 3) Page Storage Model
 
 Core page persistence:

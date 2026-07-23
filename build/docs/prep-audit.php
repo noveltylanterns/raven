@@ -382,7 +382,14 @@ final class PrepAudit
                     continue;
                 }
 
-                $paths[] = str_replace('\\', '/', $path);
+                // private/dat contains generated runtime state and seed fragments, not source
+                // modules; those files intentionally do not carry the source-file documentation header.
+                $normalizedPath = str_replace('\\', '/', $path);
+                if (str_contains($normalizedPath, 'private/dat/')) {
+                    continue;
+                }
+
+                $paths[] = $normalizedPath;
             }
         }
 

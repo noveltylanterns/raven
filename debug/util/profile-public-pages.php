@@ -14,16 +14,15 @@ use Raven\Core\Controller\Public\ChannelController;
 use Raven\Core\Controller\Public\FeedController;
 use Raven\Core\Controller\Public\GroupController;
 use Raven\Core\Controller\Public\PageController;
+use Raven\Core\Controller\Public\ProfileController;
 use Raven\Core\Controller\Public\SharedController;
 use Raven\Core\Controller\Public\TagController;
-use Raven\Core\Controller\Public\UserController;
 use Raven\Core\Debug\RequestProfiler;
 use Raven\Core\Repository\ChannelRead;
 use Raven\Core\Repository\GroupRead;
 use Raven\Core\Repository\PageRead;
 use Raven\Core\Repository\UserRead;
 use Raven\Core\Runtime\Public\RuntimeBuilder;
-use Raven\Lib\Parser\ChannelParser;
 use Raven\Lib\View\Taxonomy;
 
 error_reporting(E_ALL & ~E_WARNING & ~E_NOTICE & ~E_DEPRECATED);
@@ -44,7 +43,7 @@ final class PublicProfileControllerAdapter
         private readonly FeedController $feed,
         private readonly CategoryController $category,
         private readonly TagController $tag,
-        private readonly UserController $user,
+        private readonly ProfileController $user,
         private readonly GroupController $group,
         private readonly SharedController $requestContext
     ) {
@@ -183,7 +182,6 @@ final class PublicRouteProfilerRunner
 
         // Build repos directly; the shared bootstrap service map was removed.
         $channelRepo = new ChannelRead($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix'], (string) $rvn['root'] . '/private/dat/channel');
-        $channelParser = new ChannelParser($rvn['config'], $rvn['input'], $channelRepo);
         $categoryEnabled = (bool) ($configSnapshot['category']['enabled'] ?? false);
         $tagEnabled = (bool) ($configSnapshot['tag']['enabled'] ?? false);
         /** @var PageRead $pages */
@@ -214,7 +212,7 @@ final class PublicRouteProfilerRunner
         $profileRoutesEnabled = $profilePrefix !== '' && in_array($profileMode, ['public_full', 'public_limited', 'private'], true);
         $groupRoutesEnabled = $groupPrefix !== '' && in_array($groupMode, ['public', 'private'], true);
 
-        $channels = $channelParser->listRoutingOptions();
+        $channels = $channelRepo->listRoutingOptions();
         $categories = [];
         $tags = [];
         if ($categoryPrefix !== '' || $tagPrefix !== '') {
@@ -507,8 +505,8 @@ final class PublicRouteProfilerRunner
         $categoryFactory = $rvn['public_category_controller'];
         /** @var callable(): TagController $tagFactory */
         $tagFactory = $rvn['public_tag_controller'];
-        /** @var callable(): UserController $userFactory */
-        $userFactory = $rvn['public_user_controller'];
+        /** @var callable(): ProfileController $userFactory */
+        $userFactory = $rvn['public_profile_controller'];
         /** @var callable(): GroupController $groupFactory */
         $groupFactory = $rvn['public_group_controller'];
         /** @var callable(): SharedController $requestContextFactory */

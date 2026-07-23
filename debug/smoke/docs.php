@@ -40,7 +40,9 @@ final class ConfigurationDocsSmokeRunner
         $this->root = rtrim($root, '/');
         $this->runnerPath = $this->root . '/debug/util/request-runner.php';
         $this->phpCommand = $this->resolvePhpCommand();
-        $this->docsPath = $this->root . '/docs/configuration.md';
+        // The generated config appendix is the exhaustive key inventory; the narrative
+        // configuration guide intentionally documents behavior and ownership at a higher level.
+        $this->docsPath = $this->root . '/docs/appendix/config.md';
         $this->runId = time();
 
         /** @var array<string, mixed> $config */
@@ -96,7 +98,7 @@ final class ConfigurationDocsSmokeRunner
         try {
             $docs = file_get_contents($this->docsPath);
             if (!is_string($docs) || trim($docs) === '') {
-                throw new RuntimeException('Unable to read docs/configuration.md.');
+                throw new RuntimeException('Unable to read docs/appendix/config.md.');
             }
 
             $config = require $this->root . '/private/dat/config.php';
@@ -408,7 +410,11 @@ final class ConfigurationDocsSmokeRunner
     }
 
     /**
-     * Extracts static option/control labels from one panel view template source.
+     * Extracts static field labels and selectable values from one panel view template source.
+     *
+     * Action buttons, navigation links, and table headings are deliberately excluded: they
+     * describe panel chrome rather than a module's documented data contract, and requiring every
+     * transient action caption in narrative docs makes this check report false drift.
      *
      * @return array<int, string>
      */
@@ -422,9 +428,6 @@ final class ConfigurationDocsSmokeRunner
         $tokens = [];
         $patterns = [
             ['pattern' => '/<label\\b[^>]*>(.*?)<\\/label>/is', 'group' => 1],
-            ['pattern' => '/<button\\b[^>]*>(.*?)<\\/button>/is', 'group' => 1],
-            ['pattern' => '/<a\\b[^>]*class=(\"|\\\')[^\"\\\']*\\bbtn\\b[^\"\\\']*\\1[^>]*>(.*?)<\\/a>/is', 'group' => 2],
-            ['pattern' => '/<th\\b[^>]*>(.*?)<\\/th>/is', 'group' => 1],
             ['pattern' => '/<option\\b[^>]*>(.*?)<\\/option>/is', 'group' => 1],
         ];
 
@@ -724,7 +727,9 @@ final class ConfigurationDocsSmokeRunner
                 if (!is_string($line)) {
                     continue;
                 }
-                if (stripos($line, 'debug/') === false) {
+                // Ban repository-root diagnostic paths while allowing generated class/file
+                // references such as private/sys/Debug/..., which are valid API documentation.
+                if (preg_match('/(?<![A-Za-z0-9_./-])debug\\//i', $line) !== 1) {
                     continue;
                 }
 

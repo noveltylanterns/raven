@@ -18,7 +18,6 @@ use Raven\Core\Repository\TagRead;
 use Raven\Core\Repository\UserRead;
 use Raven\Core\Repository\UserWrite;
 use Raven\Core\Debug\RequestProfiler;
-use Raven\Lib\Parser\ChannelParser;
 use Raven\Core\Repository\ConfigRead;
 
 error_reporting(E_ALL & ~E_WARNING & ~E_NOTICE & ~E_DEPRECATED);
@@ -291,7 +290,6 @@ final class PanelListProfilerRunner
         $tagEnabled = $this->featureEnabled($rvn, 'tag.enabled', true);
         // Build repos directly; the shared bootstrap service map was removed.
         $channelRepo = new ChannelRead($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix'], (string) $rvn['root'] . '/private/dat/channel');
-        $channelParser = new ChannelParser($rvn['config'], $rvn['input'], $channelRepo);
         $pageRepo = new PageRead($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix'], $channelRepo, $categoryEnabled, $tagEnabled);
         $redirectRepo = new RedirectRead($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix'], $channelRepo);
         $groupRepo = new GroupRead($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix']);
@@ -320,7 +318,7 @@ final class PanelListProfilerRunner
             $routes['tag'] = '/' . $this->panelPath . '/tag';
         }
 
-        $channelOptions = $channelParser->listOptions();
+        $channelOptions = $channelRepo->listOptions();
         if ($channelOptions !== []) {
             $channelSlug = trim((string) ($channelOptions[0]['slug'] ?? ''));
             if ($channelSlug !== '') {
@@ -445,7 +443,7 @@ final class PanelListProfilerRunner
         $tagId = null;
         $groupName = null;
 
-        $channelOptions = $channelParser->listOptions();
+        $channelOptions = $channelRepo->listOptions();
         if ($channelOptions !== []) {
             $value = trim((string) ($channelOptions[0]['slug'] ?? ''));
             if ($value !== '') {
@@ -480,7 +478,7 @@ final class PanelListProfilerRunner
                 $pageIds = array_values(array_map(static fn (array $row): int => (int) ($row['id'] ?? 0), $rows));
                 $pageRepo->taxonomyAssignmentIdsByPage($pageIds);
             },
-            'channel' => static fn () => $channelParser->listAll(),
+            'channel' => static fn () => $channelRepo->listAll(),
             'redirect' => static fn () => $redirectRepo->listAll(),
             'groups' => static fn () => $groupRepo->listAll(),
             'users' => static fn () => $userRepo->listAll(),
@@ -511,8 +509,8 @@ final class PanelListProfilerRunner
                 $pageIds = array_values(array_map(static fn (array $row): int => (int) ($row['id'] ?? 0), $rows));
                 $pageRepo->taxonomyAssignmentIdsByPage($pageIds);
             },
-            'channels' => static function () use ($channelParser): void {
-                $channelParser->listPageForPanel(50, 0);
+            'channels' => static function () use ($channelRepo): void {
+                $channelRepo->listPage(50, 0);
             },
             'redirects' => static function () use ($redirectRepo): void {
                 $redirectRepo->countForPanel();
