@@ -11,10 +11,6 @@ This is the secondary Build Mode backlog file. If the user asks about long-term 
 - Update this file as you go (add sub-checklists as need be) to keep track of your progress, in case the session breaks and we have to start over.
 
 
-## Documentation Rewrite
-The documentation project has been moved to `build/todo.md` (2026-05-20) so it can be tracked with active build work and current execution batches.
-
-
 ## Finish Updater
 We've been making this one up as we go along:
 - [ ] It needs a cohesive plan to make it work long term.
