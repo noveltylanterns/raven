@@ -66,6 +66,8 @@ When managed local files have local changes, Raven reports them in `Dry Run`.
 
 - default update behavior blocks those overwrites
 - `Allow overwrite of local core changes` lets `Update Now` replace them anyway
+- Dry-run action rows use future-tense wording because they describe planned changes; completed
+  `Update Now` rows use past-tense wording because the file operations have already run.
 
 ## Current Scope
 

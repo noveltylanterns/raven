@@ -10,6 +10,7 @@
 - Fixed group-editor saves crashing after persistence because the controller still referenced the removed `groupDataParser`; post-save image reconciliation now reloads through `GroupRead`.
 - Completed the smoke/debug tooling reference-retirement audit: profilers now use `ChannelRead` and `public_profile_controller`, config key parity is restored, docs coverage checks target the generated config appendix without UI-chrome false positives, route snapshots match the current install, and the full PHP/debug matrix passes (with contact workflow skipped while that extension is disabled).
 - Fixed Smallweb bare `.tar` imports: suffixless PHP upload paths are now staged under a temporary `.tar` name before PharData reads them, with a regression check covering the shared Smallweb package-import path.
+- Corrected updater action details so Dry Run remains future-tense while completed Update Now results report file changes in past tense.
 
 ### July 22, 2026
 - Removed executable symlink support from extension loading and CLI storage; extension providers, class roots, and manifests must be symlink-free, while extension commands use regular root-contained launchers in `private/bin/`.

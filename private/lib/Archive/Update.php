@@ -115,7 +115,7 @@ final class Update
             $workspace = $this->prepareWorkspace($source, true);
             // Always clean temporary workspace state after dry-run planning.
             try {
-                $plan = $this->buildPlan($workspace, true);
+                $plan = $this->buildPlan($workspace, true, true);
                 // Surface a distinct warning when local managed-file changes block overwrite.
                 $message = $plan['summary']['blocked_count'] > 0 && !$allowOverwrite
                     ? 'Dry run found local managed-file changes that would require overwrite.'
@@ -160,7 +160,7 @@ final class Update
             $workspace = $this->prepareWorkspace($source, true);
             // Always clean temporary workspace state after update attempts.
             try {
-                $plan = $this->buildPlan($workspace, true);
+                $plan = $this->buildPlan($workspace, true, false);
 
                 // Block apply operations when overwrite is disabled and local changes conflict.
                 if ($plan['summary']['blocked_count'] > 0 && !$allowOverwrite) {
@@ -350,12 +350,13 @@ final class Update
      *
      * @param array<string, mixed> $workspace Workspace descriptor from prepareWorkspace().
      * @param bool $preserveWorkspace Whether to skip temp-dir cleanup after plan build.
+     * @param bool $dryRun Whether action details should describe planned future operations.
      * @return array{
      *   actions: array<int, array<string, mixed>>,
      *   summary: array<string, int>
      * } Action list and summary counters.
      */
-    private function buildPlan(array $workspace, bool $preserveWorkspace): array
+    private function buildPlan(array $workspace, bool $preserveWorkspace, bool $dryRun): array
     {
         $sourceTree = (string) ($workspace['source_tree'] ?? '');
         // Plan building requires a checked-out source tree to diff against local files.
@@ -399,7 +400,13 @@ final class Update
 
             // Missing local managed files are staged as creates.
             if (!is_string($localPath)) {
-                $actions[] = $this->planAction($relativePath, 'create', 'New file from source.', false, false);
+                $actions[] = $this->planAction(
+                    $relativePath,
+                    'create',
+                    $dryRun ? 'Will create new file from source.' : 'Created new file from source.',
+                    false,
+                    false
+                );
                 continue;
             }
 
@@ -411,7 +418,7 @@ final class Update
             $actions[] = $this->planAction(
                 $relativePath,
                 'update',
-                $localModified ? 'Will overwrite local managed-file changes.' : 'Will replace with newer source file.',
+                $this->actionDetail('update', $localModified, $dryRun),
                 $localModified,
                 $localModified
             );
@@ -435,7 +442,7 @@ final class Update
             $actions[] = $this->planAction(
                 $relativePath,
                 'delete',
-                $localModified ? 'Will delete local managed-file changes absent from source.' : 'No longer present in source.',
+                $this->actionDetail('delete', $localModified, $dryRun),
                 $localModified,
                 $localModified
             );
@@ -1029,6 +1036,28 @@ final class Update
         }
 
         return null;
+    }
+
+    /**
+     * Returns tense-correct detail text for one planned or applied file operation.
+     *
+     * @param string $operation Action key (`create`, `update`, or `delete`).
+     * @param bool $localModified Whether the file has local uncommitted changes.
+     * @param bool $dryRun Whether the operation is only planned and has not run yet.
+     * @return string Human-facing action detail in future or past tense.
+     */
+    private function actionDetail(string $operation, bool $localModified, bool $dryRun): string
+    {
+        return match ($operation) {
+            'create' => $dryRun ? 'Will create new file from source.' : 'Created new file from source.',
+            'update' => $dryRun
+                ? ($localModified ? 'Will overwrite local managed-file changes.' : 'Will replace with newer source file.')
+                : ($localModified ? 'Overwrote local managed-file changes.' : 'Replaced with newer source file.'),
+            'delete' => $dryRun
+                ? ($localModified ? 'Will delete local managed-file changes absent from source.' : 'Will delete file no longer present in source.')
+                : ($localModified ? 'Deleted local managed-file changes absent from source.' : 'Deleted file no longer present in source.'),
+            default => 'No action taken.',
+        };
     }
 
     /**
