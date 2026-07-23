@@ -1,5 +1,4 @@
 # Raven CMS Running To-Do Checklist
-
 This document tracks current/future bugs, patches, modifications & feature additions for the Raven CMS platform.
 This is the default Build Mode backlog file. If the user asks about goals, unpatched bugs, roadmap goals or what to build next, check this file before searching elsewhere in the repo.
 
@@ -12,7 +11,7 @@ This is the default Build Mode backlog file. If the user asks about goals, unpat
 - `build/long.md` houses long-term project & roadmap goals, for optional secondary context. Do not load it on short-term build tasks.
 
 
-# Misc Bugs & Tweaks
+# Primary Checklist
 **Do not delete this heading!**
 
 ## Event Logger Completion
@@ -69,7 +68,6 @@ We need to generate better documentation. This is going to be a whole project.
 - `docs/` is the single source of truth for both the GitHub repo and the live Raven docs site
 - Raven's per-page title-display flag lets embedded markdown files use their own `#` headings natively
 
-
 ## Smoke/Debug Reference-Retirement Audit
 Audit every smoke, debug, profiling, utility, and snapshot tool for references
 to classes, namespaces, service keys, factories, and method names that were
@@ -114,7 +112,6 @@ removed or moved during the recent library refactor.
 - [ ] Re-run git diff --check, PHP lint for every changed diagnostic file,
   snapshot checks, and the maintenance smoke commands before closing the audit.
 
-
 ## Content Security Policy and Deployment Headers
 - [ ] Decide the CSP policy for local Raven scripts, styles, images, fonts,
   data URIs, inline scripts, Adminer, and the explicit captcha exception.
@@ -128,15 +125,13 @@ removed or moved during the recent library refactor.
   public, panel, installer, Adminer, redirect, and error responses.
 
 
-
 # Legacy Fallback Log
+**Do not delete this heading!**
 Running ledger of backward-friendly and legacy shims added during the cleanup work,
 so they can be removed later once the new schema/contracts are fully settled. No remaining
 legacy fallback items are currently open.
 
 ---
 
-- Closed 2026-07-23: removed the obsolete page-image table rename migration after confirming Foundry uses only the canonical media tables.
-- Closed 2026-07-23: confirmed the dead `EditorMedia` hydration/column-stripping block was already absent and removed its remaining stale references.
 
 ---
