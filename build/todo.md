@@ -15,6 +15,53 @@ This is the default Build Mode backlog file. If the user asks about goals, unpat
 # Misc Bugs & Tweaks
 **Do not delete this heading!**
 
+## Event Logger Completion
+The Event Logger storage path is present and its configuration controls are enabled on the
+Foundry install, but the shared `rvn_event_log` table currently has no rows. The logger's
+database write path succeeds in isolation; the missing work is event coverage and runtime
+diagnostics. No additional logger notes were found in the other build markdown files, so this
+section is the consolidated completion plan.
+
+- [ ] Define the event taxonomy and retention policy: severity (`error`, `warn`, `info`),
+  channels, privacy rules for context payloads, and which events are diagnostic versus audit
+  records.
+- [ ] Expose one lazy, shared Logger resolver in the core runtime container and reuse it from
+  the global error handler, panel logs controller, scheduler, controllers, repositories, and
+  enabled extensions instead of maintaining separate ad hoc logger construction paths.
+- [ ] Add explicit error/warning/info events for the core operations operators need to explain:
+  authentication and authorization outcomes, configuration saves, content/taxonomy/user/group
+  mutations, media actions, redirects, theme/extension management, updater activity, scheduler
+  failures, and important routing/request failures.
+- [ ] Add a shutdown handler for fatal PHP errors (`error_get_last()`), covering only fatal
+  types that PHP cannot deliver to `set_error_handler()`, while preventing recursive logging
+  and preserving the existing PHP/default error output behavior.
+- [ ] Decide and document whether PHP notices/deprecations and rejected-but-expected user input
+  belong in the shared event log; keep noisy request-validation details out unless they provide
+  actionable operational value.
+- [ ] Harden the logger's failure path with a safe fallback diagnostic so a missing table,
+  malformed context value, or database write failure is observable without allowing logging to
+  cascade into an application failure.
+- [ ] Add an event-logger smoke test that verifies schema creation, each enabled severity,
+  disabled-severity suppression, context serialization, filtering, retention pruning, CSV export,
+  clear behavior, PHP warning capture, and fatal-shutdown capture without polluting a real install.
+- [ ] Exercise representative events through the actual request/CLI paths and verify rows and
+  context in the panel log viewer; test both SQLite and the supported server database drivers
+  where the local QA environments provide them.
+- [ ] Verify Foundry, Quarry, and Stage each have the `event_log` schema, expected `logging.*`
+  defaults, writable database access, and the same deployed logger wiring; record any install
+  migration or configuration drift found during the check.
+- [ ] Update the relevant hand-authored runtime/configuration documentation and regenerate
+  generator-owned references after the final event surface and public logger contract settle.
+- [ ] Run the focused logger smoke test plus the auth, routing, output-profiler, CLI, docs, and
+  security checks; record results and any fixes in the current release-notes heading before
+  closing this section.
+- [ ] Finish the syslog/rsyslog deployment component for Grackle: route Raven's `LOG_USER`
+  messages by the `raven` program name into a dedicated log, add tmpfiles and logrotate
+  lifecycle rules, update the `grinstall base` and `grupdate` copy steps, and verify permissions,
+  reload behavior, and duplicate-routing choices; publish the completed setup as an appendix
+  guide with sample rsyslog, Nginx, and PHP-FPM configuration, validation commands,
+  troubleshooting notes, and the relationship between Raven's database logger and server logs.
+
 ## Documentation Rewrite
 We need to generate better documentation. This is going to be a whole project.
 - [ ] Do a proper human proofreading sweep once narrative docs are rewritten; replace this section with final authoring task list

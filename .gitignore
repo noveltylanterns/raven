@@ -26,6 +26,7 @@
 
 # Local dev tools
 /build/legacy/
+/local/
 /private/ext/debug-*/
 /.codex
 /.log/
