@@ -92,6 +92,12 @@ Group assignment notes:
 - If no group is selected, user is auto-assigned to `User`.
 - Only Admin users can assign the `Admin` group.
 - Only Admin users can newly assign groups with `Manage System Configuration`.
+- Editing an account without changing its identity preserves its existing primary group, including when a restricted form control is omitted by the browser.
+
+Panel permissions are assigned to groups rather than directly to user rows. Use the
+user editor's `Permissions` tab to assign group memberships, and use the group editor's
+`Permissions` tab to change the checkbox matrix. Enabled system extensions such as
+Database Manager appear in the sidebar only for users with the relevant panel access.
 
 ## 2) Developer And Agent Internals
 

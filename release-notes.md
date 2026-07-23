@@ -2,6 +2,9 @@
 
 *The machine is supposed to be logging patches & mods to this file. Sometimes it does, sometimes it doesn't. It might be useful for historical architectural context to your Agent at one point.*
 
+### July 23, 2026
+- Fixed user-editor saves demoting Admin accounts to Guest when a display-name-only edit omitted the disabled primary-group control; Admin membership and panel access are now preserved, and the Database Manager sidebar entry returns when the account retains its configuration permission.
+
 ### July 22, 2026
 - Removed executable symlink support from extension loading and CLI storage; extension providers, class roots, and manifests must be symlink-free, while extension commands use regular root-contained launchers in `private/bin/`.
 - Repaired the repository extension CLI launcher after its stale bootstrap path and namespace reference prevented the shared `private/bin/rvn-repo --help` probe from reaching the extension command.

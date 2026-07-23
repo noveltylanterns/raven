@@ -40,6 +40,7 @@ spl_autoload_register(static function (string $class) use ($root): void {
 use Raven\Core\Config;
 use Raven\Core\Repository\GroupRead;
 use Raven\Core\Repository\GroupWrite;
+use Raven\Core\Repository\UserRead;
 use Raven\Core\Repository\UserWrite;
 use Raven\Lib\Auth\Panel\PermissionBase as PanelAccess;
 use Raven\Lib\Extension\Panel\Manager as ExtensionCatalogService;
@@ -132,6 +133,8 @@ final class PanelPermissionsSmokeRunner
             $this->seedDebugExtensions();
             $this->enableDebugExtensions();
             $users = $this->createPermissionMatrixUsers();
+
+            $this->assertAdminDisplayNameSavePreservesPanelAccess($users['admin']);
 
             $this->assertAllNavUserSeesManagedNavAndNoDisabledTaxonomyLeaks($users['all_nav']);
             $this->assertPageViewUserNav($users['page_view']);
@@ -438,6 +441,7 @@ PHP;
             | $this->moduleAccessBit;
 
         return [
+            'admin' => $this->createAdminRegressionUser(),
             'all_nav' => $this->createUserWithMask('all-nav', $allMask),
             'page_view' => $this->createUserWithMask('page-view', PanelAccess::PANEL_LOGIN | PanelAccess::PAGES_VIEW),
             'page_create' => $this->createUserWithMask('page-create', PanelAccess::PANEL_LOGIN | PanelAccess::PAGES_CREATE),
@@ -448,6 +452,117 @@ PHP;
             'plugin_manage' => $this->createUserWithMask('plugin-manage', PanelAccess::PANEL_LOGIN | $this->pluginManageBit),
             'module_access' => $this->createUserWithMask('module-access', PanelAccess::PANEL_LOGIN | $this->moduleAccessBit),
         ];
+    }
+
+    /**
+     * Creates a temporary Admin account for the user-editor preservation regression.
+     *
+     * @return array{id:int,username:string,email:string,password:string} Temporary Admin account credentials.
+     */
+    private function createAdminRegressionUser(): array
+    {
+        require_once $this->root . '/private/Raven.php';
+        $rvn = \Raven\Raven::boot();
+        if (is_callable($rvn['auth_db'] ?? null)) {
+            $rvn['auth_db'] = ($rvn['auth_db'])();
+        }
+
+        $groupRepo = new GroupRead($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix']);
+        $userRepo = new UserWrite($rvn['auth_db'], $rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix']);
+        $adminGroupId = $groupRepo->idBySlug('admin');
+        $this->assert($adminGroupId !== null, 'Canonical Admin group is unavailable for user-editor regression.');
+
+        $username = 'nav_admin_' . $this->runId;
+        $email = $username . '@example.test';
+        $password = 'NavAdmin!' . $this->runId . 'Aa';
+        $userId = (int) $userRepo->save([
+            'id' => null,
+            'username' => $username,
+            'display_name' => 'Nav Smoke Admin ' . $this->runId,
+            'email' => $email,
+            'theme' => 'default',
+            'password' => $password,
+            'group_ids' => [(int) $adminGroupId],
+            'set_avatar' => false,
+            'avatar_path' => null,
+        ]);
+        $this->assert($userId > 0, 'Failed to create temporary Admin account for user-editor regression.');
+        $this->createdUsers[] = $userId;
+
+        return [
+            'id' => $userId,
+            'username' => $username,
+            'email' => $email,
+            'password' => $password,
+        ];
+    }
+
+    /**
+     * Verifies that a display-name-only save cannot remove Admin membership or system nav access.
+     *
+     * @param array{id:int,username:string,email:string,password:string} $user Temporary Admin account credentials.
+     * @return void
+     */
+    private function assertAdminDisplayNameSavePreservesPanelAccess(array $user): void
+    {
+        $client = $this->loginClient('admin-regression', $user);
+        $editUri = '/' . $this->panelPath . '/user/edit/' . (int) $user['id'];
+        $editPage = $this->requestPanel($client, 'GET', $editUri . '?tab=account');
+        $this->assert($editPage['status'] === 200, 'Admin user editor should return 200 for preservation regression.');
+        $this->assert(
+            str_contains($editPage['body'], 'value="' . (string) $user['id'] . '"'),
+            'Admin user editor should render the target user id.'
+        );
+
+        $csrf = $this->extractCsrf($editPage['body']);
+        $this->assert($csrf !== '', 'Admin user editor missing CSRF token for preservation regression.');
+        // Omit group fields intentionally to model a browser dropping a disabled primary select value.
+        $save = $this->requestPanel($client, 'POST', '/' . $this->panelPath . '/user/save', [
+            '_csrf' => $csrf,
+            'id' => (int) $user['id'],
+            'tab' => 'account',
+            'username' => (string) $user['username'],
+            'display_name' => 'Renamed Smoke Admin ' . $this->runId,
+            'email' => (string) $user['email'],
+            'theme' => 'default',
+            'bio' => '',
+            'password' => '',
+            'password_confirm' => '',
+        ]);
+        $this->assert(
+            in_array($save['status'], [302, 303], true),
+            'Display-name-only Admin save should redirect successfully.'
+        );
+
+        require_once $this->root . '/private/Raven.php';
+        $rvn = \Raven\Raven::boot();
+        if (is_callable($rvn['auth_db'] ?? null)) {
+            $rvn['auth_db'] = ($rvn['auth_db'])();
+        }
+
+        $groupRepo = new GroupRead($rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix']);
+        $userRead = new UserRead($rvn['auth_db'], $rvn['db'], (string) $rvn['driver'], (string) $rvn['prefix']);
+        $adminGroupId = $groupRepo->idBySlug('admin');
+        $savedUser = $userRead->findById((int) $user['id']);
+        $savedGroupIds = is_array($savedUser) ? array_map('intval', (array) ($savedUser['group_ids'] ?? [])) : [];
+        $this->assert($adminGroupId !== null, 'Canonical Admin group disappeared during preservation regression.');
+        $this->assert(
+            is_array($savedUser) && (int) ($savedUser['primary_group_id'] ?? 0) === (int) $adminGroupId,
+            'Display-name-only save changed the Admin user primary group.'
+        );
+        $this->assert(
+            in_array((int) $adminGroupId, $savedGroupIds, true),
+            'Display-name-only save removed the Admin user membership.'
+        );
+
+        $dashboard = $this->requestPanel($client, 'GET', '/' . $this->panelPath . '/');
+        $this->assert($dashboard['status'] === 200, 'Preserved Admin account should still reach the panel dashboard.');
+        $this->assertLinkPresent(
+            $this->extractLinkPaths($dashboard['body']),
+            '/' . $this->panelPath . '/database',
+            'Enabled Database Manager should remain visible to an Admin account.'
+        );
+        $this->events[] = 'admin_user_save_preserves_panel_access=ok';
     }
 
     /**

@@ -18,7 +18,7 @@
 /** @var array<int, array{id: int, name: string, slug: string, permissions: int, is_stock: int}> $groupOptions */
 /** @var int $primaryGroupId */
 /** @var array<int> $secondaryGroupIds */
-/** @var bool $canAssignSuperAdmin */
+/** @var bool $canAssignAdmin */
 /** @var bool $canAssignConfigurationGroups */
 /** @var array<string, array{label: string, prefix: string}> $profileContactOptions */
 /** @var array<string, string> $twoFactorTypeOptions */
@@ -55,6 +55,7 @@ $profileRoutesEnabled = (bool) ($profileRoutesEnabled ?? false);
 $profileRouteSegment = trim((string) ($profileRouteSegment ?? ''));
 $primaryGroupId = (int) ($primaryGroupId ?? ($userRow['primary_group_id'] ?? 0));
 $secondaryGroupIds = array_map('intval', (array) ($secondaryGroupIds ?? ($userRow['secondary_group_ids'] ?? [])));
+$canAssignAdmin = (bool) ($canAssignAdmin ?? false);
 $avatarPath = isset($userRow['avatar']) && is_string($userRow['avatar'])
     ? $userRow['avatar']
     : null;
@@ -367,6 +368,7 @@ if ($hasPersistedUser) {
             <?php $systemPanelBitsMask = PanelAccess::maskFromBits(PanelAccess::systemPanelBits()); ?>
             <div class="form-group">
                 <label class="form-label h5 mb-1" for="primary_group_id">Primary Group</label>
+                <?php $lockedPrimaryGroupId = null; ?>
                 <select id="primary_group_id" name="primary_group_id" class="form-select" required>
                     <?php foreach ($groupOptions as $group): ?>
                         <?php
@@ -374,12 +376,16 @@ if ($hasPersistedUser) {
                         $groupSlug = strtolower(trim((string) ($group['slug'] ?? '')));
                         $isAdminGroup = $groupSlug === 'admin';
                         $isConfigurationGroup = (((int) ($group['permissions'] ?? 0)) & $systemPanelBitsMask) !== 0;
-                        $lockAdminAssignment = $isAdminGroup && !$canAssignSuperAdmin;
+                        $lockAdminAssignment = $isAdminGroup && !$canAssignAdmin;
                         $lockConfigurationPromotion = !$canAssignConfigurationGroups && $isConfigurationGroup && !$isAdminGroup;
                         $optionDisabled = $lockAdminAssignment || $lockConfigurationPromotion;
                         // Default to Guest on the new-user form (primaryGroupId = 0).
                         $optionSelected = $primaryGroupId === $groupId
                             || ($primaryGroupId === 0 && $groupSlug === 'guest');
+                        // Disabled selected options are omitted by browsers; remember the value so a display-only edit cannot demote the user.
+                        if ($optionDisabled && $optionSelected) {
+                            $lockedPrimaryGroupId = $groupId;
+                        }
                         ?>
                         <option
                             value="<?= $groupId ?>"
@@ -388,8 +394,11 @@ if ($hasPersistedUser) {
                         ><?= e($group['name']) ?></option>
                     <?php endforeach; ?>
                 </select>
+                <?php if ($lockedPrimaryGroupId !== null): ?>
+                    <input type="hidden" name="primary_group_id" value="<?= (int) $lockedPrimaryGroupId ?>">
+                <?php endif; ?>
                 <div class="form-text">Defaults to <code>Guest</code> if not selected.</div>
-                <?php if (!$canAssignSuperAdmin): ?>
+                <?php if (!$canAssignAdmin): ?>
                     <div class="form-text text-muted">Only Admin users can assign the <code>Admin</code> group.</div>
                 <?php endif; ?>
             </div>
@@ -402,7 +411,7 @@ if ($hasPersistedUser) {
                     $isAdminGroup = strtolower(trim((string) ($group['slug'] ?? ''))) === 'admin';
                     $isConfigurationGroup = (((int) ($group['permissions'] ?? 0)) & $systemPanelBitsMask) !== 0;
                     $isSelected = in_array($groupId, $secondaryGroupIds, true);
-                    $lockAdminAssignment = $isAdminGroup && !$canAssignSuperAdmin;
+                    $lockAdminAssignment = $isAdminGroup && !$canAssignAdmin;
                     $lockConfigurationPromotion = !$canAssignConfigurationGroups && $isConfigurationGroup && !$isSelected && !$isAdminGroup;
                     $checkboxDisabled = $lockAdminAssignment || $lockConfigurationPromotion;
                     ?>

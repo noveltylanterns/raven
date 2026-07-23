@@ -297,7 +297,12 @@ final class UserEditController
             : null;
         $currentUserString = $this->currentUserString($existingUser);
 
+        $primaryGroupSubmitted = array_key_exists('primary_group_id', $post);
         $primaryGroupId = $this->input->int($post['primary_group_id'] ?? null, 1) ?? 0;
+        // Preserve the existing primary group when an older or restricted form omitted its disabled select value.
+        if ($id !== null && !$primaryGroupSubmitted && is_array($existingUser)) {
+            $primaryGroupId = (int) ($existingUser['primary_group_id'] ?? 0);
+        }
         /** @var mixed $secondaryGroupIdsRaw */
         $secondaryGroupIdsRaw = $post['secondary_group_ids'] ?? [];
         $secondaryGroupIds = [];
