@@ -113,7 +113,7 @@ final class Footer
     <p class="small text-muted mb-0">
         Powered by <a href="https://lanterns.io/raven" target="_blank" rel="noopener noreferrer">Raven CMS</a>
         <span aria-hidden="true">&middot;</span>
-        <a href="https://lanterns.io/raven" target="_blank" rel="noopener noreferrer">Documentation</a>
+        <a href="https://lanterns.io/raven/docs" target="_blank" rel="noopener noreferrer">Documentation</a>
     </p>
 </footer>
 <?php
