@@ -305,8 +305,7 @@ declare(strict_types=1);
 - Enabled extensions may autoload PHP classes from `private/ext/{slug}/lib/`.
 - Namespace-to-path mapping is PSR-4-like from that `lib/` root.
 - Raven no longer scans a legacy `src/` fallback. If a class should autoload, place it under `lib/`.
-- Example:
-- class `Raven\Ext\Smallweb\SmallwebService` must live at `private/ext/smallweb/lib/Smallweb/SmallwebService.php`
+- Examples:
 - class `Raven\Ext\Acme\Admin\Controller` must live at `private/ext/acme/lib/Acme/Admin/Controller.php`
 - Do not flatten namespaced classes directly into `lib/` unless the namespace path is also flat.
 - If an extension service class is not loading, check the namespace/path match first.
@@ -668,7 +667,7 @@ hand-copy the standard category/tag route patterns.
 ## Deletion/Protection Rules
 - Stock extension directories are protected from file removal during uninstall.
 - Current protected stock list: `contact`, `cron`, `database`, `phpinfo`, `signups`.
-- Bundled but removable extensions currently include `repo` and `smallweb`.
+- Bundled but removable extensions currently include `repo`.
 - Enabled extensions must be disabled before uninstall.
 
 ## Extension Storage Contract

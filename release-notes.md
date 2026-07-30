@@ -2,6 +2,10 @@
 
 *The machine is supposed to be logging patches & mods to this file. Sometimes it does, sometimes it doesn't. It might be useful for historical architectural context to your Agent at one point.*
 
+### July 30, 2026
+
+- Removed the bundled Smallweb extension, its panel/runtime integration, dedicated smoke coverage, and active documentation so the core Raven package no longer ships or protects it.
+
 ### July 23, 2026
 
 - Fixed cached extension sidebar navigation retaining `/panel/*` URLs after an installation changes `panel.path`; the navigation cache now invalidates whenever the configured panel URL changes, keeping extension links on the active custom panel prefix.

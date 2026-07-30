@@ -19,7 +19,6 @@ use Raven\Lib\Security\InputSanitizer;
  * Supports three tab routing models used across core and extensions:
  * - Query-param tabs with a numeric id: `/page/edit/{id}?tab=meta`
  * - Query-param tabs without an id: `/configuration?tab=basic`
- * - Path-segment tabs: `/smallweb/{protocol}` (tab is the URL path segment)
  */
 final class EditorTabs
 {
@@ -85,24 +84,5 @@ final class EditorTabs
         }
 
         return $panelUrlBuilder($suffix);
-    }
-
-    /**
-     * Builds a panel URL for editors where the tab is a path segment rather than a `?tab=` query param.
-     *
-     * Used by Smallweb and any future extension whose tabs map to URL path segments
-     * (e.g. `/smallweb/{protocol}`).
-     *
-     * @param callable(string): string $panelUrlBuilder Panel URL builder callable.
-     * @param string $basePath Base path prefix without trailing slash (e.g. '/smallweb').
-     * @param string $tab Tab slug to append as the final path segment.
-     * @return string Panel URL for the requested tab.
-     */
-    public function panelPathTabUrl(
-        callable $panelUrlBuilder,
-        string $basePath,
-        string $tab
-    ): string {
-        return $panelUrlBuilder($basePath . '/' . $tab);
     }
 }

@@ -165,10 +165,6 @@ Installed list actions:
 - Table columns: `Name`, `Type`, `Author`, `Description`, `Actions`
 - Per extension: `Read Documentation` (links to the extension's `docs` URL from `ext.json` when present), `Settings` (when extension is enabled and has a panel route), `Enable/Disable`, `Export` as a button-opened archive-format dropdown menu, and `Uninstall` (when allowed).
 
-Smallweb protocol tabs also provide an `Import/Export Data` section at the bottom of each
-webroot file tree. Imports use the shared archive formats through a modal upload, while
-exports use a format dropdown; empty archives and empty webroots cannot be processed.
-
 ## 8) Manifest Basics
 
 Common manifest fields:
@@ -186,7 +182,7 @@ Notes:
 
 - `panel_path` and `panel_section` are legacy manifest keys and are ignored.
 - Panel route/nav identity comes from the extension directory slug.
-- Protected stock extensions are `contact`, `cron`, `database`, `phpinfo`, `repo`, `signups`, and `smallweb`.
+- Protected stock extensions are `contact`, `cron`, `database`, `phpinfo`, `repo`, and `signups`.
 - `ext.php` may request storage with an array contract:
   `local`, `table`, `tables`, `aux`, `panel`, `public`.
 - `local` provisions `private/dat/ext/{slug}/`.

@@ -74,8 +74,6 @@ spl_autoload_register(static function (string $class) use ($root): void {
 
 use Raven\Lib\Extension\Registry as ExtensionRegistry;
 use Raven\Lib\Extension\Resolver as Layout;
-use Raven\Lib\Archive\Package as ArchivePackage;
-use Raven\Lib\Format\Tar;
 
 /**
  * Validates extension type contracts and optionally manages local debug fixtures.
@@ -156,54 +154,8 @@ final class ExtensionBoundarySmokeRunner
             $this->validateOneExtension($directory, !empty($enabledMap[$directory]));
         }
 
-        if (in_array('smallweb', $extensionDirs, true)) {
-            $this->assertSmallwebBareTarImport();
-        }
-
         $this->finalize();
         return $this->errors === [] ? 0 : 1;
-    }
-
-    /**
-     * Verifies Smallweb's suffixless upload path for a bare TAR archive.
-     *
-     * PHP upload temporary files do not retain their client filename suffix. This regression
-     * check keeps the shared Package/Extract/Tar path covered because compressed TAR formats
-     * naturally receive a temporary `.tar` suffix during outer-layer decompression.
-     *
-     * @return void
-     */
-    private function assertSmallwebBareTarImport(): void
-    {
-        $workspace = $this->root . '/.tmp/ext-smallweb-tar-' . bin2hex(random_bytes(6));
-        $sourceDirectory = $workspace . '/source';
-        $sourceFile = $sourceDirectory . '/probe.txt';
-        $archivePath = $workspace . '/webroot.tar';
-        $uploadPath = $workspace . '/php-upload-tmp';
-        $targetDirectory = $workspace . '/extract';
-
-        try {
-            if (!mkdir($sourceDirectory, 0775, true) || file_put_contents($sourceFile, "smallweb tar probe\n") === false) {
-                throw new RuntimeException('Failed to prepare Smallweb TAR smoke fixture.');
-            }
-
-            (new Tar())->compressPath($sourceDirectory, $archivePath, 'smallweb-bare-tar');
-            if (!copy($archivePath, $uploadPath)) {
-                throw new RuntimeException('Failed to stage suffixless Smallweb TAR upload fixture.');
-            }
-
-            (new ArchivePackage($this->root))->extractUpload($uploadPath, $targetDirectory, 'webroot.tar');
-            $extractedFile = $targetDirectory . '/smallweb-bare-tar/probe.txt';
-            if (!is_file($extractedFile) || trim((string) file_get_contents($extractedFile)) !== 'smallweb tar probe') {
-                throw new RuntimeException('Bare TAR upload did not extract its Smallweb webroot payload.');
-            }
-
-            $this->events[] = 'smallweb_bare_tar_import=ok';
-        } catch (Throwable $exception) {
-            $this->errors[] = 'smallweb bare TAR import: ' . $exception->getMessage();
-        } finally {
-            $this->deleteDirectory($workspace);
-        }
     }
 
     /**
