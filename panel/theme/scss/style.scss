@@ -270,6 +270,85 @@ body#rvnp .rvnp-sidebar-card .nav-pills .show > .nav-link {
   background-color: var(--raven-accent);
 }
 
+// Keep the first sidebar action group compact while preserving its text labels for assistive technology.
+body#rvnp #rvnp-sidebar .rvnp-sidebar-brand + h2 + ul {
+  flex-direction: row !important;
+  align-items: center;
+  column-gap: 0.5rem !important;
+}
+
+body#rvnp #rvnp-sidebar .rvnp-sidebar-brand + h2 {
+  margin-bottom: 0.75rem !important;
+  letter-spacing: 0.04em;
+}
+
+body#rvnp #rvnp-sidebar .rvnp-sidebar-brand + h2 + ul > li {
+  flex: 0 0 auto;
+}
+
+body#rvnp #rvnp-sidebar .rvnp-sidebar-brand + h2 + ul > li > .nav-link,
+body#rvnp #rvnp-sidebar .rvnp-sidebar-brand + h2 + ul > li > form > .nav-link {
+  width: 24px !important;
+  height: 24px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  font-size: 0;
+}
+
+// Match the compact welcome actions to the panel's rounded form-button treatment.
+body#rvnp #rvnp-sidebar .rvnp-sidebar-brand + h2 + ul > li > .nav-link,
+body#rvnp #rvnp-sidebar .rvnp-sidebar-brand + h2 + ul > li > form > .nav-link {
+  border: 1px solid var(--bs-btn-border-color);
+  border-radius: 0.35rem;
+  background-color: var(--bs-btn-bg);
+  color: var(--bs-btn-color);
+  box-shadow: 0 0.15rem 0.35rem rgba(31, 42, 52, 0.12);
+}
+
+body#rvnp #rvnp-sidebar .rvnp-sidebar-brand + h2 + ul > li > .nav-link:hover,
+body#rvnp #rvnp-sidebar .rvnp-sidebar-brand + h2 + ul > li > .nav-link:focus-visible,
+body#rvnp #rvnp-sidebar .rvnp-sidebar-brand + h2 + ul > li > form > .nav-link:hover,
+body#rvnp #rvnp-sidebar .rvnp-sidebar-brand + h2 + ul > li > form > .nav-link:focus-visible {
+  border-color: var(--bs-btn-hover-border-color);
+  background-color: var(--bs-btn-hover-bg);
+  color: var(--bs-btn-hover-color);
+}
+
+body#rvnp #rvnp-sidebar .rvnp-sidebar-brand + h2 + ul > li > .nav-link.active,
+body#rvnp #rvnp-sidebar .rvnp-sidebar-brand + h2 + ul > li > .nav-link:active,
+body#rvnp #rvnp-sidebar .rvnp-sidebar-brand + h2 + ul > li > form > .nav-link:active {
+  border-color: var(--bs-btn-active-border-color);
+  background-color: var(--bs-btn-active-bg);
+  color: var(--bs-btn-active-color);
+}
+
+// Bootstrap Icons supply the visual language; the original link text remains the accessible name.
+body#rvnp #rvnp-sidebar .rvnp-sidebar-brand + h2 + ul > li > a[href$="/"]::before,
+body#rvnp #rvnp-sidebar .rvnp-sidebar-brand + h2 + ul > li > a[href$="/preferences"]::before,
+body#rvnp #rvnp-sidebar .rvnp-sidebar-brand + h2 + ul > li > form[action$="/logout"] > .nav-link::before {
+  display: inline-block;
+  font-family: bootstrap-icons !important;
+  font-size: 16px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 1;
+}
+
+body#rvnp #rvnp-sidebar .rvnp-sidebar-brand + h2 + ul > li > a[href$="/"]::before {
+  content: "\f580";
+}
+
+body#rvnp #rvnp-sidebar .rvnp-sidebar-brand + h2 + ul > li > a[href$="/preferences"]::before {
+  content: "\f3e5";
+}
+
+body#rvnp #rvnp-sidebar .rvnp-sidebar-brand + h2 + ul > li > form[action$="/logout"] > .nav-link::before {
+  content: "\f1c3";
+}
+
 body#rvnp .rvnp-sidebar-card .rvnp-sidebar-brand {
   border-bottom-color: #35393f !important;
 }

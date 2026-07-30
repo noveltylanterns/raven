@@ -7,6 +7,7 @@
 - Removed the bundled Smallweb extension, its panel/runtime integration, dedicated smoke coverage, and active documentation so the core Raven package no longer ships or protects it.
 - Added a channel-level `Theme` selector with an alphabetical installed-theme list, global-default inheritance, and child-to-parent-to-global fallback rendering for channel pages.
 - Added a channel `Parent` selector that stores numeric parent channel ids and presents a root-first, alphabetically grouped hierarchy.
+- Restyled the shipped panel sidebar welcome actions as a compact horizontal row of 24px icon buttons using the actual Bootstrap `btn-primary` active-state and `btn-secondary` colors.
 
 ### July 23, 2026
 

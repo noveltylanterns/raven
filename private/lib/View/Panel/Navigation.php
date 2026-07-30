@@ -198,7 +198,7 @@ final class Navigation
                     <!-- Welcome group contains the dashboard landing link. -->
                     <h2 class="h6 text-uppercase text-muted">Welcome back, <?= e($welcomeName) ?>!</h2>
                     <ul class="nav nav-pills flex-column gap-1 mb-3">
-                        <?= self::renderWelcomeItems($config) ?>
+                        <?= self::renderWelcomeItems($config, true) ?>
                         <li class="nav-item">
                             <!-- Use POST + CSRF for logout to match mobile behavior and prevent URL-logged sign-outs. -->
                             <form method="post" action="<?= e($panelBase) ?>/logout" class="m-0">
@@ -208,7 +208,7 @@ final class Navigation
                                 ?>
                                     <?= $csrfField ?>
                                 <?php endif; ?>
-                                <button type="submit" class="nav-link text-start w-100">Logout</button>
+                                <button type="submit" class="nav-link btn btn-secondary text-start w-100">Logout</button>
                             </form>
                         </li>
                     </ul>
@@ -226,20 +226,27 @@ final class Navigation
      * Logout is not included here because its CSRF form wiring differs in each
      * context and is handled by the calling public method.
      *
-     * @param array<string, mixed> $config Nav config (uses panel_base and section).
+     * @param array<string, mixed> $config         Nav config (uses panel_base and section).
+     * @param bool                 $useButtonStyles Whether to apply Bootstrap button tones to the desktop sidebar actions.
      * @return string Trusted HTML for the two welcome li elements.
      */
-    private static function renderWelcomeItems(array $config): string
+    private static function renderWelcomeItems(array $config, bool $useButtonStyles = false): string
     {
         $panelBase = (string) ($config['panel_base'] ?? '');
         $section   = (string) ($config['section'] ?? '');
+        $dashboardTone = $useButtonStyles
+            ? ($section === 'dashboard' ? ' btn btn-primary' : ' btn btn-secondary')
+            : '';
+        $preferencesTone = $useButtonStyles
+            ? ($section === 'preferences' ? ' btn btn-primary' : ' btn btn-secondary')
+            : '';
 
         ob_start();
         ?>
                         <li class="nav-item">
-                            <a class="nav-link<?= $section === 'dashboard' ? ' active' : '' ?>" href="<?= e($panelBase) ?>/">Dashboard</a>
+                            <a class="nav-link<?= $section === 'dashboard' ? ' active' : '' ?><?= $dashboardTone ?>" href="<?= e($panelBase) ?>/">Dashboard</a>
                         </li>
-                        <li class="nav-item"><a class="nav-link<?= $section === 'preferences' ? ' active' : '' ?>" href="<?= e($panelBase) ?>/preferences">Preferences</a></li>
+                        <li class="nav-item"><a class="nav-link<?= $section === 'preferences' ? ' active' : '' ?><?= $preferencesTone ?>" href="<?= e($panelBase) ?>/preferences">Preferences</a></li>
 <?php
         return (string) ob_get_clean();
     }
