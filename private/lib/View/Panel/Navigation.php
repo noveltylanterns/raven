@@ -132,7 +132,7 @@ final class Navigation
                                 ?>
                                     <?= $csrfField ?>
                                 <?php endif; ?>
-                                <button type="submit" class="nav-link text-start w-100">Logout</button>
+                                <button type="submit" class="nav-link text-start w-100" title="Logout">Logout</button>
                             </form>
                         </li>
                     </ul>
@@ -208,7 +208,7 @@ final class Navigation
                                 ?>
                                     <?= $csrfField ?>
                                 <?php endif; ?>
-                                <button type="submit" class="nav-link btn btn-secondary text-start w-100">Logout</button>
+                                <button type="submit" class="nav-link btn btn-secondary text-start w-100" title="Logout">Logout</button>
                             </form>
                         </li>
                     </ul>
@@ -244,9 +244,9 @@ final class Navigation
         ob_start();
         ?>
                         <li class="nav-item">
-                            <a class="nav-link<?= $section === 'dashboard' ? ' active' : '' ?><?= $dashboardTone ?>" href="<?= e($panelBase) ?>/">Dashboard</a>
+                            <a class="nav-link<?= $section === 'dashboard' ? ' active' : '' ?><?= $dashboardTone ?>" href="<?= e($panelBase) ?>/" title="Dashboard">Dashboard</a>
                         </li>
-                        <li class="nav-item"><a class="nav-link<?= $section === 'preferences' ? ' active' : '' ?><?= $preferencesTone ?>" href="<?= e($panelBase) ?>/preferences">Preferences</a></li>
+                        <li class="nav-item"><a class="nav-link<?= $section === 'preferences' ? ' active' : '' ?><?= $preferencesTone ?>" href="<?= e($panelBase) ?>/preferences" title="Preferences">Preferences</a></li>
 <?php
         return (string) ob_get_clean();
     }
