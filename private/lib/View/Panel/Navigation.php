@@ -228,7 +228,7 @@ final class Navigation
      *
      * @param array<string, mixed> $config         Nav config (uses panel_base and section).
      * @param bool                 $useButtonStyles Whether to apply Bootstrap button tones to the desktop sidebar actions.
-     * @return string Trusted HTML for the two welcome li elements.
+     * @return string Trusted HTML for the three welcome li elements.
      */
     private static function renderWelcomeItems(array $config, bool $useButtonStyles = false): string
     {
@@ -240,6 +240,9 @@ final class Navigation
         $preferencesTone = $useButtonStyles
             ? ($section === 'preferences' ? ' btn btn-primary' : ' btn btn-secondary')
             : '';
+        $docsTone = $useButtonStyles
+            ? ($section === 'docs' ? ' btn btn-primary' : ' btn btn-secondary')
+            : '';
 
         ob_start();
         ?>
@@ -247,6 +250,7 @@ final class Navigation
                             <a class="nav-link<?= $section === 'dashboard' ? ' active' : '' ?><?= $dashboardTone ?>" href="<?= e($panelBase) ?>/" title="Dashboard">Dashboard</a>
                         </li>
                         <li class="nav-item"><a class="nav-link<?= $section === 'preferences' ? ' active' : '' ?><?= $preferencesTone ?>" href="<?= e($panelBase) ?>/preferences" title="Preferences">Preferences</a></li>
+                        <li class="nav-item"><a class="nav-link<?= $section === 'docs' ? ' active' : '' ?><?= $docsTone ?>" href="<?= e($panelBase) ?>/docs" title="User Manual">User Manual</a></li>
 <?php
         return (string) ob_get_clean();
     }

@@ -1152,6 +1152,7 @@ Heuristic mapping of schema keys to repository/controller/template files.
     - `private/tpl/panel/user/edit.php`
   - `registered`
     - `private/sys/Repository/UserWrite.php`
+    - `private/sys/Router/Panel/DocsRouter.php`
     - `private/sys/Shell.php`
   - `resettable`
     - `private/sys/Repository/UserWrite.php`

@@ -41,6 +41,7 @@ final class PanelRouter
     {
         AuthRouter::registerWithDeps($this->router, $deps);
         DashboardRouter::registerWithDeps($this->router, $deps);
+        DocsRouter::registerWithDeps($this->router, $deps);
         PageRouter::registerWithDeps($this->router, $deps);
         ChannelRouter::registerWithDeps($this->router, $deps);
         CategoryRouter::registerWithDeps($this->router, $deps);

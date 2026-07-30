@@ -167,6 +167,12 @@ final class ConfigurationDocsSmokeRunner
             }
 
             $this->events[] = 'check_3_result=PASS';
+            $manualCoverage = $this->checkUserManualRoutes();
+            $this->events[] = 'check_4_scope=panel_user_manual';
+            $this->events[] = 'check_4_index_status=' . $manualCoverage['index_status'];
+            $this->events[] = 'check_4_appendix_status=' . $manualCoverage['appendix_status'];
+            $this->events[] = 'check_4_screenshots_status=' . $manualCoverage['screenshots_status'];
+            $this->events[] = 'check_4_result=PASS';
             $this->events[] = 'smoke_result=PASS';
             $this->events[] = 'run_id=' . $this->runId;
             $this->events[] = 'temp_user=' . $this->tempUsername;
@@ -562,6 +568,35 @@ final class ConfigurationDocsSmokeRunner
         }
 
         return $paths;
+    }
+
+    /**
+     * Verifies the User Manual renders canonical docs and excludes screenshots.
+     *
+     * @return array{index_status:int, appendix_status:int, screenshots_status:int}
+     */
+    private function checkUserManualRoutes(): array
+    {
+        $indexPage = $this->request('/panel/index.php', 'GET', '/' . $this->panelPath . '/docs');
+        if ($indexPage['status'] !== 200 || !str_contains($indexPage['body'], 'Documentation Index')) {
+            throw new RuntimeException('User Manual index route did not render the canonical documentation index (status ' . $indexPage['status'] . ').');
+        }
+
+        $appendixPage = $this->request('/panel/index.php', 'GET', '/' . $this->panelPath . '/docs/appendix/filetree.md');
+        if ($appendixPage['status'] !== 200 || !str_contains($appendixPage['body'], 'Raven Filetree')) {
+            throw new RuntimeException('User Manual appendix route did not render the canonical filetree document.');
+        }
+
+        $screenshotsPage = $this->request('/panel/index.php', 'GET', '/' . $this->panelPath . '/docs/screenshots/README.md');
+        if ($screenshotsPage['status'] !== 404) {
+            throw new RuntimeException('User Manual screenshots path should remain excluded.');
+        }
+
+        return [
+            'index_status' => $indexPage['status'],
+            'appendix_status' => $appendixPage['status'],
+            'screenshots_status' => $screenshotsPage['status'],
+        ];
     }
 
     /**

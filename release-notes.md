@@ -8,6 +8,7 @@
 - Added a channel-level `Theme` selector with an alphabetical installed-theme list, global-default inheritance, and child-to-parent-to-global fallback rendering for channel pages.
 - Added a channel `Parent` selector that stores numeric parent channel ids and presents a root-first, alphabetically grouped hierarchy.
 - Restyled the shipped panel sidebar welcome actions as a compact horizontal row of 24px icon buttons using the actual Bootstrap `btn-primary` active-state and `btn-secondary` colors.
+- Added an authenticated panel User Manual that renders the canonical `docs/` Markdown tree through the shipped Markdown parser, with appendix and examples paths preserved and screenshots excluded.
 
 ### July 23, 2026
 

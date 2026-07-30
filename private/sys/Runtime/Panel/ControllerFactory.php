@@ -19,6 +19,7 @@ use Raven\Core\Controller\Panel\ChannelEditController;
 use Raven\Core\Controller\Panel\ChannelListController;
 use Raven\Core\Controller\Panel\ConfigController;
 use Raven\Core\Controller\Panel\DashboardController;
+use Raven\Core\Controller\Panel\DocsController;
 use Raven\Core\Controller\Panel\ExtensionController;
 use Raven\Core\Controller\Panel\GroupEditController;
 use Raven\Core\Controller\Panel\GroupListController;
@@ -83,6 +84,7 @@ final class ControllerFactory
     ): void {
         $authController = null;
         $panelSharedController = null;
+        $docsController = null;
 
         /**
          * Builds a session-scoped extension permission map for the current panel user.
@@ -149,6 +151,20 @@ final class ControllerFactory
             );
 
             return $panelSharedController;
+        };
+
+        /**
+         * Builds the authenticated User Manual controller on first use.
+         */
+        $rvn['panel_docs_controller'] = static function () use (&$docsController, &$rvn): DocsController {
+            if ($docsController instanceof DocsController) {
+                return $docsController;
+            }
+
+            /** @var callable(): SharedController $requestContextFactory */
+            $requestContextFactory = $rvn['panel_request_context'];
+            $docsController = new DocsController($requestContextFactory(), (string) $rvn['root']);
+            return $docsController;
         };
     }
 

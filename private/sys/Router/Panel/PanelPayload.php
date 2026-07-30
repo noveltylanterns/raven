@@ -45,6 +45,7 @@ final class PanelPayload
     public readonly Closure $panelUpdateController;
     public readonly Closure $panelThemeController;
     public readonly Closure $panelExtensionController;
+    public readonly Closure $panelDocsController;
     public readonly InputSanitizer $input;
     public readonly bool $categoryEnabled;
     public readonly bool $tagEnabled;
@@ -84,6 +85,7 @@ final class PanelPayload
      * @param callable(): object $panelUpdateController Lazy update controller factory.
      * @param callable(): object $panelThemeController Lazy theme controller factory.
      * @param callable(): object $panelExtensionController Lazy extension controller factory.
+     * @param callable(): object $panelDocsController Lazy User Manual controller factory.
      * @param InputSanitizer $input Shared input normalizer for route params.
      * @param bool $categoryEnabled Whether category routes should be active.
      * @param bool $tagEnabled Whether tag routes should be active.
@@ -120,6 +122,7 @@ final class PanelPayload
         callable $panelUpdateController,
         callable $panelThemeController,
         callable $panelExtensionController,
+        callable $panelDocsController,
         InputSanitizer $input,
         bool $categoryEnabled,
         bool $tagEnabled,
@@ -155,6 +158,7 @@ final class PanelPayload
         $this->panelUpdateController = Closure::fromCallable($panelUpdateController);
         $this->panelThemeController = Closure::fromCallable($panelThemeController);
         $this->panelExtensionController = Closure::fromCallable($panelExtensionController);
+        $this->panelDocsController = Closure::fromCallable($panelDocsController);
         $this->input = $input;
         $this->categoryEnabled = $categoryEnabled;
         $this->tagEnabled = $tagEnabled;

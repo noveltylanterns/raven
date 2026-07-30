@@ -317,7 +317,12 @@ body#rvnp #rvnp-sidebar .rvnp-sidebar-brand + h2 + ul > li > form > .nav-link:fo
   color: var(--bs-btn-hover-color);
 }
 
-body#rvnp #rvnp-sidebar .rvnp-sidebar-brand + h2 + ul > li > .nav-link.active,
+body#rvnp #rvnp-sidebar .rvnp-sidebar-brand + h2 + ul > li > .nav-link.active {
+  border-color: var(--raven-accent);
+  background-color: var(--raven-accent);
+  color: #fff;
+}
+
 body#rvnp #rvnp-sidebar .rvnp-sidebar-brand + h2 + ul > li > .nav-link:active,
 body#rvnp #rvnp-sidebar .rvnp-sidebar-brand + h2 + ul > li > form > .nav-link:active {
   border-color: var(--bs-btn-active-border-color);
@@ -328,6 +333,7 @@ body#rvnp #rvnp-sidebar .rvnp-sidebar-brand + h2 + ul > li > form > .nav-link:ac
 // Bootstrap Icons supply the visual language; the original link text remains the accessible name.
 body#rvnp #rvnp-sidebar .rvnp-sidebar-brand + h2 + ul > li > a[href$="/"]::before,
 body#rvnp #rvnp-sidebar .rvnp-sidebar-brand + h2 + ul > li > a[href$="/preferences"]::before,
+body#rvnp #rvnp-sidebar .rvnp-sidebar-brand + h2 + ul > li > a[href$="/docs"]::before,
 body#rvnp #rvnp-sidebar .rvnp-sidebar-brand + h2 + ul > li > form[action$="/logout"] > .nav-link::before {
   display: inline-block;
   font-family: bootstrap-icons !important;
@@ -343,6 +349,10 @@ body#rvnp #rvnp-sidebar .rvnp-sidebar-brand + h2 + ul > li > a[href$="/"]::befor
 
 body#rvnp #rvnp-sidebar .rvnp-sidebar-brand + h2 + ul > li > a[href$="/preferences"]::before {
   content: "\f3e5";
+}
+
+body#rvnp #rvnp-sidebar .rvnp-sidebar-brand + h2 + ul > li > a[href$="/docs"]::before {
+  content: "\f194";
 }
 
 body#rvnp #rvnp-sidebar .rvnp-sidebar-brand + h2 + ul > li > form[action$="/logout"] > .nav-link::before {
@@ -420,6 +430,11 @@ body#rvnp.theme-light .rvnp-sidebar-card .nav-pills .show > .nav-link,
 body#rvnp.theme-light #rvnp-mobile .nav-pills .nav-link.active,
 body#rvnp.theme-light #rvnp-mobile .nav-pills .show > .nav-link {
   color: #ffffff;
+  border-color: #2c6c93;
+  background: linear-gradient(135deg, #2f6f97, #3e8bb8);
+}
+
+body#rvnp.theme-light #rvnp-sidebar .rvnp-sidebar-brand + h2 + ul > li > .nav-link.active {
   border-color: #2c6c93;
   background: linear-gradient(135deg, #2f6f97, #3e8bb8);
 }
@@ -1204,6 +1219,11 @@ body#rvnp.theme-dark .rvnp-sidebar-card .nav-pills .nav-link.active,
 body#rvnp.theme-dark .rvnp-sidebar-card .nav-pills .show > .nav-link,
 body#rvnp.theme-dark #rvnp-mobile .nav-pills .nav-link.active,
 body#rvnp.theme-dark #rvnp-mobile .nav-pills .show > .nav-link {
+  border-color: #46628d;
+  background-color: #46628d;
+}
+
+body#rvnp.theme-dark #rvnp-sidebar .rvnp-sidebar-brand + h2 + ul > li > .nav-link.active {
   border-color: #46628d;
   background-color: #46628d;
 }

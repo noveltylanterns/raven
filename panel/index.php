@@ -42,6 +42,8 @@ $requirePanelFactory = static function (string $key) use ($rvn): callable {
 $authController = $requirePanelFactory('auth_controller');
 /** @var callable(): object $panelDashboardController */
 $panelDashboardController = $requirePanelFactory('panel_dashboard_controller');
+/** @var callable(): object $panelDocsController */
+$panelDocsController = $requirePanelFactory('panel_docs_controller');
 /** @var callable(): object $panelChannelListController */
 $panelChannelListController = $requirePanelFactory('panel_channel_list_controller');
 /** @var callable(): object $panelChannelEditController */
@@ -207,6 +209,7 @@ $routeDeps = new PanelPayload(
     $panelUpdateController,
     $panelThemeController,
     $panelExtensionController,
+    $panelDocsController,
     $rvn['input'],
     $categoryEnabled,
     $tagEnabled,

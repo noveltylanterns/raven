@@ -8,11 +8,11 @@ Service-key grouping is inferred from `$rvn['...']` container usage in each sour
 
 ## Groups
 
-- `controller` (193 symbols)
+- `controller` (196 symbols)
 - `debug` (47 symbols)
 - `repository` (234 symbols)
-- `router` (211 symbols)
-- `runtime` (241 symbols)
+- `router` (215 symbols)
+- `runtime` (242 symbols)
 - `schema` (50 symbols)
 
 ## Service Keys
@@ -37,6 +37,7 @@ Service-key grouping is inferred from `$rvn['...']` container usage in each sour
 - `panel_channel_list_controller` (1 symbols, groups: `runtime`)
 - `panel_config_controller` (1 symbols, groups: `runtime`)
 - `panel_dashboard_controller` (1 symbols, groups: `runtime`)
+- `panel_docs_controller` (1 symbols, groups: `runtime`)
 - `panel_domain_content` (1 symbols, groups: `runtime`)
 - `panel_domain_group` (1 symbols, groups: `runtime`)
 - `panel_domain_logs` (1 symbols, groups: `runtime`)
@@ -59,7 +60,7 @@ Service-key grouping is inferred from `$rvn['...']` container usage in each sour
 - `panel_preferences_controller` (1 symbols, groups: `runtime`)
 - `panel_redirect_edit_controller` (1 symbols, groups: `runtime`)
 - `panel_redirect_list_controller` (1 symbols, groups: `runtime`)
-- `panel_request_context` (26 symbols, groups: `runtime`)
+- `panel_request_context` (27 symbols, groups: `runtime`)
 - `panel_routing_controller` (1 symbols, groups: `runtime`)
 - `panel_site_data` (2 symbols, groups: `runtime`)
 - `panel_tag_edit_controller` (1 symbols, groups: `runtime`)
@@ -90,6 +91,6 @@ Service-key grouping is inferred from `$rvn['...']` container usage in each sour
 - `public_request_context` (9 symbols, groups: `runtime`)
 - `public_site_data` (2 symbols, groups: `runtime`)
 - `public_tag_controller` (1 symbols, groups: `runtime`)
-- `root` (36 symbols, groups: `controller`, `runtime`)
+- `root` (37 symbols, groups: `controller`, `runtime`)
 - `scheduler` (1 symbols, groups: `runtime`)
 - `view` (5 symbols, groups: `runtime`)
