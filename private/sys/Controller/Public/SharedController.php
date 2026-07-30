@@ -157,11 +157,12 @@ final class SharedController
     /**
      * Collects site config values required by public templates.
      *
+     * @param string|null $themeOverride Optional channel theme override; null uses the global theme.
      * @return array<string, mixed> Public site metadata payload.
      */
-    public function siteData(): array
+    public function siteData(?string $themeOverride = null): array
     {
-        return $this->metaService()->siteData($this->config);
+        return $this->metaService()->siteData($this->config, $themeOverride);
     }
 
     /**
@@ -237,18 +238,25 @@ final class SharedController
      * @param string $template Template path relative to one lookup root.
      * @param array<string, mixed> $data Route-specific template payload.
      * @param string|null $layout Layout template name, or null for direct render.
+     * @param string|null $themeOverride Optional channel theme override; null/inherit uses the global theme.
      * @return void
      */
-    public function renderPublic(string $template, array $data = [], ?string $layout = null): void
+    public function renderPublic(
+        string $template,
+        array $data = [],
+        ?string $layout = null,
+        ?string $themeOverride = null
+    ): void
     {
         $data = $this->decorateTemplateData($data);
+        $themeSlug = $this->themeCatalog->resolveOverrideSlug((string) ($themeOverride ?? 'inherit'), $this->config);
         $output = $this->themeTemplate()->renderForThemeChain(
             $template,
             $data,
             $layout,
             fn (string $file, array $payload): string => $this->themeBrace->renderFile($file, $payload),
             $this->themesRoot(),
-            $this->activeThemeSlug(),
+            $themeSlug,
             dirname(__DIR__, 4) . '/private/tpl/public'
         );
 

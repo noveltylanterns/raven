@@ -414,6 +414,7 @@ final class RuntimeBuilder
             $extensionStateStoreFactory,
             $extensionManagerFactory,
             $extensionContentFactory,
+            $themeCatalogFactory,
             $categoryEnabled,
             $tagEnabled
         );

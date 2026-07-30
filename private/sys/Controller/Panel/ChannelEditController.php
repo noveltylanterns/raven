@@ -13,6 +13,7 @@ namespace Raven\Core\Controller\Panel;
 
 use Closure;
 use Raven\Core\Repository\ChannelRead;
+use Raven\Core\Repository\ChannelShared;
 use Raven\Core\Repository\ChannelWrite;
 use Raven\Core\Repository\SetRead;
 use Raven\Core\Router\ChannelPolicy;
@@ -25,6 +26,7 @@ use Raven\Lib\Transport\Upload;
 use Raven\Lib\View\Panel\EditorMeta;
 use Raven\Lib\View\Panel\EditorTabs;
 use Raven\Lib\View\Panel\EditorWrapper;
+use Raven\Lib\View\Public\ThemeCatalog;
 
 /**
  * Handles channel create/edit/save/delete routes for the panel.
@@ -51,6 +53,7 @@ final class ChannelEditController
     private FeedPolicy $feedParser;
     private EditorTabs $editorTabs;
     private EditorWrapper $editor;
+    private ThemeCatalog $themeCatalog;
     private Upload $upload;
 
     /**
@@ -67,6 +70,7 @@ final class ChannelEditController
      * @param FeedPolicy $feedParser Feed route parser for RSS/Atom route settings.
      * @param EditorTabs $editorTabs Panel editor tab normalization and tab-preserving URL builder.
      * @param EditorWrapper $editor Shared panel editor normalizers.
+     * @param ThemeCatalog $themeCatalog Shared installed public-theme catalog for channel overrides.
      * @param Upload $upload Normalizer for $_FILES upload groups.
      * @return void
      */
@@ -84,6 +88,7 @@ final class ChannelEditController
         FeedPolicy $feedParser,
         EditorTabs $editorTabs,
         EditorWrapper $editor,
+        ThemeCatalog $themeCatalog,
         Upload $upload
     ) {
         $this->context = $context;
@@ -99,6 +104,7 @@ final class ChannelEditController
         $this->feedParser = $feedParser;
         $this->editorTabs = $editorTabs;
         $this->editor = $editor;
+        $this->themeCatalog = $themeCatalog;
         $this->upload = $upload;
     }
 
@@ -129,6 +135,7 @@ final class ChannelEditController
             }
         }
 
+        $themeOptions = $this->themeCatalog->options();
         // Normalize legacy stored channel payload fields for template consumption.
         if (is_array($channel)) {
             $channel['feed_enabled'] = (bool) ($channel['feed_enabled'] ?? false);
@@ -136,6 +143,10 @@ final class ChannelEditController
             $channel['tag_sets'] = SetParser::normalizeSelection($channel['tag_sets'] ?? [], false);
             $channel['editor_override'] = $this->editor->normalizeChannelEditorOverride(
                 (string) ($channel['editor_override'] ?? 'inherit')
+            );
+            $channel['theme_override'] = $this->normalizeThemeOverrideForForm(
+                (string) ($channel['theme_override'] ?? 'inherit'),
+                $themeOptions
             );
             $channel['route_mode'] = ChannelPolicy::normalizeChannelRouteMode(
                 (string) ($channel['route_mode'] ?? 'inherit')
@@ -154,6 +165,7 @@ final class ChannelEditController
             'tagEnabled' => $this->tagEnabled,
             'categorySetOptions' => $this->categorySetRepo()->listOptions(),
             'tagSetOptions' => $this->tagSetRepo()->listOptions(),
+            'themeOptions' => $themeOptions,
             'rssFeedRoute' => $this->feedParser->rssRoute(),
             'atomFeedRoute' => $this->feedParser->atomRoute(),
             'imageAllowedExtensions' => $this->taxonomyImageService->allowedImageExtensionsLabel(),
@@ -203,6 +215,21 @@ final class ChannelEditController
         $editorOverride = $this->editor->normalizeChannelEditorOverride(
             (string) ($post['editor_override'] ?? 'inherit')
         );
+        $rawThemeOverride = strtolower(trim((string) $this->input->text($post['theme_override'] ?? null, 80)));
+        $themeOverride = ChannelShared::normalizeThemeOverride($rawThemeOverride);
+        // Reject forged or stale explicit theme values instead of silently persisting a broken choice.
+        $themeOptions = $this->themeCatalog->options();
+        if ($rawThemeOverride !== '' && $rawThemeOverride !== 'inherit'
+            && ($themeOverride === 'inherit' || !isset($themeOptions[$themeOverride]))) {
+            $this->context->flash('error', 'Theme Override must match an installed public theme.');
+            Redirect::redirect($this->editorTabs->panelEditorUrlWithTab(
+                fn (string $suffix): string => $this->context->panelUrl($suffix),
+                '/channel/edit',
+                $id,
+                $activeTab,
+                'basic'
+            ));
+        }
         $routeMode = ChannelPolicy::normalizeChannelRouteMode(
             (string) ($post['route_mode'] ?? 'inherit')
         );
@@ -241,6 +268,7 @@ final class ChannelEditController
                 'category_sets' => $categorySetSelection,
                 'tag_sets' => $tagSetSelection,
                 'editor_override' => $editorOverride,
+                'theme_override' => $themeOverride,
                 'route_mode' => $routeMode,
                 'route_separator' => $routeSeparator,
             ];
@@ -350,6 +378,24 @@ final class ChannelEditController
 
         $this->context->flash('success', 'Changes saved.');
         Redirect::redirect($savedEditUrl);
+    }
+
+    /**
+     * Returns a channel theme override only when its installed manifest still exists.
+     *
+     * Removed themes are presented as the global-default sentinel so an old channel record
+     * remains editable without exposing a dead selection in the dropdown.
+     *
+     * @param string $value Stored channel theme override.
+     * @param array<string, string> $themeOptions Installed public-theme options.
+     * @return string Valid installed theme slug or the inherit sentinel.
+     */
+    private function normalizeThemeOverrideForForm(string $value, array $themeOptions): string
+    {
+        $normalized = ChannelShared::normalizeThemeOverride($value);
+        return $normalized !== 'inherit' && isset($themeOptions[$normalized])
+            ? $normalized
+            : 'inherit';
     }
 
     /**

@@ -89,6 +89,29 @@ final class ThemeCatalog
     }
 
     /**
+     * Resolves a channel theme override through the same installed-theme fallback as the global site theme.
+     *
+     * The `inherit` sentinel delegates to `site.theme`; a missing or removed explicit theme
+     * also delegates to the global selection so old channel records never break rendering.
+     *
+     * @param string $override Stored channel override slug or `inherit` sentinel.
+     * @param Config $config Runtime configuration reader containing the global site theme.
+     * @return string Effective installed public-theme slug.
+     */
+    public function resolveOverrideSlug(string $override, Config $config): string
+    {
+        $normalized = strtolower(trim($override));
+        $options = $this->options();
+        // An explicit override is usable only while its manifest remains installed.
+        if ($normalized !== '' && $normalized !== 'inherit' && isset($options[$normalized])) {
+            return $normalized;
+        }
+
+        // Inherit and stale selections follow the exact global-theme fallback path.
+        return $this->activeSlugFromConfig($config);
+    }
+
+    /**
      * Returns the child-first inheritance chain for one public theme.
      *
      * @param string $themeSlug Theme slug to resolve.

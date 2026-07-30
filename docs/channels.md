@@ -43,6 +43,7 @@ Fields/options:
 - `Name` (required)
 - `Slug` (required)
 - `Description` (optional)
+- `Theme`
 - `Syndication`
 - `Enable Feed?` (shown only when global feeds are enabled)
 - `Enable dedicated sub-feeds for this channel.`
@@ -65,6 +66,14 @@ Feed behavior notes:
 - When `feed.rss` is configured globally, enabled channels expose `/{feed.rss}/{channel-slug}`.
 - When `feed.atom` is configured globally, enabled channels expose `/{feed.atom}/{channel-slug}`.
 - When global `feed.enabled` is off, channel feed routes are disabled and the editor hides the toggle.
+
+Theme behavior notes:
+
+- `Theme` defaults to `Inherit`, which follows the configured global public theme.
+- The remaining options list every installed public theme in alphabetical order by display name.
+- An explicit theme applies to the channel landing page and every page published in that channel.
+- Theme lookup uses the same fallback chain as the global theme: the selected child theme, its parent themes, then the global child/parent/core fallback templates and assets.
+- If a selected theme is removed later, the channel safely falls back to the global system default.
 
 Taxonomy set behavior notes:
 
@@ -143,6 +152,7 @@ Split channel handlers:
 - `ChannelWrite::save(...)` handles create/update in one method.
 - Channel records include one file-backed `feed_enabled` flag for channel-specific feed routes.
 - Channel records also include file-backed `category_sets` and `tag_sets` selections.
+- Channel records include a file-backed `theme_override` slug, or `inherit` to use the global system theme.
 - `ChannelWrite::updateImagePaths(...)` persists cover/preview source + variant paths.
 - `ChannelWrite::deleteById(...)` runs in a transaction:
   - updates `pages.channel_id` to `0`
@@ -170,6 +180,7 @@ Storage detail:
 - `/{channel}/{YYYY-MM-DD}-{page-id}`
 - `/{channel}/{YYYY-MM}-{page-id}`
 - Channel landing template priority: `tpl/channel/{channel_slug}.php` then `tpl/channel/index.php`.
+- Channel landing and channel-page rendering use the channel's effective `theme_override`; missing templates/assets continue through the selected theme's parent chain and then the global child/parent/core fallback chain.
 
 ### Security/Validation Expectations
 
@@ -187,10 +198,12 @@ When channel behavior changes, update this document in the same task. That inclu
 - `Basic`
 - `Meta`
 - `Editor Override`
+- `Theme`
 - `Route Mode`
 - `Route Separator`
 - `Use System Default`
 - `Use Global Default`
+- `Inherit`
 - `- (Hyphen)`
 - `_ (Underscore)`
 - `/{channel}/{page-slug}`

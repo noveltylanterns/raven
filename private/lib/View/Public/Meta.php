@@ -49,11 +49,12 @@ final class Meta
      * Builds the base site/meta payload for public theme templates.
      *
      * @param Config $config Runtime configuration reader.
+     * @param string|null $themeOverride Optional channel theme override; null/inherit uses the global theme.
      * @return array<string, string>
      */
-    public function siteData(Config $config): array
+    public function siteData(Config $config, ?string $themeOverride = null): array
     {
-        $publicTheme = $this->themeCatalogService->activeSlugFromConfig($config);
+        $publicTheme = $this->themeCatalogService->resolveOverrideSlug((string) ($themeOverride ?? 'inherit'), $config);
         $configuredProtocol = (string) $config->get('site.protocol', 'https');
         $configuredDomain = (string) $config->get('site.domain', 'localhost');
         $publicThemeActive = $this->themeCatalogService->cssSlug($publicTheme);

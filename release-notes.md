@@ -5,6 +5,7 @@
 ### July 30, 2026
 
 - Removed the bundled Smallweb extension, its panel/runtime integration, dedicated smoke coverage, and active documentation so the core Raven package no longer ships or protects it.
+- Added a channel-level `Theme` selector with an alphabetical installed-theme list, global-default inheritance, and child-to-parent-to-global fallback rendering for channel pages.
 
 ### July 23, 2026
 

@@ -254,18 +254,19 @@ final class PageController
 
         $page = $this->renderPageContentBlocks($page);
         $page = $this->templateDecorator()->decoratePageForTemplate($page);
+        $channelTheme = is_array($channel) ? $this->channelThemeSlug($channel) : null;
         $pageTemplate = $this->themeTemplate()->resolvePageTemplateNameForThemeChain(
             $channelSlug,
             $this->themesRoot(),
-            $this->activeThemeSlug(),
+            $channelTheme ?? $this->activeThemeSlug(),
             dirname(__DIR__, 4) . '/private/tpl/public'
         );
 
         $this->context->renderPublic($pageTemplate, [
-            'site' => $this->siteDataWithPageMeta($page),
+            'site' => $this->siteDataWithPageMeta($page, $channelTheme),
             'channel' => is_array($channel) ? $channel : null,
             'page' => $page,
-        ], 'wrapper');
+        ], 'wrapper', $channelTheme);
     }
 
     /**
@@ -327,9 +328,10 @@ final class PageController
      * Returns site data with page-level social metadata overrides when available.
      *
      * @param array<string, mixed> $page Public page payload.
+     * @param string|null $themeOverride Effective channel theme slug, or null for global theme.
      * @return array<string, mixed> Site metadata payload with page overrides.
      */
-    private function siteDataWithPageMeta(array $page): array
+    private function siteDataWithPageMeta(array $page, ?string $themeOverride = null): array
     {
         $profileContactOptions = $this->profileParser()->normalizeOptionsConfig(
             $this->context->config()->get('user.contact', $this->profileParser()->defaultOptions())
@@ -337,7 +339,7 @@ final class PageController
 
         return $this->metaService()->siteDataWithPageMeta(
             $page,
-            $this->context->siteData(),
+            $this->context->siteData($themeOverride),
             fn (int $pageId): ?string => $this->media->coverLargeVariantUrlForPage($pageId),
             fn (int $authorUserId): ?array => $this->userRead->findById($authorUserId),
             $profileContactOptions
@@ -569,6 +571,20 @@ final class PageController
     private function activeThemeSlug(): string
     {
         return $this->themeCatalog->activeSlugFromConfig($this->context->config());
+    }
+
+    /**
+     * Resolves the effective public theme for one channel.
+     *
+     * @param array<string, mixed> $channel Channel record carrying the stored theme override.
+     * @return string Effective installed public-theme slug.
+     */
+    private function channelThemeSlug(array $channel): string
+    {
+        return $this->themeCatalog->resolveOverrideSlug(
+            (string) ($channel['theme_override'] ?? 'inherit'),
+            $this->context->config()
+        );
     }
 
     /**

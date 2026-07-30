@@ -16,6 +16,7 @@
 /** @var bool $tagEnabled */
 /** @var array<int, array{id: int, name: string, slug: string, is_root: bool}> $categorySetOptions */
 /** @var array<int, array{id: int, name: string, slug: string, is_root: bool}> $tagSetOptions */
+/** @var array<string, string> $themeOptions */
 /** @var string $rssFeedRoute */
 /** @var string $atomFeedRoute */
 /** @var string $imageAllowedExtensions */
@@ -40,6 +41,7 @@ $feedEnabled = (bool) ($channel['feed_enabled'] ?? false);
 $selectedCategorySets = is_array($channel['category_sets'] ?? null) ? $channel['category_sets'] : [];
 $selectedTagSets = is_array($channel['tag_sets'] ?? null) ? $channel['tag_sets'] : [];
 $editorOverride = (string) ($channel['editor_override'] ?? 'inherit');
+$themeOverride = (string) ($channel['theme_override'] ?? 'inherit');
 $routeMode = (string) ($channel['route_mode'] ?? 'inherit');
 $routeSeparator = (string) ($channel['route_separator'] ?? 'inherit');
 $activeTab = (string) ($activeTab ?? 'basic');
@@ -202,10 +204,23 @@ if ($hasPersistedChannel) {
                 <input id="slug" name="slug" class="form-control" required value="<?= e((string) ($channel['slug'] ?? '')) ?>">
             </div>
 
-            <div class="form-group mb-0">
+            <div class="form-group mb-3">
                 <label for="description" class="form-label">Description</label>
                 <!-- Optional description is editorial/context metadata for this channel. -->
                 <textarea id="description" name="description" class="form-control" rows="4"><?= e((string) ($channel['description'] ?? '')) ?></textarea>
+            </div>
+
+            <div class="form-group mb-0">
+                <label for="theme_override" class="form-label">Theme</label>
+                <select id="theme_override" name="theme_override" class="form-select">
+                    <option value="inherit" class="fw-bold"<?= $themeOverride === 'inherit' ? ' selected' : '' ?>>Inherit</option>
+                    <?php foreach ($themeOptions as $themeSlug => $themeName): ?>
+                        <option value="<?= e((string) $themeSlug) ?>"<?= $themeOverride === $themeSlug ? ' selected' : '' ?>><?= e((string) $themeName) ?></option>
+                    <?php endforeach; ?>
+                </select>
+                <div class="form-text">
+                    All pages in this channel use the selected theme. Child themes inherit missing templates and assets from their parent, then from the global theme's fallback chain.
+                </div>
             </div>
         </div>
 

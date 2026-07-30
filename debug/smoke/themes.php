@@ -38,8 +38,10 @@ spl_autoload_register(static function (string $class) use ($root): void {
     }
 });
 
+use Raven\Core\Config;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\View\Public\ThemeBrace;
+use Raven\Lib\View\Public\ThemeCatalog;
 use Raven\Lib\View\Public\ThemeTemplate;
 
 final class ThemeTemplateSmokeRunner
@@ -192,6 +194,7 @@ PHP;
 
             $this->smokeTemplateRedirects($engine);
             $this->smokeRenderRealTemplates($engine);
+            $this->smokeChannelThemeOverrides();
             $this->events[] = 'smoke_result=PASS';
             $this->events[] = 'run_id=' . $this->runId;
         } finally {
@@ -347,6 +350,87 @@ PHP;
                 $this->assert(str_contains($output, 'Smoke block'), 'Home template did not render page:content block rows.');
             }
             $this->events[] = 'template_rendered=' . $label;
+        }
+    }
+
+    /**
+     * Verifies channel theme override selection, ordering, and inheritance fallback.
+     *
+     * @return void
+     */
+    private function smokeChannelThemeOverrides(): void
+    {
+        $fixtureRoot = $this->root . '/.tmp/channel-theme-smoke-' . $this->runId;
+        $themesRoot = $fixtureRoot . '/themes';
+        $coreRoot = $fixtureRoot . '/core';
+        $themeSlugs = ['parent', 'child', 'middle'];
+        $configPath = $fixtureRoot . '/config.php';
+
+        foreach ($themeSlugs as $themeSlug) {
+            $themeDirectory = $themesRoot . '/' . $themeSlug . '/tpl';
+            if (!is_dir($themeDirectory) && !mkdir($themeDirectory, 0775, true) && !is_dir($themeDirectory)) {
+                throw new RuntimeException('Failed to create channel theme fixture directory.');
+            }
+        }
+        if (!is_dir($coreRoot) && !mkdir($coreRoot, 0775, true) && !is_dir($coreRoot)) {
+            throw new RuntimeException('Failed to create channel theme core fixture directory.');
+        }
+
+        $manifests = [
+            'parent' => [
+                'name' => 'Zeta Parent',
+                'is_child_theme' => false,
+                'parent_theme' => '',
+            ],
+            'child' => [
+                'name' => 'Alpha Child',
+                'is_child_theme' => true,
+                'parent_theme' => 'parent',
+            ],
+            'middle' => [
+                'name' => 'Middle Theme',
+                'is_child_theme' => false,
+                'parent_theme' => '',
+            ],
+        ];
+
+        try {
+            foreach ($manifests as $themeSlug => $manifest) {
+                $manifestPath = $themesRoot . '/' . $themeSlug . '/theme.json';
+                if (file_put_contents($manifestPath, (string) json_encode($manifest), LOCK_EX) === false) {
+                    throw new RuntimeException('Failed to write channel theme fixture manifest.');
+                }
+            }
+            if (file_put_contents($configPath, "<?php\nreturn ['site' => ['theme' => 'parent']];\n", LOCK_EX) === false) {
+                throw new RuntimeException('Failed to write channel theme config fixture.');
+            }
+
+            $catalog = new ThemeCatalog($themesRoot, new InputSanitizer());
+            $config = new Config($configPath);
+            $options = $catalog->options();
+            $this->assert(array_keys($options) === ['child', 'middle', 'parent'], 'Theme options are not alphabetized by display name.');
+            $this->assert($catalog->resolveOverrideSlug('inherit', $config) === 'parent', 'Inherit override did not use global theme.');
+            $this->assert($catalog->resolveOverrideSlug('child', $config) === 'child', 'Explicit child override was not selected.');
+            $this->assert($catalog->resolveOverrideSlug('removed-theme', $config) === 'parent', 'Stale override did not use global theme.');
+
+            $template = new ThemeTemplate(new InputSanitizer());
+            $roots = $template->lookupRoots($themesRoot, 'child', $coreRoot);
+            $this->assert($roots === [
+                $themesRoot . '/child/tpl',
+                $themesRoot . '/parent/tpl',
+                $coreRoot,
+            ], 'Theme lookup did not preserve child-to-parent-core fallback order.');
+            $this->events[] = 'channel_theme_override=ok';
+        } finally {
+            foreach ($themeSlugs as $themeSlug) {
+                @unlink($themesRoot . '/' . $themeSlug . '/theme.json');
+                @rmdir($themesRoot . '/' . $themeSlug . '/tpl');
+                @rmdir($themesRoot . '/' . $themeSlug);
+            }
+            @unlink($configPath);
+            @rmdir($themesRoot);
+            @rmdir($coreRoot);
+            @rmdir($fixtureRoot);
         }
     }
 

@@ -139,15 +139,16 @@ final class ChannelController
             $channel = is_array($result['channel'] ?? null) ? $result['channel'] : [];
             $page = $this->renderPageContentBlocks($result['page']);
             $page = $this->templateDecorator()->decoratePageForTemplate($page);
+            $channelTheme = $this->channelThemeSlug($channel);
 
             $channelTemplate = $this->themeTemplate()->resolveChannelTemplateNameForThemeChain(
                 $requestedSlug,
                 $this->themesRoot(),
-                $this->activeThemeSlug(),
+                $channelTheme,
                 dirname(__DIR__, 4) . '/private/tpl/public'
             );
 
-            $site = $this->siteDataWithPageMeta($page);
+            $site = $this->siteDataWithPageMeta($page, $channelTheme);
             // Channel-level cover/preview uploads override page/default meta images on channel landings.
             $site = $this->metaService()->siteDataWithTaxonomyMetaImage($channel, $site);
 
@@ -155,7 +156,7 @@ final class ChannelController
                 'site' => $site,
                 'channel' => $channel,
                 'page' => $page,
-            ], 'wrapper');
+            ], 'wrapper', $channelTheme);
             return;
         }
 
@@ -229,9 +230,10 @@ final class ChannelController
      * Returns site data with page-level social metadata overrides when available.
      *
      * @param array<string, mixed> $page Public page payload.
+     * @param string|null $themeOverride Effective channel theme slug, or null for global theme.
      * @return array<string, mixed> Site metadata payload with page overrides.
      */
-    private function siteDataWithPageMeta(array $page): array
+    private function siteDataWithPageMeta(array $page, ?string $themeOverride = null): array
     {
         $profileContactOptions = $this->profileParser()->normalizeOptionsConfig(
             $this->context->config()->get('user.contact', $this->profileParser()->defaultOptions())
@@ -239,7 +241,7 @@ final class ChannelController
 
         return $this->metaService()->siteDataWithPageMeta(
             $page,
-            $this->context->siteData(),
+            $this->context->siteData($themeOverride),
             fn (int $pageId): ?string => $this->media->coverLargeVariantUrlForPage($pageId),
             fn (int $authorUserId): ?array => $this->userRead->findById($authorUserId),
             $profileContactOptions
@@ -471,6 +473,23 @@ final class ChannelController
     private function activeThemeSlug(): string
     {
         return $this->themeCatalog->activeSlugFromConfig($this->context->config());
+    }
+
+    /**
+     * Resolves the effective public theme for one channel.
+     *
+     * Missing or removed overrides intentionally return the global active theme so legacy
+     * channel records continue through the same child/parent/core fallback path.
+     *
+     * @param array<string, mixed> $channel Channel record carrying the stored theme override.
+     * @return string Effective installed public-theme slug.
+     */
+    private function channelThemeSlug(array $channel): string
+    {
+        return $this->themeCatalog->resolveOverrideSlug(
+            (string) ($channel['theme_override'] ?? 'inherit'),
+            $this->context->config()
+        );
     }
 
     /**

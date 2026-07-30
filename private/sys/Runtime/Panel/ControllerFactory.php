@@ -161,6 +161,7 @@ final class ControllerFactory
      * @param callable(): mixed $extensionStateStoreFactory Extension state store factory.
      * @param callable(): ExtensionManager $extensionManagerFactory Extension manager factory.
      * @param callable(): mixed $extensionContentFactory Extension content catalog factory.
+     * @param callable(): ThemeCatalog $themeCatalogFactory Public-theme catalog service factory.
      * @param bool $categoryEnabled Whether category support is enabled for the current request.
      * @param bool $tagEnabled Whether tag support is enabled for the current request.
      * @return void
@@ -172,6 +173,7 @@ final class ControllerFactory
         callable $extensionStateStoreFactory,
         callable $extensionManagerFactory,
         callable $extensionContentFactory,
+        callable $themeCatalogFactory,
         bool $categoryEnabled,
         bool $tagEnabled
     ): void {
@@ -315,7 +317,7 @@ final class ControllerFactory
          * Builds the channel edit controller on first use.
          * Owns channel create/edit, save, and delete routes.
          */
-        $rvn['panel_channel_edit_controller'] = static function () use (&$channelEditController, &$rvn, $panelTaxonomyDomain): ChannelEditController {
+        $rvn['panel_channel_edit_controller'] = static function () use (&$channelEditController, &$rvn, $panelTaxonomyDomain, $themeCatalogFactory): ChannelEditController {
             if ($channelEditController instanceof ChannelEditController) {
                 return $channelEditController;
             }
@@ -337,6 +339,7 @@ final class ControllerFactory
                 new FeedPolicy($rvn['config'], $rvn['input']),
                 $rvn['panel_editor_tabs'](),
                 $rvn['panel_editor'](),
+                $themeCatalogFactory(),
                 new Upload()
             );
 

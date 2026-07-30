@@ -61,6 +61,7 @@ final class ChannelWrite
      *   category_sets?: array<int, int|string>,
      *   tag_sets?: array<int, int|string>,
      *   editor_override?: string,
+     *   theme_override?: string,
      *   route_mode?: string,
      *   route_separator?: string
      * } $data Normalized channel fields.
@@ -74,6 +75,7 @@ final class ChannelWrite
         $slug = strtolower(trim((string) ($data['slug'] ?? '')));
         $description = trim((string) ($data['description'] ?? ''));
         $editorOverride = ChannelShared::normalizeEditorOverride((string) ($data['editor_override'] ?? 'inherit'));
+        $themeOverride = ChannelShared::normalizeThemeOverride((string) ($data['theme_override'] ?? 'inherit'));
         $routeMode = ChannelPolicy::normalizeChannelRouteMode((string) ($data['route_mode'] ?? 'inherit'));
         $routeSeparator = ChannelPolicy::normalizeChannelSeparator((string) ($data['route_separator'] ?? 'inherit'));
 
@@ -126,6 +128,7 @@ final class ChannelWrite
             'category_sets' => $categorySets,
             'tag_sets' => $tagSets,
             'editor_override' => $editorOverride,
+            'theme_override' => $themeOverride,
             'route_mode' => $routeMode,
             'route_separator' => $routeSeparator,
             'cover_image_path' => ChannelShared::normalizeNullablePath($currentRaw['cover_image_path'] ?? null),
@@ -194,6 +197,9 @@ final class ChannelWrite
                 false
             ),
             'editor_override' => (string) ($record['editor_override'] ?? 'inherit'),
+            'theme_override' => ChannelShared::normalizeThemeOverride(
+                (string) ($currentRaw['theme_override'] ?? ($record['theme_override'] ?? 'inherit'))
+            ),
             'route_mode' => (string) ($record['route_mode'] ?? 'inherit'),
             'route_separator' => (string) ($record['route_separator'] ?? 'inherit'),
             'cover_image_path' => ChannelShared::normalizeNullablePath($paths['cover_image_path'] ?? null),

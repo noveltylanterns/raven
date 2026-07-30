@@ -253,7 +253,7 @@ class ChannelRead
      *
      * Excludes the root channel, which is not selectable as a page destination.
      *
-     * @return array<int, array{id: int, name: string, slug: string, category_sets: array<int, int|string>, tag_sets: array<int, int|string>, editor_override: string, route_mode: string, route_separator: string}>
+     * @return array<int, array{id: int, name: string, slug: string, category_sets: array<int, int|string>, tag_sets: array<int, int|string>, editor_override: string, theme_override: string, route_mode: string, route_separator: string}>
      */
     public function listOptions(): array
     {
@@ -272,6 +272,7 @@ class ChannelRead
                 'category_sets' => SetParser::normalizeSelection($channel['category_sets'] ?? [], false),
                 'tag_sets' => SetParser::normalizeSelection($channel['tag_sets'] ?? [], false),
                 'editor_override' => (string) ($channel['editor_override'] ?? 'inherit'),
+                'theme_override' => (string) ($channel['theme_override'] ?? 'inherit'),
                 'route_mode' => (string) ($channel['route_mode'] ?? 'inherit'),
                 'route_separator' => (string) ($channel['route_separator'] ?? 'inherit'),
             ];
@@ -293,7 +294,7 @@ class ChannelRead
     /**
      * Returns channel options for routing diagnostics, including the stock root channel.
      *
-     * @return array<int, array{id: int, name: string, slug: string, feed_enabled: bool, category_sets: array<int, int|string>, tag_sets: array<int, int|string>, editor_override: string, route_mode: string, route_separator: string}>
+     * @return array<int, array{id: int, name: string, slug: string, feed_enabled: bool, category_sets: array<int, int|string>, tag_sets: array<int, int|string>, editor_override: string, theme_override: string, route_mode: string, route_separator: string}>
      */
     public function listRoutingOptions(): array
     {
@@ -308,6 +309,7 @@ class ChannelRead
                 'category_sets' => SetParser::normalizeSelection($channel['category_sets'] ?? [], false),
                 'tag_sets' => SetParser::normalizeSelection($channel['tag_sets'] ?? [], false),
                 'editor_override' => (string) ($channel['editor_override'] ?? 'inherit'),
+                'theme_override' => (string) ($channel['theme_override'] ?? 'inherit'),
                 'route_mode' => (string) ($channel['route_mode'] ?? 'inherit'),
                 'route_separator' => (string) ($channel['route_separator'] ?? 'inherit'),
             ];
@@ -582,6 +584,9 @@ class ChannelRead
             'feed_enabled' => false,
             'editor_override' => ChannelShared::normalizeEditorOverride(
                 (string) ($raw['editor_override'] ?? 'inherit')
+            ),
+            'theme_override' => ChannelShared::normalizeThemeOverride(
+                (string) ($raw['theme_override'] ?? 'inherit')
             ),
             'route_mode' => ChannelPolicy::normalizeChannelRouteMode((string) ($raw['route_mode'] ?? 'inherit')),
             'route_separator' => ChannelPolicy::normalizeChannelSeparator(
@@ -906,6 +911,9 @@ class ChannelRead
             'editor_override' => ChannelShared::normalizeEditorOverride(
                 (string) ($raw['editor_override'] ?? 'inherit')
             ),
+            'theme_override' => ChannelShared::normalizeThemeOverride(
+                (string) ($raw['theme_override'] ?? 'inherit')
+            ),
             'route_mode' => ChannelPolicy::normalizeChannelRouteMode((string) ($raw['route_mode'] ?? 'inherit')),
             'route_separator' => ChannelPolicy::normalizeChannelSeparator(
                 (string) ($raw['route_separator'] ?? 'inherit')
@@ -1209,6 +1217,9 @@ class ChannelRead
             'tag_sets' => SetParser::normalizeSelection($raw['tag_sets'] ?? [], false),
             'editor_override' => ChannelShared::normalizeEditorOverride(
                 (string) ($raw['editor_override'] ?? 'inherit')
+            ),
+            'theme_override' => ChannelShared::normalizeThemeOverride(
+                (string) ($raw['theme_override'] ?? 'inherit')
             ),
             'route_mode' => ChannelPolicy::normalizeChannelRouteMode((string) ($raw['route_mode'] ?? 'inherit')),
             'route_separator' => ChannelPolicy::normalizeChannelSeparator(

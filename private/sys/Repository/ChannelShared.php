@@ -87,6 +87,27 @@ final class ChannelShared
     }
 
     /**
+     * Normalizes a channel theme override to the inherit sentinel or a safe theme slug.
+     *
+     * Installed-theme validation belongs to the panel/theme catalog boundary; repository
+     * normalization only guarantees that persisted values are safe to use in path lookups.
+     *
+     * @param string $value Raw channel theme override value.
+     * @return string `inherit` or a filesystem-safe public-theme slug.
+     */
+    public static function normalizeThemeOverride(string $value): string
+    {
+        $normalized = strtolower(trim($value));
+        if ($normalized === 'inherit') {
+            return 'inherit';
+        }
+
+        return preg_match('/^[a-z0-9][a-z0-9_-]{0,63}$/', $normalized) === 1
+            ? $normalized
+            : 'inherit';
+    }
+
+    /**
      * Normalizes a nullable path scalar to a trimmed string or null.
      *
      * @param mixed $value Raw value; must be scalar or null.
