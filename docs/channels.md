@@ -41,6 +41,7 @@ Top and bottom action bars (same controls in both places):
 Fields/options:
 
 - `Name` (required)
+- `Parent` (defaults to `<root>`)
 - `Slug` (required)
 - `Description` (optional)
 - `Theme`
@@ -75,6 +76,13 @@ Theme behavior notes:
 - Theme lookup uses the same fallback chain as the global theme: the selected child theme, its parent themes, then the global child/parent/core fallback templates and assets.
 - If a selected theme is removed later, the channel safely falls back to the global system default.
 
+Parent behavior notes:
+
+- `Parent` lists the stock `<root>` channel first, followed by available channels in alphabetical sibling order.
+- Nested channels appear directly beneath their parent with indentation.
+- The edited channel and its descendants are omitted from its own parent selector to prevent circular hierarchies.
+- New channels default to the stock `<root>` channel.
+
 Taxonomy set behavior notes:
 
 - New channels default to `Use System Default`, which stores no explicit set selection and falls back to `category.set` / `tag.set` from System Configuration.
@@ -86,6 +94,7 @@ Taxonomy set behavior notes:
 Delete behavior note:
 
 - Deleting a channel detaches linked pages and redirects to root scope; it does not delete pages/redirects.
+- Deleting a channel also reparents its direct child channels to the stock `<root>` channel.
 - Raven keeps one stock `<root>` channel with reserved id `0` and placeholder slug `root`; it is protected from edit/delete actions and is not used as a public route segment.
 
 ## 2) Developer And Agent Internals
@@ -153,6 +162,7 @@ Split channel handlers:
 - Channel records include one file-backed `feed_enabled` flag for channel-specific feed routes.
 - Channel records also include file-backed `category_sets` and `tag_sets` selections.
 - Channel records include a file-backed `theme_override` slug, or `inherit` to use the global system theme.
+- Channel records include a file-backed numeric `parent_id`, defaulting to `0` for the stock `<root>` channel.
 - `ChannelWrite::updateImagePaths(...)` persists cover/preview source + variant paths.
 - `ChannelWrite::deleteById(...)` runs in a transaction:
   - updates `pages.channel_id` to `0`

@@ -57,6 +57,7 @@ final class ChannelWrite
      *   name: string,
      *   slug: string,
      *   description: string,
+     *   parent_id?: int,
      *   feed_enabled?: bool,
      *   category_sets?: array<int, int|string>,
      *   tag_sets?: array<int, int|string>,
@@ -100,6 +101,11 @@ final class ChannelWrite
         $channelId = is_array($existingRecord)
             ? (int) ($existingRecord['id'] ?? 0)
             : $this->nextChannelId();
+        $parentId = ChannelShared::normalizeParentId($data['parent_id'] ?? ChannelShared::ROOT_CHANNEL_ID);
+        // Validate against the current hierarchy so forged saves cannot create cycles or orphaned parents.
+        if (!$this->isAvailableParentId($channelId, $parentId)) {
+            throw new RuntimeException('The selected parent channel is not available.');
+        }
 
         $currentRaw = $oldSlug !== '' ? $this->read->loadRawBySlug($oldSlug) : [];
         $customFields = is_array($currentRaw['custom_fields'] ?? null) ? $currentRaw['custom_fields'] : [];
@@ -123,6 +129,7 @@ final class ChannelWrite
             'id' => $channelId,
             'name' => $name,
             'slug' => $slug,
+            'parent_id' => $parentId,
             'description' => $description,
             'feed_enabled' => $feedEnabled,
             'category_sets' => $categorySets,
@@ -184,6 +191,9 @@ final class ChannelWrite
             'id' => (int) ($record['id'] ?? $id),
             'name' => (string) ($record['name'] ?? ''),
             'slug' => $slug,
+            'parent_id' => ChannelShared::normalizeParentId(
+                $currentRaw['parent_id'] ?? ($record['parent_id'] ?? ChannelShared::ROOT_CHANNEL_ID)
+            ),
             'description' => (string) ($record['description'] ?? ''),
             'feed_enabled' => ChannelShared::normalizeFeedEnabled(
                 $currentRaw['feed_enabled'] ?? ($record['feed_enabled'] ?? false)
@@ -280,8 +290,36 @@ final class ChannelWrite
             throw $exception;
         }
 
+        // Move children to root before deleting their parent so no stored channel becomes orphaned.
+        $this->reparentChildrenToRoot($id);
         self::deleteRecordById($this->channelDirectory, $id);
         $this->read->clearCache();
+    }
+
+    /**
+     * Moves direct children of a deleted channel to the stock root channel.
+     *
+     * @param int $deletedId Channel id whose children need a safe replacement parent.
+     * @throws RuntimeException When a child channel cannot be rewritten.
+     * @return void
+     */
+    private function reparentChildrenToRoot(int $deletedId): void
+    {
+        foreach ($this->read->listRecords() as $child) {
+            $childId = (int) ($child['id'] ?? ChannelShared::ROOT_CHANNEL_ID);
+            if ($childId === ChannelShared::ROOT_CHANNEL_ID
+                || ChannelShared::normalizeParentId($child['parent_id'] ?? 0) !== $deletedId) {
+                continue;
+            }
+
+            $child['parent_id'] = ChannelShared::ROOT_CHANNEL_ID;
+            self::writeRecordById(
+                $this->channelDirectory,
+                $childId,
+                (string) ($child['slug'] ?? ''),
+                $child
+            );
+        }
     }
 
     /**
@@ -448,6 +486,24 @@ final class ChannelWrite
         }
 
         return $maxId + 1;
+    }
+
+    /**
+     * Returns whether a parent id is present in the current cycle-safe parent options.
+     *
+     * @param int $channelId Channel being created or edited.
+     * @param int $parentId Candidate parent channel id.
+     * @return bool True when the candidate is root or an eligible existing channel.
+     */
+    private function isAvailableParentId(int $channelId, int $parentId): bool
+    {
+        foreach ($this->read->listParentOptions($channelId) as $option) {
+            if ((int) ($option['id'] ?? -1) === $parentId) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

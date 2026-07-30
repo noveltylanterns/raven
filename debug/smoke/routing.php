@@ -88,6 +88,20 @@ final class RoutingSmokeRunner
         $channels = new ChannelRead($db, 'sqlite', '', $channelDirectory);
         $pages = new PageRead($db, 'sqlite', '', $channels, false, false);
 
+        $parentOptions = $channels->listParentOptions();
+        $parentOptionIds = array_map(
+            static fn (array $option): int => (int) ($option['id'] ?? -1),
+            $parentOptions
+        );
+        $parentDepths = array_map(
+            static fn (array $option): int => (int) ($option['depth'] ?? -1),
+            $parentOptions
+        );
+        $this->assert($parentOptionIds === [0, 20, 10, 30, 40], 'Parent options were not ordered root-first with grouped alphabetical descendants.');
+        $this->assert($parentDepths === [0, 1, 1, 2, 3], 'Parent option indentation depth does not match channel hierarchy.');
+        $this->assert((int) (($channels->findById(30)['parent_id'] ?? -1)) === 10, 'Parent channel id was not read as a numeric record field.');
+        $this->events[] = 'channel_parent_hierarchy=ok';
+
         $rootSlug = $this->resolvePublicPath($config, $input, $channels, $pages, 'hello-world', null);
         $this->assert((int) ($rootSlug['page']['id'] ?? 0) === 7, 'Global slug mode should resolve root slug page.');
         $this->assert((string) ($rootSlug['canonical_path'] ?? '') === '/hello-world', 'Global slug mode canonical root path mismatch.');
@@ -176,6 +190,7 @@ PHP;
                 'id' => 10,
                 'name' => 'News',
                 'slug' => 'news',
+                'parent_id' => 0,
                 'description' => '',
                 'editor_override' => 'inherit',
                 'route_mode' => 'inherit',
@@ -186,9 +201,32 @@ PHP;
                 'id' => 20,
                 'name' => 'Blog',
                 'slug' => 'blog',
+                'parent_id' => 0,
                 'description' => '',
                 'editor_override' => 'inherit',
                 'route_mode' => 'month_id',
+                'route_separator' => 'inherit',
+                'created_at' => '2026-03-20 00:00:00',
+            ],
+            'alpha' => [
+                'id' => 30,
+                'name' => 'Alpha',
+                'slug' => 'alpha',
+                'parent_id' => 10,
+                'description' => '',
+                'editor_override' => 'inherit',
+                'route_mode' => 'inherit',
+                'route_separator' => 'inherit',
+                'created_at' => '2026-03-20 00:00:00',
+            ],
+            'alpha-child' => [
+                'id' => 40,
+                'name' => 'Alpha Child',
+                'slug' => 'alpha-child',
+                'parent_id' => 30,
+                'description' => '',
+                'editor_override' => 'inherit',
+                'route_mode' => 'inherit',
                 'route_separator' => 'inherit',
                 'created_at' => '2026-03-20 00:00:00',
             ],

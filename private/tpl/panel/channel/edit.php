@@ -14,6 +14,7 @@
 /** @var bool $feedsEnabled */
 /** @var bool $categoryEnabled */
 /** @var bool $tagEnabled */
+/** @var array<int, array{id: int, name: string, slug: string, parent_id: int, depth: int}> $parentOptions */
 /** @var array<int, array{id: int, name: string, slug: string, is_root: bool}> $categorySetOptions */
 /** @var array<int, array{id: int, name: string, slug: string, is_root: bool}> $tagSetOptions */
 /** @var array<string, string> $themeOptions */
@@ -36,6 +37,7 @@ $panelBase = '/' . trim($site['panel_path'], '/');
 $channelName = trim((string) ($channel['name'] ?? ''));
 $channelId = (int) ($channel['id'] ?? 0);
 $hasPersistedChannel = $channelId > 0;
+$parentId = (int) ($channel['parent_id'] ?? 0);
 $channelSlug = trim((string) ($channel['slug'] ?? ''));
 $feedEnabled = (bool) ($channel['feed_enabled'] ?? false);
 $selectedCategorySets = is_array($channel['category_sets'] ?? null) ? $channel['category_sets'] : [];
@@ -196,6 +198,25 @@ if ($hasPersistedChannel) {
                 <label for="name" class="form-label">Name</label>
                 <!-- Channel names are display-facing labels shown in panel/public listings. -->
                 <input id="name" name="name" class="form-control" required value="<?= e((string) ($channel['name'] ?? '')) ?>">
+            </div>
+
+            <div class="form-group">
+                <label for="parent_id" class="form-label">Parent</label>
+                <select id="parent_id" name="parent_id" class="form-select">
+                    <?php foreach ($parentOptions as $parentOption): ?>
+                        <?php
+                        $parentOptionId = (int) ($parentOption['id'] ?? 0);
+                        $parentDepth = max(0, (int) ($parentOption['depth'] ?? 0));
+                        $parentIndent = $parentDepth > 0
+                            ? str_repeat("\u{00A0}\u{00A0}", $parentDepth) . '↳ '
+                            : '';
+                        ?>
+                        <option value="<?= $parentOptionId ?>"<?= $parentId === $parentOptionId ? ' selected' : '' ?>><?= e($parentIndent . (string) ($parentOption['name'] ?? '')) ?></option>
+                    <?php endforeach; ?>
+                </select>
+                <div class="form-text">
+                    Organizes this channel beneath another channel in the channel hierarchy.
+                </div>
             </div>
 
             <div class="form-group">

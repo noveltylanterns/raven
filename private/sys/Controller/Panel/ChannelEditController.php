@@ -136,9 +136,14 @@ final class ChannelEditController
         }
 
         $themeOptions = $this->themeCatalog->options();
+        $parentOptions = $this->channelRead->listParentOptions($id);
         // Normalize legacy stored channel payload fields for template consumption.
         if (is_array($channel)) {
             $channel['feed_enabled'] = (bool) ($channel['feed_enabled'] ?? false);
+            $channel['parent_id'] = $this->normalizeParentIdForForm(
+                $channel['parent_id'] ?? ChannelShared::ROOT_CHANNEL_ID,
+                $parentOptions
+            );
             $channel['category_sets'] = SetParser::normalizeSelection($channel['category_sets'] ?? [], false);
             $channel['tag_sets'] = SetParser::normalizeSelection($channel['tag_sets'] ?? [], false);
             $channel['editor_override'] = $this->editor->normalizeChannelEditorOverride(
@@ -165,6 +170,7 @@ final class ChannelEditController
             'tagEnabled' => $this->tagEnabled,
             'categorySetOptions' => $this->categorySetRepo()->listOptions(),
             'tagSetOptions' => $this->tagSetRepo()->listOptions(),
+            'parentOptions' => $parentOptions,
             'themeOptions' => $themeOptions,
             'rssFeedRoute' => $this->feedParser->rssRoute(),
             'atomFeedRoute' => $this->feedParser->atomRoute(),
@@ -204,6 +210,21 @@ final class ChannelEditController
 
         $activeTab = $this->editorTabs->normalizeEditorTab($post['tab'] ?? null, ['basic', 'meta', 'media'], 'basic');
         $existingChannel = $id !== null ? $this->channelRead->findById($id) : null;
+        $parentId = ChannelShared::normalizeParentId($post['parent_id'] ?? ChannelShared::ROOT_CHANNEL_ID);
+        $parentOptionIds = array_map(
+            static fn (array $option): int => (int) ($option['id'] ?? ChannelShared::ROOT_CHANNEL_ID),
+            $this->channelRead->listParentOptions($id)
+        );
+        if (!in_array($parentId, $parentOptionIds, true)) {
+            $this->context->flash('error', 'Parent must be an available channel.');
+            Redirect::redirect($this->editorTabs->panelEditorUrlWithTab(
+                fn (string $suffix): string => $this->context->panelUrl($suffix),
+                '/channel/edit',
+                $id,
+                $activeTab,
+                'basic'
+            ));
+        }
         $name = $this->input->text($post['name'] ?? null, 255);
         $slug = $this->input->slug($post['slug'] ?? null);
         // Preserve stored slug when edit form omits slug field.
@@ -221,7 +242,7 @@ final class ChannelEditController
         $themeOptions = $this->themeCatalog->options();
         if ($rawThemeOverride !== '' && $rawThemeOverride !== 'inherit'
             && ($themeOverride === 'inherit' || !isset($themeOptions[$themeOverride]))) {
-            $this->context->flash('error', 'Theme Override must match an installed public theme.');
+            $this->context->flash('error', 'Theme must match an installed public theme.');
             Redirect::redirect($this->editorTabs->panelEditorUrlWithTab(
                 fn (string $suffix): string => $this->context->panelUrl($suffix),
                 '/channel/edit',
@@ -264,6 +285,7 @@ final class ChannelEditController
                 'id' => $id,
                 'name' => $name,
                 'slug' => $slug,
+                'parent_id' => $parentId,
                 'description' => $description,
                 'category_sets' => $categorySetSelection,
                 'tag_sets' => $tagSetSelection,
@@ -396,6 +418,25 @@ final class ChannelEditController
         return $normalized !== 'inherit' && isset($themeOptions[$normalized])
             ? $normalized
             : 'inherit';
+    }
+
+    /**
+     * Returns a stored parent id only when it is present in the current selector options.
+     *
+     * @param mixed $value Stored channel parent id.
+     * @param array<int, array{id: int, name: string, slug: string, parent_id: int, depth: int}> $parentOptions Cycle-safe parent options.
+     * @return int Valid parent id, defaulting to the root channel.
+     */
+    private function normalizeParentIdForForm(mixed $value, array $parentOptions): int
+    {
+        $normalized = ChannelShared::normalizeParentId($value);
+        foreach ($parentOptions as $option) {
+            if ((int) ($option['id'] ?? -1) === $normalized) {
+                return $normalized;
+            }
+        }
+
+        return ChannelShared::ROOT_CHANNEL_ID;
     }
 
     /**

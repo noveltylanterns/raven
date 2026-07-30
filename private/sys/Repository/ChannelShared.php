@@ -108,6 +108,29 @@ final class ChannelShared
     }
 
     /**
+     * Normalizes a channel parent id to a non-negative integer, defaulting to root.
+     *
+     * @param mixed $value Raw parent id value from a form or channel record.
+     * @return int Valid non-negative parent id, or ROOT_CHANNEL_ID when invalid.
+     */
+    public static function normalizeParentId(mixed $value): int
+    {
+        if (is_int($value)) {
+            return $value >= self::ROOT_CHANNEL_ID ? $value : self::ROOT_CHANNEL_ID;
+        }
+
+        if (!is_string($value) || preg_match('/^\d+$/', trim($value)) !== 1) {
+            return self::ROOT_CHANNEL_ID;
+        }
+
+        $normalized = filter_var(trim($value), FILTER_VALIDATE_INT, [
+            'options' => ['min_range' => self::ROOT_CHANNEL_ID],
+        ]);
+
+        return is_int($normalized) ? $normalized : self::ROOT_CHANNEL_ID;
+    }
+
+    /**
      * Normalizes a nullable path scalar to a trimmed string or null.
      *
      * @param mixed $value Raw value; must be scalar or null.

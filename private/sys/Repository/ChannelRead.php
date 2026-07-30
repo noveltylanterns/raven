@@ -253,7 +253,7 @@ class ChannelRead
      *
      * Excludes the root channel, which is not selectable as a page destination.
      *
-     * @return array<int, array{id: int, name: string, slug: string, category_sets: array<int, int|string>, tag_sets: array<int, int|string>, editor_override: string, theme_override: string, route_mode: string, route_separator: string}>
+     * @return array<int, array{id: int, name: string, slug: string, parent_id: int, category_sets: array<int, int|string>, tag_sets: array<int, int|string>, editor_override: string, theme_override: string, route_mode: string, route_separator: string}>
      */
     public function listOptions(): array
     {
@@ -269,6 +269,7 @@ class ChannelRead
                 'id' => (int) ($channel['id'] ?? 0),
                 'name' => (string) ($channel['name'] ?? ''),
                 'slug' => (string) ($channel['slug'] ?? ''),
+                'parent_id' => ChannelShared::normalizeParentId($channel['parent_id'] ?? 0),
                 'category_sets' => SetParser::normalizeSelection($channel['category_sets'] ?? [], false),
                 'tag_sets' => SetParser::normalizeSelection($channel['tag_sets'] ?? [], false),
                 'editor_override' => (string) ($channel['editor_override'] ?? 'inherit'),
@@ -292,9 +293,134 @@ class ChannelRead
     }
 
     /**
+     * Returns root-first hierarchical options for the channel parent selector.
+     *
+     * The edited channel and its descendants are omitted so a save cannot create a
+     * self-parenting relationship or a cycle. Legacy missing/invalid parents are
+     * presented under the root without rewriting records during option rendering.
+     *
+     * @param int|null $excludeId Channel id being edited, or null while creating a channel.
+     * @return array<int, array{id: int, name: string, slug: string, parent_id: int, depth: int}> Root-first indented parent options.
+     */
+    public function listParentOptions(?int $excludeId = null): array
+    {
+        $recordsById = [];
+        // Index all normalized records so parent references can be checked without extra file reads.
+        foreach ($this->listRecords() as $channel) {
+            $id = (int) ($channel['id'] ?? -1);
+            if ($id < ChannelShared::ROOT_CHANNEL_ID) {
+                continue;
+            }
+
+            $recordsById[$id] = [
+                'id' => $id,
+                'name' => (string) ($channel['name'] ?? ''),
+                'slug' => (string) ($channel['slug'] ?? ''),
+                'parent_id' => ChannelShared::normalizeParentId($channel['parent_id'] ?? 0),
+            ];
+        }
+
+        $parentById = [ChannelShared::ROOT_CHANNEL_ID => ChannelShared::ROOT_CHANNEL_ID];
+        // Replace missing/self-referential parents with root before building the tree.
+        foreach ($recordsById as $id => $record) {
+            if ($id === ChannelShared::ROOT_CHANNEL_ID) {
+                continue;
+            }
+
+            $parentId = ChannelShared::normalizeParentId($record['parent_id']);
+            $parentById[$id] = isset($recordsById[$parentId]) && $parentId !== $id
+                ? $parentId
+                : ChannelShared::ROOT_CHANNEL_ID;
+        }
+
+        // Break legacy cycles deterministically by lifting the first repeated node to root.
+        foreach (array_keys($parentById) as $startId) {
+            $visited = [];
+            $cursor = (int) $startId;
+            while ($cursor !== ChannelShared::ROOT_CHANNEL_ID) {
+                if (isset($visited[$cursor])) {
+                    $parentById[$startId] = ChannelShared::ROOT_CHANNEL_ID;
+                    break;
+                }
+
+                $visited[$cursor] = true;
+                $cursor = $parentById[$cursor] ?? ChannelShared::ROOT_CHANNEL_ID;
+            }
+        }
+
+        $excludedIds = [];
+        // Exclude the edited channel and every descendant that would create a parent cycle.
+        if ($excludeId !== null && isset($recordsById[$excludeId])) {
+            $excludedIds[$excludeId] = true;
+            $changed = true;
+            while ($changed) {
+                $changed = false;
+                foreach ($parentById as $id => $parentId) {
+                    if (isset($excludedIds[$id]) || !isset($excludedIds[$parentId])) {
+                        continue;
+                    }
+
+                    $excludedIds[$id] = true;
+                    $changed = true;
+                }
+            }
+        }
+
+        $childrenByParent = [];
+        // Group eligible channels by normalized parent before sorting each sibling set.
+        foreach ($recordsById as $id => $record) {
+            // Root is emitted separately and must not recursively appear as its own child.
+            if ($id === ChannelShared::ROOT_CHANNEL_ID || isset($excludedIds[$id])) {
+                continue;
+            }
+
+            $parentId = $parentById[$id] ?? ChannelShared::ROOT_CHANNEL_ID;
+            $childrenByParent[$parentId][] = $id;
+        }
+
+        foreach ($childrenByParent as &$childIds) {
+            usort($childIds, function (int $leftId, int $rightId) use ($recordsById): int {
+                $nameCompare = strcasecmp($recordsById[$leftId]['name'], $recordsById[$rightId]['name']);
+                return $nameCompare !== 0 ? $nameCompare : ($leftId <=> $rightId);
+            });
+        }
+        unset($childIds);
+
+        $options = [];
+        $appendChildren = function (int $parentId, int $depth) use (&$appendChildren, &$options, $childrenByParent, $recordsById, $parentById): void {
+            foreach ($childrenByParent[$parentId] ?? [] as $childId) {
+                $record = $recordsById[$childId];
+                $options[] = [
+                    'id' => $childId,
+                    'name' => $record['name'],
+                    'slug' => $record['slug'],
+                    'parent_id' => $parentById[$childId] ?? ChannelShared::ROOT_CHANNEL_ID,
+                    'depth' => $depth,
+                ];
+                $appendChildren($childId, $depth + 1);
+            }
+        };
+
+        // Root is always the first option and all descendants follow beneath their parent.
+        if (isset($recordsById[ChannelShared::ROOT_CHANNEL_ID]) && !isset($excludedIds[ChannelShared::ROOT_CHANNEL_ID])) {
+            $root = $recordsById[ChannelShared::ROOT_CHANNEL_ID];
+            $options[] = [
+                'id' => ChannelShared::ROOT_CHANNEL_ID,
+                'name' => $root['name'],
+                'slug' => $root['slug'],
+                'parent_id' => ChannelShared::ROOT_CHANNEL_ID,
+                'depth' => 0,
+            ];
+            $appendChildren(ChannelShared::ROOT_CHANNEL_ID, 1);
+        }
+
+        return $options;
+    }
+
+    /**
      * Returns channel options for routing diagnostics, including the stock root channel.
      *
-     * @return array<int, array{id: int, name: string, slug: string, feed_enabled: bool, category_sets: array<int, int|string>, tag_sets: array<int, int|string>, editor_override: string, theme_override: string, route_mode: string, route_separator: string}>
+     * @return array<int, array{id: int, name: string, slug: string, parent_id: int, feed_enabled: bool, category_sets: array<int, int|string>, tag_sets: array<int, int|string>, editor_override: string, theme_override: string, route_mode: string, route_separator: string}>
      */
     public function listRoutingOptions(): array
     {
@@ -305,6 +431,7 @@ class ChannelRead
                 'id' => (int) ($channel['id'] ?? 0),
                 'name' => (string) ($channel['name'] ?? ''),
                 'slug' => (string) ($channel['slug'] ?? ''),
+                'parent_id' => ChannelShared::normalizeParentId($channel['parent_id'] ?? 0),
                 'feed_enabled' => (bool) ($channel['feed_enabled'] ?? false),
                 'category_sets' => SetParser::normalizeSelection($channel['category_sets'] ?? [], false),
                 'tag_sets' => SetParser::normalizeSelection($channel['tag_sets'] ?? [], false),
@@ -580,6 +707,7 @@ class ChannelRead
             'id' => ChannelShared::ROOT_CHANNEL_ID,
             'name' => ChannelShared::ROOT_CHANNEL_NAME,
             'slug' => ChannelShared::ROOT_CHANNEL_SLUG,
+            'parent_id' => ChannelShared::ROOT_CHANNEL_ID,
             'description' => trim((string) ($raw['description'] ?? '')),
             'feed_enabled' => false,
             'editor_override' => ChannelShared::normalizeEditorOverride(
@@ -633,6 +761,11 @@ class ChannelRead
 
         // Root record slug is immutable and must always remain the reserved root slug.
         if (!ChannelShared::isRootChannelSlug((string) ($raw['slug'] ?? ''))) {
+            return true;
+        }
+
+        // Root channel cannot inherit from another channel.
+        if (ChannelShared::normalizeParentId($raw['parent_id'] ?? 0) !== ChannelShared::ROOT_CHANNEL_ID) {
             return true;
         }
 
@@ -904,6 +1037,9 @@ class ChannelRead
             'id' => $normalizedId,
             'name' => $name,
             'slug' => $normalizedSlug,
+            'parent_id' => $normalizedId === ChannelShared::ROOT_CHANNEL_ID
+                ? ChannelShared::ROOT_CHANNEL_ID
+                : ChannelShared::normalizeParentId($raw['parent_id'] ?? 0),
             'description' => trim((string) ($raw['description'] ?? '')),
             'feed_enabled' => ChannelShared::normalizeFeedEnabled($raw['feed_enabled'] ?? false),
             'category_sets' => SetParser::normalizeSelection($raw['category_sets'] ?? [], false),
@@ -1211,6 +1347,9 @@ class ChannelRead
             'id' => $normalizedId,
             'name' => $name,
             'slug' => $normalizedSlug,
+            'parent_id' => $normalizedId === ChannelShared::ROOT_CHANNEL_ID
+                ? ChannelShared::ROOT_CHANNEL_ID
+                : ChannelShared::normalizeParentId($raw['parent_id'] ?? 0),
             'description' => trim((string) ($raw['description'] ?? '')),
             'feed_enabled' => ChannelShared::normalizeFeedEnabled($raw['feed_enabled'] ?? false),
             'category_sets' => SetParser::normalizeSelection($raw['category_sets'] ?? [], false),
