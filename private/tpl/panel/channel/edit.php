@@ -214,9 +214,6 @@ if ($hasPersistedChannel) {
                         <option value="<?= $parentOptionId ?>"<?= $parentId === $parentOptionId ? ' selected' : '' ?>><?= e($parentIndent . (string) ($parentOption['name'] ?? '')) ?></option>
                     <?php endforeach; ?>
                 </select>
-                <div class="form-text">
-                    Organizes this channel beneath another channel in the channel hierarchy.
-                </div>
             </div>
 
             <div class="form-group">
@@ -239,9 +236,6 @@ if ($hasPersistedChannel) {
                         <option value="<?= e((string) $themeSlug) ?>"<?= $themeOverride === $themeSlug ? ' selected' : '' ?>><?= e((string) $themeName) ?></option>
                     <?php endforeach; ?>
                 </select>
-                <div class="form-text">
-                    All pages in this channel use the selected theme. Child themes inherit missing templates and assets from their parent, then from the global theme's fallback chain.
-                </div>
             </div>
         </div>
 
