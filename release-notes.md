@@ -2,6 +2,10 @@
 
 *The machine is supposed to be logging patches & mods to this file. Sometimes it does, sometimes it doesn't. It might be useful for historical architectural context to your Agent at one point.*
 
+### August 2, 2026
+
+- Made extensionless public page routes accept file-looking suffixes from repository Markdown links, discard the period suffix for lookup, and 301-redirect resolved pages to their canonical extensionless URLs.
+
 ### July 30, 2026
 
 - Removed the bundled Smallweb extension, its panel/runtime integration, dedicated smoke coverage, and active documentation so the core Raven package no longer ships or protects it.

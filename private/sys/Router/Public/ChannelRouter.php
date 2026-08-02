@@ -12,6 +12,7 @@ declare(strict_types=1);
 namespace Raven\Core\Router\Public;
 
 use Raven\Core\Router\RouteHandler;
+use Raven\Core\Router\PagePolicy;
 use Raven\Core\Router\RouteValidator;
 
 /**
@@ -37,7 +38,9 @@ final class ChannelRouter
 
         // Single-segment route: channel landing first, then root page/redirect fallback.
         $router->add('GET', '/{slug}', static function (array $params) use ($publicChannelController, $publicRequestContext, $input, $reservedPrefixes): void {
-            $slug = RouteValidator::slugOrNotFound($input, $params['slug'] ?? null, static function () use ($publicRequestContext): void {
+            $requestedSlug = strtolower(trim((string) ($params['slug'] ?? '')));
+            $lookupSlug = PagePolicy::stripPeriodSuffix($requestedSlug);
+            $slug = RouteValidator::slugOrNotFound($input, $lookupSlug, static function () use ($publicRequestContext): void {
                 $publicRequestContext()->notFound();
             });
             $slug = RouteValidator::slugAllowedOrNotFound($slug, $reservedPrefixes, static function () use ($publicRequestContext): void {
@@ -48,7 +51,8 @@ final class ChannelRouter
                 return;
             }
 
-            $publicChannelController()->channel($slug);
+            // Keep the original suffix-bearing segment so channel fallback can canonicalize it.
+            $publicChannelController()->channel($requestedSlug);
         });
     }
 }

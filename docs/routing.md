@@ -47,6 +47,7 @@ Core public family behavior:
 - Profile/group routes:
   - enabled only when their prefixes/modes are configured
 - Content routes:
+  - Page-route segments may include a legacy/file suffix; Raven discards the first period and everything after it, then 301-redirects a resolved route to its canonical extensionless URL (for example /docs/guide.md -> /docs/guide).
   - `/` homepage
   - `/{slug}` channel landing/root fallback seam
   - `/{channel}/{slug}` channel-scoped pages

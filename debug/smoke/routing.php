@@ -107,6 +107,11 @@ final class RoutingSmokeRunner
         $this->assert((string) ($rootSlug['canonical_path'] ?? '') === '/hello-world', 'Global slug mode canonical root path mismatch.');
         $this->events[] = 'root_slug=ok';
 
+        $rootMarkdownAlias = $this->resolvePublicPath($config, $input, $channels, $pages, 'hello-world.md', null);
+        $this->assert((int) ($rootMarkdownAlias['page']['id'] ?? 0) === 7, 'Markdown-style root links should resolve after their period suffix is removed.');
+        $this->assert((string) ($rootMarkdownAlias['canonical_path'] ?? '') === '/hello-world', 'Markdown-style root link canonical path mismatch.');
+        $this->events[] = 'root_markdown_alias=ok';
+
         ConfigWrite::persistValue($configPath, $config->all(), 'content.separator', '_');
         $config = new Config($configPath);
         $rootUnderscore = $this->resolvePublicPath($config, $input, $channels, $pages, 'hello_world', null);
@@ -278,7 +283,7 @@ PHP;
         string $requestedSegment,
         ?string $channelSlug
     ): array {
-        $requestedSegment = strtolower(trim($requestedSegment));
+        $requestedSegment = PagePolicy::stripPeriodSuffix($requestedSegment);
         $lookupSlug = $requestedSegment;
         $lookupTarget = null;
         $routeMode = 'slug';

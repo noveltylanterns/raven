@@ -85,6 +85,10 @@ Repository references are resolved by enabled extensions through the public Mark
 contract. The stock `repo` extension reads only Markdown text blobs from its mirrored bare
 repositories; it never exposes the bare repository directory as a direct filesystem path.
 
+Links in repository-sourced Markdown may use file-looking page URLs such as /docs/guide.md. When
+the target resolves to a Raven page route, Raven removes the suffix and redirects the visitor to
+the canonical extensionless URL, /docs/guide.
+
 Template resolution and fallback behavior are documented in:
 
 - `docs/appendix/templates/public.md`

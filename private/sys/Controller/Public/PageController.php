@@ -144,7 +144,8 @@ final class PageController
      */
     public function page(string $pageSlug, ?string $channelSlug = null): void
     {
-        $requestedSlug = strtolower(trim($pageSlug));
+        $requestedRouteSegment = strtolower(trim($pageSlug));
+        $requestedSlug = PagePolicy::stripPeriodSuffix($requestedRouteSegment);
         $lookupSlug = $requestedSlug;
         $lookupTarget = null;
         $channel = null;
@@ -245,10 +246,10 @@ final class PageController
         // Channel-scoped canonical redirect branch.
         if ($channelSlug !== null) {
             // Redirect to canonical segment when requested slug differs.
-            if ($canonicalSegment !== '' && strcasecmp($canonicalSegment, $requestedSlug) !== 0) {
+            if ($canonicalSegment !== '' && strcasecmp($canonicalSegment, $requestedRouteSegment) !== 0) {
                 Redirect::redirect('/' . rawurlencode($channelSlug) . '/' . rawurlencode($canonicalSegment), 301);
             }
-        } elseif ($canonicalSegment !== '' && strcasecmp($canonicalSegment, $requestedSlug) !== 0) {
+        } elseif ($canonicalSegment !== '' && strcasecmp($canonicalSegment, $requestedRouteSegment) !== 0) {
             Redirect::redirect('/' . rawurlencode($canonicalSegment), 301);
         }
 

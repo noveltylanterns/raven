@@ -12,6 +12,7 @@ declare(strict_types=1);
 namespace Raven\Core\Router\Public;
 
 use Raven\Core\Router\RouteHandler;
+use Raven\Core\Router\PagePolicy;
 use Raven\Core\Router\RouteValidator;
 
 /**
@@ -60,9 +61,11 @@ final class PageRouter
             $channel = RouteValidator::slugOrNotFound($input, $params['channel'] ?? null, static function () use ($publicRequestContext): void {
                 $publicRequestContext()->notFound();
             });
-            $slugRaw = strtolower(trim((string) ($params['slug'] ?? '')));
+            $requestedSlug = strtolower(trim((string) ($params['slug'] ?? '')));
+            $slugRaw = PagePolicy::stripPeriodSuffix($requestedSlug);
 
-            // Reject malformed segments and reserved channel prefixes before controller dispatch.
+            // Validate the suffix-free segment, but pass the original request through so the
+            // controller can issue a canonical redirect for file-looking aliases such as .md.
             if (
                 $channel === null
                 || $slugRaw === ''
@@ -73,7 +76,7 @@ final class PageRouter
                 return;
             }
 
-            $publicPageController()->page($slugRaw, $channel);
+            $publicPageController()->page($requestedSlug, $channel);
         });
     }
 }

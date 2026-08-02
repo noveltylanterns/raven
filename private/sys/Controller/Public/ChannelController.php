@@ -124,7 +124,8 @@ final class ChannelController
      */
     public function channel(string $channelSlug): void
     {
-        $requestedSlug = strtolower(trim($channelSlug));
+        $requestedRouteSegment = strtolower(trim($channelSlug));
+        $requestedSlug = PagePolicy::stripPeriodSuffix($requestedRouteSegment);
         // Empty single-segment routes cannot resolve to channel or page resources.
         if ($requestedSlug === '') {
             $this->context->notFound();
@@ -136,6 +137,12 @@ final class ChannelController
         $result = $this->pageRead->findChannelHomepage($requestedSlug);
         // Channel landing page path renders when homepage tuple includes page payload.
         if (is_array($result) && is_array($result['page'] ?? null)) {
+            // Repository Markdown often links to channel documents with a .md suffix;
+            // keep the public route extensionless after resolving that compatibility alias.
+            if (strcasecmp($requestedRouteSegment, $requestedSlug) !== 0) {
+                Redirect::redirect('/' . rawurlencode($requestedSlug), 301);
+            }
+
             $channel = is_array($result['channel'] ?? null) ? $result['channel'] : [];
             $page = $this->renderPageContentBlocks($result['page']);
             $page = $this->templateDecorator()->decoratePageForTemplate($page);
@@ -206,7 +213,7 @@ final class ChannelController
             (string) $this->context->config()->get('content.separator', '-')
         );
         // Redirect to canonical segment when requested slug casing/format differs.
-        if ($canonicalSegment !== '' && strcasecmp($canonicalSegment, $requestedSlug) !== 0) {
+        if ($canonicalSegment !== '' && strcasecmp($canonicalSegment, $requestedRouteSegment) !== 0) {
             Redirect::redirect('/' . rawurlencode($canonicalSegment), 301);
         }
 

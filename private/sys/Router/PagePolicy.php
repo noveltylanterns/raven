@@ -23,6 +23,26 @@ use Raven\Lib\Security\InputSanitizer;
 final class PagePolicy
 {
     /**
+     * Removes a file-style suffix from one public page route segment.
+     *
+     * Markdown sourced from repositories commonly links to sibling documents
+     * with names such as guide.md, while Raven's canonical public routes are
+     * extensionless. Treating the first period and everything after it as a
+     * compatibility suffix lets those links resolve before the controller
+     * redirects them to the canonical extensionless URL.
+     *
+     * @param string $segment Raw public route segment.
+     * @return string Route segment without its optional period suffix.
+     */
+    public static function stripPeriodSuffix(string $segment): string
+    {
+        $segment = strtolower(trim($segment));
+        $periodPosition = strpos($segment, '.');
+
+        return $periodPosition === false ? $segment : substr($segment, 0, $periodPosition);
+    }
+
+    /**
      * Normalizes a URL path segment for a slug-based page lookup.
      *
      * Converts underscores to hyphens first when the channel uses underscore separators,
