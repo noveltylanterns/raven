@@ -440,6 +440,8 @@ final class SharedController
         // links until another nav-affecting setting changed.
         $navCacheKey = md5(implode('|', [
             'panel:' . $panelUrl(''),
+            // Invalidate prior session nav snapshots when the quick-menu channel scope changes.
+            'page-create-channels:top-level-v1',
             implode(',', array_keys($enabledExtensionManifests)),
             (string) $rvn['auth']->panelService()->panelPermissionMask(),
             $categoryEnabled ? '1' : '0',
@@ -592,6 +594,11 @@ final class SharedController
 
                 $channelName = trim((string) ($channelOption['name'] ?? ''));
                 $channelSlug = strtolower(trim((string) ($channelOption['slug'] ?? '')));
+                // Keep the quick menu shallow; the editor itself still receives every channel option.
+                if ((int) ($channelOption['parent_id'] ?? 0) !== 0) {
+                    continue;
+                }
+
                 // Require display name and a valid slug token for shortcut links.
                 if ($channelName === '' || $channelSlug === '' || preg_match('/^[a-z0-9][a-z0-9_-]{0,127}$/', $channelSlug) !== 1) {
                     continue;

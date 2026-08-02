@@ -5,6 +5,7 @@
 ### August 2, 2026
 
 - Made extensionless public page routes accept file-looking suffixes from repository Markdown links, discard the period suffix for lookup, and 301-redirect resolved pages to their canonical extensionless URLs.
+- Limited the panel quick Create Page channel shortcuts to top-level channels while preserving the full channel list in the page editor.
 
 ### July 30, 2026
 

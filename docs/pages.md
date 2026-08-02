@@ -43,6 +43,8 @@ New pages must be saved before gallery operations are available.
 
 The panel editor exposes these corresponding field controls:
 
+The quick Create Page menu offers root-level channel shortcuts; the page editor's channel selector still includes nested channels.
+
 - `Display title?`, `Description`, `Publish At`, and `Expire At`
 - `Upload Image`, `Select`, `Alt / Title`, and `Caption`
 - `Include in gallery` and `Use as cover image`
