@@ -91,20 +91,20 @@ class PageRead
     }
 
     /**
-     * Finds the channel homepage by slug priority: `home` first, then `index`.
+     * Finds the channel homepage by parent-aware path priority: `home` first, then `index`.
      *
      * Returns the resolved channel and its homepage as a named-key tuple so the
      * caller can reuse the already-fetched channel row without a second DB round-trip.
      * Returns null when the channel slug does not resolve to a known channel.
      * When the channel exists but has no published homepage, `page` is null.
      *
-     * @param string $channelSlug Normalized channel slug to look up.
+     * @param string $channelSlug Normalized parent-aware channel path to look up.
      * @return array{channel: array<string,mixed>, page: ?array<string,mixed>}|null Null when channel not found.
      */
     public function findChannelHomepage(string $channelSlug): ?array
     {
         $pages = $this->table('pages');
-        $channel = $this->channelRepo->findBySlug($channelSlug);
+        $channel = $this->resolveChannelScope($channelSlug);
         // Unknown channel slug means channel homepage lookup cannot proceed.
         if ($channel === null) {
             return null;
@@ -147,10 +147,10 @@ class PageRead
     /**
      * Finds one published page by slug and optional channel slug.
      *
-     * Unchanneled pages resolve at root; channeled pages require an explicit channel slug match.
+     * Unchanneled pages resolve at root; channeled pages require an explicit channel path or slug match.
      *
      * @param string      $pageSlug    Exact page slug to look up.
-     * @param string|null $channelSlug Optional channel slug to scope the lookup.
+     * @param string|null $channelSlug Optional parent-aware channel path to scope the lookup.
      * @return array<string, mixed>|null Hydrated page row with channel context, or null when not found.
      */
     public function findPublishedBySlug(string $pageSlug, ?string $channelSlug = null): ?array
@@ -170,7 +170,7 @@ class PageRead
         if ($channelSlug === null) {
             $sql .= ' AND p.channel = 0';
         } else {
-            $channel = $this->channelRepo->findBySlug($channelSlug);
+            $channel = $this->resolveChannelScope($channelSlug);
             // Unknown channel slug means no scoped page can match.
             if ($channel === null) {
                 return null;
@@ -199,7 +199,7 @@ class PageRead
      * Finds one published page by id and optional channel slug.
      *
      * @param int         $pageId      Page id to resolve.
-     * @param string|null $channelSlug Optional channel slug to scope the lookup.
+     * @param string|null $channelSlug Optional parent-aware channel path to scope the lookup.
      * @return array<string, mixed>|null Hydrated page row with channel context, or null when not found.
      */
     public function findPublishedById(int $pageId, ?string $channelSlug = null): ?array
@@ -224,7 +224,7 @@ class PageRead
         if ($channelSlug === null) {
             $sql .= ' AND p.channel = 0';
         } else {
-            $channel = $this->channelRepo->findBySlug($channelSlug);
+            $channel = $this->resolveChannelScope($channelSlug);
             // Unknown channel slug means no scoped page can match.
             if ($channel === null) {
                 return null;
@@ -252,7 +252,7 @@ class PageRead
     /**
      * Returns one page by slug and optional channel scope.
      *
-     * $channel accepts a channel id (int), a channel slug (string), or null for root scope.
+     * $channel accepts a channel id (int), a channel path/slug (string), or null for root scope.
      * Root scope matches pages that do not belong to any channel.
      *
      * @param string           $pageSlug Exact page slug to look up.
@@ -267,7 +267,8 @@ class PageRead
 
         // String channel input resolves via channel slug lookup.
         if (is_string($channel)) {
-            $channelId = $this->channelRepo->idBySlug($channel);
+            $resolvedChannel = $this->resolveChannelScope($channel);
+            $channelId = is_array($resolvedChannel) ? (int) ($resolvedChannel['id'] ?? 0) : null;
             // Unknown channel slug cannot produce a scoped page match.
             if ($channelId === null || $channelId < 1) {
                 return null;
@@ -293,7 +294,7 @@ class PageRead
     /**
      * Returns one page id by slug and optional channel scope, or null when not found.
      *
-     * $channel accepts a channel id (int), a channel slug (string), or null for root scope.
+     * $channel accepts a channel id (int), a channel path/slug (string), or null for root scope.
      *
      * @param string           $pageSlug Exact page slug to look up.
      * @param int|string|null  $channel  Channel id, slug, or null for root.
@@ -307,7 +308,8 @@ class PageRead
 
         // String channel input resolves via channel slug lookup.
         if (is_string($channel)) {
-            $channelId = $this->channelRepo->idBySlug($channel);
+            $resolvedChannel = $this->resolveChannelScope($channel);
+            $channelId = is_array($resolvedChannel) ? (int) ($resolvedChannel['id'] ?? 0) : null;
             // Unknown channel slug cannot produce a scoped page-id match.
             if ($channelId === null || $channelId < 1) {
                 return null;
@@ -1364,6 +1366,22 @@ class PageRead
     private function channelsByIdMap(): array
     {
         return ChannelRead::channelsByIdMap($this->channelRepo->listRecords());
+    }
+
+    /**
+     * Resolves a channel scope strictly through its parent-aware public path.
+     *
+     * @param string $channelPath Parent-aware channel path.
+     * @return array<string, mixed>|null Matching channel record, or null when no scope exists.
+     */
+    private function resolveChannelScope(string $channelPath): ?array
+    {
+        $normalized = strtolower(trim($channelPath, '/'));
+        if ($normalized === '') {
+            return null;
+        }
+
+        return $this->channelRepo->findByPath($normalized);
     }
 
     /**

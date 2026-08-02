@@ -221,6 +221,9 @@ final class PageEditController
                 $galleryImages = is_array($editData['gallery_images'] ?? null) ? $editData['gallery_images'] : [];
             }
         }
+        $channelPath = is_array($page)
+            ? $this->channelRead->pathForChannel((int) ($page['channel'] ?? 0))
+            : '';
         $activeTab = $this->editorTabs->normalizeEditorTab($_GET['tab'] ?? null, ['content', 'meta', 'media'], 'content');
 
         // Load channel/category/tag options and page assignments in one query.
@@ -283,6 +286,7 @@ final class PageEditController
 
         $this->context->renderPanel('panel/page/edit', [
             'page' => $page,
+            'channelPath' => $channelPath,
             'currentUserId' => $currentUserId !== null ? $currentUserId : 0,
             'authorOptions' => $this->pageAuthorOptionBuilder()->build(
                 $this->userRepo->listAll(),

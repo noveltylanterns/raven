@@ -138,6 +138,7 @@ final class RouteProfiler
                 $channelsById[$channelId] = [
                     'slug' => (string) ($channelOption['slug'] ?? ''),
                     'name' => (string) ($channelOption['name'] ?? ''),
+                    'parent_id' => ChannelShared::normalizeParentId($channelOption['parent_id'] ?? 0),
                     'route_mode' => (string) ($channelOption['route_mode'] ?? 'inherit'),
                     'route_separator' => (string) ($channelOption['route_separator'] ?? 'inherit'),
                 ];
@@ -147,6 +148,9 @@ final class RouteProfiler
         foreach ($pagesForRouting as &$pageForRouting) {
             $channelId = (int) ($pageForRouting['channel'] ?? 0);
             $pageForRouting['channel_slug'] = (string) ($channelsById[$channelId]['slug'] ?? '');
+            $pageForRouting['channel_path'] = $channelId > 0
+                ? $this->channelPathForId($channelId, $channelsById)
+                : '';
             $pageForRouting['channel_name'] = (string) ($channelsById[$channelId]['name'] ?? '');
             $pageForRouting['route_mode_effective'] = (string) ($channelsById[$channelId]['route_mode'] ?? 'inherit');
             $pageForRouting['route_separator_effective'] = (string) ($channelsById[$channelId]['route_separator'] ?? 'inherit');
@@ -211,6 +215,7 @@ final class RouteProfiler
 
             $isRootChannel = ChannelShared::isRootChannelId($channelId)
                 || ChannelShared::isRootChannelSlug($channelSlug);
+            $channelPath = $isRootChannel ? '' : $this->channelPathForId($channelId, $channelsById);
             $landingSlug = $isRootChannel
                 ? $this->rootLandingSlug($pagesForRouting)
                 : trim((string) ($channelLandingMap[$channelSlug] ?? ''));
@@ -229,7 +234,7 @@ final class RouteProfiler
                 $notes = 'Reserved prefix; this channel route is not publicly reachable.';
             }
 
-            $publicUrl = $isRootChannel ? '/' : ('/' . $channelSlug);
+            $publicUrl = $isRootChannel ? '/' : ('/' . ($channelPath !== '' ? $channelPath : $channelSlug));
             $conflictKey = strtolower($publicUrl);
             $pathUsage[$conflictKey] = (int) ($pathUsage[$conflictKey] ?? 0) + 1;
 
@@ -307,10 +312,11 @@ final class RouteProfiler
             }
 
             $channelSlug = trim((string) ($page['channel_slug'] ?? ''));
+            $channelPath = trim((string) ($page['channel_path'] ?? ''));
             $publicUrl = $buildPageUrl(
                 $pageSlug,
                 (int) ($page['id'] ?? 0),
-                $channelSlug,
+                $channelPath !== '' ? $channelPath : $channelSlug,
                 (string) ($page['created'] ?? ''),
                 (string) ($page['route_mode_effective'] ?? 'inherit'),
                 (string) ($page['route_separator_effective'] ?? 'inherit')
@@ -323,7 +329,7 @@ final class RouteProfiler
             // Flag page routes that collide with reserved root/channel prefixes.
             if ($channelSlug === '' && in_array($pageSlug, $reservedPrefixes, true)) {
                 $notes = 'Reserved prefix; this root-level page route is not publicly reachable.';
-            } elseif ($channelSlug !== '' && in_array($channelSlug, $reservedPrefixes, true)) {
+            } elseif ($channelSlug !== '' && in_array(explode('/', $channelPath !== '' ? $channelPath : $channelSlug)[0], $reservedPrefixes, true)) {
                 $notes = 'Reserved channel prefix; this channeled page route is not publicly reachable.';
             }
 
@@ -523,10 +529,13 @@ final class RouteProfiler
                 continue;
             }
 
+            $channelId = (int) ($redirect['channel'] ?? 0);
             $channelSlug = trim((string) ($redirect['channel_slug'] ?? ''));
-            $publicUrl = $channelSlug === ''
+            $channelPath = $channelId > 0 ? $this->channelPathForId($channelId, $channelsById) : '';
+            $channelPath = $channelPath !== '' ? $channelPath : $channelSlug;
+            $publicUrl = $channelPath === ''
                 ? '/' . $redirectSlug
-                : '/' . $channelSlug . '/' . $redirectSlug;
+                : '/' . $channelPath . '/' . $redirectSlug;
 
             $statusKey = (int) ($redirect['active'] ?? 0) === 1 ? 'active' : 'inactive';
             $statusLabel = $statusKey === 'active' ? 'Active' : 'Inactive';
@@ -535,7 +544,7 @@ final class RouteProfiler
             // Flag redirect paths shadowed by reserved root/channel prefixes.
             if ($channelSlug === '' && in_array($redirectSlug, $reservedPrefixes, true)) {
                 $notes = 'Reserved prefix; this root-level redirect route is not publicly reachable.';
-            } elseif ($channelSlug !== '' && in_array($channelSlug, $reservedPrefixes, true)) {
+            } elseif ($channelPath !== '' && in_array(explode('/', $channelPath)[0], $reservedPrefixes, true)) {
                 $notes = 'Reserved channel prefix; this channeled redirect route is not publicly reachable.';
             }
 
@@ -596,6 +605,47 @@ final class RouteProfiler
         });
 
         return $rows;
+    }
+
+    /**
+     * Builds one canonical channel path from indexed channel records.
+     *
+     * @param int $channelId Channel id whose ancestor path should be returned.
+     * @param array<int, array<string, mixed>> $channelsById Channel rows indexed by id.
+     * @return string Slash-separated channel path, or an empty string for invalid hierarchy data.
+     */
+    private function channelPathForId(int $channelId, array $channelsById): string
+    {
+        if ($channelId < 1 || !isset($channelsById[$channelId])) {
+            return '';
+        }
+
+        $segments = [];
+        $visited = [];
+        $currentId = $channelId;
+        // Walk ancestors with a cycle guard so diagnostics remain safe on malformed records.
+        while ($currentId > ChannelShared::ROOT_CHANNEL_ID) {
+            if (isset($visited[$currentId]) || !isset($channelsById[$currentId])) {
+                return '';
+            }
+
+            $visited[$currentId] = true;
+            $channel = $channelsById[$currentId];
+            $slug = strtolower(trim((string) ($channel['slug'] ?? '')));
+            if (!ChannelShared::isValidSlug($slug)) {
+                return '';
+            }
+
+            array_unshift($segments, $slug);
+            $parentId = ChannelShared::normalizeParentId($channel['parent_id'] ?? 0);
+            if ($parentId === $currentId) {
+                return '';
+            }
+
+            $currentId = $parentId;
+        }
+
+        return implode('/', $segments);
     }
 
     /**

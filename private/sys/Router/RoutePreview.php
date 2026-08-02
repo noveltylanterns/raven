@@ -46,7 +46,7 @@ final class RoutePreview
      *
      * @param string $pageSlug Raw page slug.
      * @param int $pageId Page id used by id-bearing route modes.
-     * @param string $channelSlug Raw channel slug for channel-scoped routes.
+     * @param string $channelSlug Parent-aware channel path for channel-scoped routes.
      * @param string $publishedAt Published timestamp string used by dated route modes.
      * @param string $channelPageRouteMode Configured route mode for channel pages.
      * @param string $channelPageUrlSeparator Configured separator for channel page routes.
@@ -69,7 +69,7 @@ final class RoutePreview
             return '/';
         }
 
-        $normalizedChannel = $this->input->slug($channelSlug);
+        $normalizedChannel = $this->normalizeChannelPath($channelSlug);
         $routeSegment = PagePolicy::buildRouteSegment(
             $this->input,
             (string) $normalizedSlug,
@@ -90,6 +90,33 @@ final class RoutePreview
         }
 
         return '/' . $normalizedChannel . '/' . $routeSegment;
+    }
+
+    /**
+     * Normalizes each segment of a parent-aware channel path independently.
+     *
+     * @param string $channelPath Raw slash-separated channel path.
+     * @return string|null Normalized path, or null when any segment is invalid.
+     */
+    private function normalizeChannelPath(string $channelPath): ?string
+    {
+        $trimmedPath = trim($channelPath, '/');
+        if ($trimmedPath === '') {
+            return null;
+        }
+
+        $segments = explode('/', $trimmedPath);
+        $normalizedSegments = [];
+        foreach ($segments as $segment) {
+            $normalized = $this->input->slug($segment);
+            if ($normalized === null || $normalized === '') {
+                return null;
+            }
+
+            $normalizedSegments[] = $normalized;
+        }
+
+        return implode('/', $normalizedSegments);
     }
 
     /**

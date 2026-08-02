@@ -120,6 +120,7 @@ final class ControllerFactory
             $formDomain = $publicFormDomain();
             $publicChannelController = new PublicChannelController(
                 $requestContextFactory(),
+                $contentDomain['channel'],
                 $contentDomain['media'],
                 $contentDomain['page'],
                 $contentDomain['redirect_read'],

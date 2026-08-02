@@ -41,8 +41,11 @@ use Raven\Core\Config;
 use Raven\Core\Repository\ChannelRead;
 use Raven\Core\Repository\ConfigWrite;
 use Raven\Core\Repository\PageRead;
+use Raven\Core\Debug\RouteProfiler;
 use Raven\Core\Router\ChannelPolicy;
 use Raven\Core\Router\PagePolicy;
+use Raven\Core\Router\RouteHandler;
+use Raven\Core\Router\RouteRequest;
 use Raven\Lib\Security\InputSanitizer;
 
 final class RoutingSmokeRunner
@@ -100,7 +103,46 @@ final class RoutingSmokeRunner
         $this->assert($parentOptionIds === [0, 20, 10, 30, 40], 'Parent options were not ordered root-first with grouped alphabetical descendants.');
         $this->assert($parentDepths === [0, 1, 1, 2, 3], 'Parent option indentation depth does not match channel hierarchy.');
         $this->assert((int) (($channels->findById(30)['parent_id'] ?? -1)) === 10, 'Parent channel id was not read as a numeric record field.');
+        $this->assert((int) (($channels->findByPath('news/alpha')['id'] ?? 0)) === 30, 'Nested channel path did not resolve through its direct parent.');
+        $this->assert((int) (($channels->findByPath('news/alpha/alpha-child')['id'] ?? 0)) === 40, 'Third-level channel path did not resolve through all ancestors.');
+        $this->assert($channels->findByPath('alpha') === null, 'A child channel must not resolve as a root-level path.');
+        $this->assert($channels->pathForChannel(40) === 'news/alpha/alpha-child', 'Canonical channel path did not include all parent slugs.');
         $this->events[] = 'channel_parent_hierarchy=ok';
+
+        $routeHandler = new RouteHandler();
+        $routeHandler->add('GET', '/{channel}/{path...}', static fn (array $params): array => $params);
+        $deepRoute = $routeHandler->dispatch(new RouteRequest('GET', '/news/alpha/nested-post'));
+        $this->assert($deepRoute->isHandled(), 'Catch-all route pattern did not dispatch a deep channel path.');
+        $this->assert((string) ($deepRoute->params()['channel'] ?? '') === 'news', 'Catch-all route did not capture its first channel segment.');
+        $this->assert((string) ($deepRoute->params()['path'] ?? '') === 'alpha/nested-post', 'Catch-all route did not preserve nested path segments.');
+        $this->events[] = 'nested_route_pattern=ok';
+
+        $profiler = new RouteProfiler($input);
+        $routingRows = $profiler->buildRows([
+            'reserved_prefixes' => [],
+            'channel_index_template_exists' => true,
+            'feed_enabled' => false,
+            'channel_routing_options' => [
+                ['id' => 0, 'name' => '<root>', 'slug' => 'root', 'parent_id' => 0, 'route_mode' => 'inherit', 'route_separator' => 'inherit'],
+                ['id' => 10, 'name' => 'News', 'slug' => 'news', 'parent_id' => 0, 'route_mode' => 'inherit', 'route_separator' => 'inherit'],
+                ['id' => 30, 'name' => 'Alpha', 'slug' => 'alpha', 'parent_id' => 10, 'route_mode' => 'inherit', 'route_separator' => 'inherit'],
+            ],
+            'pages_for_routing' => [
+                ['id' => 91, 'title' => 'Nested Post', 'slug' => 'nested-post', 'status' => 'published', 'created' => '2026-03-20 12:00:00', 'channel' => 30],
+            ],
+            'build_page_url' => static function (string $slug, int $id, string $channelPath, string $created, string $mode, string $separator): string {
+                return ($channelPath !== '' ? '/' . $channelPath : '') . '/' . $slug;
+            },
+            'channel_landing_map_builder' => static fn (array $pages): array => [],
+            'build_edit_url' => static fn (string $type, array $meta): string => '',
+            'build_user_route_segment' => static fn (array $user): ?string => null,
+            'slugify_group_name' => static fn (string $name): string => $name,
+        ]);
+        $channelRoute = array_values(array_filter($routingRows, static fn (array $row): bool => ($row['type_key'] ?? '') === 'channel' && ($row['source_label'] ?? '') === 'Alpha'))[0] ?? [];
+        $pageRoute = array_values(array_filter($routingRows, static fn (array $row): bool => ($row['type_key'] ?? '') === 'page'))[0] ?? [];
+        $this->assert((string) ($channelRoute['public_url'] ?? '') === '/news/alpha', 'Routing inventory channel URI did not include its parent path.');
+        $this->assert((string) ($pageRoute['public_url'] ?? '') === '/news/alpha/nested-post', 'Routing inventory page URI did not include its parent channel path.');
+        $this->events[] = 'routing_inventory_parent_paths=ok';
 
         $rootSlug = $this->resolvePublicPath($config, $input, $channels, $pages, 'hello-world', null);
         $this->assert((int) ($rootSlug['page']['id'] ?? 0) === 7, 'Global slug mode should resolve root slug page.');
@@ -125,6 +167,11 @@ final class RoutingSmokeRunner
         $this->assert((int) ($inheritSlug['page']['id'] ?? 0) === 42, 'Inherited channel slug mode should resolve channel page by slug.');
         $this->assert((string) ($inheritSlug['canonical_path'] ?? '') === '/news/smoke-post', 'Inherited channel slug canonical path mismatch.');
         $this->events[] = 'channel_inherit_slug=ok';
+
+        $nestedSlug = $this->resolvePublicPath($config, $input, $channels, $pages, 'nested-post', 'news/alpha');
+        $this->assert((int) ($nestedSlug['page']['id'] ?? 0) === 91, 'Nested channel path should scope page lookup to the leaf channel.');
+        $this->assert((string) ($nestedSlug['canonical_path'] ?? '') === '/news/alpha/nested-post', 'Nested channel page canonical path mismatch.');
+        $this->events[] = 'channel_nested_slug=ok';
 
         ConfigWrite::persistValue($configPath, $config->all(), 'content.mode', 'id');
         $config = new Config($configPath);
@@ -252,6 +299,7 @@ PHP;
             [7, 'Root Page', 'hello-world', 1, 0, '2026-03-20 12:00:00'],
             [42, 'News Post', 'smoke-post', 1, 10, '2026-03-20 12:00:00'],
             [84, 'Blog Post', 'build-log', 1, 20, '2026-03-20 12:00:00'],
+            [91, 'Nested Post', 'nested-post', 1, 30, '2026-03-20 12:00:00'],
         ];
 
         $stmt = $db->prepare(
@@ -290,7 +338,7 @@ PHP;
         $wordSeparator = 'inherit';
 
         if ($channelSlug !== null) {
-            $channel = $channels->findBySlug($channelSlug);
+            $channel = $channels->findByPath($channelSlug);
             $this->assert($channel !== null, 'Missing channel fixture for ' . $channelSlug . '.');
 
             $routeMode = ChannelPolicy::effectiveChannelRouteMode($config, (string) ($channel['route_mode'] ?? 'inherit'));
@@ -330,8 +378,11 @@ PHP;
             $wordSeparator,
             (string) $config->get('content.separator', $config->get('content.route_separator', '-'))
         );
+        $canonicalChannelPath = $channelSlug !== null
+            ? $channels->pathForChannel((int) ($page['channel'] ?? 0))
+            : '';
         $canonicalPath = $channelSlug !== null
-            ? '/' . rawurlencode($channelSlug) . '/' . rawurlencode($canonicalSegment)
+            ? '/' . implode('/', array_map('rawurlencode', explode('/', $canonicalChannelPath))) . '/' . rawurlencode($canonicalSegment)
             : '/' . rawurlencode($canonicalSegment);
 
         return [

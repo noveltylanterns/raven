@@ -30,6 +30,7 @@ final class PageRouter
     public static function registerWithDeps(RouteHandler $router, PublicPayload $deps): void
     {
         $publicPageController = $deps->publicPageController;
+        $publicChannelController = $deps->publicChannelController;
         $publicRequestContext = $deps->publicRequestContext;
         $input = $deps->input;
         $reservedPrefixes = is_array($deps->routeConfig['reserved_prefixes'] ?? null)
@@ -57,7 +58,7 @@ final class PageRouter
         });
 
         // Channel + page route for pages assigned to channels.
-        $router->add('GET', '/{channel}/{slug}', static function (array $params) use ($publicPageController, $publicRequestContext, $input, $reservedPrefixes): void {
+        $router->add('GET', '/{channel}/{slug}', static function (array $params) use ($publicPageController, $publicChannelController, $publicRequestContext, $input, $reservedPrefixes): void {
             $channel = RouteValidator::slugOrNotFound($input, $params['channel'] ?? null, static function () use ($publicRequestContext): void {
                 $publicRequestContext()->notFound();
             });
@@ -76,7 +77,66 @@ final class PageRouter
                 return;
             }
 
+            $nestedChannelPath = $channel . '/' . $slugRaw;
+            // A two-segment channel path takes precedence over a same-shaped page URL.
+            if ($publicChannelController()->channelPathExists($nestedChannelPath)) {
+                $publicChannelController()->channel($channel . '/' . $requestedSlug);
+                return;
+            }
+
             $publicPageController()->page($requestedSlug, $channel);
+        });
+
+        // Parent-aware channel/page route for paths deeper than one channel segment.
+        // The catch-all placeholder is intentionally registered after the exact two-segment
+        // route so ordinary /channel/page URLs retain their existing dispatch behavior.
+        $router->add('GET', '/{channel}/{path...}', static function (array $params) use ($publicPageController, $publicChannelController, $publicRequestContext, $input, $reservedPrefixes): void {
+            $channel = RouteValidator::slugOrNotFound($input, $params['channel'] ?? null, static function () use ($publicRequestContext): void {
+                $publicRequestContext()->notFound();
+            });
+            $path = trim((string) ($params['path'] ?? ''), '/');
+            $segments = $path === '' ? [] : explode('/', $path);
+            $lastSegment = array_pop($segments);
+            $lookupLastSegment = PagePolicy::stripPeriodSuffix(strtolower(trim((string) $lastSegment)));
+            $normalizedSegments = array_map(
+                static fn (mixed $segment): string => strtolower(trim((string) $segment)),
+                $segments
+            );
+            $channelSegments = array_merge([$channel ?? ''], $normalizedSegments);
+
+            // Every channel segment must be a canonical channel slug; only the final page
+            // segment may use page-specific underscores or a file-looking suffix.
+            $validChannelPath = $channel !== null
+                && !in_array($channel, $reservedPrefixes, true)
+                && $lookupLastSegment !== ''
+                && preg_match('/^[a-z0-9][a-z0-9_-]*$/', $lookupLastSegment) === 1;
+            foreach ($segments as $segment) {
+                if (preg_match('/^[a-z0-9][a-z0-9-]*$/', strtolower(trim((string) $segment))) !== 1) {
+                    $validChannelPath = false;
+                    break;
+                }
+            }
+
+            if (!$validChannelPath) {
+                $publicRequestContext()->notFound();
+                return;
+            }
+
+            $fullChannelPath = implode('/', array_merge($channelSegments, [$lookupLastSegment]));
+            // A deep path with no page suffix can itself be a channel landing route.
+            if ($publicChannelController()->channelPathExists($fullChannelPath)) {
+                $publicChannelController()->channel(implode('/', array_merge($channelSegments, [(string) $lastSegment])));
+                return;
+            }
+
+            $parentChannelPath = implode('/', $channelSegments);
+            // Otherwise the final segment is a page scoped to the fully resolved parent path.
+            if ($publicChannelController()->channelPathExists($parentChannelPath)) {
+                $publicPageController()->page((string) $lastSegment, $parentChannelPath);
+                return;
+            }
+
+            $publicRequestContext()->notFound();
         });
     }
 }

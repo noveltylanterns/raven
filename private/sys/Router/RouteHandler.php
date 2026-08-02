@@ -12,7 +12,7 @@ declare(strict_types=1);
 namespace Raven\Core\Router;
 
 /**
- * Minimal path router supporting `{param}` placeholders.
+ * Minimal path router supporting `{param}` and final-segment `{param...}` placeholders.
  */
 final class RouteHandler
 {
@@ -23,7 +23,7 @@ final class RouteHandler
      * Registers one route handler for a method and path pattern.
      *
      * @param string $method HTTP method such as `GET` or `POST`.
-     * @param string $pattern Path pattern, optionally using `{param}` placeholders.
+     * @param string $pattern Path pattern, optionally using `{param}` or final-segment `{param...}` placeholders.
      * @param callable $handler Route callback invoked with named path params.
      * @return void
      */
@@ -77,7 +77,7 @@ final class RouteHandler
     /**
      * Compiles one path pattern into a route-matching regex.
      *
-     * @param string $pattern Path pattern, optionally using `{param}` placeholders.
+     * @param string $pattern Path pattern, optionally using `{param}` or final-segment `{param...}` placeholders.
      * @return string PCRE regex anchored to the full normalized path.
      */
     private function compilePattern(string $pattern): string
@@ -85,8 +85,10 @@ final class RouteHandler
         $normalized = RouteRequest::normalizePath($pattern);
 
         $regex = preg_replace_callback(
-            '/\{([a-zA-Z_][a-zA-Z0-9_]*)\}/',
-            static fn (array $m): string => '(?P<' . $m[1] . '>[^/]+)',
+            '/\{([a-zA-Z_][a-zA-Z0-9_]*)(\.\.\.)?\}/',
+            static fn (array $m): string => ($m[2] ?? '') === '...'
+                ? '(?P<' . $m[1] . '>.+)'
+                : '(?P<' . $m[1] . '>[^/]+)',
             $normalized
         );
 

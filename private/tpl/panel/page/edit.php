@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 /** @var array<string, string> $site */
 /** @var array<string, mixed>|null $page */
+/** @var string $channelPath */
 /** @var int $currentUserId */
 /** @var array<int, array{id: int, username: string, display_name: string}> $authorOptions */
 /** @var array<int, array<string, mixed>> $channelOptions */
@@ -61,6 +62,7 @@ if ($selectedAuthorUserId < 1) {
 }
 $deleteFormId = 'delete-page-form';
 $selectedChannelSlug = (string) ($page['channel_slug'] ?? '');
+$selectedChannelPath = trim((string) ($channelPath ?? ''));
 $selectedStatus = ($page['status'] ?? 'published') === 'published' ? 'published' : 'draft';
 $rawPublishAt = (string) ($page['published'] ?? '');
 $rawExpireAt = (string) ($page['expires'] ?? '');
@@ -213,8 +215,8 @@ $routeSegment = trim(
     ),
     '/'
 );
-if ($selectedChannelSlug !== '') {
-    $permalinkPathParts[] = trim($selectedChannelSlug, '/');
+if ($selectedChannelPath !== '') {
+    $permalinkPathParts[] = $selectedChannelPath;
 }
 if ($routeSegment !== '') {
     $permalinkPathParts[] = $routeSegment;

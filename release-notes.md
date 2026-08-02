@@ -4,6 +4,9 @@
 
 ### August 2, 2026
 
+- Public channel routes now resolve complete parent-aware paths for nested channels and nested pages; child slugs are resolved only beneath their stored parent paths.
+- The page editor's published-page header now displays the full canonical URL, including nested channel parents.
+- The panel Routing Table now displays canonical channel and page URIs with all stored channel parents.
 - Made extensionless public page routes accept file-looking suffixes from repository Markdown links, discard the period suffix for lookup, and 301-redirect resolved pages to their canonical extensionless URLs.
 - Limited the panel quick Create Page channel shortcuts to top-level channels while preserving the full channel list in the page editor.
 

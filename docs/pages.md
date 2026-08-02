@@ -45,6 +45,8 @@ The panel editor exposes these corresponding field controls:
 
 The quick Create Page menu offers root-level channel shortcuts; the page editor's channel selector still includes nested channels.
 
+When editing a published page, the header card shows its full canonical URL, including every parent channel path segment.
+
 - `Display title?`, `Description`, `Publish At`, and `Expire At`
 - `Upload Image`, `Select`, `Alt / Title`, and `Caption`
 - `Include in gallery` and `Use as cover image`
@@ -76,7 +78,7 @@ Core public page seams:
 
 - homepage (`/`)
 - channel landing/root fallback (`/{slug}`)
-- channel-scoped pages (`/{channel}/{slug}`)
+- channel-scoped pages (`/{channel_path}/{slug}`), including parent-aware paths such as `/news/alpha/article`
 
 Markdown file body blocks accept either a local project path or a repository-backed reference:
 

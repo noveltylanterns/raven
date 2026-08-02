@@ -523,6 +523,101 @@ class ChannelRead
     }
 
     /**
+     * Returns one channel by its complete parent-aware public path.
+     *
+     * Each path segment must name a direct child of the channel resolved by the
+     * preceding segment. This prevents a child channel with a globally unique
+     * slug from being treated as a root channel in public URLs.
+     *
+     * @param string $path Slash-separated channel path, excluding the root channel.
+     * @return array<string, mixed>|null Channel record, or null when the hierarchy does not match.
+     */
+    public function findByPath(string $path): ?array
+    {
+        $segments = preg_split('/\\/+/', trim($path, '/')) ?: [];
+        if ($segments === [] || in_array('', $segments, true)) {
+            return null;
+        }
+
+        $parentId = ChannelShared::ROOT_CHANNEL_ID;
+        $resolved = null;
+        // Resolve each segment against the current parent instead of using a global slug lookup.
+        foreach ($segments as $segment) {
+            $normalizedSegment = strtolower(trim((string) $segment));
+            if (!ChannelShared::isValidSlug($normalizedSegment)) {
+                return null;
+            }
+
+            $resolved = null;
+            foreach ($this->listRecords() as $channel) {
+                $channelId = (int) ($channel['id'] ?? -1);
+                $channelParentId = ChannelShared::normalizeParentId($channel['parent_id'] ?? 0);
+                if ($channelId < 1 || $channelParentId !== $parentId) {
+                    continue;
+                }
+
+                if (strtolower((string) ($channel['slug'] ?? '')) !== $normalizedSegment) {
+                    continue;
+                }
+
+                $resolved = $channel;
+                break;
+            }
+
+            // A missing direct child invalidates the whole path.
+            if ($resolved === null) {
+                return null;
+            }
+
+            $parentId = (int) ($resolved['id'] ?? 0);
+        }
+
+        return $resolved;
+    }
+
+    /**
+     * Builds the canonical parent-aware public path for one channel id.
+     *
+     * @param int $id Channel id whose ancestor path should be returned.
+     * @return string Slash-separated public channel path, or an empty string for root/invalid channels.
+     */
+    public function pathForChannel(int $id): string
+    {
+        if ($id < 1) {
+            return '';
+        }
+
+        $channelsById = self::channelsByIdMap($this->listRecords());
+        $segments = [];
+        $visited = [];
+        $currentId = $id;
+
+        // Walk upward with a visited guard so malformed legacy cycles cannot loop forever.
+        while ($currentId > ChannelShared::ROOT_CHANNEL_ID) {
+            if (isset($visited[$currentId]) || !isset($channelsById[$currentId])) {
+                return '';
+            }
+
+            $visited[$currentId] = true;
+            $channel = $channelsById[$currentId];
+            $slug = strtolower(trim((string) ($channel['slug'] ?? '')));
+            if (!ChannelShared::isValidSlug($slug)) {
+                return '';
+            }
+
+            array_unshift($segments, $slug);
+            $parentId = ChannelShared::normalizeParentId($channel['parent_id'] ?? 0);
+            if ($parentId === $currentId) {
+                return '';
+            }
+
+            $currentId = $parentId;
+        }
+
+        return implode('/', $segments);
+    }
+
+    /**
      * Returns one channel by either a numeric id or a slug string.
      *
      * A numeric string (e.g. '3') is treated as an id. A non-numeric string is

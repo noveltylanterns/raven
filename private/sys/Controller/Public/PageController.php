@@ -136,10 +136,10 @@ final class PageController
     }
 
     /**
-     * Renders one public page, optionally nested by channel slug.
+     * Renders one public page, optionally nested by a parent-aware channel path.
      *
      * @param string $pageSlug Raw requested page slug segment.
-     * @param string|null $channelSlug Optional parent channel slug.
+     * @param string|null $channelSlug Optional slash-separated parent channel path.
      * @return void
      */
     public function page(string $pageSlug, ?string $channelSlug = null): void
@@ -154,7 +154,7 @@ final class PageController
 
         // Channel-scoped route branch.
         if ($channelSlug !== null) {
-            $channel = $this->channelRead->findBySlug($channelSlug);
+            $channel = $this->channelRead->findByPath($channelSlug);
             // Missing channel attempts redirect fallback before 404.
             if ($channel === null) {
                 // Redirect lookup keeps legacy channel-prefixed slugs working.
@@ -245,9 +245,18 @@ final class PageController
         );
         // Channel-scoped canonical redirect branch.
         if ($channelSlug !== null) {
-            // Redirect to canonical segment when requested slug differs.
-            if ($canonicalSegment !== '' && strcasecmp($canonicalSegment, $requestedRouteSegment) !== 0) {
-                Redirect::redirect('/' . rawurlencode($channelSlug) . '/' . rawurlencode($canonicalSegment), 301);
+            $canonicalChannelPath = is_array($channel)
+                ? $this->channelRead->pathForChannel((int) ($channel['id'] ?? 0))
+                : '';
+            $canonicalChannelPath = $canonicalChannelPath !== ''
+                ? $canonicalChannelPath
+                : trim($channelSlug, '/');
+            // Redirect flat child paths, suffix aliases, and non-canonical page segments together.
+            if (
+                ($canonicalSegment !== '' && strcasecmp($canonicalSegment, $requestedRouteSegment) !== 0)
+                || strcasecmp($canonicalChannelPath, trim($channelSlug, '/')) !== 0
+            ) {
+                Redirect::redirect('/' . $this->encodePath($canonicalChannelPath . '/' . $canonicalSegment), 301);
             }
         } elseif ($canonicalSegment !== '' && strcasecmp($canonicalSegment, $requestedRouteSegment) !== 0) {
             Redirect::redirect('/' . rawurlencode($canonicalSegment), 301);
@@ -257,7 +266,7 @@ final class PageController
         $page = $this->templateDecorator()->decoratePageForTemplate($page);
         $channelTheme = is_array($channel) ? $this->channelThemeSlug($channel) : null;
         $pageTemplate = $this->themeTemplate()->resolvePageTemplateNameForThemeChain(
-            $channelSlug,
+            is_array($channel) ? (string) ($channel['slug'] ?? '') : null,
             $this->themesRoot(),
             $channelTheme ?? $this->activeThemeSlug(),
             dirname(__DIR__, 4) . '/private/tpl/public'
@@ -700,6 +709,17 @@ final class PageController
         }
 
         return $this->pageBlocks;
+    }
+
+    /**
+     * Encodes each public path segment without escaping hierarchy separators.
+     *
+     * @param string $path Slash-separated public path.
+     * @return string Encoded path without a leading slash.
+     */
+    private function encodePath(string $path): string
+    {
+        return implode('/', array_map('rawurlencode', explode('/', trim($path, '/'))));
     }
 
 }

@@ -350,14 +350,14 @@ final class RoutingController
             'build_page_url' => fn (
                 string $pageSlug,
                 int $pageId,
-                string $channelSlug,
+                string $channelPath,
                 string $publishedAt,
                 string $channelPageRouteMode,
                 string $channelPageUrlSeparator
             ): string => $this->routingPublicPathForPage(
                 $pageSlug,
                 $pageId,
-                $channelSlug,
+                $channelPath,
                 $publishedAt,
                 $channelPageRouteMode,
                 $channelPageUrlSeparator

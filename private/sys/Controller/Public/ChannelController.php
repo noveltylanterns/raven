@@ -13,6 +13,7 @@ namespace Raven\Core\Controller\Public;
 
 use Closure;
 use Raven\Core\Debug\ClientProfiler;
+use Raven\Core\Repository\ChannelRead;
 use Raven\Core\Repository\MediaRead;
 use Raven\Core\Repository\PageRead;
 use Raven\Core\Repository\RedirectRead;
@@ -48,6 +49,7 @@ use Raven\Lib\View\Public\ThemeTemplate;
 final class ChannelController
 {
     private SharedController $context;
+    private ChannelRead $channelRead;
     private MediaRead $media;
     private PageRead $pageRead;
     private RedirectRead $redirectRead;
@@ -75,6 +77,7 @@ final class ChannelController
 
     /**
      * @param SharedController $context Shared public request context.
+     * @param ChannelRead $channelRead Channel repository read side for parent-aware public paths.
      * @param MediaRead $media Media repository read side for gallery rendering and page meta images.
      * @param PageRead $pageRead Page repository read side for channel-homepage and root-page lookups.
      * @param RedirectRead $redirectRead Redirect repository read side for public redirect fallbacks.
@@ -86,6 +89,7 @@ final class ChannelController
      */
     public function __construct(
         SharedController $context,
+        ChannelRead $channelRead,
         MediaRead $media,
         PageRead $pageRead,
         RedirectRead $redirectRead,
@@ -95,6 +99,7 @@ final class ChannelController
         callable $extensionServicesProvider
     ) {
         $this->context = $context;
+        $this->channelRead = $channelRead;
         $this->media = $media;
         $this->pageRead = $pageRead;
         $this->redirectRead = $redirectRead;
@@ -113,13 +118,24 @@ final class ChannelController
     }
 
     /**
-     * Resolves one single-segment public route by slug.
+     * Returns whether a complete public channel path resolves through direct parents.
+     *
+     * @param string $channelPath Slash-separated channel path to test.
+     * @return bool True when the path identifies a non-root channel.
+     */
+    public function channelPathExists(string $channelPath): bool
+    {
+        return $this->channelRead->findByPath($channelPath) !== null;
+    }
+
+    /**
+     * Resolves one public channel route by its parent-aware path.
      *
      * Channel landing pages keep priority on this route shape. When a channel
      * does not exist or has no landing page, the same slug is reinterpreted as
      * a root-scope page route before falling through to redirects and 404s.
      *
-     * @param string $channelSlug Normalized single-segment slug.
+     * @param string $channelSlug Normalized parent-aware channel path.
      * @return void
      */
     public function channel(string $channelSlug): void
@@ -137,19 +153,22 @@ final class ChannelController
         $result = $this->pageRead->findChannelHomepage($requestedSlug);
         // Channel landing page path renders when homepage tuple includes page payload.
         if (is_array($result) && is_array($result['page'] ?? null)) {
-            // Repository Markdown often links to channel documents with a .md suffix;
-            // keep the public route extensionless after resolving that compatibility alias.
-            if (strcasecmp($requestedRouteSegment, $requestedSlug) !== 0) {
-                Redirect::redirect('/' . rawurlencode($requestedSlug), 301);
+            $channel = is_array($result['channel'] ?? null) ? $result['channel'] : [];
+            $canonicalPath = $this->channelRead->pathForChannel((int) ($channel['id'] ?? 0));
+            // File-looking aliases canonicalize to the extensionless parent-aware path.
+            if (
+                ($canonicalPath !== '' && strcasecmp($requestedSlug, $canonicalPath) !== 0)
+                || strcasecmp($requestedRouteSegment, $requestedSlug) !== 0
+            ) {
+                Redirect::redirect('/' . $this->encodePath($canonicalPath), 301);
             }
 
-            $channel = is_array($result['channel'] ?? null) ? $result['channel'] : [];
             $page = $this->renderPageContentBlocks($result['page']);
             $page = $this->templateDecorator()->decoratePageForTemplate($page);
             $channelTheme = $this->channelThemeSlug($channel);
 
             $channelTemplate = $this->themeTemplate()->resolveChannelTemplateNameForThemeChain(
-                $requestedSlug,
+                (string) ($channel['slug'] ?? ''),
                 $this->themesRoot(),
                 $channelTheme,
                 dirname(__DIR__, 4) . '/private/tpl/public'
@@ -611,6 +630,17 @@ final class ChannelController
         }
 
         return $this->pageBlocks;
+    }
+
+    /**
+     * Encodes each public path segment without escaping hierarchy separators.
+     *
+     * @param string $path Slash-separated public path.
+     * @return string Encoded path without a leading slash.
+     */
+    private function encodePath(string $path): string
+    {
+        return implode('/', array_map('rawurlencode', explode('/', trim($path, '/'))));
     }
 
 }

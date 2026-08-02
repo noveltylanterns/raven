@@ -177,18 +177,19 @@ Storage detail:
 
 ### Public Routing Touchpoints
 
-- Channel landing routes use single segment `/{channel_slug}` with page fallback rules.
-- Channel pages resolve at `/{channel_slug}/{segment}`, where `{segment}` depends on the channel's effective `route_mode`.
+- Channel landing routes use the complete parent-aware path `/{channel_path}` with page fallback rules. A channel named `alpha` under `news` therefore lands at `/news/alpha`.
+- Channel pages resolve at `/{channel_path}/{segment}`, where `{segment}` depends on the leaf channel's effective `route_mode`. Paths may continue through any number of channel-parent levels.
+- Every channel segment must resolve as a direct child of the preceding segment; a child slug is not treated as a root channel or resolved globally.
 - When global feeds are enabled and a channel has `feed_enabled = true`, that channel also exposes `/{feed.rss}/{channel_slug}` and/or `/{feed.atom}/{channel_slug}`.
 - The stock `<root>` channel is not routable; root-scope pages/redirects stay at `/...` instead of `/root/...`.
 - When a channel is set to `inherit`, it uses the global `content.mode` default (`slug` or `id`).
 - Supported channel page-route segments:
-- `/{channel}/{page-slug}`
-- `/{channel}/{YYYY-MM-DD}-{page-slug}`
-- `/{channel}/{YYYY-MM}-{page-slug}`
-- `/{channel}/{page-id}`
-- `/{channel}/{YYYY-MM-DD}-{page-id}`
-- `/{channel}/{YYYY-MM}-{page-id}`
+- `/{channel_path}/{page-slug}`
+- `/{channel_path}/{YYYY-MM-DD}-{page-slug}`
+- `/{channel_path}/{YYYY-MM}-{page-slug}`
+- `/{channel_path}/{page-id}`
+- `/{channel_path}/{YYYY-MM-DD}-{page-id}`
+- `/{channel_path}/{YYYY-MM}-{page-id}`
 - Channel landing template priority: `tpl/channel/{channel_slug}.php` then `tpl/channel/index.php`.
 - Channel landing and channel-page rendering use the channel's effective `theme_override`; missing templates/assets continue through the selected theme's parent chain and then the global child/parent/core fallback chain.
 

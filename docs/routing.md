@@ -49,8 +49,9 @@ Core public family behavior:
 - Content routes:
   - Page-route segments may include a legacy/file suffix; Raven discards the first period and everything after it, then 301-redirects a resolved route to its canonical extensionless URL (for example /docs/guide.md -> /docs/guide).
   - `/` homepage
-  - `/{slug}` channel landing/root fallback seam
-  - `/{channel}/{slug}` channel-scoped pages
+  - `/{slug}` root channel landing/root fallback seam
+  - `/{channel_path}` parent-aware channel landing routes, such as `/news/alpha`
+  - `/{channel_path}/{slug}` parent-aware channel-scoped pages, such as `/news/alpha/article`
 - Embedded form route:
   - `POST /forms/submit` (extension-agnostic form submit gateway)
 
@@ -110,6 +111,7 @@ Behavior summary:
 
 - Requires panel login and routing route `view` permission.
 - Builds a merged read-only route inventory (pages, channels, redirects, feeds, taxonomy, user/group profile routes, and conflict metadata).
+- Channel and page URI rows use each channel's complete stored parent path, matching public canonical routes.
 - Supports filter/search/sort in UI and CSV export.
 
 ## 7) Extension Routes
