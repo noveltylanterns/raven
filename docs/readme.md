@@ -2,9 +2,6 @@
 
 ### Start Here
 - [Introduction](./intro.md)
-- [Filetree](./appendix/filetree.md)
-- [Developer API](./appendix/readme.md)
-- [Architecture](./appendix/architecture.md)
 
 ### Basic Functions
 - [Configuration](./configuration.md)
@@ -29,4 +26,12 @@
 - [Extensions](./extensions.md)
 - [Theming](./theming.md)
 - [CLI](./cli.md)
-- [Router Developer Reference](./appendix/router.md)
+
+### Developer Appendix
+- [Appendix Index](./appendix/readme.md)
+- [Architecture Summary](./appendix/architecture.md)
+- [Bootstrap Dependency Reference](./appendix/bootstrap.md)
+- [Database Map](./appendix/database.md)
+- [Filetree](./appendix/filetree.md)
+- [Router Summary](./appendix/router.md)
+- [System Configuration Keys](./appendix/config.md)

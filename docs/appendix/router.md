@@ -1,4 +1,4 @@
-# Router Developer Reference
+# Router Summary
 
 This appendix documents Raven's subsurface router and the classes that connect
 request matching to public and panel controllers. It is an implementation
