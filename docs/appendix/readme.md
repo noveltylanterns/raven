@@ -1,4 +1,4 @@
-# Raven Developer API Appendix
+# Raven Developer Appendix
 
 This page is the developer-surface index for Raven CMS. It links the stable implementation surfaces and the generated reference appendices that track code-level contracts.
 

@@ -1,4 +1,4 @@
-# Raven Architecture Appendix
+# Raven Architecture Reference
 
 This appendix explains why Raven is structured the way it is and what that structure enables for maintainers, extension authors, and operators.
 

@@ -47,7 +47,7 @@ Raven is a self-hosted CMS focused on readable code, update-safe customization, 
 ## Developer References
 
 - System map: [Filetree](./appendix/filetree.md)
-- Developer API index: [Appendix API](./appendix/api.md)
+- Developer API index: [Appendix API](./appendix/readme.md)
 - Generated reference appendices: `docs/appendix/`
 - Release history: `release-notes.md`
 
