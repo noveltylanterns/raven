@@ -4,6 +4,7 @@
 
 ### August 4, 2026
 
+- Simplified the CLI appendix index rows to show only linked `rvn-*` command names.
 - Updated the CLI appendix overview links to use the actual `rvn-*` wrapper names and point directly to each generated command reference.
 - Fixed channel saves reverting the selected Index route mode to `Automatic` when the post-save image persistence pass rewrote the channel record without carrying that setting forward.
 - Renamed the generated core, extensions, and libraries appendix landing files from `overview.md` to `readme.md`, keeping all appendix families consistent.

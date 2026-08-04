@@ -6,14 +6,14 @@ This appendix family documents `private/bin/rvn-*` command help output.
 
 ## Commands
 
-- [rvn-cat](./cat.md) -> `ok`
-- [rvn-chan](./chan.md) -> `ok`
-- [rvn-conf](./conf.md) -> `ok`
-- [rvn-cron](./cron.md) -> `ok`
-- [rvn-ext](./ext.md) -> `ok`
-- [rvn-group](./group.md) -> `ok`
-- [rvn-redir](./redir.md) -> `ok`
-- [rvn-repo](./repo.md) -> `ok`
-- [rvn-sys](./sys.md) -> `ok`
-- [rvn-tag](./tag.md) -> `ok`
-- [rvn-theme](./theme.md) -> `ok`
+- [rvn-cat](./cat.md)
+- [rvn-chan](./chan.md)
+- [rvn-conf](./conf.md)
+- [rvn-cron](./cron.md)
+- [rvn-ext](./ext.md)
+- [rvn-group](./group.md)
+- [rvn-redir](./redir.md)
+- [rvn-repo](./repo.md)
+- [rvn-sys](./sys.md)
+- [rvn-tag](./tag.md)
+- [rvn-theme](./theme.md)
