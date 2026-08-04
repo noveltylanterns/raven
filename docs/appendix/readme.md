@@ -10,7 +10,7 @@ This page is the developer-surface index for Raven CMS. It links the stable impl
   - [Filetree Appendix](./filetree.md)
   - [Router Developer Reference](./router.md)
   - [Core Router Symbol Inventory](./core/router.md)
-  - [Core Runtime Appendix Overview](./core/overview.md)
+  - [Core Runtime Appendix Overview](./core/readme.md)
   - [Config Appendix](./config.md)
   - [Database Appendix](./database.md)
 
@@ -19,7 +19,7 @@ This page is the developer-surface index for Raven CMS. It links the stable impl
 - Command wrappers: `private/bin/rvn-*`
 - Shared CLI implementation: `private/lib/Shell/raven_cli.php`
 - Primary references:
-  - [CLI Appendix Overview](./cli/overview.md)
+  - [CLI Appendix Overview](./cli/readme.md)
   - [CLI Narrative Guide](../cli.md)
 
 ## Extensions
@@ -27,7 +27,7 @@ This page is the developer-surface index for Raven CMS. It links the stable impl
 - Extension root: `private/ext/{slug}/`
 - Manifest: `private/ext/{slug}/ext.json`
 - Primary references:
-  - [Extensions Appendix Overview](./extensions/overview.md)
+  - [Extensions Appendix Overview](./extensions/readme.md)
   - [Extensions Narrative Guide](../extensions.md)
   - [Extension Authoring Contract](../../private/ext/AGENTS.md)
 
@@ -35,7 +35,7 @@ This page is the developer-surface index for Raven CMS. It links the stable impl
 
 - Shared reusable core library: `private/lib/*`
 - Primary references:
-  - [Libraries Appendix Overview](./libraries/overview.md)
+  - [Libraries Appendix Overview](./libraries/readme.md)
 
 ## Templates And Theming
 
@@ -52,12 +52,12 @@ This page is the developer-surface index for Raven CMS. It links the stable impl
 
 ## Suggested Reading Order
 
-1. [Core Runtime Appendix Overview](./core/overview.md)
+1. [Core Runtime Appendix Overview](./core/readme.md)
 2. [Router Developer Reference](./router.md)
 3. [Config Appendix](./config.md)
 4. [Database Appendix](./database.md)
-5. [Extensions Appendix Overview](./extensions/overview.md)
-6. [Libraries Appendix Overview](./libraries/overview.md)
-7. [CLI Appendix Overview](./cli/overview.md)
+5. [Extensions Appendix Overview](./extensions/readme.md)
+6. [Libraries Appendix Overview](./libraries/readme.md)
+7. [CLI Appendix Overview](./cli/readme.md)
 8. [Templates Appendix (Public)](./templates/public.md)
 9. [Bootstrap Appendix](./bootstrap.md)

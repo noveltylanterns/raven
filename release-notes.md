@@ -4,6 +4,8 @@
 
 ### August 4, 2026
 
+- Renamed the generated core, extensions, and libraries appendix landing files from `overview.md` to `readme.md`, keeping all appendix families consistent.
+- Updated `rvn-docs` to generate the CLI appendix landing page at `docs/appendix/cli/readme.md`, matching the repository's documentation index convention.
 - Added the bundled stock `Backup & Restore` system extension at `/panel/backup`, with a complete JSON export/import archive for pages, taxonomy, channels, sets, redirects, and page relationships; numeric IDs are preserved, media is excluded, and the restore UI warns that archives are for new systems only.
 - Removed the User Manual help action from the panel Dashboard header while retaining contextual help actions on other panel sections.
 - Fixed authenticated panel sessions retaining an empty extension sidebar after login or 2FA cleared the pre-authentication navigation snapshot; extension routes and navigation now become available together.

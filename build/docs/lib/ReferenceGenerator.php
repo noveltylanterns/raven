@@ -572,7 +572,8 @@ final class ReferenceGenerator
             . '## Commands' . "\n\n"
             . ($overviewRows === [] ? '- No CLI wrappers were discovered.' : implode("\n", $overviewRows)) . "\n";
 
-        $outputs['docs/appendix/cli/overview.md'] = $overview;
+        // CLI appendix directories use readme.md as their landing document, matching the panel docs contract.
+        $outputs['docs/appendix/cli/readme.md'] = $overview;
 
         ksort($outputs, SORT_STRING);
         return $outputs;
@@ -1012,7 +1013,8 @@ final class ReferenceGenerator
             }
         }
 
-        $outputs['docs/appendix/core/overview.md'] = implode("\n", $overviewLines) . "\n";
+        // Core appendix directories use readme.md as their landing document.
+        $outputs['docs/appendix/core/readme.md'] = implode("\n", $overviewLines) . "\n";
         ksort($outputs, SORT_STRING);
         return $outputs;
     }
@@ -1604,7 +1606,8 @@ final class ReferenceGenerator
             $overviewLines[] = '- `' . $group . '` (' . count($entries) . ' symbols)';
         }
 
-        $outputs['docs/appendix/libraries/overview.md'] = implode("\n", $overviewLines) . "\n";
+        // Libraries appendix directories use readme.md as their landing document.
+        $outputs['docs/appendix/libraries/readme.md'] = implode("\n", $overviewLines) . "\n";
         ksort($outputs, SORT_STRING);
         return $outputs;
     }
@@ -2524,7 +2527,8 @@ final class ReferenceGenerator
                 . (string) count($entries) . ' |';
         }
 
-        $outputs['docs/appendix/extensions/overview.md'] = implode("\n", $overviewLines) . "\n";
+        // Extensions appendix directories use readme.md as their landing document.
+        $outputs['docs/appendix/extensions/readme.md'] = implode("\n", $overviewLines) . "\n";
         ksort($outputs, SORT_STRING);
         return $outputs;
     }

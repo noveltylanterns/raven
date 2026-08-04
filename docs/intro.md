@@ -42,7 +42,7 @@ Raven is a self-hosted CMS focused on readable code, update-safe customization, 
 
 - Themes: use [Theming Guide](./theming.md) and [public/theme/AGENTS.md](../public/theme/AGENTS.md).
 - Extensions: use [Extensions Guide](./extensions.md) and [private/ext/AGENTS.md](../private/ext/AGENTS.md).
-- CLI: use [CLI Guide](./cli.md) or generated [CLI Appendix](./appendix/cli/overview.md).
+- CLI: use [CLI Guide](./cli.md) or generated [CLI Appendix](./appendix/cli/readme.md).
 
 ## Developer References
 

@@ -6,6 +6,7 @@ Extension references extracted from `private/ext/*` manifests, provider files, a
 
 | Slug | Name | Type | Providers | Symbols |
 | --- | --- | --- | --- | --- |
+| `backup` | Backup & Restore | `system` | 3 | 3 |
 | `contact` | Contact Forms | `content` | 4 | 21 |
 | `cron` | Scheduled Tasks | `system` | 4 | 17 |
 | `database` | Database Manager | `system` | 2 | 0 |
