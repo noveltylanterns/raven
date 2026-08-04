@@ -6,14 +6,14 @@ This appendix family documents `private/bin/rvn-*` command help output.
 
 ## Commands
 
-- `cat` -> `ok` -> `docs/appendix/cli/cat.md`
-- `chan` -> `ok` -> `docs/appendix/cli/chan.md`
-- `conf` -> `ok` -> `docs/appendix/cli/conf.md`
-- `cron` -> `ok` -> `docs/appendix/cli/cron.md`
-- `ext` -> `ok` -> `docs/appendix/cli/ext.md`
-- `group` -> `ok` -> `docs/appendix/cli/group.md`
-- `redir` -> `ok` -> `docs/appendix/cli/redir.md`
-- `repo` -> `ok` -> `docs/appendix/cli/repo.md`
-- `sys` -> `ok` -> `docs/appendix/cli/sys.md`
-- `tag` -> `ok` -> `docs/appendix/cli/tag.md`
-- `theme` -> `ok` -> `docs/appendix/cli/theme.md`
+- [rvn-cat](./cat.md) -> `ok`
+- [rvn-chan](./chan.md) -> `ok`
+- [rvn-conf](./conf.md) -> `ok`
+- [rvn-cron](./cron.md) -> `ok`
+- [rvn-ext](./ext.md) -> `ok`
+- [rvn-group](./group.md) -> `ok`
+- [rvn-redir](./redir.md) -> `ok`
+- [rvn-repo](./repo.md) -> `ok`
+- [rvn-sys](./sys.md) -> `ok`
+- [rvn-tag](./tag.md) -> `ok`
+- [rvn-theme](./theme.md) -> `ok`
