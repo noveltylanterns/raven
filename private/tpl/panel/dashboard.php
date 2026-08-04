@@ -40,7 +40,6 @@ if ($section === 'dashboard') {
         'intro_html' => '<p class="mb-1">Logged in as: <strong>' . e((string) ($user['email'] ?? 'unknown')) . '</strong></p>',
         'summary_html' => 'Welcome to <b>Raven CMS</b>. Use the navigation to browse your system. Full dashboard coming soon.',
         'summary_class' => 'text-muted',
-        'help_url' => $panelBase . '/docs/intro',
     ];
 } else {
     $dashboardHeaderBodyHtml = '';

@@ -4,6 +4,7 @@
 
 ### August 4, 2026
 
+- Removed the User Manual help action from the panel Dashboard header while retaining contextual help actions on other panel sections.
 - Fixed authenticated panel sessions retaining an empty extension sidebar after login or 2FA cleared the pre-authentication navigation snapshot; extension routes and navigation now become available together.
 - Redirect reads, writes, panel selectors, and public route metadata now use canonical parent-aware channel paths, so redirects under child channels resolve at their complete nested URLs.
 - Split routing identity from slash policy: Content now uses `content.selector` (`slug` or `id`), while Basic `site.routing` (`no_trailing_slash` or `trailing_slash`) controls built-in 301 canonicalization across public site paths, including taxonomy links.
