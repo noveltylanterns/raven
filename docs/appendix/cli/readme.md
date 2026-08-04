@@ -4,6 +4,7 @@ This is the landing page for Raven's command-line tools. Each command link opens
 
 ## Command Inventory
 
+- [rvn](./rvn.md)
 - [rvn-cat](./cat.md)
 - [rvn-chan](./chan.md)
 - [rvn-conf](./conf.md)
@@ -12,11 +13,10 @@ This is the landing page for Raven's command-line tools. Each command link opens
 - [rvn-group](./group.md)
 - [rvn-redir](./redir.md)
 - [rvn-repo](./repo.md)
-- [rvn](./rvn.md)
-- [rvn-sh](./rvn-sh.md)
 - [rvn-sys](./sys.md)
 - [rvn-tag](./tag.md)
 - [rvn-theme](./theme.md)
+- [rvn.sh](./sh.md)
 
 ## Global Flags
 

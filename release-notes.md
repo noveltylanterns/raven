@@ -4,7 +4,7 @@
 
 ### August 4, 2026
 
-- Updated CLI inventory generation to derive the complete list below the `Command Inventory` heading and generate uniform dispatcher and shell-helper references at `rvn.md` and `rvn-sh.md`.
+- Updated CLI inventory generation to derive the complete list below the `Command Inventory` heading, keep `rvn` first, and generate uniform dispatcher and shell-helper references at `rvn.md` and `sh.md`.
 - Connected `rvn-docs` to the command list below the `Command Inventory` heading in the hand-authored CLI index, so discovered `rvn-*` wrappers always receive generated links without replacing the rest of the page.
 - Restored the shared CLI summary, inventory, banner contract, and QA guidance to the hand-authored CLI appendix index while keeping command-specific details on generated child pages.
 - Consolidated CLI documentation under the hand-authored `docs/appendix/cli/readme.md`; removed the redundant `docs/cli.md`, moved command guidance into generated command pages, and left the generator responsible only for those child references.
