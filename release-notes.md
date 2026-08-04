@@ -4,6 +4,7 @@
 
 ### August 4, 2026
 
+- Fixed channel edit header preview links to preserve nested channel path separators when building public URLs.
 - Linked core and library class-group lists and extension slugs to their corresponding appendix reference pages.
 - Clarified that the shared CLI flags documented in the appendix apply to focused commands, except `rvn` and `rvn.sh`.
 - Updated CLI inventory generation to derive the complete list below the `Command Inventory` heading, keep `rvn` first, and generate uniform dispatcher and shell-helper references at `rvn.md` and `sh.md`.

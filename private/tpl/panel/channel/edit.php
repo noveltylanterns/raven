@@ -76,7 +76,13 @@ if ($previewCopyUrl !== '' && $publicBase !== '') {
 }
 $channelPublicUrl = null;
 if ($channel !== null && $publicBase !== '' && $channelSlug !== '') {
-    $channelPublicUrl = $publicBase . '/' . rawurlencode($channelSlug);
+    // Encode each slug segment independently so nested channel paths keep their route separators.
+    $channelPathSegments = array_values(array_filter(
+        explode('/', trim($channelSlug, '/')),
+        static fn (string $segment): bool => $segment !== ''
+    ));
+    $encodedChannelPath = implode('/', array_map('rawurlencode', $channelPathSegments));
+    $channelPublicUrl = $publicBase . '/' . $encodedChannelPath;
 }
 $rssFeedRoute = trim((string) ($rssFeedRoute ?? ''));
 $atomFeedRoute = trim((string) ($atomFeedRoute ?? ''));
