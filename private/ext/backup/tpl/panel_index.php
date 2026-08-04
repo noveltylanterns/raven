@@ -21,16 +21,16 @@ use function Raven\Lib\Security\e;
 $success = isset($success) ? trim((string) $success) : '';
 $error = isset($error) ? trim((string) $error) : '';
 $backupBasePath = rtrim($backupBasePath, '/');
+$backupDocsUrl = 'https://lanterns.io/raven';
 ?>
 <?= Header::render([
     'title' => 'Backup & Restore',
     'summary' => 'Export or restore Raven page content, taxonomy, channels, sets, redirects, and relationships.',
     'actions' => [
-        '<a class="btn btn-primary btn-sm" href="' . e($backupBasePath) . '/export">'
-            . '<i class="bi bi-download me-2" aria-hidden="true"></i>Export Backup'
+        '<a href="' . e($backupDocsUrl) . '" class="btn btn-primary btn-sm" target="_blank" rel="noopener noreferrer">'
+            . '<i class="bi bi-file-earmark-medical me-2" aria-hidden="true"></i>Documentation'
             . '</a>',
     ],
-    'actions_class' => 'd-flex align-items-center gap-2',
 ]) ?>
 
 <?php if ($success !== ''): ?>
@@ -49,7 +49,7 @@ $backupBasePath = rtrim($backupBasePath, '/');
 
 <section class="card">
     <div class="card-body">
-        <h2 class="h5">Restore a Raven backup</h2>
+        <h2 class="h5">Import a Raven Backup</h2>
         <p class="text-muted">
             Upload a JSON backup exported from this utility. Pages, categories, tags, channels, taxonomy
             sets, redirects, and page relationships are restored with their original numeric IDs.
@@ -65,5 +65,18 @@ $backupBasePath = rtrim($backupBasePath, '/');
                 <i class="bi bi-upload me-2" aria-hidden="true"></i>Restore Backup
             </button>
         </form>
+    </div>
+</section>
+
+<section class="card mt-3">
+    <div class="card-body">
+        <h2 class="h5">Export a Raven Backup</h2>
+        <p class="text-muted">
+            Download a JSON archive containing all supported page content, taxonomy, channels, sets,
+            redirects, and page relationships. Media files and media-tab content are not included.
+        </p>
+        <a class="btn btn-primary" href="<?= e($backupBasePath) ?>/export">
+            <i class="bi bi-download me-2" aria-hidden="true"></i>Export Backup
+        </a>
     </div>
 </section>
