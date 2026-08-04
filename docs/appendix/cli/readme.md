@@ -32,7 +32,7 @@ Help and interactive modes include explicit placeholder lines for future ASCII-a
 
 ## Universal Dispatcher
 
-Use `private/bin/rvn` as the single entrypoint for humans, macros, and headless automation:
+Use `rvn` as the single entrypoint for humans, macros, and headless automation:
 
 ```bash
 php private/bin/rvn --help
@@ -44,10 +44,10 @@ Dispatcher commands are `category`, `channel`, `group`, `tag`, `redirect`, `conf
 
 ## Shell Completion
 
-`private/bin/rvn.sh` provides basic command and flag completion for bash/zsh-style `complete` usage.
+`rvn.sh` provides basic command and flag completion for bash/zsh-style `complete` usage.
 
 ```bash
-source /home/dev/app/private/bin/rvn.sh
+source private/bin/rvn.sh
 ```
 
 ## Data Path Contract
