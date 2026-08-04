@@ -139,6 +139,8 @@ final class ChannelEditController
         $parentOptions = $this->channelRead->listParentOptions($id);
         // Normalize legacy stored channel payload fields for template consumption.
         if (is_array($channel)) {
+            // Supply the canonical parent-aware path for public links; the stored slug is only the leaf segment.
+            $channel['path'] = $this->channelRead->pathForChannel((int) ($channel['id'] ?? 0));
             $channel['feed_enabled'] = (bool) ($channel['feed_enabled'] ?? false);
             $channel['parent_id'] = $this->normalizeParentIdForForm(
                 $channel['parent_id'] ?? ChannelShared::ROOT_CHANNEL_ID,

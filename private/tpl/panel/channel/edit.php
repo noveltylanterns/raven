@@ -39,6 +39,7 @@ $channelId = (int) ($channel['id'] ?? 0);
 $hasPersistedChannel = $channelId > 0;
 $parentId = (int) ($channel['parent_id'] ?? 0);
 $channelSlug = trim((string) ($channel['slug'] ?? ''));
+$channelPath = trim((string) ($channel['path'] ?? $channelSlug), '/');
 $feedEnabled = (bool) ($channel['feed_enabled'] ?? false);
 $selectedCategorySets = is_array($channel['category_sets'] ?? null) ? $channel['category_sets'] : [];
 $selectedTagSets = is_array($channel['tag_sets'] ?? null) ? $channel['tag_sets'] : [];
@@ -75,10 +76,10 @@ if ($previewCopyUrl !== '' && $publicBase !== '') {
     $previewCopyUrl = $publicBase . $previewCopyUrl;
 }
 $channelPublicUrl = null;
-if ($channel !== null && $publicBase !== '' && $channelSlug !== '') {
+if ($channel !== null && $publicBase !== '' && $channelPath !== '') {
     // Encode each slug segment independently so nested channel paths keep their route separators.
     $channelPathSegments = array_values(array_filter(
-        explode('/', trim($channelSlug, '/')),
+        explode('/', $channelPath),
         static fn (string $segment): bool => $segment !== ''
     ));
     $encodedChannelPath = implode('/', array_map('rawurlencode', $channelPathSegments));
