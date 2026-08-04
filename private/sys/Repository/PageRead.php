@@ -91,7 +91,7 @@ class PageRead
     }
 
     /**
-     * Finds the channel homepage by parent-aware path priority: `home` first, then `index`.
+     * Finds the channel homepage by published `home` page, with `index` fallback.
      *
      * Returns the resolved channel and its homepage as a named-key tuple so the
      * caller can reuse the already-fetched channel row without a second DB round-trip.
@@ -116,6 +116,8 @@ class PageRead
             return null;
         }
 
+        // Channel index route modes affect only URL canonicalization; page content
+        // continues to use the established home-first/index fallback.
         $stmt = $this->db->prepare(
             'SELECT p.*
              FROM ' . $pages . ' p
@@ -754,13 +756,12 @@ class PageRead
     /**
      * Returns one landing-page slug map keyed by channel slug for routing inventory.
      *
-     * Landing priority per channel: `home` first, fallback `index`.
+     * Uses each channel's automatic `home` then `index` fallback.
      *
      * @return array<string, string> Channel slug to homepage slug map; empty string means no homepage found.
      */
     public function channelHomepagesForRouting(): array
     {
-        $pages = $this->table('pages');
         $channelsById = $this->channelsByIdMap();
         // No channels means there is no channel-homepage map to build.
         if ($channelsById === []) {
@@ -779,42 +780,23 @@ class PageRead
             $result[$slug] = '';
         }
 
-        $stmt = $this->db->prepare(
-            'SELECT p.channel, p.slug
-             FROM ' . $pages . ' p
-             WHERE p.channel IS NOT NULL
-               AND p.channel <> 0
-               AND p.status = :status
-               AND p.slug IN (:slug_home, :slug_index)
-             ORDER BY p.channel ASC,
-                      CASE p.slug WHEN :slug_home_order THEN 0 ELSE 1 END,
-                      p.created DESC'
-        );
-        $stmt->execute([
-            ':status' => 'published',
-            ':slug_home' => 'home',
-            ':slug_index' => 'index',
-            ':slug_home_order' => 'home',
-        ]);
-
-        $rows = $stmt->fetchAll() ?: [];
-        $seen = [];
-        // Pick first ranked homepage row per channel.
-        foreach ($rows as $row) {
-            $channelId = (int) ($row['channel'] ?? 0);
-            // Ignore invalid/duplicate/unresolvable channel rows.
-            if ($channelId < 1 || isset($seen[$channelId]) || !isset($channelsById[$channelId])) {
+        // Resolve through the same automatic homepage helper used by public channel rendering.
+        foreach ($channelsById as $channelId => $channel) {
+            $channelSlug = trim((string) ($channel['slug'] ?? ''));
+            if ($channelId < 1 || $channelSlug === '') {
                 continue;
             }
 
-            $channelSlug = trim((string) ($channelsById[$channelId]['slug'] ?? ''));
-            // Skip channels with malformed empty slugs.
-            if ($channelSlug === '') {
+            $channelPath = $this->channelRepo->pathForChannel((int) $channelId);
+            if ($channelPath === '') {
                 continue;
             }
 
-            $result[$channelSlug] = trim((string) ($row['slug'] ?? ''));
-            $seen[$channelId] = true;
+            $homepage = $this->findChannelHomepage($channelPath);
+            $homepagePage = is_array($homepage['page'] ?? null) ? $homepage['page'] : null;
+            $result[$channelSlug] = $homepagePage !== null
+                ? trim((string) ($homepagePage['slug'] ?? ''))
+                : '';
         }
 
         return $result;

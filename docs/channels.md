@@ -44,6 +44,7 @@ Fields/options:
 - `Parent` (defaults to `<root>`)
 - `Slug` (required)
 - `Description` (optional)
+- `Index`: `Automatic`, `No Trailing Slash`, `Use Trailing Slash`, or `Redirect`
 - `Theme`
 - `Syndication`
 - `Enable Feed?` (shown only when global feeds are enabled)
@@ -96,6 +97,14 @@ Delete behavior note:
 - Deleting a channel detaches linked pages and redirects to root scope; it does not delete pages/redirects.
 - Deleting a channel also reparents its direct child channels to the stock `<root>` channel.
 - Raven keeps one stock `<root>` channel with reserved id `0` and placeholder slug `root`; it is protected from edit/delete actions and is not used as a public route segment.
+
+Index behavior notes:
+
+- `Automatic` makes the channel root canonical using the system `site.routing` trailing-slash policy.
+- `No Trailing Slash` makes the channel root canonical without a trailing slash, overriding `site.routing` for this channel index only.
+- `Use Trailing Slash` makes the channel root canonical with a trailing slash, overriding `site.routing` for this channel index only.
+- `Redirect` sends the channel root to `/{channel_path}/home` when a published `home` page exists, otherwise to `/{channel_path}/index` when a published `index` page exists.
+- These settings change only the channel index route. They do not change routing or canonicalization for other pages assigned to the channel.
 
 ## 2) Developer And Agent Internals
 
@@ -178,6 +187,7 @@ Storage detail:
 ### Public Routing Touchpoints
 
 - Channel landing routes use the complete parent-aware path `/{channel_path}` with page fallback rules. A channel named `alpha` under `news` therefore lands at `/news/alpha`.
+- Channel index routes use the `Index` mode from the editor. `Automatic` follows system slash rules at `/{channel_path}`; the two explicit slash modes override them; `Redirect` sends that root to the existing published `home` or `index` page route, prioritizing `home`. These modes do not apply to other channel pages.
 - Channel pages resolve at `/{channel_path}/{segment}`, where `{segment}` depends on the leaf channel's effective `route_mode`. Paths may continue through any number of channel-parent levels.
 - Every channel segment must resolve as a direct child of the preceding segment; a child slug is not treated as a root channel or resolved globally.
 - When global feeds are enabled and a channel has `feed_enabled = true`, that channel also exposes `/{feed.rss}/{channel_slug}` and/or `/{feed.atom}/{channel_slug}`.
@@ -212,6 +222,11 @@ When channel behavior changes, update this document in the same task. That inclu
 - `Theme`
 - `Route Mode`
 - `Route Separator`
+- `Index`
+- `Automatic`
+- `No Trailing Slash`
+- `Use Trailing Slash`
+- `Redirect`
 - `Use System Default`
 - `Use Global Default`
 - `Inherit`

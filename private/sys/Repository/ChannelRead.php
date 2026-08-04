@@ -470,7 +470,7 @@ class ChannelRead
     /**
      * Returns channel options for routing diagnostics, including the stock root channel.
      *
-     * @return array<int, array{id: int, name: string, slug: string, path: string, parent_id: int, feed_enabled: bool, category_sets: array<int, int|string>, tag_sets: array<int, int|string>, editor_override: string, theme_override: string, route_mode: string, route_separator: string}>
+     * @return array<int, array{id: int, name: string, slug: string, path: string, parent_id: int, index: string, feed_enabled: bool, category_sets: array<int, int|string>, tag_sets: array<int, int|string>, editor_override: string, route_mode: string, route_separator: string}>
      */
     public function listRoutingOptions(): array
     {
@@ -485,6 +485,9 @@ class ChannelRead
                     ? $this->pathForChannel((int) ($channel['id'] ?? 0))
                     : ChannelShared::ROOT_CHANNEL_SLUG,
                 'parent_id' => ChannelShared::normalizeParentId($channel['parent_id'] ?? 0),
+                'index' => ChannelPolicy::normalizeChannelIndexRouteMode(
+                    (string) ($channel['index'] ?? 'auto')
+                ),
                 'feed_enabled' => (bool) ($channel['feed_enabled'] ?? false),
                 'category_sets' => SetParser::normalizeSelection($channel['category_sets'] ?? [], false),
                 'tag_sets' => SetParser::normalizeSelection($channel['tag_sets'] ?? [], false),
@@ -1188,6 +1191,9 @@ class ChannelRead
             'parent_id' => $normalizedId === ChannelShared::ROOT_CHANNEL_ID
                 ? ChannelShared::ROOT_CHANNEL_ID
                 : ChannelShared::normalizeParentId($raw['parent_id'] ?? 0),
+            'index' => ChannelPolicy::normalizeChannelIndexRouteMode(
+                (string) ($raw['index'] ?? 'auto')
+            ),
             'description' => trim((string) ($raw['description'] ?? '')),
             'feed_enabled' => ChannelShared::normalizeFeedEnabled($raw['feed_enabled'] ?? false),
             'category_sets' => SetParser::normalizeSelection($raw['category_sets'] ?? [], false),
@@ -1498,6 +1504,9 @@ class ChannelRead
             'parent_id' => $normalizedId === ChannelShared::ROOT_CHANNEL_ID
                 ? ChannelShared::ROOT_CHANNEL_ID
                 : ChannelShared::normalizeParentId($raw['parent_id'] ?? 0),
+            'index' => ChannelPolicy::normalizeChannelIndexRouteMode(
+                (string) ($raw['index'] ?? 'auto')
+            ),
             'description' => trim((string) ($raw['description'] ?? '')),
             'feed_enabled' => ChannelShared::normalizeFeedEnabled($raw['feed_enabled'] ?? false),
             'category_sets' => SetParser::normalizeSelection($raw['category_sets'] ?? [], false),

@@ -10,6 +10,8 @@
 - Updated the panel page list's Channel column, channel filter values, and channel prefilters to use complete parent-aware paths such as `raven/docs/appendix`, restoring meaningful alphabetical channel sorting across the tree.
 - Updated the page editor's channel selector to show `None`, alphabetized root channels, and alphabetized descendants grouped beneath their parents with two-space indentation per level.
 - Added a dedicated Taxonomy tab to the page editor for channel, category, and tag assignments; Meta now contains only page metadata fields.
+- Deferred global trailing-slash redirects for file-looking public aliases until their route handlers strip the period suffix, so `whatever.md` canonicalizes directly to `whatever` or `whatever/` according to site routing mode.
+- Added a channel Basic-tab `Index` route mode with `Automatic`, `No Trailing Slash`, `Use Trailing Slash`, and `Redirect` options; these affect only the channel index URL while preserving existing `home`/`index` content fallback and ordinary page routes.
 
 ### August 2, 2026
 

@@ -80,6 +80,34 @@ final class ChannelPolicy
     }
 
     /**
+     * Normalizes a channel index URL mode.
+     *
+     * @param string $value Raw channel index URL mode.
+     * @return string `auto`, `no_trailing_slash`, `trailing_slash`, or `redirect`.
+     */
+    public static function normalizeChannelIndexRouteMode(string $value): string
+    {
+        $mode = strtolower(trim($value));
+        return in_array($mode, ['auto', 'no_trailing_slash', 'trailing_slash', 'redirect'], true)
+            ? $mode
+            : 'auto';
+    }
+
+    /**
+     * Resolves whether one channel index URL should have a trailing slash.
+     *
+     * @param Config $config Runtime site configuration for automatic mode.
+     * @param string $channelIndexMode Stored per-channel index URL mode.
+     * @return bool True when the channel index canonical URL ends in `/`.
+     */
+    public static function channelIndexUsesTrailingSlash(Config $config, string $channelIndexMode): bool
+    {
+        $mode = self::normalizeChannelIndexRouteMode($channelIndexMode);
+        return $mode === 'trailing_slash'
+            || (($mode === 'auto' || $mode === 'redirect') && self::siteRoutingUsesTrailingSlash($config));
+    }
+
+    /**
      * Normalizes a global word-separator config value to '-' or '_'.
      *
      * @param string $value Raw separator string from site config.

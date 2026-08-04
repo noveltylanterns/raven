@@ -12,6 +12,7 @@ declare(strict_types=1);
 namespace Raven\Core\Debug;
 
 use Raven\Core\Repository\ChannelShared;
+use Raven\Core\Router\ChannelPolicy;
 use Raven\Core\Router\PagePolicy;
 use Raven\Lib\Security\InputSanitizer;
 
@@ -227,6 +228,11 @@ final class RouteProfiler
             $landingSlug = $isRootChannel
                 ? $this->rootLandingSlug($pagesForRouting)
                 : trim((string) ($channelLandingMap[$landingKey] ?? $channelLandingMap[$channelSlug] ?? ''));
+            $indexRouteMode = ChannelPolicy::normalizeChannelIndexRouteMode(
+                (string) ($channel['index'] ?? 'auto')
+            );
+            $channelIndexTrailingSlash = $indexRouteMode === 'trailing_slash'
+                || ($indexRouteMode === 'auto' && $siteRoutingTrailingSlash);
             $hasLanding = $landingSlug !== '';
             $statusKey = $hasLanding ? 'active' : 'missing';
             $statusLabel = $hasLanding
@@ -244,10 +250,15 @@ final class RouteProfiler
 
             $publicUrl = $isRootChannel
                 ? '/'
-                : PagePolicy::canonicalPath(
-                    '/' . ($channelPath !== '' ? $channelPath : $channelSlug),
-                    $siteRoutingTrailingSlash
-                );
+                : ($indexRouteMode === 'redirect' && $hasLanding
+                    ? PagePolicy::canonicalPath(
+                        '/' . ($channelPath !== '' ? $channelPath : $channelSlug) . '/' . $landingSlug,
+                        $siteRoutingTrailingSlash
+                    )
+                    : PagePolicy::canonicalPath(
+                        '/' . ($channelPath !== '' ? $channelPath : $channelSlug),
+                        $channelIndexTrailingSlash
+                    ));
             $conflictKey = strtolower($publicUrl);
             $pathUsage[$conflictKey] = (int) ($pathUsage[$conflictKey] ?? 0) + 1;
 

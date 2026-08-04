@@ -14,6 +14,20 @@ This is the default Build Mode backlog file. If the user asks about goals, unpat
 # Primary Checklist
 **Do not delete this heading!**
 
+
+## Misc Panel Tweaks
+- [ ] Default option for "Channel" drop-down in Page Editor should read <root> instead of <none>, with <root> stylized bold & at the top of the dropdown list. The full parent/child channel tree should be used in the parenthethis of each option instead of the bare ({slug})
+- [ ] "Parent" drop-down in Channel Editor should be styled exactly like aforementioned Channel drop-down in Page Editor.
+- [ ] "Channel" drop-down in Redirect Editor should be styled exactly like aforementioned Channel drop-down in Page Editor.
+- [ ] Reorder "Basic" tab of Channel Editor to: Name, Slug, Parent, Index, Theme, Description.
+- [ ] Make sure each setting on Channel Editor has accompanying form-text class description text (Use quick and to-the-point descriptions).
+- [ ] Remove 'Welcome Back..." text from panel navigation to the Dashboard page. Then increase padding below button row thats before Content nav section.
+- [ ] Make sure each setting on User Preferences & User Editor forms has accompanying form-text class descriptions (Use quick and to-the-point descriptions).
+- [ ] Make sure each setting on Category & Tag Editors has accompanying form-text class description text (Use quick and to-the-point descriptions).
+- [ ] Make sure each setting on Category & Tag Set Editors has accompanying form-text class description text (Use quick and to-the-point descriptions).
+- [ ] Make sure each setting on Redirect Editor has accompanying form-text class description text (Use quick and to-the-point descriptions).
+
+
 ## Event Logger Completion
 The Event Logger storage path is present and its configuration controls are enabled on the
 Foundry install, but the shared `rvn_event_log` table currently has no rows. The logger's

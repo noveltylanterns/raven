@@ -155,16 +155,34 @@ final class ChannelController
         if (is_array($result) && is_array($result['page'] ?? null)) {
             $channel = is_array($result['channel'] ?? null) ? $result['channel'] : [];
             $canonicalPath = $this->channelRead->pathForChannel((int) ($channel['id'] ?? 0));
-            $globalRouteMode = ChannelPolicy::globalPageRouteSelector($this->context->config());
+            $indexRouteMode = ChannelPolicy::normalizeChannelIndexRouteMode(
+                (string) ($channel['index'] ?? 'auto')
+            );
+            // Redirect mode keeps the existing home/index content selection but
+            // exposes that page URL instead of rendering the channel root.
+            if ($indexRouteMode === 'redirect' && $canonicalPath !== '') {
+                $redirectPath = PagePolicy::canonicalPath(
+                    '/' . $this->encodePath($canonicalPath . '/' . (string) ($result['page']['slug'] ?? '')),
+                    ChannelPolicy::siteRoutingUsesTrailingSlash($this->context->config())
+                );
+                Redirect::redirect($redirectPath, 301);
+            }
+
             $canonicalPublicPath = PagePolicy::canonicalPath(
                 '/' . $this->encodePath($canonicalPath),
-                ChannelPolicy::siteRoutingUsesTrailingSlash($this->context->config())
+                ChannelPolicy::channelIndexUsesTrailingSlash(
+                    $this->context->config(),
+                    $indexRouteMode
+                )
             );
             // File-looking aliases canonicalize to the extensionless parent-aware path.
             if (
                 ($canonicalPath !== '' && strcasecmp($requestedSlug, $canonicalPath) !== 0)
                 || strcasecmp($requestedRouteSegment, $requestedSlug) !== 0
-                || $this->request->hasTrailingSlash() !== ChannelPolicy::siteRoutingUsesTrailingSlash($this->context->config())
+                || $this->request->hasTrailingSlash() !== ChannelPolicy::channelIndexUsesTrailingSlash(
+                    $this->context->config(),
+                    $indexRouteMode
+                )
             ) {
                 Redirect::redirect($canonicalPublicPath, 301);
             }

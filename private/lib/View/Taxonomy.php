@@ -71,7 +71,7 @@ final class Taxonomy
      * @param bool $includeTags       Whether tag route rows should be included.
      * @param bool $includeRedirects  Whether redirect inventory rows should be included.
      * @return array{
-     *   channel_options: array<int, array{id: int, name: string, slug: string, parent_id: int, feed_enabled: bool, editor_override: string, route_mode: string, route_separator: string}>,
+     *   channel_options: array<int, array{id: int, name: string, slug: string, parent_id: int, index: string, feed_enabled: bool, editor_override: string, route_mode: string, route_separator: string}>,
      *   category_options_all: array<int, array{id: int, name: string, slug: string}>,
      *   tag_options_all: array<int, array{id: int, name: string, slug: string}>,
      *   redirect_rows: array<int, array<string, mixed>>

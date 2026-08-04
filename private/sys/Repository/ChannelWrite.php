@@ -58,6 +58,7 @@ final class ChannelWrite
      *   slug: string,
      *   description: string,
      *   parent_id?: int,
+     *   index?: string,
      *   feed_enabled?: bool,
      *   category_sets?: array<int, int|string>,
      *   tag_sets?: array<int, int|string>,
@@ -119,6 +120,9 @@ final class ChannelWrite
         $tagSets = array_key_exists('tag_sets', $data)
             ? SetParser::normalizeSelection($data['tag_sets'], false)
             : SetParser::normalizeSelection($currentRaw['tag_sets'] ?? [], false);
+        $indexRouteMode = array_key_exists('index', $data)
+            ? ChannelPolicy::normalizeChannelIndexRouteMode((string) $data['index'])
+            : ChannelPolicy::normalizeChannelIndexRouteMode((string) ($currentRaw['index'] ?? 'auto'));
         $createdAt = trim((string) ($currentRaw['created_at'] ?? ''));
         // Preserve original created_at when available; backfill for legacy rows otherwise.
         if ($createdAt === '') {
@@ -130,6 +134,7 @@ final class ChannelWrite
             'name' => $name,
             'slug' => $slug,
             'parent_id' => $parentId,
+            'index' => $indexRouteMode,
             'description' => $description,
             'feed_enabled' => $feedEnabled,
             'category_sets' => $categorySets,

@@ -46,6 +46,7 @@ $editorOverride = (string) ($channel['editor_override'] ?? 'inherit');
 $themeOverride = (string) ($channel['theme_override'] ?? 'inherit');
 $routeMode = (string) ($channel['route_mode'] ?? 'inherit');
 $routeSeparator = (string) ($channel['route_separator'] ?? 'inherit');
+$indexRouteMode = (string) ($channel['index'] ?? 'auto');
 $activeTab = (string) ($activeTab ?? 'basic');
 $taxonomyAssignmentsEnabled = $categoryEnabled || $tagEnabled;
 $deleteFormId = 'delete-channel-form';
@@ -226,6 +227,17 @@ if ($hasPersistedChannel) {
                 <label for="description" class="form-label">Description</label>
                 <!-- Optional description is editorial/context metadata for this channel. -->
                 <textarea id="description" name="description" class="form-control" rows="4"><?= e((string) ($channel['description'] ?? '')) ?></textarea>
+            </div>
+
+            <div class="form-group">
+                <label for="index" class="form-label">Index</label>
+                <select id="index" name="index" class="form-select">
+                    <option value="auto"<?= $indexRouteMode === 'auto' ? ' selected' : '' ?>>Automatic</option>
+                    <option value="no_trailing_slash"<?= $indexRouteMode === 'no_trailing_slash' ? ' selected' : '' ?>>No Trailing Slash</option>
+                    <option value="trailing_slash"<?= $indexRouteMode === 'trailing_slash' ? ' selected' : '' ?>>Use Trailing Slash</option>
+                    <option value="redirect"<?= $indexRouteMode === 'redirect' ? ' selected' : '' ?>>Redirect</option>
+                </select>
+                <div class="form-text">Controls only the channel index URL. Redirect sends the channel root to its published <code>home</code> page, or <code>index</code> page when home is unavailable.</div>
             </div>
 
             <div class="form-group mb-0">

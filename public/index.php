@@ -209,18 +209,31 @@ if (!$bypassAvailability && !$publicRequestContext()->enforceSiteAvailability())
     exit;
 }
 
-// Canonicalize every public GET route from one site-wide slash policy before family dispatch.
+// Canonicalize extensionless public GET routes from one site-wide slash policy before family dispatch.
+// File-looking aliases must reach their route family first so `.md` becomes `page` before
+// the controller applies the final slash policy; otherwise `/page.md` becomes `/page.md/`.
 if ($method === 'GET') {
-    $canonicalPublicPath = PagePolicy::canonicalPath(
-        $path,
-        ChannelPolicy::siteRoutingUsesTrailingSlash($rvn['config'])
-    );
-    // Preserve query parameters while redirecting only the path-shape difference.
-    if ($canonicalPublicPath !== $path) {
-        $query = (string) parse_url((string) ($_SERVER['REQUEST_URI'] ?? ''), PHP_URL_QUERY);
-        $query = str_replace(["\r", "\n", "\0"], '', $query);
-        header('Location: ' . $canonicalPublicPath . ($query !== '' ? '?' . $query : ''), true, 301);
-        exit;
+    $pathWithoutSlashes = trim($path, '/');
+    $lastPathSegment = $pathWithoutSlashes === ''
+        ? ''
+        : substr($pathWithoutSlashes, (int) strrpos($pathWithoutSlashes, '/') + 1);
+    // Channel index modes can override the site-wide slash policy, so let a
+    // resolved channel path reach ChannelController before global canonicalization.
+    $channelIndexRouteCandidate = $pathWithoutSlashes !== ''
+        && $publicChannelController()->channelPathExists($pathWithoutSlashes);
+
+    if (!PagePolicy::hasPeriodSuffix($lastPathSegment) && !$channelIndexRouteCandidate) {
+        $canonicalPublicPath = PagePolicy::canonicalPath(
+            $path,
+            ChannelPolicy::siteRoutingUsesTrailingSlash($rvn['config'])
+        );
+        // Preserve query parameters while redirecting only the path-shape difference.
+        if ($canonicalPublicPath !== $path) {
+            $query = (string) parse_url((string) ($_SERVER['REQUEST_URI'] ?? ''), PHP_URL_QUERY);
+            $query = str_replace(["\r", "\n", "\0"], '', $query);
+            header('Location: ' . $canonicalPublicPath . ($query !== '' ? '?' . $query : ''), true, 301);
+            exit;
+        }
     }
 }
 

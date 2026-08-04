@@ -39,6 +39,7 @@ spl_autoload_register(static function (string $class) use ($root): void {
 
 use Raven\Core\Config;
 use Raven\Core\Repository\ChannelRead;
+use Raven\Core\Repository\ChannelWrite;
 use Raven\Core\Repository\ConfigWrite;
 use Raven\Core\Repository\PageRead;
 use Raven\Core\Repository\RedirectRead;
@@ -46,7 +47,9 @@ use Raven\Core\Repository\RedirectWrite;
 use Raven\Core\Debug\RouteProfiler;
 use Raven\Core\Router\ChannelPolicy;
 use Raven\Core\Router\PagePolicy;
+use Raven\Core\Router\RoutePreview;
 use Raven\Lib\Transport\Request;
+use Raven\Lib\View\Public\ThemeCatalog;
 use Raven\Core\Router\RouteHandler;
 use Raven\Core\Router\RouteRequest;
 use Raven\Lib\Security\InputSanitizer;
@@ -92,6 +95,7 @@ final class RoutingSmokeRunner
         $config = new Config($configPath);
         $input = new InputSanitizer();
         $channels = new ChannelRead($db, 'sqlite', '', $channelDirectory);
+        $channelWriter = new ChannelWrite($db, 'sqlite', '', $channels, $channelDirectory);
         $pages = new PageRead($db, 'sqlite', '', $channels, false, false);
         $redirects = new RedirectRead($db, 'sqlite', '', $channels);
         $redirectWriter = new RedirectWrite($db, 'sqlite', '', $channels);
@@ -112,6 +116,35 @@ final class RoutingSmokeRunner
         $this->assert((int) (($channels->findByPath('news/alpha/alpha-child')['id'] ?? 0)) === 40, 'Third-level channel path did not resolve through all ancestors.');
         $this->assert($channels->findByPath('alpha') === null, 'A child channel must not resolve as a root-level path.');
         $this->assert($channels->pathForChannel(40) === 'news/alpha/alpha-child', 'Canonical channel path did not include all parent slugs.');
+        $this->assert((string) (($channels->findById(10)['index'] ?? '')) === 'auto', 'Automatic channel index route mode was not preserved in channel reads.');
+        $newsIndex = $pages->findChannelHomepage('news');
+        $this->assert((string) ($newsIndex['page']['slug'] ?? '') === 'home', 'Channel homepage content no longer prioritizes the published home page.');
+        $blogIndex = $pages->findChannelHomepage('blog');
+        $this->assert((string) ($blogIndex['page']['slug'] ?? '') === 'home', 'Channel index route mode must not disable automatic home/index content fallback.');
+        $routingHomepages = $pages->channelHomepagesForRouting();
+        $this->assert(($routingHomepages['news'] ?? '') === 'home', 'Routing homepage inventory did not use automatic home priority.');
+        $this->assert(($routingHomepages['blog'] ?? '') === 'home', 'Routing homepage inventory ignored automatic channel homepage fallback.');
+        $this->assert(!ChannelPolicy::channelIndexUsesTrailingSlash($config, 'auto'), 'Automatic channel index mode should follow the no-slash system policy.');
+        $this->assert(!ChannelPolicy::channelIndexUsesTrailingSlash($config, 'no_trailing_slash'), 'Forced no-slash channel index mode was not enforced.');
+        $this->assert(ChannelPolicy::channelIndexUsesTrailingSlash($config, 'trailing_slash'), 'Forced trailing-slash channel index mode was not enforced.');
+        $this->assert(ChannelPolicy::normalizeChannelIndexRouteMode('invalid') === 'auto', 'Invalid channel index route mode did not normalize to automatic.');
+        $channelWriter->save([
+            'id' => 30,
+            'name' => 'Alpha',
+            'slug' => 'alpha',
+            'parent_id' => 10,
+            'index' => 'redirect',
+            'description' => '',
+        ]);
+        $this->assert((string) (($channels->findById(30)['index'] ?? '')) === 'redirect', 'Channel index route mode did not persist through the channel writer.');
+        $channelWriter->save([
+            'id' => 30,
+            'name' => 'Alpha',
+            'slug' => 'alpha',
+            'parent_id' => 10,
+            'index' => 'trailing_slash',
+            'description' => '',
+        ]);
         $this->events[] = 'channel_parent_hierarchy=ok';
 
         $redirectWriter->save([
@@ -145,7 +178,7 @@ final class RoutingSmokeRunner
             'channel_routing_options' => [
                 ['id' => 0, 'name' => '<root>', 'slug' => 'root', 'parent_id' => 0, 'route_mode' => 'inherit', 'route_separator' => 'inherit'],
                 ['id' => 10, 'name' => 'News', 'slug' => 'news', 'parent_id' => 0, 'route_mode' => 'inherit', 'route_separator' => 'inherit'],
-                ['id' => 30, 'name' => 'Alpha', 'slug' => 'alpha', 'parent_id' => 10, 'route_mode' => 'inherit', 'route_separator' => 'inherit'],
+                ['id' => 30, 'name' => 'Alpha', 'slug' => 'alpha', 'parent_id' => 10, 'index' => 'trailing_slash', 'route_mode' => 'inherit', 'route_separator' => 'inherit'],
             ],
             'pages_for_routing' => [
                 ['id' => 91, 'title' => 'Nested Post', 'slug' => 'nested-post', 'status' => 'published', 'created' => '2026-03-20 12:00:00', 'channel' => 30],
@@ -160,9 +193,23 @@ final class RoutingSmokeRunner
         ]);
         $channelRoute = array_values(array_filter($routingRows, static fn (array $row): bool => ($row['type_key'] ?? '') === 'channel' && ($row['source_label'] ?? '') === 'Alpha'))[0] ?? [];
         $pageRoute = array_values(array_filter($routingRows, static fn (array $row): bool => ($row['type_key'] ?? '') === 'page'))[0] ?? [];
-        $this->assert((string) ($channelRoute['public_url'] ?? '') === '/news/alpha', 'Routing inventory channel URI did not include its parent path.');
+        $this->assert((string) ($channelRoute['public_url'] ?? '') === '/news/alpha/', 'Routing inventory channel URI did not apply the channel index trailing-slash override.');
         $this->assert((string) ($pageRoute['public_url'] ?? '') === '/news/alpha/nested-post', 'Routing inventory page URI did not include its parent channel path.');
         $this->events[] = 'routing_inventory_parent_paths=ok';
+
+        $routePreview = new RoutePreview(
+            $this->root . '/public/theme',
+            $input,
+            new ThemeCatalog($this->root . '/public/theme', $input)
+        );
+        $automaticLandingMap = $routePreview->channelLandingMapFromPages(
+            [
+                ['id' => 92, 'slug' => 'index', 'status' => 'published', 'created' => '2026-03-20 12:00:00', 'channel_slug' => 'alpha', 'channel_path' => 'news/alpha'],
+                ['id' => 91, 'slug' => 'home', 'status' => 'published', 'created' => '2026-03-19 12:00:00', 'channel_slug' => 'alpha', 'channel_path' => 'news/alpha'],
+            ]
+        );
+        $this->assert(($automaticLandingMap['news/alpha'] ?? '') === 'home', 'Routing preview no longer uses automatic home priority.');
+        $this->events[] = 'routing_inventory_automatic_index=ok';
 
         $rootSlug = $this->resolvePublicPath($config, $input, $channels, $pages, 'hello-world', null);
         $this->assert((int) ($rootSlug['page']['id'] ?? 0) === 7, 'Global slug mode should resolve root slug page.');
@@ -175,6 +222,8 @@ final class RoutingSmokeRunner
         $this->assert((int) ($rootSlugSlash['page']['id'] ?? 0) === 7, 'Trailing-slash site routing should resolve root slug page.');
         $this->assert((string) ($rootSlugSlash['canonical_path'] ?? '') === '/hello-world/', 'Trailing-slash site routing canonical root path mismatch.');
         $this->assert(ChannelPolicy::siteRoutingUsesTrailingSlash($config), 'Site routing mode did not enable trailing-slash policy.');
+        $this->assert(ChannelPolicy::channelIndexUsesTrailingSlash($config, 'auto'), 'Automatic channel index mode did not follow the trailing-slash system policy.');
+        $this->assert(!ChannelPolicy::channelIndexUsesTrailingSlash($config, 'no_trailing_slash'), 'No-slash channel index override was not honored over the trailing-slash system policy.');
         $this->assert(PagePolicy::canonicalPath('/hello-world/', false) === '/hello-world', 'No-slash canonical path normalization failed.');
         $this->assert(PagePolicy::canonicalPath('/hello-world', true) === '/hello-world/', 'Trailing-slash canonical path normalization failed.');
         $this->assert(Request::hasTrailingSlash(['REQUEST_URI' => '/hello-world/?source=smoke']), 'Request trailing-slash detection failed.');
@@ -187,7 +236,15 @@ final class RoutingSmokeRunner
         $rootMarkdownAlias = $this->resolvePublicPath($config, $input, $channels, $pages, 'hello-world.md', null);
         $this->assert((int) ($rootMarkdownAlias['page']['id'] ?? 0) === 7, 'Markdown-style root links should resolve after their period suffix is removed.');
         $this->assert((string) ($rootMarkdownAlias['canonical_path'] ?? '') === '/hello-world', 'Markdown-style root link canonical path mismatch.');
+        $this->assert(PagePolicy::hasPeriodSuffix('hello-world.md'), 'File-looking route suffix detection failed.');
         $this->events[] = 'root_markdown_alias=ok';
+
+        ConfigWrite::persistValue($configPath, $config->all(), 'site.routing', 'trailing_slash');
+        $config = new Config($configPath);
+        $rootMarkdownAliasSlash = $this->resolvePublicPath($config, $input, $channels, $pages, 'hello-world.md', null);
+        $this->assert((string) ($rootMarkdownAliasSlash['canonical_path'] ?? '') === '/hello-world/', 'File-looking route should receive the canonical slash after suffix filtering.');
+        ConfigWrite::persistValue($configPath, $config->all(), 'site.routing', 'no_trailing_slash');
+        $config = new Config($configPath);
 
         ConfigWrite::persistValue($configPath, $config->all(), 'content.separator', '_');
         $config = new Config($configPath);
@@ -304,6 +361,7 @@ PHP;
                 'name' => 'News',
                 'slug' => 'news',
                 'parent_id' => 0,
+                'index' => 'auto',
                 'description' => '',
                 'editor_override' => 'inherit',
                 'route_mode' => 'inherit',
@@ -315,6 +373,7 @@ PHP;
                 'name' => 'Blog',
                 'slug' => 'blog',
                 'parent_id' => 0,
+                'index' => 'no_trailing_slash',
                 'description' => '',
                 'editor_override' => 'inherit',
                 'route_mode' => 'month_id',
@@ -326,6 +385,7 @@ PHP;
                 'name' => 'Alpha',
                 'slug' => 'alpha',
                 'parent_id' => 10,
+                'index' => 'trailing_slash',
                 'description' => '',
                 'editor_override' => 'inherit',
                 'route_mode' => 'inherit',
@@ -337,6 +397,7 @@ PHP;
                 'name' => 'Alpha Child',
                 'slug' => 'alpha-child',
                 'parent_id' => 30,
+                'index' => 'redirect',
                 'description' => '',
                 'editor_override' => 'inherit',
                 'route_mode' => 'inherit',
@@ -358,7 +419,9 @@ PHP;
     {
         $rows = [
             [7, 'Root Page', 'hello-world', 1, 0, '2026-03-20 12:00:00'],
-            [42, 'News Post', 'smoke-post', 1, 10, '2026-03-20 12:00:00'],
+            [43, 'News Home', 'home', 1, 10, '2026-03-20 12:00:00'],
+            [42, 'News Post', 'smoke-post', 1, 10, '2026-03-19 12:00:00'],
+            [85, 'Blog Home', 'home', 1, 20, '2026-03-20 12:00:00'],
             [84, 'Blog Post', 'build-log', 1, 20, '2026-03-20 12:00:00'],
             [91, 'Nested Post', 'nested-post', 1, 30, '2026-03-20 12:00:00'],
         ];

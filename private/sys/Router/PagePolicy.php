@@ -43,6 +43,17 @@ final class PagePolicy
     }
 
     /**
+     * Reports whether a public route segment contains a file-style period suffix.
+     *
+     * @param string $segment Raw public route segment.
+     * @return bool True when the segment contains a period marker.
+     */
+    public static function hasPeriodSuffix(string $segment): bool
+    {
+        return strpos(trim($segment), '.') !== false;
+    }
+
+    /**
      * Normalizes a URL path segment for a slug-based page lookup.
      *
      * Converts underscores to hyphens first when the channel uses underscore separators,

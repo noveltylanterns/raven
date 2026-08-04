@@ -159,6 +159,9 @@ final class ChannelEditController
             $channel['route_separator'] = ChannelPolicy::normalizeChannelSeparator(
                 (string) ($channel['route_separator'] ?? 'inherit')
             );
+            $channel['index'] = ChannelPolicy::normalizeChannelIndexRouteMode(
+                (string) ($channel['index'] ?? 'auto')
+            );
         }
 
         $activeTab = $this->editorTabs->normalizeEditorTab($_GET['tab'] ?? null, ['basic', 'meta', 'media'], 'basic');
@@ -257,6 +260,9 @@ final class ChannelEditController
         $routeSeparator = ChannelPolicy::normalizeChannelSeparator(
             (string) ($post['route_separator'] ?? 'inherit')
         );
+        $indexRouteMode = ChannelPolicy::normalizeChannelIndexRouteMode(
+            (string) ($post['index'] ?? 'auto')
+        );
         $feedsEnabled = $this->feedParser->feedEnabled();
         $categorySetSelection = $this->normalizeSubmittedSetSelection(
             $post['category_sets'] ?? [],
@@ -286,6 +292,7 @@ final class ChannelEditController
                 'name' => $name,
                 'slug' => $slug,
                 'parent_id' => $parentId,
+                'index' => $indexRouteMode,
                 'description' => $description,
                 'category_sets' => $categorySetSelection,
                 'tag_sets' => $tagSetSelection,

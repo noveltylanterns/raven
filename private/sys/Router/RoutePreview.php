@@ -160,7 +160,7 @@ final class RoutePreview
                 'index' => 1,
                 default => null,
             };
-            // Only home/index slugs participate in landing-page selection.
+            // Automatic channel index selection only considers home/index slugs.
             if ($priority === null) {
                 continue;
             }
