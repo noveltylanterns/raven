@@ -15,7 +15,7 @@ use Raven\Core\Router\RouteHandler;
 use Raven\Core\Router\RouteValidator;
 
 /**
- * Registers public feed routes, including taxonomy-scoped feed endpoints.
+ * Registers public feed routes, including taxonomy and parent-aware channel feeds.
  */
 final class FeedRouter
 {
@@ -33,117 +33,101 @@ final class FeedRouter
         $input = $deps->input;
         $routeConfig = $deps->routeConfig;
 
-        $feedsEnabled = !empty($routeConfig['feeds_enabled']);
-        $rssFeedRoute = (string) ($routeConfig['rss_feed_route'] ?? '');
-        $atomFeedRoute = (string) ($routeConfig['atom_feed_route'] ?? '');
+        if (empty($routeConfig['feeds_enabled'])) {
+            return;
+        }
+
         $categoryPrefix = (string) ($routeConfig['category_prefix'] ?? '');
         $tagPrefix = (string) ($routeConfig['tag_prefix'] ?? '');
         $reservedPrefixes = is_array($routeConfig['reserved_prefixes'] ?? null)
             ? array_values($routeConfig['reserved_prefixes'])
             : [];
 
-        // Register RSS routes only when feeds are enabled and the route prefix is configured.
-        if ($feedsEnabled && $rssFeedRoute !== '') {
-            $router->add('GET', '/' . $rssFeedRoute, static function () use ($publicFeedController): void {
-                $publicFeedController()->rssFeed();
+        // Register exact taxonomy routes before the final-segment channel route so
+        // reserved prefixes remain available for category/tag feed endpoints.
+        $registerFormat = static function (
+            string $route,
+            string $globalMethod,
+            string $categoryMethod,
+            string $tagMethod
+        ) use (
+            $router,
+            $publicFeedController,
+            $publicRequestContext,
+            $input,
+            $categoryPrefix,
+            $tagPrefix,
+            $reservedPrefixes
+        ): void {
+            if ($route === '') {
+                return;
+            }
+
+            $router->add('GET', '/' . $route, static function () use ($publicFeedController, $globalMethod): void {
+                $publicFeedController()->{$globalMethod}();
             });
 
-            $router->add('GET', '/' . $rssFeedRoute . '/{channel}', static function (array $params) use ($publicFeedController, $publicRequestContext, $input, $reservedPrefixes): void {
-                $channel = RouteValidator::slugOrNotFound($input, $params['channel'] ?? null, static function () use ($publicRequestContext): void {
-                    $publicRequestContext()->notFound();
+            if ($categoryPrefix !== '') {
+                $router->add('GET', '/' . $route . '/' . $categoryPrefix . '/{slug}', static function (array $params) use ($publicFeedController, $publicRequestContext, $input, $categoryMethod): void {
+                    $slug = RouteValidator::slugOrNotFound($input, $params['slug'] ?? null, static function () use ($publicRequestContext): void {
+                        $publicRequestContext()->notFound();
+                    });
+                    if ($slug === null) {
+                        return;
+                    }
+
+                    $publicFeedController()->{$categoryMethod}($slug);
                 });
-                $channel = RouteValidator::slugAllowedOrNotFound($channel, $reservedPrefixes, static function () use ($publicRequestContext): void {
-                    $publicRequestContext()->notFound();
+            }
+
+            if ($tagPrefix !== '') {
+                $router->add('GET', '/' . $route . '/' . $tagPrefix . '/{slug}', static function (array $params) use ($publicFeedController, $publicRequestContext, $input, $tagMethod): void {
+                    $slug = RouteValidator::slugOrNotFound($input, $params['slug'] ?? null, static function () use ($publicRequestContext): void {
+                        $publicRequestContext()->notFound();
+                    });
+                    if ($slug === null) {
+                        return;
+                    }
+
+                    $publicFeedController()->{$tagMethod}($slug);
                 });
-                // Validators already rendered not-found for invalid or reserved slugs.
-                if ($channel === null) {
+            }
+
+            $router->add('GET', '/' . $route . '/{channel_path...}', static function (array $params) use ($publicFeedController, $publicRequestContext, $input, $reservedPrefixes, $globalMethod): void {
+                $rawPath = trim((string) ($params['channel_path'] ?? ''), '/');
+                $segments = $rawPath === '' ? [] : explode('/', $rawPath);
+                $normalizedSegments = [];
+                foreach ($segments as $segment) {
+                    $normalized = $input->slug($segment);
+                    if ($normalized === null || $normalized === '') {
+                        $publicRequestContext()->notFound();
+                        return;
+                    }
+
+                    $normalizedSegments[] = $normalized;
+                }
+
+                // System/taxonomy prefixes cannot be interpreted as channel roots.
+                if ($normalizedSegments === [] || in_array($normalizedSegments[0], $reservedPrefixes, true)) {
+                    $publicRequestContext()->notFound();
                     return;
                 }
 
-                $publicFeedController()->rssFeed($channel);
+                $publicFeedController()->{$globalMethod}(implode('/', $normalizedSegments));
             });
+        };
 
-            // Taxonomy-scoped RSS category feeds are optional and prefix-driven.
-            if ($categoryPrefix !== '') {
-                $router->add('GET', '/' . $rssFeedRoute . '/' . $categoryPrefix . '/{slug}', static function (array $params) use ($publicFeedController, $publicRequestContext, $input): void {
-                    $slug = RouteValidator::slugOrNotFound($input, $params['slug'] ?? null, static function () use ($publicRequestContext): void {
-                        $publicRequestContext()->notFound();
-                    });
-                    // Validator already rendered not-found for invalid taxonomy slugs.
-                    if ($slug === null) {
-                        return;
-                    }
-
-                    $publicFeedController()->rssCategoryFeed($slug);
-                });
-            }
-
-            // Taxonomy-scoped RSS tag feeds are optional and prefix-driven.
-            if ($tagPrefix !== '') {
-                $router->add('GET', '/' . $rssFeedRoute . '/' . $tagPrefix . '/{slug}', static function (array $params) use ($publicFeedController, $publicRequestContext, $input): void {
-                    $slug = RouteValidator::slugOrNotFound($input, $params['slug'] ?? null, static function () use ($publicRequestContext): void {
-                        $publicRequestContext()->notFound();
-                    });
-                    // Validator already rendered not-found for invalid taxonomy slugs.
-                    if ($slug === null) {
-                        return;
-                    }
-
-                    $publicFeedController()->rssTagFeed($slug);
-                });
-            }
-        }
-
-        // Register Atom routes only when feeds are enabled and the route prefix is configured.
-        if ($feedsEnabled && $atomFeedRoute !== '') {
-            $router->add('GET', '/' . $atomFeedRoute, static function () use ($publicFeedController): void {
-                $publicFeedController()->atomFeed();
-            });
-
-            $router->add('GET', '/' . $atomFeedRoute . '/{channel}', static function (array $params) use ($publicFeedController, $publicRequestContext, $input, $reservedPrefixes): void {
-                $channel = RouteValidator::slugOrNotFound($input, $params['channel'] ?? null, static function () use ($publicRequestContext): void {
-                    $publicRequestContext()->notFound();
-                });
-                $channel = RouteValidator::slugAllowedOrNotFound($channel, $reservedPrefixes, static function () use ($publicRequestContext): void {
-                    $publicRequestContext()->notFound();
-                });
-                // Validators already rendered not-found for invalid or reserved slugs.
-                if ($channel === null) {
-                    return;
-                }
-
-                $publicFeedController()->atomFeed($channel);
-            });
-
-            // Taxonomy-scoped Atom category feeds are optional and prefix-driven.
-            if ($categoryPrefix !== '') {
-                $router->add('GET', '/' . $atomFeedRoute . '/' . $categoryPrefix . '/{slug}', static function (array $params) use ($publicFeedController, $publicRequestContext, $input): void {
-                    $slug = RouteValidator::slugOrNotFound($input, $params['slug'] ?? null, static function () use ($publicRequestContext): void {
-                        $publicRequestContext()->notFound();
-                    });
-                    // Validator already rendered not-found for invalid taxonomy slugs.
-                    if ($slug === null) {
-                        return;
-                    }
-
-                    $publicFeedController()->atomCategoryFeed($slug);
-                });
-            }
-
-            // Taxonomy-scoped Atom tag feeds are optional and prefix-driven.
-            if ($tagPrefix !== '') {
-                $router->add('GET', '/' . $atomFeedRoute . '/' . $tagPrefix . '/{slug}', static function (array $params) use ($publicFeedController, $publicRequestContext, $input): void {
-                    $slug = RouteValidator::slugOrNotFound($input, $params['slug'] ?? null, static function () use ($publicRequestContext): void {
-                        $publicRequestContext()->notFound();
-                    });
-                    // Validator already rendered not-found for invalid taxonomy slugs.
-                    if ($slug === null) {
-                        return;
-                    }
-
-                    $publicFeedController()->atomTagFeed($slug);
-                });
-            }
-        }
+        $registerFormat(
+            (string) ($routeConfig['rss_feed_route'] ?? ''),
+            'rssFeed',
+            'rssCategoryFeed',
+            'rssTagFeed'
+        );
+        $registerFormat(
+            (string) ($routeConfig['atom_feed_route'] ?? ''),
+            'atomFeed',
+            'atomCategoryFeed',
+            'atomTagFeed'
+        );
     }
 }

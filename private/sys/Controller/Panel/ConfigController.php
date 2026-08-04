@@ -65,6 +65,7 @@ final class ConfigController
         'site.theme' => 'Default Site Theme',
         'site.timezone' => 'Timezone',
         'site.visibility' => 'Visibility',
+        'site.routing' => 'Site Routing Mode',
         'mail.agent' => 'Mail Agent',
         'mail.sender_address' => 'Mail Sender Address',
         'mail.sender_name' => 'Mail Sender Name',
@@ -75,7 +76,7 @@ final class ConfigController
         'database.pgsql.name' => 'Database',
         'database.pgsql.pass' => 'Password',
         'content.editor' => 'Default Text Editor',
-        'content.mode' => 'Default Routing Mode',
+        'content.selector' => 'Default Routing Selector',
         'content.separator' => 'Default Routing Separator',
         'feed.channels' => 'Feed Channels',
         'feed.items' => 'Feed Items',
@@ -455,7 +456,7 @@ final class ConfigController
     /**
      * Returns channel options once per request for config-editor validation and rendering.
      *
-     * @return array<int, array{id: int, name: string, slug: string, editor_override: string, route_mode: string, route_separator: string}> Channel routing rows.
+     * @return array<int, array{id: int, name: string, slug: string, path: string, editor_override: string, route_mode: string, route_separator: string}> Channel routing rows.
      */
     private function channelRoutingOptions(): array
     {
@@ -674,6 +675,20 @@ final class ConfigController
             }
 
             return $mode;
+        }
+
+        // Site routing mode controls the canonical slash policy for public paths.
+        if ($path === 'site.routing') {
+            $mode = strtolower(trim($value));
+            // Accept concise legacy aliases while persisting one canonical value.
+            if (in_array($mode, ['trailing', 'trailing_slash'], true)) {
+                return 'trailing_slash';
+            }
+            if (in_array($mode, ['no_trailing', 'no_trailing_slash'], true)) {
+                return 'no_trailing_slash';
+            }
+
+            throw new \RuntimeException('site.routing must be trailing_slash or no_trailing_slash.');
         }
 
         // Timezone may be blank or one valid PHP timezone identifier.
@@ -1154,15 +1169,15 @@ final class ConfigController
             return $editor;
         }
 
-        // Normalize global content route mode.
-        if ($path === 'content.mode') {
-            $mode = strtolower(trim($value));
-            // Content route mode is constrained to slug/id.
-            if (!in_array($mode, ['slug', 'id'], true)) {
-                throw new \RuntimeException('content.mode must be slug or id.');
+        // Normalize the global content route selector.
+        if ($path === 'content.selector') {
+            $selector = strtolower(trim($value));
+            // Content selector is limited to slug/id lookup identity.
+            if (!in_array($selector, ['slug', 'id'], true)) {
+                throw new \RuntimeException('content.selector must be slug or id.');
             }
 
-            return $mode;
+            return $selector;
         }
 
         // Normalize global content route separator.
@@ -1483,7 +1498,7 @@ final class ConfigController
     }
 
     /**
-     * Seeds defaults for content editor and feed settings.
+     * Seeds defaults for site routing, content editor, and feed settings.
      *
      * @param array<string, mixed> $config Config snapshot being normalized.
      * @return array<string, mixed> Snapshot with content/feed defaults applied.
@@ -1496,9 +1511,26 @@ final class ConfigController
             $content = [];
         }
 
+        $legacyMode = strtolower(trim((string) ($content['mode'] ?? '')));
+        // Migrate the former combined route modes into independent selector and slash settings.
+        if (!array_key_exists('selector', $content)) {
+            $content['selector'] = $this->normalizeGlobalPageRouteSelector($legacyMode);
+        } else {
+            $content['selector'] = $this->normalizeGlobalPageRouteSelector((string) $content['selector']);
+        }
+        unset($content['mode']);
         $content['editor'] = $this->editor->normalizeBodyTextEditorOption((string) ($content['editor'] ?? 'tinymce'));
-        $content['mode'] = $this->normalizeGlobalPageRouteMode((string) ($content['mode'] ?? 'slug'));
         $content['separator'] = ChannelPolicy::normalizeGlobalSeparator((string) ($content['separator'] ?? '-'));
+
+        $site = $config['site'] ?? null;
+        // Site config may be missing in sparse or pre-routing snapshots.
+        if (!is_array($site)) {
+            $site = [];
+        }
+        $siteRouting = array_key_exists('routing', $site)
+            ? (string) $site['routing']
+            : ($legacyMode === 'slug_slash' || $legacyMode === 'id_slash' ? 'trailing_slash' : 'no_trailing_slash');
+        $site['routing'] = $this->normalizeSiteRoutingMode($siteRouting);
 
         $feed = $config['feed'] ?? null;
         // Feed config section may be missing in older snapshots.
@@ -1522,7 +1554,7 @@ final class ConfigController
         }
 
         $normalizedChannels = [];
-        // Normalize stored feed channel list into canonical slug/sentinel values.
+        // Normalize stored feed channel list into canonical parent-aware path/sentinel values.
         foreach ($rawChannels as $rawChannel) {
             $candidate = strtolower(trim((string) $rawChannel));
             // Ignore empty channel entries.
@@ -1535,13 +1567,39 @@ final class ConfigController
                 break;
             }
 
-            $channelSlug = $this->input->slug($candidate);
-            // Skip invalid channel slug entries.
-            if ($channelSlug === null || $channelSlug === '') {
+            $segments = array_values(array_filter(explode('/', trim($candidate, '/')), static fn (string $segment): bool => $segment !== ''));
+            $normalizedSegments = [];
+            foreach ($segments as $segment) {
+                $normalizedSegment = $this->input->slug($segment);
+                // Reject a configured channel path when any segment is invalid.
+                if ($normalizedSegment === null || $normalizedSegment === '') {
+                    $normalizedSegments = [];
+                    break;
+                }
+
+                $normalizedSegments[] = $normalizedSegment;
+            }
+            if ($normalizedSegments === []) {
                 continue;
             }
 
-            $normalizedChannels[$channelSlug] = $channelSlug;
+            $normalizedPath = implode('/', $normalizedSegments);
+            $canonicalPath = $normalizedPath;
+            // Preserve legacy leaf-slug selections by upgrading them to their unique full path.
+            foreach ($channelRoutingOptions as $channelOption) {
+                $optionSlug = strtolower(trim((string) ($channelOption['slug'] ?? '')));
+                if ($optionSlug !== $normalizedPath) {
+                    continue;
+                }
+
+                $optionPath = trim((string) ($channelOption['path'] ?? ''), '/');
+                if ($optionPath !== '') {
+                    $canonicalPath = $optionPath;
+                }
+                break;
+            }
+
+            $normalizedChannels[$canonicalPath] = $canonicalPath;
         }
         $feed['channels'] = array_values($normalizedChannels);
         // Restore default all-channels when implicit list normalized to empty.
@@ -1578,6 +1636,7 @@ final class ConfigController
             $feed['atom'] = $rawAtom === '' ? '' : ($this->input->slug($rawAtom) ?? 'atom');
         }
 
+        $config['site'] = $site;
         $config['content'] = $content;
         $config['feed'] = $feed;
 
@@ -2491,16 +2550,35 @@ final class ConfigController
     }
 
     /**
-     * Normalizes the global route mode choice.
+     * Normalizes the global content route selector, including legacy combined values.
      *
-     * @param string $value Submitted route-mode choice.
-     * @return string Canonical route mode.
+     * @param string $value Submitted selector or legacy combined route mode.
+     * @return string Canonical `slug` or `id` selector.
      */
-    private function normalizeGlobalPageRouteMode(string $value): string
+    private function normalizeGlobalPageRouteSelector(string $value): string
     {
-        $mode = strtolower(trim($value));
+        $selector = strtolower(trim($value));
+        if ($selector === 'slug_slash') {
+            return 'slug';
+        }
+        if ($selector === 'id_slash') {
+            return 'id';
+        }
 
-        return in_array($mode, ['slug', 'id'], true) ? $mode : 'slug';
+        return in_array($selector, ['slug', 'id'], true) ? $selector : 'slug';
+    }
+
+    /**
+     * Normalizes the site-wide canonical slash policy.
+     *
+     * @param string $value Submitted site routing mode.
+     * @return string Canonical `trailing_slash` or `no_trailing_slash` mode.
+     */
+    private function normalizeSiteRoutingMode(string $value): string
+    {
+        return in_array(strtolower(trim($value)), ['trailing', 'trailing_slash'], true)
+            ? 'trailing_slash'
+            : 'no_trailing_slash';
     }
 
     /**

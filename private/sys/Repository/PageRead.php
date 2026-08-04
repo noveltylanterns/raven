@@ -358,8 +358,8 @@ class PageRead
         if ($normalizedChannelSlug === ChannelShared::ROOT_CHANNEL_SLUG) {
             $sql .= ' AND p.channel = 0';
         } elseif ($normalizedChannelSlug !== '') {
-            $channel = $this->channelRepo->findBySlug($normalizedChannelSlug);
-            // Unknown channel slug yields no published rows for scoped query.
+            $channel = $this->channelRepo->findByPath($normalizedChannelSlug);
+            // Unknown parent-aware channel path yields no published rows for scoped query.
             if ($channel === null) {
                 return [];
             }
@@ -450,8 +450,8 @@ class PageRead
         $channelIds = [];
         // Resolve provided slugs to channel ids, skipping unknown channels.
         foreach ($normalizedSlugs as $normalizedSlug) {
-            $channel = $this->channelRepo->findBySlug($normalizedSlug);
-            // Ignore unknown channel slugs in mixed filter lists.
+            $channel = $this->channelRepo->findByPath($normalizedSlug);
+            // Ignore unknown channel paths in mixed filter lists.
             if (!is_array($channel)) {
                 continue;
             }
@@ -1393,7 +1393,7 @@ class PageRead
      * @param array<string, mixed>      $row          Hydrated page row.
      * @param array<string, mixed>|null $channel      Pre-resolved channel row, or null to auto-resolve.
      * @param array<int, array<string, mixed>>|null $channelsById Optional pre-fetched channel map.
-     * @return array<string, mixed> Page row with channel context fields added.
+     * @return array<string, mixed> Page row with channel context fields and a full channel_path added.
      */
     private function withChannelContext(array $row, ?array $channel = null, ?array $channelsById = null): array
     {
@@ -1408,7 +1408,13 @@ class PageRead
             }
         }
 
-        return ChannelRead::applyPageChannelContext($row, $resolvedChannel);
+        $row = ChannelRead::applyPageChannelContext($row, $resolvedChannel);
+        // Listing consumers need the complete hierarchy to build unambiguous nested URLs.
+        $row['channel_path'] = $resolvedChannel !== null
+            ? $this->channelRepo->pathForChannel((int) ($resolvedChannel['id'] ?? 0))
+            : '';
+
+        return $row;
     }
 
     /**

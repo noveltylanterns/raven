@@ -314,7 +314,8 @@ final class PageEditController
             'editorDefault' => $this->editor->normalizeBodyTextEditorOption(
                 (string) $this->config->get('content.editor', 'tinymce')
             ),
-            'routeModeDefault' => ChannelPolicy::globalPageRouteMode($this->config),
+            'routeModeDefault' => ChannelPolicy::globalPageRouteSelector($this->config),
+            'routeTrailingSlash' => ChannelPolicy::siteRoutingUsesTrailingSlash($this->config),
             'routeSeparatorDefault' => ChannelPolicy::normalizeGlobalSeparator(
                 (string) $this->config->get('content.separator', '-')
             ),

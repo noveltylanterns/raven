@@ -193,7 +193,7 @@ final class PageController
                 $lookupSlug = (string) ($lookupTarget['slug'] ?? '');
             }
         } else {
-            $channelRouteMode = ChannelPolicy::globalPageRouteMode($this->context->config());
+            $channelRouteMode = ChannelPolicy::globalPageRouteSelector($this->context->config());
             $lookupTarget = PagePolicy::resolveLookupTarget($this->context->input(), 
                 $requestedSlug,
                 $channelRouteMode,
@@ -251,15 +251,29 @@ final class PageController
             $canonicalChannelPath = $canonicalChannelPath !== ''
                 ? $canonicalChannelPath
                 : trim($channelSlug, '/');
+            $canonicalPath = PagePolicy::canonicalPath(
+                '/' . $this->encodePath($canonicalChannelPath . '/' . $canonicalSegment),
+                ChannelPolicy::siteRoutingUsesTrailingSlash($this->context->config())
+            );
             // Redirect flat child paths, suffix aliases, and non-canonical page segments together.
             if (
                 ($canonicalSegment !== '' && strcasecmp($canonicalSegment, $requestedRouteSegment) !== 0)
                 || strcasecmp($canonicalChannelPath, trim($channelSlug, '/')) !== 0
+                || $this->request->hasTrailingSlash() !== ChannelPolicy::siteRoutingUsesTrailingSlash($this->context->config())
             ) {
-                Redirect::redirect('/' . $this->encodePath($canonicalChannelPath . '/' . $canonicalSegment), 301);
+                Redirect::redirect($canonicalPath, 301);
             }
-        } elseif ($canonicalSegment !== '' && strcasecmp($canonicalSegment, $requestedRouteSegment) !== 0) {
-            Redirect::redirect('/' . rawurlencode($canonicalSegment), 301);
+        } else {
+            $canonicalPath = PagePolicy::canonicalPath(
+                '/' . rawurlencode($canonicalSegment),
+                ChannelPolicy::siteRoutingUsesTrailingSlash($this->context->config())
+            );
+            if (
+                ($canonicalSegment !== '' && strcasecmp($canonicalSegment, $requestedRouteSegment) !== 0)
+                || $this->request->hasTrailingSlash() !== ChannelPolicy::siteRoutingUsesTrailingSlash($this->context->config())
+            ) {
+                Redirect::redirect($canonicalPath, 301);
+            }
         }
 
         $page = $this->renderPageContentBlocks($page);
@@ -490,6 +504,12 @@ final class PageController
         if (!RedirectParser::isAllowedHttpOrRootPath($targetUrl)) {
             return false;
         }
+
+        // Redirect targets should converge directly on the configured public slash policy.
+        $targetUrl = PagePolicy::canonicalRedirectTarget(
+            $targetUrl,
+            ChannelPolicy::siteRoutingUsesTrailingSlash($this->context->config())
+        );
 
         // Default behavior remains temporary until route status configuration is introduced.
         Redirect::redirect($targetUrl, 302);

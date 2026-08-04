@@ -24,6 +24,7 @@ return array (
     'theme' => 'raven',
     'timezone' => '',
     'scheduler' => 'always',
+    'routing' => 'no_trailing_slash',
   ),
   'meta' =>
   array (
@@ -112,7 +113,7 @@ return array (
   'content' =>
   array (
     'editor' => 'tinymce',
-    'mode' => 'slug',
+    'selector' => 'slug',
     'separator' => '-',
   ),
   'feed' =>

@@ -420,7 +420,7 @@ class ChannelRead
     /**
      * Returns channel options for routing diagnostics, including the stock root channel.
      *
-     * @return array<int, array{id: int, name: string, slug: string, parent_id: int, feed_enabled: bool, category_sets: array<int, int|string>, tag_sets: array<int, int|string>, editor_override: string, theme_override: string, route_mode: string, route_separator: string}>
+     * @return array<int, array{id: int, name: string, slug: string, path: string, parent_id: int, feed_enabled: bool, category_sets: array<int, int|string>, tag_sets: array<int, int|string>, editor_override: string, theme_override: string, route_mode: string, route_separator: string}>
      */
     public function listRoutingOptions(): array
     {
@@ -431,6 +431,9 @@ class ChannelRead
                 'id' => (int) ($channel['id'] ?? 0),
                 'name' => (string) ($channel['name'] ?? ''),
                 'slug' => (string) ($channel['slug'] ?? ''),
+                'path' => (int) ($channel['id'] ?? 0) > 0
+                    ? $this->pathForChannel((int) ($channel['id'] ?? 0))
+                    : ChannelShared::ROOT_CHANNEL_SLUG,
                 'parent_id' => ChannelShared::normalizeParentId($channel['parent_id'] ?? 0),
                 'feed_enabled' => (bool) ($channel['feed_enabled'] ?? false),
                 'category_sets' => SetParser::normalizeSelection($channel['category_sets'] ?? [], false),

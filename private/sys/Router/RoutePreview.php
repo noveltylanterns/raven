@@ -51,6 +51,7 @@ final class RoutePreview
      * @param string $channelPageRouteMode Configured route mode for channel pages.
      * @param string $channelPageUrlSeparator Configured separator for channel page routes.
      * @param string $contentSeparator Fallback content separator when route policy needs one.
+     * @param bool $trailingSlash Whether site routing requires trailing slashes.
      * @return string Root-relative preview path for the current routing settings.
      */
     public function routingPublicPathForPage(
@@ -60,7 +61,8 @@ final class RoutePreview
         string $publishedAt,
         string $channelPageRouteMode,
         string $channelPageUrlSeparator,
-        string $contentSeparator = '-'
+        string $contentSeparator = '-',
+        bool $trailingSlash = false
     ): string {
         $routeMode = ChannelPolicy::normalizeRouteMode($channelPageRouteMode);
         $normalizedSlug = $this->input->slug($pageSlug);
@@ -86,10 +88,16 @@ final class RoutePreview
 
         // Root-scope pages omit the channel segment from their preview path.
         if ($normalizedChannel === null || $normalizedChannel === '') {
-            return '/' . $routeSegment;
+            return PagePolicy::canonicalPath(
+                '/' . $routeSegment,
+                $trailingSlash
+            );
         }
 
-        return '/' . $normalizedChannel . '/' . $routeSegment;
+        return PagePolicy::canonicalPath(
+            '/' . $normalizedChannel . '/' . $routeSegment,
+            $trailingSlash
+        );
     }
 
     /**
@@ -123,20 +131,23 @@ final class RoutePreview
      * Picks the best landing-page slug per channel from one page row set.
      *
      * @param array<int, array<string, mixed>> $pagesForRouting Full page row set to scan for landing candidates.
-     * @return array<string, string> Map of channel slug to chosen landing-page slug.
+     * @return array<string, string> Map of full channel path to chosen landing-page slug.
      */
     public function channelLandingMapFromPages(array $pagesForRouting): array
     {
         /** @var array<string, array{slug: string, priority: int, published_ts: int}> $best */
         $best = [];
 
-        // Scan candidate pages and keep best landing slug per channel.
+        // Scan candidate pages and keep the best landing slug per full channel path.
         foreach ($pagesForRouting as $page) {
             $channelSlug = trim((string) ($page['channel_slug'] ?? ''));
             // Landing maps apply only to channel-scoped pages.
             if ($channelSlug === '') {
                 continue;
             }
+
+            $channelKey = trim((string) ($page['channel_path'] ?? ''), '/');
+            $channelKey = $channelKey !== '' ? $channelKey : $channelSlug;
 
             // Unpublished pages are never valid channel landing targets.
             if (($page['status'] ?? '') !== 'published') {
@@ -167,13 +178,13 @@ final class RoutePreview
                 'published_ts' => $publishedTs,
             ];
 
-            // First candidate for a channel becomes the baseline.
-            if (!isset($best[$channelSlug])) {
-                $best[$channelSlug] = $candidate;
+            // First candidate for a channel path becomes the baseline.
+            if (!isset($best[$channelKey])) {
+                $best[$channelKey] = $candidate;
                 continue;
             }
 
-            $current = $best[$channelSlug];
+            $current = $best[$channelKey];
             // Prefer higher-priority slug, then newer publish timestamp as tie-breaker.
             if (
                 $candidate['priority'] < $current['priority']
@@ -182,14 +193,14 @@ final class RoutePreview
                     && $candidate['published_ts'] > $current['published_ts']
                 )
             ) {
-                $best[$channelSlug] = $candidate;
+                $best[$channelKey] = $candidate;
             }
         }
 
         $result = [];
-        // Flatten the candidate structs to channel=>slug output map.
-        foreach ($best as $channelSlug => $candidate) {
-            $result[$channelSlug] = (string) ($candidate['slug'] ?? '');
+        // Flatten the candidate structs to full-channel-path=>slug output map.
+        foreach ($best as $channelKey => $candidate) {
+            $result[$channelKey] = (string) ($candidate['slug'] ?? '');
         }
 
         return $result;

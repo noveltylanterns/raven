@@ -222,13 +222,13 @@ final class RoutingController
     }
 
     /**
-     * Returns the configured global page route mode.
+     * Returns the configured global page route selector.
      *
-     * @return string 'slug' or 'id'; reflects the `content.mode` config key.
+     * @return string Global route selector; slash policy is resolved separately from site config.
      */
-    private function globalPageRouteMode(): string
+    private function globalPageRouteSelector(): string
     {
-        return ChannelPolicy::globalPageRouteMode($this->config);
+        return ChannelPolicy::globalPageRouteSelector($this->config);
     }
 
     /**
@@ -322,6 +322,7 @@ final class RoutingController
 
         return $this->routeProfiler()->buildRows([
             'reserved_prefixes' => $this->reservedPublicPrefixes(),
+            'site_routing_trailing_slash' => ChannelPolicy::siteRoutingUsesTrailingSlash($this->config),
             'channel_index_template_exists' => $this->channelIndexTemplateExistsForRouting(),
             'feed_enabled' => $this->feedParser()->feedEnabled(),
             'rss_feed_route' => $this->feedParser()->rssRoute(),
@@ -450,10 +451,11 @@ final class RoutingController
             $channelSlug,
             $publishedAt,
             $channelSlug === ''
-                ? $this->globalPageRouteMode()
+                ? $this->globalPageRouteSelector()
                 : $this->effectiveChannelRouteMode($routeModeEffective),
             $routeSeparatorEffective,
-            (string) $this->config->get('content.separator', '-')
+            (string) $this->config->get('content.separator', '-'),
+            ChannelPolicy::siteRoutingUsesTrailingSlash($this->config)
         );
     }
 

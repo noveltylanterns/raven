@@ -35,8 +35,8 @@ final class CategoryRouter
             'category_route_enabled',
             'category_prefix',
             $deps->routeConfig,
-            fn(string $slug) => $deps->publicCategoryController()->category($slug, 1),
-            fn(string $slug, int $page) => $deps->publicCategoryController()->category($slug, $page),
+            fn(string $slug) => ($deps->publicCategoryController)()->category($slug, 1),
+            fn(string $slug, int $page) => ($deps->publicCategoryController)()->category($slug, $page),
             $deps->publicRequestContext,
             $deps->input
         );

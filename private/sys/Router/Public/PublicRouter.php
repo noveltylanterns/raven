@@ -42,8 +42,10 @@ final class PublicRouter
         AuthRouter::registerWithDeps($this->router, $deps);
         PublicRoutes::register($this->router, $deps->rvn, $deps->publicRequestContext, $deps->input);
         CategoryRouter::registerWithDeps($this->router, $deps);
-        ChannelRouter::registerWithDeps($this->router, $deps);
+        // Feed roots must precede the generic one-segment channel route, whose
+        // reserved-prefix rejection would otherwise consume `/rss` and `/atom`.
         FeedRouter::registerWithDeps($this->router, $deps);
+        ChannelRouter::registerWithDeps($this->router, $deps);
         ProfileRouter::registerWithDeps($this->router, $deps);
         GroupRouter::registerWithDeps($this->router, $deps);
         TagRouter::registerWithDeps($this->router, $deps);

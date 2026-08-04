@@ -40,6 +40,8 @@ Notable behavior:
 - Active tab is preserved across saves.
 - Driver-specific database fields are shown by selected `database.driver`.
 - Captcha provider fields are shown by selected `captcha.provider`.
+- The Content tab's `content.selector` setting accepts `slug` or `id` and controls the default content URL selector.
+- The Basic tab's `site.routing` setting accepts `no_trailing_slash` or `trailing_slash` and applies the selected canonical slash policy to public site links and routes; the non-canonical form receives a built-in 301 redirect.
 - Save operations replace the full config snapshot after normalization/validation.
 
 ## 4) Save Workflow

@@ -182,7 +182,7 @@ Storage detail:
 - Every channel segment must resolve as a direct child of the preceding segment; a child slug is not treated as a root channel or resolved globally.
 - When global feeds are enabled and a channel has `feed_enabled = true`, that channel also exposes `/{feed.rss}/{channel_slug}` and/or `/{feed.atom}/{channel_slug}`.
 - The stock `<root>` channel is not routable; root-scope pages/redirects stay at `/...` instead of `/root/...`.
-- When a channel is set to `inherit`, it uses the global `content.mode` default (`slug` or `id`).
+- When a channel is set to `inherit`, it uses the global `content.selector` default (`slug` or `id`). Canonical trailing-slash behavior is controlled independently by `site.routing`.
 - Supported channel page-route segments:
 - `/{channel_path}/{page-slug}`
 - `/{channel_path}/{YYYY-MM-DD}-{page-slug}`

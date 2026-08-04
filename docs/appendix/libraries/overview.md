@@ -16,5 +16,5 @@ Library references extracted from `private/lib/*` public/protected methods and g
 - `parser` (49 symbols)
 - `scheduler` (9 symbols)
 - `security` (63 symbols)
-- `transport` (13 symbols)
+- `transport` (14 symbols)
 - `view` (165 symbols)

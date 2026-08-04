@@ -31,6 +31,18 @@ final class Request
     }
 
     /**
+     * Returns whether the current non-root request path ends with a trailing slash.
+     *
+     * @param array<string, mixed>|null $server Optional server map; defaults to `$_SERVER`.
+     * @return bool True when the requested path has a meaningful trailing slash.
+     */
+    public static function hasTrailingSlash(?array $server = null): bool
+    {
+        $path = self::path($server);
+        return $path !== '/' && str_ends_with($path, '/');
+    }
+
+    /**
      * Builds the current absolute request URL from server state plus config fallbacks.
      *
      * @param string $configuredDomain Site domain fallback from config.

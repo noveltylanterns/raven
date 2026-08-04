@@ -213,6 +213,46 @@ final class PagePolicy
     }
 
     /**
+     * Applies the configured trailing-slash policy to one root-relative public path.
+     *
+     * @param string $path Root-relative path before slash-policy normalization.
+     * @param bool $trailingSlash Whether the canonical path must end with `/`.
+     * @return string Canonical root-relative path, preserving `/` as the site root.
+     */
+    public static function canonicalPath(string $path, bool $trailingSlash): string
+    {
+        $normalized = '/' . trim($path, '/');
+        if ($normalized === '//') {
+            return '/';
+        }
+
+        return $trailingSlash ? $normalized . '/' : $normalized;
+    }
+
+    /**
+     * Applies site slash policy to a safe root-relative redirect target.
+     *
+     * External targets remain unchanged, while query strings and fragments on
+     * root-relative targets are preserved after the path is canonicalized.
+     *
+     * @param string $target Redirect target URL or root-relative path.
+     * @param bool $trailingSlash Whether the canonical path must end with `/`.
+     * @return string Redirect target with the site slash policy applied where possible.
+     */
+    public static function canonicalRedirectTarget(string $target, bool $trailingSlash): string
+    {
+        if (!str_starts_with($target, '/') || str_starts_with($target, '//')) {
+            return $target;
+        }
+
+        $suffixOffset = strcspn($target, '?#');
+        $path = substr($target, 0, $suffixOffset);
+        $suffix = substr($target, $suffixOffset);
+
+        return self::canonicalPath($path, $trailingSlash) . $suffix;
+    }
+
+    /**
      * Extracts the date prefix component for a page route segment given a timestamp and route mode.
      *
      * @param string $createdAt Page created-at timestamp string; may be empty (falls back to current time).

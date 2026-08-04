@@ -27,7 +27,7 @@ Wrapper layout defaults to `wrapper` and resolves through the same chain.
 | `auth/login` | `GET /login` | `AuthController::login()` |
 | `auth/login_2fa` | `GET /login/2fa` | `AuthController::loginTwoFactor()` |
 | `auth/register` | `GET /register` | `AuthController::register()` |
-| `category/index` | `GET /{category_prefix}/{slug}`<br>`GET /{category_prefix}/{slug}/{page}` | `CategoryController::category()` |
+| `category/index` | `(unmapped)` | `CategoryController::category()` |
 | `channel/index` | `(unmapped)` | `ChannelController::channel()` |
 | `feeds/atom` | `(unmapped)` | `FeedController::renderFeed()`<br>`FeedController::renderTaxonomyFeed()` |
 | `feeds/rss` | `(unmapped)` | `FeedController::renderFeed()`<br>`FeedController::renderTaxonomyFeed()` |
@@ -42,5 +42,5 @@ Wrapper layout defaults to `wrapper` and resolves through the same chain.
 | `status/404` | `(unmapped)` | `(none)` |
 | `status/denied` | `(unmapped)` | `(none)` |
 | `status/disabled` | `(unmapped)` | `(none)` |
-| `tag/index` | `GET /{tag_prefix}/{slug}`<br>`GET /{tag_prefix}/{slug}/{page}` | `TagController::tag()` |
+| `tag/index` | `(unmapped)` | `TagController::tag()` |
 | `wrapper` | `(unmapped)` | `(none)` |

@@ -36,6 +36,7 @@ declare(strict_types=1);
 /** @var int $imageMaxFilesPerUpload */
 /** @var string $editorDefault */
 /** @var string $routeModeDefault */
+/** @var bool $routeTrailingSlash */
 /** @var string $routeSeparatorDefault */
 /** @var array<string, array{label?: string, editor?: string}> $bodyBlockTypeDefinitions */
 /** @var array<int, array{extension: string, label: string, shortcode: string}> $shortcodeInsertItems */
@@ -78,6 +79,7 @@ $editorDefault = (string) ($editorDefault ?? 'tinymce');
 $routeModeDefault = in_array($routeModeDefault ?? 'slug', ['slug', 'id'], true)
     ? (string) $routeModeDefault
     : 'slug';
+$routeTrailingSlash = (bool) ($routeTrailingSlash ?? false);
 $defaultCategorySetSelection = is_array($defaultCategorySetSelection ?? null) ? $defaultCategorySetSelection : [1];
 $defaultTagSetSelection = is_array($defaultTagSetSelection ?? null) ? $defaultTagSetSelection : [1];
 $categoryEnabled = (bool) ($categoryEnabled ?? true);
@@ -223,7 +225,10 @@ if ($routeSegment !== '') {
 }
 $publishedPermalink = null;
 if ($selectedStatus === 'published' && $permalinkBase !== '' && $routeSegment !== '') {
-    $publishedPermalink = $permalinkBase . '/' . implode('/', $permalinkPathParts);
+    $publishedPermalink = $permalinkBase . \Raven\Core\Router\PagePolicy::canonicalPath(
+        '/' . implode('/', $permalinkPathParts),
+        $routeTrailingSlash
+    );
 }
 
 // Gallery items for the TinyMCE gallery button are built by EditorMCE::galleryItems()

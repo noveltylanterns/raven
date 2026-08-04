@@ -13,6 +13,8 @@ use Raven\Core\Debug\OutputProfilerPolicy;
 use Raven\Core\Debug\OutputProfiler;
 use Raven\Core\Runtime\Public\RuntimeContract as PublicRuntimeContract;
 use Raven\Core\Runtime\RuntimeAssert;
+use Raven\Core\Router\ChannelPolicy;
+use Raven\Core\Router\PagePolicy;
 use Raven\Core\Router\RouteRequest;
 use Raven\Core\Router\Public\PublicRouter;
 use Raven\Lib\Transport\Request as HttpRequest;
@@ -205,6 +207,21 @@ $bypassAvailability = in_array($path, $bypassAvailabilityPaths, true);
 
 if (!$bypassAvailability && !$publicRequestContext()->enforceSiteAvailability()) {
     exit;
+}
+
+// Canonicalize every public GET route from one site-wide slash policy before family dispatch.
+if ($method === 'GET') {
+    $canonicalPublicPath = PagePolicy::canonicalPath(
+        $path,
+        ChannelPolicy::siteRoutingUsesTrailingSlash($rvn['config'])
+    );
+    // Preserve query parameters while redirecting only the path-shape difference.
+    if ($canonicalPublicPath !== $path) {
+        $query = (string) parse_url((string) ($_SERVER['REQUEST_URI'] ?? ''), PHP_URL_QUERY);
+        $query = str_replace(["\r", "\n", "\0"], '', $query);
+        header('Location: ' . $canonicalPublicPath . ($query !== '' ? '?' . $query : ''), true, 301);
+        exit;
+    }
 }
 
 $dispatchResult = $router->dispatch(new RouteRequest($method, $path));

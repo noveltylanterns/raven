@@ -35,8 +35,8 @@ final class TagRouter
             'tag_route_enabled',
             'tag_prefix',
             $deps->routeConfig,
-            fn(string $slug) => $deps->publicTagController()->tag($slug, 1),
-            fn(string $slug, int $page) => $deps->publicTagController()->tag($slug, $page),
+            fn(string $slug) => ($deps->publicTagController)()->tag($slug, 1),
+            fn(string $slug, int $page) => ($deps->publicTagController)()->tag($slug, $page),
             $deps->publicRequestContext,
             $deps->input
         );

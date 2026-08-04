@@ -202,6 +202,7 @@ if ($basicSiteConfigFields !== []) {
         'site.visibility' => 40,
         'site.timezone' => 50,
         'site.scheduler' => 60,
+        'site.routing' => 70,
     ];
 
     usort(
@@ -603,7 +604,7 @@ $renderConfigField = static function (array $field) use (
     $isCaptchaProviderField = $path === 'captcha.provider';
     $isMailAgentField = $path === 'mail.agent';
     $isEditorDefaultField = $path === 'content.editor';
-    $isRouteModeDefaultField = $path === 'content.mode';
+    $isRouteSelectorDefaultField = $path === 'content.selector';
     $isRouteSeparatorDefaultField = $path === 'content.separator';
     $isFeedsChannelField = $path === 'feed.channels';
     $isCategoryDefaultSetField = $path === 'category.set';
@@ -612,6 +613,7 @@ $renderConfigField = static function (array $field) use (
     $isSiteProtocolField = $path === 'site.protocol';
     $isSiteTimezoneField = $path === 'site.timezone';
     $isSiteSchedulerField = $path === 'site.scheduler';
+    $isSiteRoutingField = $path === 'site.routing';
     $isPanelDefaultThemeField = $path === 'panel.theme';
     $isPublicProfilesModeField = $path === 'user.visibility';
     $isShowGroupsField = $path === 'group.visibility';
@@ -669,7 +671,7 @@ $renderConfigField = static function (array $field) use (
             $inputValue = ltrim($inputValue, '/');
         }
     }
-    $isRequired = in_array($path, ['site.domain', 'site.protocol', 'panel.path', 'site.visibility', 'database.driver', 'captcha.provider', 'mail.agent', 'content.editor', 'content.mode', 'content.separator', 'panel.theme', 'session.cookie.name', 'user.visibility', 'group.visibility', 'user.auth.method', 'user.auth.registration', 'user.selector', 'user.string', 'category.selector', 'tag.selector', 'group.selector'], true);
+    $isRequired = in_array($path, ['site.domain', 'site.protocol', 'panel.path', 'site.visibility', 'site.routing', 'database.driver', 'captcha.provider', 'mail.agent', 'content.editor', 'content.selector', 'content.separator', 'panel.theme', 'session.cookie.name', 'user.visibility', 'group.visibility', 'user.auth.method', 'user.auth.registration', 'user.selector', 'user.string', 'category.selector', 'tag.selector', 'group.selector'], true);
     $disableUriNote = match ($path) {
         'feed.rss' => ' (leave blank to disable RSS feeds)',
         'feed.atom' => ' (leave blank to disable Atom feeds)',
@@ -753,7 +755,7 @@ $renderConfigField = static function (array $field) use (
                 <option value="autobr"<?= (string) $field['value'] === 'autobr' ? ' selected' : '' ?>>plaintext</option>
                 <option value="markdown"<?= (string) $field['value'] === 'markdown' ? ' selected' : '' ?>>markdown</option>
             </select>
-        <?php elseif ($isRouteModeDefaultField): ?>
+        <?php elseif ($isRouteSelectorDefaultField): ?>
             <select
                 class="form-select font-monospace"
                 id="<?= e($inputId) ?>"
@@ -762,6 +764,16 @@ $renderConfigField = static function (array $field) use (
             >
                 <option value="slug"<?= (string) $field['value'] === 'slug' ? ' selected' : '' ?>>/{slug}</option>
                 <option value="id"<?= (string) $field['value'] === 'id' ? ' selected' : '' ?>>/{id}</option>
+            </select>
+        <?php elseif ($isSiteRoutingField): ?>
+            <select
+                class="form-select font-monospace"
+                id="<?= e($inputId) ?>"
+                name="<?= e($fieldName) ?>"
+                required
+            >
+                <option value="no_trailing_slash"<?= (string) $field['value'] === 'no_trailing_slash' ? ' selected' : '' ?>>No Trailing Slash</option>
+                <option value="trailing_slash"<?= (string) $field['value'] === 'trailing_slash' ? ' selected' : '' ?>>Trailing Slash</option>
             </select>
         <?php elseif ($isRouteSeparatorDefaultField): ?>
             <!-- Route separator controls generated root and channel page route segments. -->
@@ -792,26 +804,29 @@ $renderConfigField = static function (array $field) use (
                 </div>
                 <?php foreach ($channelOptions as $channelOption): ?>
                     <?php $channelSlug = strtolower(trim((string) ($channelOption['slug'] ?? ''))); ?>
-                    <?php if ($channelSlug === ''): ?>
+                    <?php $channelPath = strtolower(trim((string) ($channelOption['path'] ?? $channelSlug), '/')); ?>
+                    <?php if ($channelSlug === '' || $channelPath === ''): ?>
                         <?php continue; ?>
                     <?php endif; ?>
                     <?php $channelName = trim((string) ($channelOption['name'] ?? '')); ?>
                     <?php if ($channelSlug === 'root'): ?>
                         <?php $channelName = 'Root'; ?>
                     <?php endif; ?>
-                    <?php $channelChecked = $allChannelsSelected || in_array($channelSlug, $selectedFeedChannels, true); ?>
+                    <?php $channelChecked = $allChannelsSelected
+                        || in_array($channelPath, $selectedFeedChannels, true)
+                        || in_array($channelSlug, $selectedFeedChannels, true); ?>
                     <div class="form-check">
                         <input
                             type="checkbox"
                             class="form-check-input"
-                            id="<?= e($inputId) ?>_<?= e($channelSlug) ?>"
+                        id="<?= e($inputId) ?>_<?= e(str_replace('/', '_', $channelPath)) ?>"
                             name="<?= e($feedChannelFieldName) ?>"
-                            value="<?= e($channelSlug) ?>"
+                        value="<?= e($channelPath) ?>"
                             data-rvn-feed-channel-item="1"
                             <?= $channelChecked ? 'checked' : '' ?>
                         >
                         <label class="form-check-label" for="<?= e($inputId) ?>_<?= e($channelSlug) ?>">
-                            <?= e($channelName !== '' ? $channelName : $channelSlug) ?> (<?= e($channelSlug) ?>)
+                            <?= e($channelName !== '' ? $channelName : $channelSlug) ?> (<?= e($channelPath) ?>)
                         </label>
                     </div>
                 <?php endforeach; ?>

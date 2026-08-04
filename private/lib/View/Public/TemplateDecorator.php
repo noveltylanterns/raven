@@ -12,6 +12,8 @@ declare(strict_types=1);
 namespace Raven\Lib\View\Public;
 
 use Raven\Core\Config;
+use Raven\Core\Router\ChannelPolicy;
+use Raven\Core\Router\PagePolicy;
 use Raven\Lib\Media\AvatarConfig;
 use Raven\Lib\Security\InputSanitizer;
 use Raven\Lib\View\Pagination;
@@ -58,18 +60,33 @@ final class TemplateDecorator
             // Derive fallback URL path from slug/channel fields when explicit URL is absent.
             if ($path === '') {
                 $slug = $this->input->slug((string) ($page['slug'] ?? ''));
+                $channelPath = trim((string) ($page['channel_path'] ?? ''), '/');
                 $channelSlug = $this->input->slug((string) ($page['channel_slug'] ?? ''));
                 // Root pages with missing slugs resolve to site root.
                 if ($slug === null || $slug === '') {
                     $path = '/';
                 } elseif ($channelSlug === null || $channelSlug === '') {
                     $path = '/' . rawurlencode($slug);
+                } elseif ($channelPath !== '') {
+                    $segments = array_values(array_filter(
+                        explode('/', $channelPath),
+                        static fn (string $segment): bool => $segment !== ''
+                    ));
+                    // Encode hierarchy segments separately so fallback links preserve parent identity.
+                    $path = '/' . implode('/', array_map(
+                        static fn (string $segment): string => rawurlencode($segment),
+                        $segments
+                    )) . '/' . rawurlencode($slug);
                 } else {
                     $path = '/' . rawurlencode($channelSlug) . '/' . rawurlencode($slug);
                 }
             }
 
-            $pages[$index]['url'] = $path;
+            // Fallback URLs must follow the same site-wide slash policy as controller-built links.
+            $pages[$index]['url'] = PagePolicy::canonicalPath(
+                $path,
+                ChannelPolicy::siteRoutingUsesTrailingSlash($this->config)
+            );
         }
 
         return $pages;
@@ -508,11 +525,15 @@ final class TemplateDecorator
         }
 
         $path = trim((string) ($parts['path'] ?? ''));
-        // Root path canonicalizes to empty suffix while deeper paths trim trailing slash.
+        $trailingSlash = ChannelPolicy::siteRoutingUsesTrailingSlash($this->config);
+        // Root path canonicalizes to empty suffix while deeper paths follow site routing mode.
         if ($path === '' || $path === '/') {
             $path = '';
         } else {
             $path = rtrim($path, '/');
+            if ($trailingSlash) {
+                $path .= '/';
+            }
         }
 
         $normalized = $scheme . $authority . $path;

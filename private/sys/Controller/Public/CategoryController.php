@@ -114,7 +114,10 @@ final class CategoryController
             'current' => $pageNumber,
             'total_pages' => $totalPages,
             'total_items' => $total,
-            'base_path' => '/' . $categoryPrefix . '/' . rawurlencode($categorySlug),
+            'base_path' => PagePolicy::canonicalPath(
+                '/' . $categoryPrefix . '/' . rawurlencode($categorySlug),
+                ChannelPolicy::siteRoutingUsesTrailingSlash($this->context->config())
+            ),
         ]);
         $categoryTemplate = $this->themeTemplate()->resolveCategoryTemplateNameForThemeChain(
             $categorySlug,
@@ -155,34 +158,50 @@ final class CategoryController
                 continue;
             }
 
-            $channelSlug = $this->context->input()->slug((string) ($page['channel_slug'] ?? ''));
-            // Root-scope page URL path when page has no channel slug.
-            if ($channelSlug === null || $channelSlug === '') {
+            $channelPath = trim((string) ($page['channel_path'] ?? ''), '/');
+            // Root-scope page URL path when page has no parent-aware channel path.
+            if ($channelPath === '') {
+                $rootRouteMode = ChannelPolicy::globalPageRouteSelector($this->context->config());
                 $rootSegment = PagePolicy::buildRouteSegment($this->context->input(), 
                     $slug,
                     $pageId,
                     (string) ($page['created'] ?? ''),
-                    ChannelPolicy::globalPageRouteMode($this->context->config()),
+                    $rootRouteMode,
                     'inherit',
                     (string) $this->context->config()->get('content.separator', '-')
                 );
-                $pages[$index]['url'] = '/' . rawurlencode($rootSegment !== '' ? $rootSegment : $slug);
+                $pages[$index]['url'] = PagePolicy::canonicalPath(
+                    '/' . rawurlencode($rootSegment !== '' ? $rootSegment : $slug),
+                    ChannelPolicy::siteRoutingUsesTrailingSlash($this->context->config())
+                );
                 continue;
             }
 
-            $pages[$index]['url'] = '/'
-                . rawurlencode($channelSlug)
-                . '/'
-                . rawurlencode(
-                    PagePolicy::buildRouteSegment($this->context->input(), 
-                        $slug,
-                        $pageId,
-                        (string) ($page['created'] ?? ''),
-                        ChannelPolicy::effectiveChannelRouteMode($this->context->config(), (string) ($page['route_mode_effective'] ?? 'inherit')),
-                        (string) ($page['route_separator_effective'] ?? 'inherit'),
-                        (string) $this->context->config()->get('content.separator', '-')
-                    )
-                );
+            $channelRouteMode = ChannelPolicy::effectiveChannelRouteMode(
+                $this->context->config(),
+                (string) ($page['route_mode_effective'] ?? 'inherit')
+            );
+            $channelRouteSegment = PagePolicy::buildRouteSegment($this->context->input(),
+                $slug,
+                $pageId,
+                (string) ($page['created'] ?? ''),
+                $channelRouteMode,
+                (string) ($page['route_separator_effective'] ?? 'inherit'),
+                (string) $this->context->config()->get('content.separator', '-')
+            );
+            $channelSegments = array_values(array_filter(
+                explode('/', $channelPath),
+                static fn (string $segment): bool => $segment !== ''
+            ));
+            // Encode each hierarchy segment independently so parent/child paths remain routable.
+            $encodedChannelPath = implode('/', array_map(
+                static fn (string $segment): string => rawurlencode($segment),
+                $channelSegments
+            ));
+            $pages[$index]['url'] = PagePolicy::canonicalPath(
+                '/' . $encodedChannelPath . '/' . rawurlencode($channelRouteSegment),
+                ChannelPolicy::siteRoutingUsesTrailingSlash($this->context->config())
+            );
         }
 
         return $pages;

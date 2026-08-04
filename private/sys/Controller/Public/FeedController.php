@@ -62,7 +62,7 @@ final class FeedController
     /**
      * Renders RSS feed route `/{feed.rss}` when feeds are enabled.
      *
-     * @param string|null $channelSlug Optional channel slug for channel-scoped feeds.
+     * @param string|null $channelSlug Optional parent-aware channel path for channel-scoped feeds.
      * @return void
      */
     public function rssFeed(?string $channelSlug = null): void
@@ -155,7 +155,7 @@ final class FeedController
         $scopeSlug = '';
         $pages = [];
 
-        // Channel-scoped feed path: validate channel slug and channel feed availability.
+        // Channel-scoped feed path: validate the parent-aware channel path and feed availability.
         if ($channelSlug !== null) {
             $normalizedChannelSlug = strtolower(trim($channelSlug));
             // Empty channel slug cannot resolve to a valid channel feed.
@@ -164,7 +164,7 @@ final class FeedController
                 return;
             }
 
-            $channel = $this->channelRead->findBySlug($normalizedChannelSlug);
+            $channel = $this->channelRead->findByPath($normalizedChannelSlug);
             // Channel must exist and be feed-enabled for channel-scoped feed.
             if (!is_array($channel) || !$this->channelFeedEnabled($channel)) {
                 $this->context->notFound();
@@ -473,7 +473,7 @@ final class FeedController
             return 'Root';
         }
 
-        $channel = $this->channelRead->findBySlug($normalized);
+        $channel = $this->channelRead->findByPath($normalized);
         // Unknown channels fall back to normalized slug label.
         if (!is_array($channel)) {
             return $normalized;
@@ -525,7 +525,10 @@ final class FeedController
                 continue;
             }
 
-            $segments[] = $trimmed;
+            // Preserve hierarchy boundaries when a channel path is passed as one suffix.
+            foreach (array_filter(explode('/', $trimmed), static fn (string $part): bool => $part !== '') as $part) {
+                $segments[] = $part;
+            }
         }
 
         return implode('/', array_map(
@@ -557,34 +560,50 @@ final class FeedController
                 continue;
             }
 
-            $channelSlug = $this->context->input()->slug((string) ($page['channel_slug'] ?? ''));
-            // Root-scope URL branch for pages without channel slug.
-            if ($channelSlug === null || $channelSlug === '') {
+            $channelPath = trim((string) ($page['channel_path'] ?? ''), '/');
+            // Root-scope URL branch for pages without a parent-aware channel path.
+            if ($channelPath === '') {
+                $rootRouteMode = ChannelPolicy::globalPageRouteSelector($this->context->config());
                 $rootSegment = PagePolicy::buildRouteSegment($this->context->input(), 
                     $slug,
                     $pageId,
                     (string) ($page['created'] ?? ''),
-                    ChannelPolicy::globalPageRouteMode($this->context->config()),
+                    $rootRouteMode,
                     'inherit',
                     (string) $this->context->config()->get('content.separator', '-')
                 );
-                $pages[$index]['url'] = '/' . rawurlencode($rootSegment !== '' ? $rootSegment : $slug);
+                $pages[$index]['url'] = PagePolicy::canonicalPath(
+                    '/' . rawurlencode($rootSegment !== '' ? $rootSegment : $slug),
+                    ChannelPolicy::siteRoutingUsesTrailingSlash($this->context->config())
+                );
                 continue;
             }
 
-            $pages[$index]['url'] = '/'
-                . rawurlencode($channelSlug)
-                . '/'
-                . rawurlencode(
-                    PagePolicy::buildRouteSegment($this->context->input(), 
-                        $slug,
-                        $pageId,
-                        (string) ($page['created'] ?? ''),
-                        ChannelPolicy::effectiveChannelRouteMode($this->context->config(), (string) ($page['route_mode_effective'] ?? 'inherit')),
-                        (string) ($page['route_separator_effective'] ?? 'inherit'),
-                        (string) $this->context->config()->get('content.separator', '-')
-                    )
-                );
+            $channelRouteMode = ChannelPolicy::effectiveChannelRouteMode(
+                $this->context->config(),
+                (string) ($page['route_mode_effective'] ?? 'inherit')
+            );
+            $channelRouteSegment = PagePolicy::buildRouteSegment($this->context->input(),
+                $slug,
+                $pageId,
+                (string) ($page['created'] ?? ''),
+                $channelRouteMode,
+                (string) ($page['route_separator_effective'] ?? 'inherit'),
+                (string) $this->context->config()->get('content.separator', '-')
+            );
+            $channelSegments = array_values(array_filter(
+                explode('/', $channelPath),
+                static fn (string $segment): bool => $segment !== ''
+            ));
+            // Encode each hierarchy segment independently so parent/child paths remain routable.
+            $encodedChannelPath = implode('/', array_map(
+                static fn (string $segment): string => rawurlencode($segment),
+                $channelSegments
+            ));
+            $pages[$index]['url'] = PagePolicy::canonicalPath(
+                '/' . $encodedChannelPath . '/' . rawurlencode($channelRouteSegment),
+                ChannelPolicy::siteRoutingUsesTrailingSlash($this->context->config())
+            );
         }
 
         return $pages;

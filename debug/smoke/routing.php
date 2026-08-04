@@ -46,6 +46,7 @@ use Raven\Core\Repository\RedirectWrite;
 use Raven\Core\Debug\RouteProfiler;
 use Raven\Core\Router\ChannelPolicy;
 use Raven\Core\Router\PagePolicy;
+use Raven\Lib\Transport\Request;
 use Raven\Core\Router\RouteHandler;
 use Raven\Core\Router\RouteRequest;
 use Raven\Lib\Security\InputSanitizer;
@@ -168,6 +169,21 @@ final class RoutingSmokeRunner
         $this->assert((string) ($rootSlug['canonical_path'] ?? '') === '/hello-world', 'Global slug mode canonical root path mismatch.');
         $this->events[] = 'root_slug=ok';
 
+        ConfigWrite::persistValue($configPath, $config->all(), 'site.routing', 'trailing_slash');
+        $config = new Config($configPath);
+        $rootSlugSlash = $this->resolvePublicPath($config, $input, $channels, $pages, 'hello-world', null);
+        $this->assert((int) ($rootSlugSlash['page']['id'] ?? 0) === 7, 'Trailing-slash site routing should resolve root slug page.');
+        $this->assert((string) ($rootSlugSlash['canonical_path'] ?? '') === '/hello-world/', 'Trailing-slash site routing canonical root path mismatch.');
+        $this->assert(ChannelPolicy::siteRoutingUsesTrailingSlash($config), 'Site routing mode did not enable trailing-slash policy.');
+        $this->assert(PagePolicy::canonicalPath('/hello-world/', false) === '/hello-world', 'No-slash canonical path normalization failed.');
+        $this->assert(PagePolicy::canonicalPath('/hello-world', true) === '/hello-world/', 'Trailing-slash canonical path normalization failed.');
+        $this->assert(Request::hasTrailingSlash(['REQUEST_URI' => '/hello-world/?source=smoke']), 'Request trailing-slash detection failed.');
+        $this->assert(!Request::hasTrailingSlash(['REQUEST_URI' => '/']), 'Site root must not be treated as a trailing-slash content route.');
+        $this->events[] = 'trailing_slash_policy=ok';
+
+        ConfigWrite::persistValue($configPath, $config->all(), 'site.routing', 'no_trailing_slash');
+        $config = new Config($configPath);
+
         $rootMarkdownAlias = $this->resolvePublicPath($config, $input, $channels, $pages, 'hello-world.md', null);
         $this->assert((int) ($rootMarkdownAlias['page']['id'] ?? 0) === 7, 'Markdown-style root links should resolve after their period suffix is removed.');
         $this->assert((string) ($rootMarkdownAlias['canonical_path'] ?? '') === '/hello-world', 'Markdown-style root link canonical path mismatch.');
@@ -192,12 +208,22 @@ final class RoutingSmokeRunner
         $this->assert((string) ($nestedSlug['canonical_path'] ?? '') === '/news/alpha/nested-post', 'Nested channel page canonical path mismatch.');
         $this->events[] = 'channel_nested_slug=ok';
 
-        ConfigWrite::persistValue($configPath, $config->all(), 'content.mode', 'id');
+        ConfigWrite::persistValue($configPath, $config->all(), 'content.selector', 'id');
         $config = new Config($configPath);
         $rootId = $this->resolvePublicPath($config, $input, $channels, $pages, '7', null);
         $this->assert((int) ($rootId['page']['id'] ?? 0) === 7, 'Global id mode should resolve root page by id.');
         $this->assert((string) ($rootId['canonical_path'] ?? '') === '/7', 'Global id mode canonical root path mismatch.');
         $this->events[] = 'root_id=ok';
+
+        ConfigWrite::persistValue($configPath, $config->all(), 'site.routing', 'trailing_slash');
+        $config = new Config($configPath);
+        $rootIdSlash = $this->resolvePublicPath($config, $input, $channels, $pages, '7', null);
+        $this->assert((int) ($rootIdSlash['page']['id'] ?? 0) === 7, 'Trailing-slash site routing should resolve root page by id.');
+        $this->assert((string) ($rootIdSlash['canonical_path'] ?? '') === '/7/', 'Trailing-slash site routing canonical root id path mismatch.');
+        $this->events[] = 'root_id_trailing=ok';
+
+        ConfigWrite::persistValue($configPath, $config->all(), 'site.routing', 'no_trailing_slash');
+        $config = new Config($configPath);
 
         $inheritId = $this->resolvePublicPath($config, $input, $channels, $pages, '42', 'news');
         $this->assert((int) ($inheritId['page']['id'] ?? 0) === 42, 'Inherited channel id mode should resolve channel page by id.');
@@ -222,8 +248,11 @@ declare(strict_types=1);
 
 return [
     'content' => [
-        'route_mode' => 'slug',
+        'selector' => 'slug',
         'separator' => '-',
+    ],
+    'site' => [
+        'routing' => 'no_trailing_slash',
     ],
 ];
 PHP;
@@ -381,7 +410,7 @@ PHP;
                 $lookupSlug = (string) ($lookupTarget['slug'] ?? '');
             }
         } else {
-            $routeMode = ChannelPolicy::globalPageRouteMode($config);
+            $routeMode = ChannelPolicy::globalPageRouteSelector($config);
             $lookupTarget = PagePolicy::resolveLookupTarget(
                 $input,
                 $requestedSegment,
@@ -416,6 +445,10 @@ PHP;
         $canonicalPath = $channelSlug !== null
             ? '/' . implode('/', array_map('rawurlencode', explode('/', $canonicalChannelPath))) . '/' . rawurlencode($canonicalSegment)
             : '/' . rawurlencode($canonicalSegment);
+        $canonicalPath = PagePolicy::canonicalPath(
+            $canonicalPath,
+            ChannelPolicy::siteRoutingUsesTrailingSlash($config)
+        );
 
         return [
             'page' => $page,

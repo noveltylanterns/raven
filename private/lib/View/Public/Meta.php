@@ -12,7 +12,9 @@ declare(strict_types=1);
 namespace Raven\Lib\View\Public;
 
 use Raven\Core\Config;
+use Raven\Core\Router\ChannelPolicy;
 use Raven\Core\Router\FeedPolicy;
+use Raven\Core\Router\PagePolicy;
 use Raven\Lib\Parser\UserProfileParser;
 use Raven\Lib\Transport\Request;
 
@@ -72,7 +74,7 @@ final class Meta
             ),
         ]);
 
-        return $this->withRootFeedUrls($site);
+        return $this->withRootFeedUrls($site, $config);
     }
 
     /**
@@ -277,7 +279,7 @@ final class Meta
      * @param array<string, string> $site
      * @return array<string, string>
      */
-    private function withRootFeedUrls(array $site): array
+    private function withRootFeedUrls(array $site, Config $config): array
     {
         $siteUrl = rtrim((string) ($site['url'] ?? ''), '/');
         $site['feed_rss_url'] = '';
@@ -291,13 +293,19 @@ final class Meta
         $rssRoute = $this->feedParser->rssRoute();
         // Emit RSS URL only when feed policy exposes an RSS route.
         if ($rssRoute !== '') {
-            $site['feed_rss_url'] = $siteUrl . '/' . ltrim($rssRoute, '/');
+            $site['feed_rss_url'] = $siteUrl . PagePolicy::canonicalPath(
+                '/' . ltrim($rssRoute, '/'),
+                ChannelPolicy::siteRoutingUsesTrailingSlash($config)
+            );
         }
 
         $atomRoute = $this->feedParser->atomRoute();
         // Emit Atom URL only when feed policy exposes an Atom route.
         if ($atomRoute !== '') {
-            $site['feed_atom_url'] = $siteUrl . '/' . ltrim($atomRoute, '/');
+            $site['feed_atom_url'] = $siteUrl . PagePolicy::canonicalPath(
+                '/' . ltrim($atomRoute, '/'),
+                ChannelPolicy::siteRoutingUsesTrailingSlash($config)
+            );
         }
 
         return $site;

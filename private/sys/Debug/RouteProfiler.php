@@ -12,6 +12,7 @@ declare(strict_types=1);
 namespace Raven\Core\Debug;
 
 use Raven\Core\Repository\ChannelShared;
+use Raven\Core\Router\PagePolicy;
 use Raven\Lib\Security\InputSanitizer;
 
 /**
@@ -38,6 +39,7 @@ final class RouteProfiler
      *
      * @param array{
      *   reserved_prefixes?: array<int, string>,
+     *   site_routing_trailing_slash?: bool,
      *   channel_index_template_exists?: bool,
      *   feed_enabled?: bool,
      *   rss_feed_route?: string,
@@ -99,6 +101,7 @@ final class RouteProfiler
         $reservedPrefixes = is_array($context['reserved_prefixes'] ?? null)
             ? array_values(array_filter(array_map('strval', $context['reserved_prefixes']), static fn (string $value): bool => $value !== ''))
             : [];
+        $siteRoutingTrailingSlash = !empty($context['site_routing_trailing_slash']);
         $channelIndexTemplateExists = !empty($context['channel_index_template_exists']);
         $categoryPrefix = trim((string) ($context['category_prefix'] ?? ''));
         $tagPrefix = trim((string) ($context['tag_prefix'] ?? ''));
@@ -128,6 +131,10 @@ final class RouteProfiler
             ? $context['redirect_routing_rows']
             : [];
         $pagesForRouting = is_array($context['pages_for_routing'] ?? null) ? $context['pages_for_routing'] : [];
+        $canonicalPublicUrl = static fn (string $path): string => PagePolicy::canonicalPath(
+            $path,
+            $siteRoutingTrailingSlash
+        );
 
         $channelsById = [];
         // Index channel metadata by id so page rows can inherit effective channel routing options.
@@ -164,7 +171,7 @@ final class RouteProfiler
 
         // Add global RSS route row only when feed feature and RSS route are both configured.
         if ($feedEnabled && $rssFeedRoute !== '') {
-            $publicUrl = '/' . $rssFeedRoute;
+            $publicUrl = $canonicalPublicUrl('/' . $rssFeedRoute);
             $conflictKey = strtolower($publicUrl);
             $pathUsage[$conflictKey] = (int) ($pathUsage[$conflictKey] ?? 0) + 1;
 
@@ -185,7 +192,7 @@ final class RouteProfiler
 
         // Add global Atom route row only when feed feature and Atom route are both configured.
         if ($feedEnabled && $atomFeedRoute !== '') {
-            $publicUrl = '/' . $atomFeedRoute;
+            $publicUrl = $canonicalPublicUrl('/' . $atomFeedRoute);
             $conflictKey = strtolower($publicUrl);
             $pathUsage[$conflictKey] = (int) ($pathUsage[$conflictKey] ?? 0) + 1;
 
@@ -216,9 +223,10 @@ final class RouteProfiler
             $isRootChannel = ChannelShared::isRootChannelId($channelId)
                 || ChannelShared::isRootChannelSlug($channelSlug);
             $channelPath = $isRootChannel ? '' : $this->channelPathForId($channelId, $channelsById);
+            $landingKey = $channelPath !== '' ? $channelPath : $channelSlug;
             $landingSlug = $isRootChannel
                 ? $this->rootLandingSlug($pagesForRouting)
-                : trim((string) ($channelLandingMap[$channelSlug] ?? ''));
+                : trim((string) ($channelLandingMap[$landingKey] ?? $channelLandingMap[$channelSlug] ?? ''));
             $hasLanding = $landingSlug !== '';
             $statusKey = $hasLanding ? 'active' : 'missing';
             $statusLabel = $hasLanding
@@ -234,7 +242,12 @@ final class RouteProfiler
                 $notes = 'Reserved prefix; this channel route is not publicly reachable.';
             }
 
-            $publicUrl = $isRootChannel ? '/' : ('/' . ($channelPath !== '' ? $channelPath : $channelSlug));
+            $publicUrl = $isRootChannel
+                ? '/'
+                : PagePolicy::canonicalPath(
+                    '/' . ($channelPath !== '' ? $channelPath : $channelSlug),
+                    $siteRoutingTrailingSlash
+                );
             $conflictKey = strtolower($publicUrl);
             $pathUsage[$conflictKey] = (int) ($pathUsage[$conflictKey] ?? 0) + 1;
 
@@ -261,7 +274,10 @@ final class RouteProfiler
 
             // Add channel-scoped RSS endpoint when RSS route prefix is configured.
             if ($rssFeedRoute !== '') {
-                $feedUrl = '/' . $rssFeedRoute . '/' . $channelSlug;
+                $feedUrl = PagePolicy::canonicalPath(
+                    '/' . $rssFeedRoute . '/' . ($channelPath !== '' ? $channelPath : $channelSlug),
+                    $siteRoutingTrailingSlash
+                );
                 $feedConflictKey = strtolower($feedUrl);
                 $pathUsage[$feedConflictKey] = (int) ($pathUsage[$feedConflictKey] ?? 0) + 1;
 
@@ -282,7 +298,10 @@ final class RouteProfiler
 
             // Add channel-scoped Atom endpoint when Atom route prefix is configured.
             if ($atomFeedRoute !== '') {
-                $feedUrl = '/' . $atomFeedRoute . '/' . $channelSlug;
+                $feedUrl = PagePolicy::canonicalPath(
+                    '/' . $atomFeedRoute . '/' . ($channelPath !== '' ? $channelPath : $channelSlug),
+                    $siteRoutingTrailingSlash
+                );
                 $feedConflictKey = strtolower($feedUrl);
                 $pathUsage[$feedConflictKey] = (int) ($pathUsage[$feedConflictKey] ?? 0) + 1;
 
@@ -362,7 +381,7 @@ final class RouteProfiler
                     continue;
                 }
 
-                $publicUrl = '/' . $categoryPrefix . '/' . $categorySlug;
+                $publicUrl = $canonicalPublicUrl('/' . $categoryPrefix . '/' . $categorySlug);
                 $conflictKey = strtolower($publicUrl);
                 $pathUsage[$conflictKey] = (int) ($pathUsage[$conflictKey] ?? 0) + 1;
 
@@ -395,7 +414,7 @@ final class RouteProfiler
                     continue;
                 }
 
-                $publicUrl = '/' . $tagPrefix . '/' . $tagSlug;
+                $publicUrl = $canonicalPublicUrl('/' . $tagPrefix . '/' . $tagSlug);
                 $conflictKey = strtolower($publicUrl);
                 $pathUsage[$conflictKey] = (int) ($pathUsage[$conflictKey] ?? 0) + 1;
 
@@ -447,7 +466,7 @@ final class RouteProfiler
                     continue;
                 }
 
-                $publicUrl = '/' . $groupPrefix . '/' . $groupSlug;
+                $publicUrl = $canonicalPublicUrl('/' . $groupPrefix . '/' . $groupSlug);
                 $conflictKey = strtolower($publicUrl);
                 $pathUsage[$conflictKey] = (int) ($pathUsage[$conflictKey] ?? 0) + 1;
 
@@ -481,7 +500,7 @@ final class RouteProfiler
                     continue;
                 }
 
-                $publicUrl = '/' . $profilePrefix . '/' . rawurlencode($routeSegment);
+                $publicUrl = $canonicalPublicUrl('/' . $profilePrefix . '/' . rawurlencode($routeSegment));
                 $conflictKey = strtolower($publicUrl);
                 $pathUsage[$conflictKey] = (int) ($pathUsage[$conflictKey] ?? 0) + 1;
 
@@ -536,6 +555,11 @@ final class RouteProfiler
             $publicUrl = $channelPath === ''
                 ? '/' . $redirectSlug
                 : '/' . $channelPath . '/' . $redirectSlug;
+            $publicUrl = $canonicalPublicUrl($publicUrl);
+            $targetUrl = PagePolicy::canonicalRedirectTarget(
+                trim((string) ($redirect['target'] ?? '')),
+                $siteRoutingTrailingSlash
+            );
 
             $statusKey = (int) ($redirect['active'] ?? 0) === 1 ? 'active' : 'inactive';
             $statusLabel = $statusKey === 'active' ? 'Active' : 'Inactive';
@@ -557,7 +581,7 @@ final class RouteProfiler
                 'source_label' => trim((string) ($redirect['title'] ?? '')) !== '' ? (string) $redirect['title'] : $redirectSlug,
                 'edit_url' => (string) $buildEditUrl('redirect', ['id' => $redirectId]),
                 'public_url' => $publicUrl,
-                'target_url' => trim((string) ($redirect['target'] ?? '')),
+                'target_url' => $targetUrl,
                 'status_key' => $statusKey,
                 'status_label' => $statusLabel,
                 'notes' => $notes,

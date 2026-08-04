@@ -66,12 +66,29 @@ final class FeedParser
                 return ['all'];
             }
 
-            $normalized = $channel === 'root' ? 'root' : $this->input->slug($channel);
-            // Skip tokens that do not sanitize into valid slug values.
-            if ($normalized === null || $normalized === '') {
+            if ($channel === 'root') {
+                $normalizedChannels['root'] = 'root';
                 continue;
             }
 
+            $segments = array_values(array_filter(explode('/', trim($channel, '/')), static fn (string $segment): bool => $segment !== ''));
+            $normalizedSegments = [];
+            foreach ($segments as $segment) {
+                $normalizedSegment = $this->input->slug($segment);
+                // Skip a configured path when any hierarchy segment is invalid.
+                if ($normalizedSegment === null || $normalizedSegment === '') {
+                    $normalizedSegments = [];
+                    break;
+                }
+
+                $normalizedSegments[] = $normalizedSegment;
+            }
+            // Skip tokens that do not sanitize into valid parent-aware paths.
+            if ($normalizedSegments === []) {
+                continue;
+            }
+
+            $normalized = implode('/', $normalizedSegments);
             $normalizedChannels[$normalized] = $normalized;
         }
 

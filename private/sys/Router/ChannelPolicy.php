@@ -16,7 +16,7 @@ use Raven\Core\Config;
 /**
  * Static routing policy helpers: route-mode normalization, separator resolution, and config-backed effective-mode resolution.
  *
- * The Config-taking methods (globalPageRouteMode, effectiveChannelRouteMode, resolveChannelSeparator) are the
+ * The Config-taking methods (globalPageRouteSelector, siteRoutingUsesTrailingSlash, effectiveChannelRouteMode, resolveChannelSeparator) are the
  * canonical entry point for any code that needs to resolve URL policy without loading the full ChannelParser stack.
  * Shared by ChannelParser, ChannelRead, PagePolicy, and panel/public controllers.
  */
@@ -43,7 +43,7 @@ final class ChannelPolicy
      * Normalizes a concrete route-mode value (no 'inherit') to one of the accepted strings.
      *
      * @param string $value Raw route-mode string.
-     * @return string       One of 'slug', 'date_slug', 'month_slug', 'id', 'date_id', 'month_id'; defaults to 'slug'.
+     * @return string       One of the supported concrete route modes; defaults to 'slug'.
      */
     public static function normalizeRouteMode(string $value): string
     {
@@ -114,24 +114,51 @@ final class ChannelPolicy
     }
 
     /**
-     * Returns the site-wide global page route mode from config.
+     * Returns the site-wide global page route selector from config.
      *
-     * Reads the `content.mode` config key and constrains the value to the two
-     * site-level modes (`slug`, `id`). Per-channel modes use the full normalizer.
+     * Reads the `content.selector` config key and constrains the value to
+     * the selector values (`slug`, `id`). Per-channel modes use the full normalizer.
      *
      * @param Config $config Runtime site configuration.
-     * @return string        'slug' or 'id'; defaults to 'slug'.
+     * @return string        Global route selector; defaults to 'slug'.
+     */
+    public static function globalPageRouteSelector(Config $config): string
+    {
+        $selector = strtolower(trim((string) $config->get('content.selector', 'slug')));
+        return in_array($selector, ['slug', 'id'], true) ? $selector : 'slug';
+    }
+
+    /**
+     * Returns the global content selector through the pre-selector compatibility name.
+     *
+     * @param Config $config Runtime site configuration.
+     * @return string Global route selector; defaults to 'slug'.
+     * @deprecated Use globalPageRouteSelector() now that selector and slash policy are separate settings.
      */
     public static function globalPageRouteMode(Config $config): string
     {
-        $mode = strtolower(trim((string) $config->get('content.mode', 'slug')));
-        return in_array($mode, ['slug', 'id'], true) ? $mode : 'slug';
+        return self::globalPageRouteSelector($config);
+    }
+
+    /**
+     * Returns whether site routing requires trailing slashes on canonical public paths.
+     *
+     * @param Config $config Runtime site configuration.
+     * @return bool True when the site routing mode is `trailing_slash`.
+     */
+    public static function siteRoutingUsesTrailingSlash(Config $config): bool
+    {
+        return in_array(
+            strtolower(trim((string) $config->get('site.routing', 'no_trailing_slash'))),
+            ['trailing', 'trailing_slash'],
+            true
+        );
     }
 
     /**
      * Returns the effective page route mode for one channel, resolving `inherit` against the global default.
      *
-     * When the channel record carries `inherit`, the site-wide `content.mode` is used.
+     * When the channel record carries `inherit`, the site-wide `content.selector` is used.
      * Otherwise the channel value is run through the full route-mode normalizer.
      *
      * @param Config $config       Runtime site configuration (for global fallback).
@@ -141,7 +168,7 @@ final class ChannelPolicy
     public static function effectiveChannelRouteMode(Config $config, string $channelValue): string
     {
         $mode = self::normalizeChannelRouteMode($channelValue);
-        return $mode === 'inherit' ? self::globalPageRouteMode($config) : self::normalizeRouteMode($mode);
+        return $mode === 'inherit' ? self::globalPageRouteSelector($config) : self::normalizeRouteMode($mode);
     }
 
     /**

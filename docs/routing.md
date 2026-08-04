@@ -48,6 +48,7 @@ Core public family behavior:
   - enabled only when their prefixes/modes are configured
 - Content routes:
   - Page-route segments may include a legacy/file suffix; Raven discards the first period and everything after it, then 301-redirects a resolved route to its canonical extensionless URL (for example /docs/guide.md -> /docs/guide).
+  - `content.selector` controls page lookup identity (`slug` or `id`), while `site.routing` independently controls canonical slash policy (`no_trailing_slash` or `trailing_slash`); either URL form resolves, and the non-canonical form receives a built-in 301 redirect.
   - `/` homepage
   - `/{slug}` root channel landing/root fallback seam
   - `/{channel_path}` parent-aware channel landing routes, such as `/news/alpha`
