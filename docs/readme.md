@@ -22,16 +22,16 @@
 - [Groups](./groups.md)
 - [Users](./users.md)
 
-### Advanced Usage
-- [Command Line](./appendix/cli/readme.md)
+### Building With Raven
 - [Extensions](./extensions.md)
 - [Theming](./theming.md)
 
-### Developer Appendix
+### Developer Appendices
 - [Appendix Index](./appendix/readme.md)
 - [Architecture Summary](./appendix/architecture.md)
-- [Bootstrap Dependency Reference](./appendix/bootstrap.md)
+- [Bootstrap Dependency Appendix](./appendix/bootstrap.md)
+- [Configuration Key Appendix](./appendix/config.md)
 - [Database Map](./appendix/database.md)
-- [Filetree](./appendix/filetree.md)
+- [Filetree Appendix](./appendix/filetree.md)
 - [Router Summary](./appendix/router.md)
-- [System Configuration Keys](./appendix/config.md)
+- [Shell Command Appendix](./appendix/cli/readme.md)
