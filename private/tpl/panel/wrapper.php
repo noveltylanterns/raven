@@ -266,7 +266,13 @@ $showPoweredByRaven = $panelBrandNameInput !== '';
 $panelBrandName = $panelBrandNameInput !== '' ? $panelBrandNameInput : 'Raven CMS';
 $panelBrandLogoRaw = trim((string) ($site['panel_brand_logo'] ?? ''));
 $panelBrandLogoUrl = $panelBase . '/theme/img/logo-white_sm.png';
-if (
+// Config saves local logo paths as absolute site URLs, so retain those URLs
+// while allowing legacy root-relative values to continue working.
+if (preg_match('#^https?://#i', $panelBrandLogoRaw) === 1) {
+    if (filter_var($panelBrandLogoRaw, FILTER_VALIDATE_URL) !== false) {
+        $panelBrandLogoUrl = $panelBrandLogoRaw;
+    }
+} elseif (
     $panelBrandLogoRaw !== ''
     && preg_match('#^[A-Za-z][A-Za-z0-9+.-]*:#', $panelBrandLogoRaw) !== 1
     && !str_starts_with($panelBrandLogoRaw, '//')
