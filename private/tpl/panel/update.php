@@ -99,7 +99,7 @@ $updateToolbarItems = [
         <div class="card-body">
             <h2 class="mb-3">Source</h2>
             <div class="row g-3">
-                <div class="col-12 col-lg-4">
+                <div class="col-12">
                     <label class="form-label" for="update_source_mode">Source</label>
                     <select class="form-select" id="update_source_mode" name="update_source_mode">
                         <?php foreach ($updateSourceModes as $modeKey => $modeLabel): ?>
@@ -107,7 +107,7 @@ $updateToolbarItems = [
                         <?php endforeach; ?>
                     </select>
                 </div>
-                <div class="col-12 col-lg-5" data-update-source-field="github_custom"<?= $selectedMode === 'github_custom' ? '' : ' style="display:none;"' ?>>
+                <div class="col-12" data-update-source-field="github_custom"<?= $selectedMode === 'github_custom' ? '' : ' style="display:none;"' ?>>
                     <label class="form-label" for="update_source_github_repo">Github Repo</label>
                     <input
                         class="form-control font-monospace"
@@ -117,7 +117,7 @@ $updateToolbarItems = [
                         placeholder="owner/repo"
                     >
                 </div>
-                <div class="col-12 col-lg-5" data-update-source-field="repo_custom"<?= $selectedMode === 'repo_custom' ? '' : ' style="display:none;"' ?>>
+                <div class="col-12" data-update-source-field="repo_custom"<?= $selectedMode === 'repo_custom' ? '' : ' style="display:none;"' ?>>
                     <label class="form-label" for="update_source_repo_url">Custom Repo URL</label>
                     <input
                         class="form-control font-monospace"
@@ -127,19 +127,18 @@ $updateToolbarItems = [
                         placeholder="https://example.com/repo.git"
                     >
                 </div>
-                <div class="col-12 col-lg-3">
-                    <label class="form-label d-block">Overwrite Override</label>
-                    <div class="form-check mt-2">
-                        <input
-                            class="form-check-input"
-                            type="checkbox"
-                            id="allow_overwrite"
-                            name="allow_overwrite"
-                            value="1"
-                            <?= !empty($allowOverwrite) ? 'checked' : '' ?>
-                        >
-                        <label class="form-check-label" for="allow_overwrite">Allow overwrite of local core changes</label>
-                    </div>
+            </div>
+            <div class="mt-3 pt-3 border-top">
+                <div class="form-check">
+                    <input
+                        class="form-check-input"
+                        type="checkbox"
+                        id="allow_overwrite"
+                        name="allow_overwrite"
+                        value="1"
+                        <?= !empty($allowOverwrite) ? 'checked' : '' ?>
+                    >
+                    <label class="form-check-label" for="allow_overwrite">Allow overwrite of local core changes</label>
                 </div>
             </div>
         </div>
