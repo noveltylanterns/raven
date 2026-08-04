@@ -680,6 +680,52 @@ class ChannelRead
     }
 
     /**
+     * Resolves the first explicit public-theme override in a channel's parent chain.
+     *
+     * A child channel with `inherit` delegates to its direct parent, then continues
+     * upward until an explicit override is found or the system theme becomes the fallback.
+     *
+     * @param int $id Channel id whose theme hierarchy should be inspected.
+     * @return string Explicit theme slug from the channel hierarchy, or `inherit` when none is set.
+     */
+    public function themeOverrideForChannelHierarchy(int $id): string
+    {
+        if ($id < 1) {
+            return 'inherit';
+        }
+
+        $channelsById = self::channelsByIdMap($this->listRecords());
+        $visited = [];
+        $currentId = $id;
+        // Walk upward with a cycle guard so malformed parent data cannot loop forever.
+        while ($currentId > ChannelShared::ROOT_CHANNEL_ID) {
+            if (isset($visited[$currentId]) || !isset($channelsById[$currentId])) {
+                break;
+            }
+
+            $visited[$currentId] = true;
+            $channel = $channelsById[$currentId];
+            $themeOverride = ChannelShared::normalizeThemeOverride(
+                (string) ($channel['theme_override'] ?? 'inherit')
+            );
+            // The nearest explicit channel override wins over all ancestor values.
+            if ($themeOverride !== 'inherit') {
+                return $themeOverride;
+            }
+
+            $parentId = ChannelShared::normalizeParentId($channel['parent_id'] ?? ChannelShared::ROOT_CHANNEL_ID);
+            // A self-parent is malformed and must terminate the hierarchy walk safely.
+            if ($parentId === $currentId) {
+                break;
+            }
+
+            $currentId = $parentId;
+        }
+
+        return 'inherit';
+    }
+
+    /**
      * Returns one channel by either a numeric id or a slug string.
      *
      * A numeric string (e.g. '3') is treated as an id. A non-numeric string is

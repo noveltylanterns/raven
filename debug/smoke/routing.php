@@ -131,20 +131,32 @@ final class RoutingSmokeRunner
         $this->assert(ChannelPolicy::channelIndexUsesTrailingSlash($config, 'trailing_slash'), 'Forced trailing-slash channel index mode was not enforced.');
         $this->assert(ChannelPolicy::normalizeChannelIndexRouteMode('invalid') === 'auto', 'Invalid channel index route mode did not normalize to automatic.');
         $channelWriter->save([
+            'id' => 10,
+            'name' => 'News',
+            'slug' => 'news',
+            'parent_id' => 0,
+            'index' => 'auto',
+            'theme_override' => 'parent-theme',
+            'description' => '',
+        ]);
+        $channelWriter->save([
             'id' => 30,
             'name' => 'Alpha',
             'slug' => 'alpha',
             'parent_id' => 10,
             'index' => 'redirect',
+            'theme_override' => 'inherit',
             'description' => '',
         ]);
         $this->assert((string) (($channels->findById(30)['index'] ?? '')) === 'redirect', 'Channel index route mode did not persist through the channel writer.');
+        $this->assert($channels->themeOverrideForChannelHierarchy(30) === 'parent-theme', 'Child channel theme inheritance did not resolve the nearest parent override.');
         $channelWriter->save([
             'id' => 30,
             'name' => 'Alpha',
             'slug' => 'alpha',
             'parent_id' => 10,
             'index' => 'trailing_slash',
+            'theme_override' => 'inherit',
             'description' => '',
         ]);
         $channelWriter->updateImagePaths(30, [

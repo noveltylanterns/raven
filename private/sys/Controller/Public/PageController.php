@@ -611,8 +611,12 @@ final class PageController
      */
     private function channelThemeSlug(array $channel): string
     {
+        $themeOverride = $this->channelRead->themeOverrideForChannelHierarchy(
+            (int) ($channel['id'] ?? 0)
+        );
+
         return $this->themeCatalog->resolveOverrideSlug(
-            (string) ($channel['theme_override'] ?? 'inherit'),
+            $themeOverride,
             $this->context->config()
         );
     }

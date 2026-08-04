@@ -4,6 +4,7 @@
 
 ### August 4, 2026
 
+- Fixed child channels inheriting public theme overrides through their parent channel chain before falling back to the system theme.
 - Simplified the CLI appendix index rows to show only linked `rvn-*` command names.
 - Updated the CLI appendix overview links to use the actual `rvn-*` wrapper names and point directly to each generated command reference.
 - Fixed channel saves reverting the selected Index route mode to `Automatic` when the post-save image persistence pass rewrote the channel record without carrying that setting forward.
