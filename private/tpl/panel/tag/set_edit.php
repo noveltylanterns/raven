@@ -24,12 +24,11 @@ $setId = $set !== null ? (int) ($set['id'] ?? 0) : null;
 $hasPersistedSet = $set !== null;
 $isDefaultSet = $hasPersistedSet && $setId === 1;
 $deleteFormId = 'delete-tag-set-form';
-$tagSetToolbarItems = [
-    '<a href="' . e($panelBase) . '/tag/set" class="btn btn-secondary"><i class="bi bi-box-arrow-left me-2" aria-hidden="true"></i>Back to Sets</a>',
-];
+$tagSetToolbarItems = [];
 if (!$isDefaultSet) {
     $tagSetToolbarItems[] = '<button type="submit" class="btn btn-success"><i class="bi bi-floppy me-2" aria-hidden="true"></i>Save Tag Set</button>';
 }
+$tagSetToolbarItems[] = '<a href="' . e($panelBase) . '/tag/set" class="btn btn-secondary"><i class="bi bi-box-arrow-left me-2" aria-hidden="true"></i>Back to Sets</a>';
 if ($hasPersistedSet && !$isDefaultSet) {
     $tagSetToolbarItems[] = '<button type="submit" class="btn btn-danger" form="' . e($deleteFormId) . '" onclick="return confirm(\'Delete this tag set?\');"><i class="bi bi-trash3 me-2" aria-hidden="true"></i>Delete Tag Set</button>';
 }

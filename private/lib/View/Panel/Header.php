@@ -46,7 +46,7 @@ final class Header
         if ($helpUrl !== '') {
             // Append the help affordance so it remains the rightmost action in every heading card.
             $actions[] =
-                '<a href="' . e($helpUrl) . '" class="btn btn-warning btn-sm" title="Open help documentation" aria-label="Open help documentation">'
+                '<a href="' . e($helpUrl) . '" class="btn btn-primary btn-sm" title="Open help documentation" aria-label="Open help documentation">'
                     . '<i class="bi bi-question-lg" aria-hidden="true"></i>'
                     . '</a>';
         }

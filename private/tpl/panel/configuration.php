@@ -1153,7 +1153,7 @@ $renderConfigFieldGroup = static function (array $fields) use ($renderConfigFiel
     }
 };
 $configurationToolbarItems = [
-    '<button class="btn btn-primary" type="submit"><i class="bi bi-floppy me-2" aria-hidden="true"></i>Save Configuration</button>',
+    '<button class="btn btn-success" type="submit"><i class="bi bi-floppy me-2" aria-hidden="true"></i>Save Configuration</button>',
 ];
 ?>
 

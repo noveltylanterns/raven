@@ -24,12 +24,11 @@ $setId = $set !== null ? (int) ($set['id'] ?? 0) : null;
 $hasPersistedSet = $set !== null;
 $isDefaultSet = $hasPersistedSet && $setId === 1;
 $deleteFormId = 'delete-category-set-form';
-$categorySetToolbarItems = [
-    '<a href="' . e($panelBase) . '/category/set" class="btn btn-secondary"><i class="bi bi-box-arrow-left me-2" aria-hidden="true"></i>Back to Sets</a>',
-];
+$categorySetToolbarItems = [];
 if (!$isDefaultSet) {
     $categorySetToolbarItems[] = '<button type="submit" class="btn btn-success"><i class="bi bi-floppy me-2" aria-hidden="true"></i>Save Category Set</button>';
 }
+$categorySetToolbarItems[] = '<a href="' . e($panelBase) . '/category/set" class="btn btn-secondary"><i class="bi bi-box-arrow-left me-2" aria-hidden="true"></i>Back to Sets</a>';
 if ($hasPersistedSet && !$isDefaultSet) {
     $categorySetToolbarItems[] = '<button type="submit" class="btn btn-danger" form="' . e($deleteFormId) . '" onclick="return confirm(\'Delete this category set?\');"><i class="bi bi-trash3 me-2" aria-hidden="true"></i>Delete Category Set</button>';
 }
