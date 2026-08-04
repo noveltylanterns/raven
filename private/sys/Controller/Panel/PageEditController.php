@@ -202,9 +202,10 @@ final class PageEditController
         $pageNavChannel = '';
         // Create mode optionally preselects channel from query string.
         if ($id === null) {
-            $requestedChannel = $this->input->slug($_GET['channel'] ?? null);
-            // Keep channel preselection only when a non-empty slug was provided.
-            if (is_string($requestedChannel) && $requestedChannel !== '') {
+            // Preserve slash-separated parent-aware paths for nested channel shortcuts.
+            $requestedChannel = strtolower(trim($this->input->text($_GET['channel'] ?? null, 160), '/'));
+            // Keep channel preselection only when a non-empty path was provided.
+            if ($requestedChannel !== '') {
                 $pageNavChannel = $requestedChannel;
             }
         }
@@ -260,8 +261,15 @@ final class PageEditController
                     continue;
                 }
 
-                // Match using case-insensitive slug comparison.
-                if (strtolower(trim((string) ($channelOption['slug'] ?? ''))) === strtolower($pageNavChannel)) {
+                $channelOptionPath = trim((string) ($channelOption['path'] ?? ''), '/');
+                if ($channelOptionPath === '') {
+                    $channelOptionPath = trim((string) ($channelOption['slug'] ?? ''), '/');
+                }
+                // Match using the canonical parent-aware path, while accepting legacy leaf-slug shortcuts.
+                if (
+                    strtolower($channelOptionPath) === strtolower($pageNavChannel)
+                    || strtolower(trim((string) ($channelOption['slug'] ?? ''), '/')) === strtolower($pageNavChannel)
+                ) {
                     $channelExists = true;
                     break;
                 }
@@ -364,7 +372,8 @@ final class PageEditController
             50
         );
         $description = $this->input->text($post['description'] ?? null, 1000);
-        $channelSlug = $this->input->slug($post['channel_slug'] ?? null);
+        // Preserve slash-separated parent-aware channel paths for nested channel assignments.
+        $channelPath = strtolower(trim($this->input->text($post['channel_slug'] ?? null, 160), '/'));
         $status = strtolower((string) $this->input->text($post['status'] ?? null, 20));
         $publishAt = $this->input->text($post['published'] ?? null, 32);
         $expireAt = $this->input->text($post['expires'] ?? null, 32);
@@ -420,8 +429,8 @@ final class PageEditController
         // Only keep ids that currently exist, preventing stale/manual post values.
         $categoryIds = $this->categoryEnabled ? $this->categoryRepo()->existingIds($categoryIds) : [];
         $tagIds = $this->tagEnabled ? $this->tagRepo()->existingIds($tagIds) : [];
-        $channelRecord = $channelSlug !== null && $channelSlug !== ''
-            ? $this->channelRead->findBySlug($channelSlug)
+        $channelRecord = $channelPath !== ''
+            ? $this->channelRead->findByPath($channelPath)
             : null;
         $allowedCategorySets = $this->allowedTaxonomySetIdsForChannel($channelRecord, 'category');
         $allowedTagSets = $this->allowedTaxonomySetIdsForChannel($channelRecord, 'tag');
@@ -489,7 +498,7 @@ final class PageEditController
                 'display_title' => $displayTitle ? 1 : 0,
                 'gallery_enabled' => $galleryEnabled ? 1 : 0,
                 'author' => $authorUserId,
-                'channel_slug' => $channelSlug,
+                'channel_slug' => $channelPath,
                 'category_ids' => $categoryIds,
                 'tag_ids' => $tagIds,
                 'status' => $status,

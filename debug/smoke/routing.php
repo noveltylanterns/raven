@@ -124,6 +124,8 @@ final class RoutingSmokeRunner
         $routingHomepages = $pages->channelHomepagesForRouting();
         $this->assert(($routingHomepages['news'] ?? '') === 'home', 'Routing homepage inventory did not use automatic home priority.');
         $this->assert(($routingHomepages['blog'] ?? '') === 'home', 'Routing homepage inventory ignored automatic channel homepage fallback.');
+        $this->assert(array_key_exists('news/alpha', $routingHomepages), 'Routing homepage inventory did not retain the nested channel path key.');
+        $this->assert(!array_key_exists('alpha', $routingHomepages), 'Routing homepage inventory still exposed a leaf-only nested channel key.');
         $this->assert(!ChannelPolicy::channelIndexUsesTrailingSlash($config, 'auto'), 'Automatic channel index mode should follow the no-slash system policy.');
         $this->assert(!ChannelPolicy::channelIndexUsesTrailingSlash($config, 'no_trailing_slash'), 'Forced no-slash channel index mode was not enforced.');
         $this->assert(ChannelPolicy::channelIndexUsesTrailingSlash($config, 'trailing_slash'), 'Forced trailing-slash channel index mode was not enforced.');

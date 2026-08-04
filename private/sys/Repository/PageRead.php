@@ -754,11 +754,11 @@ class PageRead
     }
 
     /**
-     * Returns one landing-page slug map keyed by channel slug for routing inventory.
+     * Returns one landing-page slug map keyed by canonical channel path for routing inventory.
      *
      * Uses each channel's automatic `home` then `index` fallback.
      *
-     * @return array<string, string> Channel slug to homepage slug map; empty string means no homepage found.
+     * @return array<string, string> Channel path to homepage slug map; empty string means no homepage found.
      */
     public function channelHomepagesForRouting(): array
     {
@@ -769,32 +769,35 @@ class PageRead
         }
 
         $result = [];
-        // Initialize every known channel slug with empty homepage sentinel.
+        // Initialize every known channel path with an empty homepage sentinel.
         foreach ($channelsById as $channelId => $channel) {
-            $slug = trim((string) ($channel['slug'] ?? ''));
-            // Skip malformed channel rows missing slugs.
-            if ($slug === '') {
+            $numericChannelId = (int) $channelId;
+            $channelPath = $numericChannelId > 0
+                ? $this->channelRepo->pathForChannel($numericChannelId)
+                : ChannelShared::ROOT_CHANNEL_SLUG;
+            // Skip malformed channel rows that cannot produce a canonical path.
+            if ($channelPath === '') {
                 continue;
             }
 
-            $result[$slug] = '';
+            $result[$channelPath] = '';
         }
 
         // Resolve through the same automatic homepage helper used by public channel rendering.
         foreach ($channelsById as $channelId => $channel) {
-            $channelSlug = trim((string) ($channel['slug'] ?? ''));
-            if ($channelId < 1 || $channelSlug === '') {
+            $numericChannelId = (int) $channelId;
+            if ($numericChannelId < 1) {
                 continue;
             }
 
-            $channelPath = $this->channelRepo->pathForChannel((int) $channelId);
+            $channelPath = $this->channelRepo->pathForChannel($numericChannelId);
             if ($channelPath === '') {
                 continue;
             }
 
             $homepage = $this->findChannelHomepage($channelPath);
             $homepagePage = is_array($homepage['page'] ?? null) ? $homepage['page'] : null;
-            $result[$channelSlug] = $homepagePage !== null
+            $result[$channelPath] = $homepagePage !== null
                 ? trim((string) ($homepagePage['slug'] ?? ''))
                 : '';
         }

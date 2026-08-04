@@ -1369,22 +1369,42 @@ final class ConfigController
      * Normalizes the submitted feed-channel selection list.
      *
      * @param mixed $rawValue Submitted feed-channel payload.
-     * @param array<int, array{id: int, name: string, slug: string, editor_override: string, route_mode: string, route_separator: string}> $feedChannelOptions Allowed channel options.
+     * @param array<int, array{id: int, name: string, slug: string, path?: string, editor_override: string, route_mode: string, route_separator: string}> $feedChannelOptions Allowed channel options.
      * @return array<int, string> Canonical persisted feed channel selection.
      */
     private function normalizeFeedChannelsValue(mixed $rawValue, array $feedChannelOptions): array
     {
         $submitted = is_array($rawValue) ? $rawValue : [];
         $allowed = [];
-        // Build allow-list from channel option slugs.
+        $legacyPathsBySlug = [];
+        // Build the allow-list from canonical paths while indexing leaf slugs for legacy config values.
         foreach ($feedChannelOptions as $channelOption) {
             $optionSlug = $this->input->slug((string) ($channelOption['slug'] ?? ''));
-            // Ignore options with invalid/empty slug values.
-            if ($optionSlug === null || $optionSlug === '') {
+            $optionPath = trim((string) ($channelOption['path'] ?? $optionSlug ?? ''), '/');
+            $pathSegments = $optionPath === '' ? [] : explode('/', $optionPath);
+            $normalizedPathSegments = [];
+            foreach ($pathSegments as $pathSegment) {
+                $normalizedSegment = $this->input->slug($pathSegment);
+                // Ignore option paths containing an invalid segment.
+                if ($normalizedSegment === null || $normalizedSegment === '') {
+                    $normalizedPathSegments = [];
+                    break;
+                }
+
+                $normalizedPathSegments[] = $normalizedSegment;
+            }
+
+            // Ignore options with invalid/empty canonical paths.
+            if ($normalizedPathSegments === []) {
                 continue;
             }
 
-            $allowed[$optionSlug] = true;
+            $canonicalPath = implode('/', $normalizedPathSegments);
+            $allowed[$canonicalPath] = true;
+            // Preserve unambiguous legacy leaf-slug selections during migration to path values.
+            if ($optionSlug !== null && $optionSlug !== '') {
+                $legacyPathsBySlug[$optionSlug][] = $canonicalPath;
+            }
         }
 
         $normalized = [];
@@ -1401,13 +1421,40 @@ final class ConfigController
                 return ['all'];
             }
 
-            $channelSlug = $this->input->slug($value);
-            // Skip invalid/unknown channel slugs.
-            if ($channelSlug === null || $channelSlug === '' || !isset($allowed[$channelSlug])) {
+            $segments = explode('/', trim($value, '/'));
+            $normalizedSegments = [];
+            foreach ($segments as $segment) {
+                $normalizedSegment = $this->input->slug($segment);
+                // Reject a submitted path when any hierarchy segment is invalid.
+                if ($normalizedSegment === null || $normalizedSegment === '') {
+                    $normalizedSegments = [];
+                    break;
+                }
+
+                $normalizedSegments[] = $normalizedSegment;
+            }
+            if ($normalizedSegments === []) {
                 continue;
             }
 
-            $normalized[$channelSlug] = $channelSlug;
+            $normalizedPath = implode('/', $normalizedSegments);
+            $canonicalPath = null;
+            if (isset($allowed[$normalizedPath])) {
+                $canonicalPath = $normalizedPath;
+            } elseif (count($normalizedSegments) === 1) {
+                // Upgrade a legacy leaf value only when it identifies exactly one channel path.
+                $legacyCandidates = array_values(array_unique($legacyPathsBySlug[$normalizedPath] ?? []));
+                if (count($legacyCandidates) === 1) {
+                    $canonicalPath = $legacyCandidates[0];
+                }
+            }
+
+            // Skip invalid, unknown, or ambiguous channel selectors.
+            if ($canonicalPath === null) {
+                continue;
+            }
+
+            $normalized[$canonicalPath] = $canonicalPath;
         }
 
         // Empty normalized list means no valid channel selections were submitted.
