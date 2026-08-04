@@ -224,7 +224,7 @@ final class PageEditController
         $channelPath = is_array($page)
             ? $this->channelRead->pathForChannel((int) ($page['channel'] ?? 0))
             : '';
-        $activeTab = $this->editorTabs->normalizeEditorTab($_GET['tab'] ?? null, ['content', 'meta', 'media'], 'content');
+        $activeTab = $this->editorTabs->normalizeEditorTab($_GET['tab'] ?? null, ['content', 'taxonomy', 'meta', 'media'], 'content');
 
         // Load channel/category/tag options and page assignments in one query.
         $taxonomyOptionSets = $this->pageEditorTaxonomyOptionSets($id ?? 0, $this->categoryEnabled, $this->tagEnabled);
@@ -355,7 +355,7 @@ final class PageEditController
             Redirect::redirect($this->context->panelUrl('/page'));
         }
 
-        $activeTab = $this->editorTabs->normalizeEditorTab($post['tab'] ?? null, ['content', 'meta', 'media'], 'content');
+        $activeTab = $this->editorTabs->normalizeEditorTab($post['tab'] ?? null, ['content', 'taxonomy', 'meta', 'media'], 'content');
         $title = $this->input->text($post['title'] ?? null, 255);
         $slug = $this->input->slug($post['slug'] ?? null);
         $contentBlocks = $this->pageBlocks()->normalizeEditorSubmittedBlocks(
@@ -434,7 +434,14 @@ final class PageEditController
                 // Abort save when any category selection is outside allowed sets.
                 if (!in_array($setId, $allowedCategorySets, true)) {
                     $this->context->flash('error', 'One or more selected categories are outside the allowed sets for this channel.');
-                    Redirect::redirect($this->editorTabs->panelEditorUrlWithTab(fn (string $suffix): string => $this->context->panelUrl($suffix), '/page/edit', $id, $activeTab, 'meta'));
+                    Redirect::redirect($this->editorTabs->panelEditorUrlWithTab(
+                        fn (string $suffix): string => $this->context->panelUrl($suffix),
+                        '/page/edit',
+                        $id,
+                        'taxonomy',
+                        'content',
+                        'rvnp-editor-pane-taxonomy'
+                    ));
                 }
             }
         }
@@ -447,7 +454,14 @@ final class PageEditController
                 // Abort save when any tag selection is outside allowed sets.
                 if (!in_array($setId, $allowedTagSets, true)) {
                     $this->context->flash('error', 'One or more selected tags are outside the allowed sets for this channel.');
-                    Redirect::redirect($this->editorTabs->panelEditorUrlWithTab(fn (string $suffix): string => $this->context->panelUrl($suffix), '/page/edit', $id, $activeTab, 'meta'));
+                    Redirect::redirect($this->editorTabs->panelEditorUrlWithTab(
+                        fn (string $suffix): string => $this->context->panelUrl($suffix),
+                        '/page/edit',
+                        $id,
+                        'taxonomy',
+                        'content',
+                        'rvnp-editor-pane-taxonomy'
+                    ));
                 }
             }
         }

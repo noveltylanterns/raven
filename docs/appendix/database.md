@@ -757,12 +757,12 @@ Heuristic mapping of schema keys to repository/controller/template files.
   - `id`
     - `private/sys/Controller/Panel/ChannelEditController.php`
     - `private/sys/Controller/Panel/PageEditController.php`
+    - `private/sys/Controller/Panel/PageListController.php`
     - `private/sys/Controller/Public/CategoryController.php`
     - `private/sys/Controller/Public/ChannelController.php`
     - `private/sys/Controller/Public/FeedController.php`
     - `private/sys/Controller/Public/TagController.php`
     - `private/sys/Debug/RouteProfiler.php`
-    - `private/sys/Debug/UniquenessProfiler.php`
   - `preview_image`
     - `private/sys/Controller/Panel/ChannelEditController.php`
     - `private/sys/Repository/CategoryRead.php`
@@ -784,12 +784,12 @@ Heuristic mapping of schema keys to repository/controller/template files.
   - `slug`
     - `private/sys/Controller/Panel/ChannelEditController.php`
     - `private/sys/Controller/Panel/PageEditController.php`
-    - `private/sys/Controller/Panel/PageListController.php`
     - `private/sys/Controller/Public/CategoryController.php`
     - `private/sys/Controller/Public/ChannelController.php`
     - `private/sys/Controller/Public/FeedController.php`
     - `private/sys/Controller/Public/TagController.php`
     - `private/sys/Debug/RouteProfiler.php`
+    - `private/sys/Debug/UniquenessProfiler.php`
   - `status`
     - `private/sys/Controller/Panel/PageEditController.php`
     - `private/sys/Controller/Public/ChannelController.php`

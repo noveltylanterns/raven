@@ -253,20 +253,25 @@ class ChannelRead
      *
      * Excludes the root channel, which is not selectable as a page destination.
      *
-     * @return array<int, array{id: int, name: string, slug: string, parent_id: int, category_sets: array<int, int|string>, tag_sets: array<int, int|string>, editor_override: string, theme_override: string, route_mode: string, route_separator: string}>
+     * @return array<int, array{id: int, name: string, slug: string, parent_id: int, depth: int, category_sets: array<int, int|string>, tag_sets: array<int, int|string>, editor_override: string, route_mode: string, route_separator: string}>
      */
     public function listOptions(): array
     {
-        $rows = [];
-        // Build selectable options from record cache while excluding non-selectable root channel.
+        $recordsById = [];
+        // Index selectable records first so hierarchy construction can resolve parents locally.
         foreach ($this->listRecords() as $channel) {
             // Root channel is implicit and should not appear in destination pickers.
             if (ChannelShared::isRootChannelId((int) ($channel['id'] ?? -1))) {
                 continue;
             }
 
-            $rows[] = [
-                'id' => (int) ($channel['id'] ?? 0),
+            $channelId = (int) ($channel['id'] ?? 0);
+            if ($channelId < 1) {
+                continue;
+            }
+
+            $recordsById[$channelId] = [
+                'id' => $channelId,
                 'name' => (string) ($channel['name'] ?? ''),
                 'slug' => (string) ($channel['slug'] ?? ''),
                 'parent_id' => ChannelShared::normalizeParentId($channel['parent_id'] ?? 0),
@@ -279,15 +284,60 @@ class ChannelRead
             ];
         }
 
-        usort($rows, static function (array $a, array $b): int {
-            $nameCompare = strcasecmp($a['name'], $b['name']);
-            // Keep deterministic alphabetical ordering for non-tied names.
-            if ($nameCompare !== 0) {
-                return $nameCompare;
+        $childrenByParent = [];
+        // Group each channel beneath its valid parent; malformed parents fall back to root.
+        foreach ($recordsById as $channelId => $channel) {
+            $parentId = (int) ($channel['parent_id'] ?? 0);
+            if ($parentId === $channelId || ($parentId > 0 && !isset($recordsById[$parentId]))) {
+                $parentId = ChannelShared::ROOT_CHANNEL_ID;
+                $recordsById[$channelId]['parent_id'] = $parentId;
             }
 
-            return $a['id'] <=> $b['id'];
-        });
+            $childrenByParent[$parentId][] = $channelId;
+        }
+
+        foreach ($childrenByParent as &$childIds) {
+            usort($childIds, static function (int $leftId, int $rightId) use ($recordsById): int {
+                $nameCompare = strcasecmp(
+                    (string) ($recordsById[$leftId]['name'] ?? ''),
+                    (string) ($recordsById[$rightId]['name'] ?? '')
+                );
+                // Keep deterministic alphabetical ordering for tied sibling names.
+                return $nameCompare !== 0 ? $nameCompare : ($leftId <=> $rightId);
+            });
+        }
+        unset($childIds);
+
+        $rows = [];
+        $visited = [];
+        $appendChildren = function (int $parentId, int $depth) use (&$appendChildren, &$rows, &$visited, $childrenByParent, $recordsById): void {
+            foreach ($childrenByParent[$parentId] ?? [] as $childId) {
+                if (isset($visited[$childId]) || !isset($recordsById[$childId])) {
+                    continue;
+                }
+
+                $visited[$childId] = true;
+                $row = $recordsById[$childId];
+                $row['depth'] = $depth;
+                $rows[] = $row;
+                $appendChildren($childId, $depth + 1);
+            }
+        };
+
+        // Emit root channels first, then alphabetized descendants beneath each parent.
+        $appendChildren(ChannelShared::ROOT_CHANNEL_ID, 0);
+        // Preserve orphaned records without allowing malformed parent cycles to hide them.
+        foreach ($recordsById as $channelId => $channel) {
+            if (isset($visited[$channelId])) {
+                continue;
+            }
+
+            $visited[$channelId] = true;
+            $channel['parent_id'] = ChannelShared::ROOT_CHANNEL_ID;
+            $channel['depth'] = 0;
+            $rows[] = $channel;
+            $appendChildren($channelId, 1);
+        }
 
         return $rows;
     }

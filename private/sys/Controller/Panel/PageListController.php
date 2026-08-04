@@ -37,7 +37,7 @@ final class PageListController
      * @param bool $categoryEnabled Whether category prefilter support is enabled in runtime config.
      * @param bool $tagEnabled Whether tag prefilter support is enabled in runtime config.
      * @param PageRead $pageRead Page repository read side for paginated page list queries.
-     * @param ChannelRead $channelRead Channel repository read side for channel-slug prefilter resolution.
+     * @param ChannelRead $channelRead Channel repository read side for parent-aware channel prefilter resolution.
      * @return void
      */
     public function __construct(
@@ -69,7 +69,8 @@ final class PageListController
             return;
         }
 
-        $prefilterChannel = $this->input->slug($_GET['channel'] ?? null) ?? '';
+        // Preserve slash-separated channel paths so child channels remain unambiguous.
+        $prefilterChannel = strtolower(trim((string) ($_GET['channel'] ?? ''), '/'));
         $prefilterCategoryId = $this->input->int($_GET['category'] ?? null, 1) ?? 0;
         $prefilterTagId = $this->input->int($_GET['tag'] ?? null, 1) ?? 0;
         // Disable category prefilter when taxonomy feature is globally off.
@@ -82,8 +83,13 @@ final class PageListController
         }
         $requestedPage = $this->input->int($_GET['page'] ?? null, 1) ?? 1;
         $perPage = 50;
-        $prefilterChannelId = $prefilterChannel !== '' ? $this->channelRead->idBySlug($prefilterChannel) : null;
-        // An unknown channel slug should behave like an empty filtered result, not like "all channels".
+        $prefilterChannelRecord = $prefilterChannel !== ''
+            ? $this->channelRead->findByPath($prefilterChannel)
+            : null;
+        $prefilterChannelId = is_array($prefilterChannelRecord)
+            ? (int) ($prefilterChannelRecord['id'] ?? 0)
+            : null;
+        // An unknown parent-aware channel path should behave like an empty filtered result, not like "all channels".
         $hasMissingChannelPrefilter = $prefilterChannel !== '' && $prefilterChannelId === null;
         $pageResult = $hasMissingChannelPrefilter
             ? ['rows' => [], 'total' => 0]

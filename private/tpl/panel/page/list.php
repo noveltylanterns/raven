@@ -45,8 +45,8 @@ foreach ($pages as $pageRow) {
         $pagesStatusOptions[$statusOptionKey] = $statusLabel;
     }
 
-    $channelSlugValue = trim((string) ($pageRow['channel_slug'] ?? ''));
-    $channelLabel = $channelSlugValue === '' ? '<none>' : $channelSlugValue;
+    $channelPathValue = trim((string) ($pageRow['channel_path'] ?? ''), '/');
+    $channelLabel = $channelPathValue === '' ? '<none>' : $channelPathValue;
     $channelOptionKey = strtolower($channelLabel);
     if (!isset($pagesChannelOptions[$channelOptionKey])) {
         $pagesChannelOptions[$channelOptionKey] = $channelLabel;
@@ -128,8 +128,8 @@ $pageListToolbarItems = [
         $rowId = (int) ($row['id'] ?? 0);
         $rowTitle = (string) ($row['title'] ?? '');
         $rowSlug = (string) ($row['slug'] ?? '');
-        $channelSlug = trim((string) ($row['channel_slug'] ?? ''));
-        $channelLabel = $channelSlug === '' ? '<none>' : $channelSlug;
+        $channelPath = trim((string) ($row['channel_path'] ?? ''), '/');
+        $channelLabel = $channelPath === '' ? '<none>' : $channelPath;
         $statusLabel = ($row['status'] ?? '') === 'published' ? 'Published' : 'Draft';
         $statusBadgeClass = $statusLabel === 'Published' ? 'text-bg-success' : 'text-bg-warning';
         $rowCategoryIds = [];
@@ -186,7 +186,7 @@ $pageListToolbarItems = [
                 </a>
             </td>
             <td><?= e($rowSlug) ?></td>
-            <td><?= $channelSlug === '' ? '&lt;none&gt;' : e($channelSlug) ?></td>
+            <td><?= $channelPath === '' ? '&lt;none&gt;' : e($channelPath) ?></td>
             <td><span class="badge <?= e($statusBadgeClass) ?>"><?= e($statusLabel) ?></span></td>
             <td class="text-center">
                 <div class="d-flex justify-content-center gap-2">

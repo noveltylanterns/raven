@@ -7,6 +7,9 @@
 - Redirect reads, writes, panel selectors, and public route metadata now use canonical parent-aware channel paths, so redirects under child channels resolve at their complete nested URLs.
 - Split routing identity from slash policy: Content now uses `content.selector` (`slug` or `id`), while Basic `site.routing` (`no_trailing_slash` or `trailing_slash`) controls built-in 301 canonicalization across public site paths, including taxonomy links.
 - Corrected public taxonomy route closure dispatch, parent-aware links in category/tag/feed listings and template fallbacks, nested channel feed paths, feed metadata, pagination links, and custom redirect targets so every public URL surface follows the same channel tree and slash policy.
+- Updated the panel page list's Channel column, channel filter values, and channel prefilters to use complete parent-aware paths such as `raven/docs/appendix`, restoring meaningful alphabetical channel sorting across the tree.
+- Updated the page editor's channel selector to show `None`, alphabetized root channels, and alphabetized descendants grouped beneath their parents with two-space indentation per level.
+- Added a dedicated Taxonomy tab to the page editor for channel, category, and tag assignments; Meta now contains only page metadata fields.
 
 ### August 2, 2026
 

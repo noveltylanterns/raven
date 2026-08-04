@@ -3,7 +3,7 @@
 /**
  * RAVEN CMS
  * ~/private/tpl/panel/page/edit.php
- * Admin panel page editor template with content/meta/media tabs.
+ * Admin panel page editor template with content/taxonomy/meta/media tabs.
  * Docs: https://lanterns.io/raven
  */
 
@@ -380,6 +380,17 @@ if ($hasPersistedPage) {
                 aria-selected="<?= $activeTab === 'meta' ? 'true' : 'false' ?>"
             >Meta</button>
         </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link<?= $activeTab === 'taxonomy' ? ' active' : '' ?>"
+                id="page-taxonomy-tab"
+                data-bs-toggle="tab"
+                data-bs-target="#rvnp-editor-pane-taxonomy"
+                type="button"
+                role="tab"
+                aria-controls="rvnp-editor-pane-taxonomy"
+                aria-selected="<?= $activeTab === 'taxonomy' ? 'true' : 'false' ?>"
+            >Taxonomy</button>
+        </li>
     </ul>
 
     <div class="tab-content raven-tab-content-surface border border-top-0 p-3" id="rvnp-editor-content">
@@ -541,6 +552,7 @@ if ($hasPersistedPage) {
                             <option value="published"<?= $selectedStatus === 'published' ? ' selected' : '' ?>>Published</option>
                             <option value="draft"<?= $selectedStatus === 'draft' ? ' selected' : '' ?>>Draft</option>
                         </select>
+                        <div class="form-text">Toggles visibility on public site.</div>
                     </div>
 
                     <div class="form-group">
@@ -568,11 +580,6 @@ if ($hasPersistedPage) {
                     </div>
 
                     <div class="form-group">
-                        <label for="description" class="form-label">Description</label>
-                        <textarea id="description" name="description" class="form-control" rows="3"><?= e((string) ($page['description'] ?? '')) ?></textarea>
-                    </div>
-
-                    <div class="form-group">
                         <label for="author_user_id" class="form-label">Author</label>
                         <select id="author_user_id" name="author_user_id" class="form-select">
                             <?php foreach ($authorOptions as $authorOption): ?>
@@ -595,6 +602,21 @@ if ($hasPersistedPage) {
                         <div class="form-text">Defaults to the creator account for new pages. Override here to change public author metadata.</div>
                     </div>
 
+                    <div class="form-group">
+                        <label for="description" class="form-label">Description</label>
+                        <textarea id="description" name="description" class="form-control" rows="3"><?= e((string) ($page['description'] ?? '')) ?></textarea>
+                        <div class="form-text">Summary text used for meta & social preview descriptions. Auto-generates if left blank.</div>
+                    </div>
+
+                </div>
+
+                <div
+                    class="tab-pane fade<?= $activeTab === 'taxonomy' ? ' show active' : '' ?>"
+                    id="rvnp-editor-pane-taxonomy"
+                    role="tabpanel"
+                    aria-labelledby="page-taxonomy-tab"
+                    tabindex="0"
+                >
                     <div class="form-group">
                         <label for="channel_slug" class="form-label">Channel</label>
                         <select id="channel_slug" name="channel_slug" class="form-select">
@@ -620,6 +642,9 @@ if ($hasPersistedPage) {
                                     $channelUrlSeparator = 'inherit';
                                 }
                                 ?>
+                                <?php $channelDepth = max(0, (int) ($channel['depth'] ?? 0)); ?>
+                                <?php $channelIndent = str_repeat("\u{00a0}", $channelDepth * 2); ?>
+                                <?php $channelLabel = $channelIndent . (string) ($channel['name'] ?? $slug); ?>
                                 <option
                                     value="<?= e($slug) ?>"
                                     data-rvn-channel-editor-override="<?= e($channelEditorOverride) ?>"
@@ -629,10 +654,11 @@ if ($hasPersistedPage) {
                                     data-rvn-channel-tag-sets="<?= e(implode(',', array_map('strval', is_array($channel['tag_sets'] ?? null) ? $channel['tag_sets'] : $defaultTagSetSelection))) ?>"
                                     <?= $selectedChannelSlug === $slug ? ' selected' : '' ?>
                                 >
-                                    <?= e((string) ($channel['name'] ?? $slug)) ?> (<?= e($slug) ?>)
+                                    <?= e($channelLabel) ?> (<?= e($slug) ?>)
                                 </option>
                             <?php endforeach; ?>
                         </select>
+                        <div class="form-text">Sort this page into the designated channel.</div>
                     </div>
 
                     <?php if ($categoryEnabled): ?>
