@@ -33,6 +33,10 @@ Core runtime bootstrap (`private/Raven.php` + extension runtime services) does t
    `schema.php` runs when the extension requests storage in `ext.php`.
 5. Injects a context object (`app`, `panelUrl`, `requirePanelLogin`, etc.) for route registration.
 
+The panel rebuilds its extension navigation after authentication-helper requests
+clear the pre-authentication nav snapshot. This keeps sidebar visibility in sync
+with route access when a session moves from login or 2FA into the authenticated panel.
+
 Provider files are loaded only from the extension root. Raven no longer falls back to legacy `lib/*.php` provider locations.
 
 Enabled extension classes autoload only from `private/ext/{slug}/lib/`. Raven no longer scans a legacy `src/` class root.

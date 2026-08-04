@@ -428,6 +428,10 @@ final class SharedController
             $_SESSION['_raven_nav_modules'] = [];
             $_SESSION['_raven_nav_system_extensions'] = [];
             $_SESSION['_raven_nav_page_create_channels'] = [];
+            // Auth-helper requests intentionally clear the rendered nav snapshot;
+            // clear its cache key too so the first authenticated request rebuilds
+            // extension links instead of accepting the now-empty snapshot.
+            unset($_SESSION['_raven_nav_cache_key']);
             return;
         }
 
