@@ -4,6 +4,7 @@
 
 ### August 4, 2026
 
+- Moved generated public and panel template references to `docs/appendix/templates_public.md` and `docs/appendix/templates_panel.md`.
 - Fixed channel edit header preview links to use the channel's complete parent-aware public path instead of its leaf slug.
 - Fixed channel edit header preview links to preserve nested channel path separators when building public URLs.
 - Linked core and library class-group lists and extension slugs to their corresponding appendix reference pages.

@@ -42,8 +42,8 @@ This page is the developer-surface index for Raven CMS. It links the stable impl
 - Panel fallback templates: `private/tpl/panel/*`
 - Public themes: `public/theme/{slug}/`
 - Primary references:
-  - [Templates Appendix (Public)](./templates/public.md)
-  - [Templates Appendix (Panel)](./templates/panel.md)
+  - [Templates Appendix (Public)](./templates_public.md)
+  - [Templates Appendix (Panel)](./templates_panel.md)
   - [Bootstrap Appendix](./bootstrap.md)
   - [Theming Narrative Guide](../theming.md)
   - [Public Theme Contract](../../public/theme/AGENTS.md)
@@ -58,5 +58,5 @@ This page is the developer-surface index for Raven CMS. It links the stable impl
 5. [Extensions Appendix Overview](./extensions/readme.md)
 6. [Libraries Appendix Overview](./libraries/readme.md)
 7. [CLI Appendix Index](./cli/readme.md)
-8. [Templates Appendix (Public)](./templates/public.md)
+8. [Templates Appendix (Public)](./templates_public.md)
 9. [Bootstrap Appendix](./bootstrap.md)

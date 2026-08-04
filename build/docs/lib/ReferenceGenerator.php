@@ -1960,12 +1960,12 @@ MARKDOWN,
         $publicRoutes = $this->routeRecordsForScope('public');
 
         return [
-            'docs/appendix/templates/panel.md' => $this->renderPanelTemplatesDocument(
+            'docs/appendix/templates_panel.md' => $this->renderPanelTemplatesDocument(
                 $panelTemplates,
                 $panelRenders,
                 $panelRoutes
             ),
-            'docs/appendix/templates/public.md' => $this->renderPublicTemplatesDocument(
+            'docs/appendix/templates_public.md' => $this->renderPublicTemplatesDocument(
                 $publicTemplates,
                 $publicRenders,
                 $publicRoutes

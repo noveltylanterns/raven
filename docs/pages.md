@@ -96,7 +96,7 @@ the canonical extensionless URL, /docs/guide.
 
 Template resolution and fallback behavior are documented in:
 
-- `docs/appendix/templates/public.md`
+- `docs/appendix/templates_public.md`
 
 ## 5) Scheduling And Visibility
 
@@ -132,5 +132,5 @@ Panel editor media hydration helpers are under:
 
 - `docs/appendix/core/controller.md`
 - `docs/appendix/core/repository.md`
-- `docs/appendix/templates/public.md`
+- `docs/appendix/templates_public.md`
 - `docs/appendix/database.md`
