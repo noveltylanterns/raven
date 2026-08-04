@@ -22,10 +22,10 @@
 - [Groups](./groups.md)
 - [Users](./users.md)
 
-### Developers
+### Advanced Usage
+- [Command Line](./cli.md)
 - [Extensions](./extensions.md)
 - [Theming](./theming.md)
-- [CLI](./cli.md)
 
 ### Developer Appendix
 - [Appendix Index](./appendix/readme.md)
