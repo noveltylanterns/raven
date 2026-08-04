@@ -4,7 +4,8 @@
 
 ### August 4, 2026
 
-- Connected `rvn-docs` to the marked command-inventory fragment in the hand-authored CLI index, so discovered `rvn-*` wrappers always receive generated links without replacing the rest of the page.
+- Updated CLI inventory generation to derive the complete list below the `Command Inventory` heading and generate uniform dispatcher and shell-helper references at `rvn.md` and `rvn-sh.md`.
+- Connected `rvn-docs` to the command list below the `Command Inventory` heading in the hand-authored CLI index, so discovered `rvn-*` wrappers always receive generated links without replacing the rest of the page.
 - Restored the shared CLI summary, inventory, banner contract, and QA guidance to the hand-authored CLI appendix index while keeping command-specific details on generated child pages.
 - Consolidated CLI documentation under the hand-authored `docs/appendix/cli/readme.md`; removed the redundant `docs/cli.md`, moved command guidance into generated command pages, and left the generator responsible only for those child references.
 - Fixed child channels inheriting public theme overrides through their parent channel chain before falling back to the system theme.
