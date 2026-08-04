@@ -41,6 +41,8 @@ use Raven\Core\Config;
 use Raven\Core\Repository\ChannelRead;
 use Raven\Core\Repository\ConfigWrite;
 use Raven\Core\Repository\PageRead;
+use Raven\Core\Repository\RedirectRead;
+use Raven\Core\Repository\RedirectWrite;
 use Raven\Core\Debug\RouteProfiler;
 use Raven\Core\Router\ChannelPolicy;
 use Raven\Core\Router\PagePolicy;
@@ -90,6 +92,8 @@ final class RoutingSmokeRunner
         $input = new InputSanitizer();
         $channels = new ChannelRead($db, 'sqlite', '', $channelDirectory);
         $pages = new PageRead($db, 'sqlite', '', $channels, false, false);
+        $redirects = new RedirectRead($db, 'sqlite', '', $channels);
+        $redirectWriter = new RedirectWrite($db, 'sqlite', '', $channels);
 
         $parentOptions = $channels->listParentOptions();
         $parentOptionIds = array_map(
@@ -108,6 +112,21 @@ final class RoutingSmokeRunner
         $this->assert($channels->findByPath('alpha') === null, 'A child channel must not resolve as a root-level path.');
         $this->assert($channels->pathForChannel(40) === 'news/alpha/alpha-child', 'Canonical channel path did not include all parent slugs.');
         $this->events[] = 'channel_parent_hierarchy=ok';
+
+        $redirectWriter->save([
+            'id' => null,
+            'title' => 'Nested legacy route',
+            'description' => '',
+            'slug' => 'nested-legacy',
+            'channel_slug' => 'news/alpha',
+            'active' => 1,
+            'target' => '/new-destination',
+        ]);
+        $nestedRedirect = $redirects->findActiveByPath('nested-legacy', 'news/alpha');
+        $this->assert((string) ($nestedRedirect['target'] ?? '') === '/new-destination', 'Nested redirect did not resolve through its complete channel path.');
+        $this->assert((string) ($nestedRedirect['channel_slug'] ?? '') === 'news/alpha', 'Nested redirect did not expose its canonical channel path.');
+        $this->assert($redirects->findActiveByPath('nested-legacy', 'alpha') === null, 'Nested redirect incorrectly resolved without its parent channel segment.');
+        $this->events[] = 'nested_redirect_path=ok';
 
         $routeHandler = new RouteHandler();
         $routeHandler->add('GET', '/{channel}/{path...}', static fn (array $params): array => $params);
@@ -229,6 +248,19 @@ PHP;
                 author INTEGER NULL,
                 cover_image INTEGER NULL,
                 preview_image INTEGER NULL,
+                created TEXT NOT NULL DEFAULT \'\',
+                updated TEXT NOT NULL DEFAULT \'\'
+            )'
+        );
+        $db->exec(
+            'CREATE TABLE redirects (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                title TEXT NOT NULL DEFAULT \'\',
+                description TEXT NOT NULL DEFAULT \'\',
+                slug TEXT NOT NULL DEFAULT \'\',
+                channel INTEGER NOT NULL DEFAULT 0,
+                active INTEGER NOT NULL DEFAULT 1,
+                target TEXT NOT NULL DEFAULT \'\',
                 created TEXT NOT NULL DEFAULT \'\',
                 updated TEXT NOT NULL DEFAULT \'\'
             )'

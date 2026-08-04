@@ -623,6 +623,40 @@ function raven_cli_optional_slug(array $rvn, mixed $raw): ?string
 }
 
 /**
+ * Normalizes one optional parent-aware channel path selector from CLI input.
+ *
+ * @param array<string, mixed> $rvn Shared Raven runtime container with the input normalizer.
+ * @param mixed                $raw Raw CLI channel path value to normalize.
+ * @return string|null Normalized slash-separated channel path, or null when omitted/invalid.
+ */
+function raven_cli_optional_channel_path(array $rvn, mixed $raw): ?string
+{
+    // Optional channel paths ignore non-scalar option payloads.
+    if (!is_scalar($raw)) {
+        return null;
+    }
+
+    $value = trim((string) $raw, '/');
+    // Blank optional channel paths are treated as root scope.
+    if ($value === '') {
+        return null;
+    }
+
+    $segments = [];
+    // Normalize each segment independently so hierarchy separators remain meaningful.
+    foreach (explode('/', $value) as $segment) {
+        $normalizedSegment = $rvn['input']->slug($segment);
+        if ($normalizedSegment === null) {
+            return null;
+        }
+
+        $segments[] = $normalizedSegment;
+    }
+
+    return $segments === [] ? null : implode('/', $segments);
+}
+
+/**
  * @param array<int, array<string, mixed>> $rows
  * @return array<string, mixed>|null
  */
@@ -2098,7 +2132,14 @@ function raven_cli_command_redirect(RavenCliContext $context, array $tokens): in
                 return null;
             }
 
-            $channel = raven_cli_optional_slug($rvn, raven_cli_option($options, 'channel', ''));
+            $channelInput = raven_cli_option($options, 'channel', '');
+            $channel = raven_cli_optional_channel_path($rvn, $channelInput);
+            $channelInputProvided = $channelInput !== null
+                && (!is_scalar($channelInput) || trim((string) $channelInput, '/') !== '');
+            // Invalid explicit channel selectors must fail closed instead of falling back to root scope.
+            if ($channelInputProvided && $channel === null) {
+                return null;
+            }
 
             return $repoRead->findBySlug($slug, $channel);
         };
@@ -2195,10 +2236,17 @@ function raven_cli_command_redirect(RavenCliContext $context, array $tokens): in
                 throw new RuntimeException('Redirect target URL is required.');
             }
 
-            $channelSlug = strtolower(trim((string) raven_cli_option($options, 'channel', is_array($existing) ? (string) ($existing['channel_slug'] ?? '') : '')));
-            // Channel slug is optional; validate it only when provided.
-            if ($channelSlug !== '') {
-                $channelSlug = raven_cli_slug_from_text($rvn, $channelSlug, 'Channel slug');
+            $channelInput = raven_cli_option($options, 'channel', is_array($existing) ? (string) ($existing['channel_slug'] ?? '') : '');
+            $channelInputText = is_scalar($channelInput) ? trim((string) $channelInput) : '';
+            $channelSlug = raven_cli_optional_channel_path($rvn, $channelInput);
+            // A supplied non-empty path must not silently fall back to root scope when malformed.
+            if ($channelInputText !== '' && $channelSlug === null) {
+                throw new RuntimeException('Channel path is invalid.');
+            }
+
+            // Channel path is optional; a blank value selects root scope.
+            if ($channelSlug !== null) {
+                $channelSlug = trim($channelSlug, '/');
             }
 
             $active = raven_cli_bool_option(
@@ -2213,7 +2261,7 @@ function raven_cli_command_redirect(RavenCliContext $context, array $tokens): in
                 'title' => $title,
                 'description' => $description,
                 'slug' => $slug,
-                'channel_slug' => $channelSlug !== '' ? $channelSlug : null,
+                'channel_slug' => $channelSlug !== null && $channelSlug !== '' ? $channelSlug : null,
                 'active' => $active ? 1 : 0,
                 'target' => $target,
             ]);

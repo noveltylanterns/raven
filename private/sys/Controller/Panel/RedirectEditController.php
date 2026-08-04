@@ -70,7 +70,7 @@ final class RedirectEditController
         }
 
         $redirectRow = $id !== null ? $this->redirectRead->findById($id) : null;
-        $channelOptions = $this->channelRead->listOptions();
+        $channelOptions = $this->redirectChannelOptions();
 
         // Edit mode requires an existing redirect row.
         if ($id !== null && $redirectRow === null) {
@@ -113,7 +113,16 @@ final class RedirectEditController
         $title = $this->input->text($post['title'] ?? null, 255);
         $description = $this->input->text($post['description'] ?? null, 1000);
         $slug = $this->input->slug($post['slug'] ?? null);
-        $channelSlug = $this->input->slug($post['channel_slug'] ?? null);
+        $rawChannelPath = $post['channel_slug'] ?? null;
+        $channelPathInvalid = $rawChannelPath !== null
+            && $rawChannelPath !== ''
+            && !is_string($rawChannelPath);
+        $channelSlug = is_string($rawChannelPath)
+            ? strtolower(trim($this->input->text($rawChannelPath, 1024), '/'))
+            : null;
+        if ($channelSlug === '') {
+            $channelSlug = null;
+        }
         $status = strtolower((string) $this->input->text($post['status'] ?? null, 20));
         $targetUrl = $this->input->text($post['target'] ?? null, 2048);
 
@@ -135,8 +144,8 @@ final class RedirectEditController
             Redirect::redirect($this->editUrl($id));
         }
 
-        // Channel dropdown should only post known channel slugs.
-        if ($channelSlug !== null && !$this->channelRead->slugExists($channelSlug)) {
+        // Channel dropdown must post a canonical path that resolves through the stored parent tree.
+        if ($channelPathInvalid || ($channelSlug !== null && $this->channelRead->findByPath($channelSlug) === null)) {
             $this->context->flash('error', 'Selected channel does not exist.');
             Redirect::redirect($this->editUrl($id));
         }
@@ -248,6 +257,34 @@ final class RedirectEditController
     private function editUrl(?int $id): string
     {
         return $this->context->panelUrl('/redirect/edit' . ($id !== null ? '/' . $id : ''));
+    }
+
+    /**
+     * Returns hierarchical redirect channel options with canonical public paths.
+     *
+     * @return array<int, array<string, mixed>> Root-excluded channel options ordered by parent tree.
+     */
+    private function redirectChannelOptions(): array
+    {
+        $options = [];
+        // Parent options provide the same root-first hierarchy used by channel management.
+        foreach ($this->channelRead->listParentOptions() as $option) {
+            $id = (int) ($option['id'] ?? 0);
+            if ($id < 1) {
+                continue;
+            }
+
+            $path = $this->channelRead->pathForChannel($id);
+            // Malformed legacy hierarchy records cannot produce a safe selectable route.
+            if ($path === '') {
+                continue;
+            }
+
+            $option['path'] = $path;
+            $options[] = $option;
+        }
+
+        return $options;
     }
 
     /**

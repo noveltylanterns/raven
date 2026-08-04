@@ -2,6 +2,10 @@
 
 *The machine is supposed to be logging patches & mods to this file. Sometimes it does, sometimes it doesn't. It might be useful for historical architectural context to your Agent at one point.*
 
+### August 4, 2026
+
+- Redirect reads, writes, panel selectors, and public route metadata now use canonical parent-aware channel paths, so redirects under child channels resolve at their complete nested URLs.
+
 ### August 2, 2026
 
 - Public channel routes now resolve complete parent-aware paths for nested channels and nested pages; child slugs are resolved only beneath their stored parent paths.

@@ -12,7 +12,7 @@ Service-key grouping is inferred from `$rvn['...']` container usage in each sour
 - `debug` (47 symbols)
 - `repository` (236 symbols)
 - `router` (218 symbols)
-- `runtime` (242 symbols)
+- `runtime` (243 symbols)
 - `schema` (50 symbols)
 
 ## Service Keys
@@ -30,7 +30,7 @@ Service-key grouping is inferred from `$rvn['...']` container usage in each sour
 - `extension_services_for` (8 symbols, groups: `runtime`)
 - `initialize_panel_runtime` (1 symbols, groups: `runtime`)
 - `initialize_public_runtime` (1 symbols, groups: `runtime`)
-- `input` (45 symbols, groups: `runtime`)
+- `input` (46 symbols, groups: `runtime`)
 - `panel_category_edit_controller` (1 symbols, groups: `runtime`)
 - `panel_category_list_controller` (1 symbols, groups: `runtime`)
 - `panel_channel_edit_controller` (1 symbols, groups: `runtime`)

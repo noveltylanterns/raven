@@ -29,7 +29,7 @@ Columns shown:
 - `ID`
 - `Title`
 - `Slug`
-- `Channel` (`<none>` when using the stock root scope)
+- `Channel` (canonical parent-aware path, or `<none>` for the stock root scope)
 - `Target URL`
 - `Status` (`Active` or `Inactive`)
 - `Actions`
@@ -47,7 +47,7 @@ Fields/options:
 - `Title` (required)
 - `Description` (optional)
 - `Slug` (required)
-- `Channel` (`<none>` or a channel slug)
+- `Channel` (`<none>` or a canonical parent-aware channel path such as `news/alpha`)
 - `Status` (`Active` or `Inactive`)
 - `Target URL` (required)
 
@@ -91,7 +91,7 @@ Split redirect handlers:
 - `redirectEdit(?int $id)`
   - Owned by `RedirectEditController`.
   - Loads existing row when id is provided.
-  - Provides channel options from `ChannelRead::listAll()`.
+  - Provides root-first hierarchical channel options with canonical parent-aware paths.
   - Missing id row triggers flash error + redirect to `/redirect`.
 - `redirectSave(array $post)`
   - Owned by `RedirectEditController`.
@@ -100,7 +100,7 @@ Split redirect handlers:
   - Requires title + valid slug.
   - Enforces `status` in `active|inactive`.
   - Blocks reserved root slugs (`isReservedPublicRootSlug`) when `channel_slug` is empty.
-  - Validates posted `channel_slug` against actual channel list.
+  - Validates posted `channel_slug` against the actual parent-aware channel tree.
   - Validates target URL format (`isAllowedRedirectTargetUrl`).
   - Saves via `RedirectWrite::save(...)`.
 - `redirectDelete(array $post)`
@@ -114,7 +114,7 @@ Split redirect handlers:
 `RedirectRead` + `RedirectWrite` behavior:
 
 - `RedirectRead::listAll()` and `RedirectRead::findById()` join channel metadata for panel display.
-- `RedirectRead::findActiveByPath(slug, channelSlug)` resolves active redirects for public routing.
+- `RedirectRead::findActiveByPath(slug, channelSlug)` resolves active redirects through the complete parent-aware channel path.
 - `RedirectWrite::save(...)` handles create/update and enforces path uniqueness per `(channel, slug)`.
 - `RedirectWrite::deleteById(...)` removes one redirect row.
 
@@ -126,7 +126,8 @@ Storage detail:
 ### Public Resolution Rules
 
 - Root redirect path: `/{slug}` (redirect row stores `channel = 0` for the root scope).
-- Channel redirect path: `/{channel_slug}/{slug}` (redirect row must match channel).
+- Channel redirect path: `/{channel_path}/{slug}` (for example, `/news/alpha/old-link`; the redirect row matches the leaf channel id reached through each direct parent).
+- A child channel slug without its parent path does not resolve a redirect.
 - Only `active = 1` rows are eligible for public redirect resolution.
 
 ### Security/Validation Expectations

@@ -39,7 +39,10 @@ $redirectPublicUrl = null;
 if ($redirectRow !== null && $publicBase !== '' && $redirectSlug !== '') {
     $redirectPathParts = [];
     if ($selectedChannelSlug !== '') {
-        $redirectPathParts[] = rawurlencode($selectedChannelSlug);
+        // Encode each segment independently so hierarchy separators remain URL separators.
+        foreach (explode('/', trim($selectedChannelSlug, '/')) as $channelPathSegment) {
+            $redirectPathParts[] = rawurlencode($channelPathSegment);
+        }
     }
     $redirectPathParts[] = rawurlencode($redirectSlug);
     $redirectPublicUrl = $publicBase . '/' . implode('/', $redirectPathParts);
@@ -113,7 +116,7 @@ if ($hasPersistedRedirect) {
 
             <div class="form-group">
                 <label for="slug" class="form-label">Slug</label>
-                <!-- Slug composes redirect source path: /{slug} or /{channel_slug}/{slug}. -->
+                <!-- Slug composes redirect source path: /{slug} or /{channel_path}/{slug}. -->
                 <input id="slug" name="slug" class="form-control" required value="<?= e((string) ($redirectRow['slug'] ?? '')) ?>">
             </div>
 
@@ -125,19 +128,20 @@ if ($hasPersistedRedirect) {
 
             <div class="form-group">
                 <label for="channel_slug" class="form-label">Channel</label>
-                <!-- Optional channel scope for redirects under /{channel}/{slug}. -->
+                <!-- Optional parent-aware channel scope for redirects under /{channel_path}/{slug}. -->
                 <select id="channel_slug" name="channel_slug" class="form-select">
                     <option value="">&lt;none&gt;</option>
                     <?php foreach ($channelOptions as $channelOption): ?>
-                        <?php $optionSlug = (string) ($channelOption['slug'] ?? ''); ?>
-                        <?php if ($optionSlug === ''): ?>
+                        <?php $optionPath = (string) ($channelOption['path'] ?? ''); ?>
+                        <?php if ($optionPath === ''): ?>
                             <?php continue; ?>
                         <?php endif; ?>
                         <option
-                            value="<?= e($optionSlug) ?>"
-                            <?= $selectedChannelSlug === $optionSlug ? 'selected' : '' ?>
+                            value="<?= e($optionPath) ?>"
+                            <?= $selectedChannelSlug === $optionPath ? 'selected' : '' ?>
                         >
-                            <?= e($optionSlug) ?> (<?= e((string) ($channelOption['name'] ?? '')) ?>)
+                            <?= e(str_repeat('— ', max(0, (int) ($channelOption['depth'] ?? 1) - 1)) . (string) ($channelOption['name'] ?? $optionPath)) ?>
+                            (<?= e($optionPath) ?>)
                         </option>
                     <?php endforeach; ?>
                 </select>

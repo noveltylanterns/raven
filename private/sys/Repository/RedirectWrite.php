@@ -14,7 +14,6 @@ use PDO;
 use Raven\Core\Debug\UniquenessProfiler;
 use Raven\Core\Repository\ChannelShared;
 use Raven\Lib\Database\SqlTable;
-use Raven\Lib\Parser\ChannelParser;
 use RuntimeException;
 
 /**
@@ -169,10 +168,10 @@ final class RedirectWrite
     }
 
     /**
-     * Resolves one channel slug to its numeric id for channel-bound redirects.
+     * Resolves one parent-aware channel path to its numeric id for channel-bound redirects.
      *
-     * @param string|null $slug Submitted channel slug, or null/root sentinel.
-     * @throws RuntimeException When a non-root channel slug does not resolve to a live channel.
+     * @param string|null $slug Submitted channel path, or null/root sentinel.
+     * @throws RuntimeException When a non-root channel path does not resolve to a live channel.
      * @return int|null Resolved channel id, or `0` for root scope.
      */
     private function channelIdBySlug(?string $slug): ?int
@@ -182,11 +181,19 @@ final class RedirectWrite
             return 0;
         }
 
-        return ChannelParser::resolveChannelIdBySlug(
-            $slug,
-            fn (string $normalized): ?int => $this->channelRepo->idBySlug($normalized),
-            'Selected channel does not exist.'
-        );
+        $normalized = strtolower(trim((string) ($slug ?? ''), '/'));
+        // Empty channel paths represent the root redirect scope and persist as channel id 0.
+        if ($normalized === '') {
+            return 0;
+        }
+
+        // Resolve the complete path so a child cannot be detached from its stored parent hierarchy.
+        $channel = $this->channelRepo->findByPath($normalized);
+        if (!is_array($channel) || (int) ($channel['id'] ?? 0) < 1) {
+            throw new RuntimeException('Selected channel does not exist.');
+        }
+
+        return (int) $channel['id'];
     }
 
     /**

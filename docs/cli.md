@@ -118,10 +118,12 @@ CRUD for tags (text-only):
 CRUD for redirects (text-only):
 
 - `list`
-- `show --id <id>` or `show --slug <slug> [--channel <channel_slug>]`
-- `create --title <title> --slug <slug> --target <url> [--description <text>] [--channel <channel_slug>] [--active <1|0>]`
-- `update --id <id>|--slug <slug> [--channel <channel_slug>] ...` (same payload fields)
-- `delete --id <id>` or `delete --slug <slug> [--channel <channel_slug>]`
+- `show --id <id>` or `show --slug <slug> [--channel <channel_path>]`
+- `create --title <title> --slug <slug> --target <url> [--description <text>] [--channel <channel_path>] [--active <1|0>]`
+- `update --id <id>|--slug <slug> [--channel <channel_path>] ...` (same payload fields)
+- `delete --id <id>` or `delete --slug <slug> [--channel <channel_path>]`
+
+`--channel` accepts a complete parent-aware path such as `news/alpha`; a child slug without its parent is not a valid redirect scope.
 
 ### `rvn-conf`
 

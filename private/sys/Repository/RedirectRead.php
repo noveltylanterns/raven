@@ -220,12 +220,12 @@ class RedirectRead
      * Returns one redirect row by slug and optional channel scope.
      *
      * The repository accepts canonical selector values here: a normalized slug,
-     * plus either a channel id, a normalized channel slug, or null for root scope.
+     * plus either a channel id, a normalized parent-aware channel path, or null for root scope.
      * Higher-level parser/controller/CLI layers are responsible for user-input
      * normalization before calling into this shared data boundary.
      *
      * @param string          $slug    Redirect slug to resolve.
-     * @param int|string|null $channel Optional channel scope; null means root scope.
+     * @param int|string|null $channel Optional channel id/path scope; null means root scope.
      * @return array<string, mixed>|null Redirect row with channel context, or null when not found.
      */
     public function findBySlug(string $slug, int|string|null $channel = null): ?array
@@ -236,16 +236,16 @@ class RedirectRead
                 WHERE r.slug = :slug';
         $params = [':slug' => $slug];
 
-        // Resolve string selectors by channel slug; numeric selectors use direct id scope.
+        // Resolve string selectors through the direct-parent tree; numeric selectors use direct id scope.
         if (is_string($channel)) {
-            $channelId = $this->channelRepo->idBySlug($channel);
-            // Unknown slugs cannot be mapped into a valid redirect scope.
-            if ($channelId === null || $channelId < 1) {
+            $channelRecord = $this->channelRepo->findByPath($channel);
+            // Unknown or non-canonical paths cannot be mapped into a valid redirect scope.
+            if (!is_array($channelRecord) || (int) ($channelRecord['id'] ?? 0) < 1) {
                 return null;
             }
 
             $sql .= ' AND r.channel = :channel';
-            $params[':channel'] = $channelId;
+            $params[':channel'] = (int) $channelRecord['id'];
         } elseif (is_int($channel) && $channel > 0) {
             $sql .= ' AND r.channel = :channel';
             $params[':channel'] = $channel;
@@ -269,7 +269,7 @@ class RedirectRead
     /**
      * Returns one redirect id by slug and optional channel scope, or null when not found.
      *
-     * $channel accepts a channel ID (int), a channel slug (string), or null for root scope.
+     * $channel accepts a channel ID (int), a parent-aware channel path (string), or null for root scope.
      * Root scope matches redirects that do not belong to any channel.
      *
      * @param string           $slug    Redirect slug to look up.
@@ -282,15 +282,15 @@ class RedirectRead
         $sql = 'SELECT r.id FROM ' . $redirects . ' r WHERE r.slug = :slug';
         $params = [':slug' => $slug];
 
-        // Accept channel selectors as slug or id while preserving root-scope default behavior.
+        // Accept channel selectors as parent-aware paths or ids while preserving root-scope default behavior.
         if (is_string($channel)) {
-            $channelId = $this->channelRepo->idBySlug($channel);
-            // Unknown channel slugs should not silently match root redirects.
-            if ($channelId === null || $channelId < 1) {
+            $channelRecord = $this->channelRepo->findByPath($channel);
+            // Unknown channel paths should not silently match root redirects.
+            if (!is_array($channelRecord) || (int) ($channelRecord['id'] ?? 0) < 1) {
                 return null;
             }
             $sql .= ' AND r.channel = :channel';
-            $params[':channel'] = $channelId;
+            $params[':channel'] = (int) $channelRecord['id'];
         } elseif (is_int($channel) && $channel > 0) {
             $sql .= ' AND r.channel = :channel';
             $params[':channel'] = $channel;
@@ -313,7 +313,7 @@ class RedirectRead
      * Returns null when no active redirect exists for the given slug/channel combination.
      *
      * @param string      $slug        URL slug to match against redirect records.
-     * @param string|null $channelSlug Optional channel slug scope; null matches root redirects.
+     * @param string|null $channelSlug Optional parent-aware channel path scope; null matches root redirects.
      * @return array<string, mixed>|null Active redirect row with channel context, or null.
      */
     public function findActiveByPath(string $slug, ?string $channelSlug = null): ?array
@@ -329,17 +329,17 @@ class RedirectRead
             ':active' => 1,
         ];
 
-        // Root redirects match only channelless rows; channel routes must match by id.
+        // Root redirects match only channelless rows; channel routes must resolve through direct parents.
         if ($channelSlug === null) {
             $sql .= ' AND r.channel = 0';
         } else {
-            $channelId = $this->channelRepo->idBySlug($channelSlug);
+            $channelRecord = $this->channelRepo->findByPath($channelSlug);
             // Channel-bound paths require a valid persisted channel id.
-            if ($channelId === null || $channelId < 1) {
+            if (!is_array($channelRecord) || (int) ($channelRecord['id'] ?? 0) < 1) {
                 return null;
             }
             $sql .= ' AND r.channel = :channel';
-            $params[':channel'] = $channelId;
+            $params[':channel'] = (int) $channelRecord['id'];
         }
 
         $sql .= ' LIMIT 1';
@@ -383,7 +383,13 @@ class RedirectRead
         $row['created'] = (string) ($row['created'] ?? '');
         $row['updated'] = (string) ($row['updated'] ?? '');
 
-        return ChannelRead::applyBasicChannelContext($row, $channel);
+        $row = ChannelRead::applyBasicChannelContext($row, $channel);
+        // Redirect URLs use the canonical full channel path so nested scopes survive panel and CLI round trips.
+        $row['channel_slug'] = $channel !== null
+            ? $this->channelRepo->pathForChannel($channelId)
+            : '';
+
+        return $row;
     }
 
     /**
