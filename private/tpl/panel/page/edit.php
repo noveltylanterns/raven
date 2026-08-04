@@ -608,7 +608,7 @@ if ($hasPersistedPage) {
                     <div class="form-group">
                         <label for="description" class="form-label">Description</label>
                         <textarea id="description" name="description" class="form-control" rows="3"><?= e((string) ($page['description'] ?? '')) ?></textarea>
-                        <div class="form-text">Summary text used for metadata and social preview descriptions. Leave blank to omit a page-specific description.</div>
+                        <div class="form-text">Summary text used for metadata and social preview descriptions. Leave blank to automatically use the first lines from the page.</div>
                     </div>
 
                 </div>

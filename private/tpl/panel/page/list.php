@@ -84,6 +84,12 @@ $pageListToolbarItems = [
 <?= Header::render([
     'title' => 'Pages',
     'summary' => 'Create, organize, and manage your site pages with publication and channel controls.',
+    'actions' => [
+        '<a class="btn btn-primary btn-sm" href="' . e($panelBase) . '/backup">'
+            . '<i class="bi bi-archive me-2" aria-hidden="true"></i>Backup &amp; Restore'
+            . '</a>',
+    ],
+    'actions_class' => 'd-flex align-items-center gap-2',
     'help_url' => $panelBase . '/docs/pages',
 ]) ?>
 

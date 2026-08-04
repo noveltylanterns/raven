@@ -1,0 +1,6 @@
+{
+    "name": "raven/backup",
+    "description": "Backup & Restore extension for Raven CMS.",
+    "type": "library",
+    "require": {}
+}

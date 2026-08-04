@@ -1,0 +1,10 @@
+{
+    "slug": "backup",
+    "name": "Backup & Restore",
+    "version": "1.0.0",
+    "description": "Export and restore complete Raven page-content and taxonomy archives.",
+    "type": "system",
+    "author": "Novelty Lanterns",
+    "homepage": "https://lanterns.io/raven",
+    "docs": "https://lanterns.io/raven"
+}

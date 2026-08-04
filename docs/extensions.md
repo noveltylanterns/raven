@@ -186,7 +186,7 @@ Notes:
 
 - `panel_path` and `panel_section` are legacy manifest keys and are ignored.
 - Panel route/nav identity comes from the extension directory slug.
-- Protected stock extensions are `contact`, `cron`, `database`, `phpinfo`, `repo`, and `signups`.
+- Protected stock extensions are `backup`, `contact`, `cron`, `database`, `phpinfo`, `repo`, and `signups`.
 - `ext.php` may request storage with an array contract:
   `local`, `table`, `tables`, `aux`, `panel`, `public`.
 - `local` provisions `private/dat/ext/{slug}/`.
@@ -194,6 +194,12 @@ Notes:
 - `aux` provisions one or more sanctioned root-level folders such as `/{name}`.
 - `panel` provisions `panel/ext/{slug}/`; `public` provisions `public/uploads/ext/{slug}/` (`module` only).
 - Disabling an extension leaves storage intact; uninstalling a non-stock extension removes the storage it explicitly opted into and removes the package files, while stock extension uninstall only purges the opted-in storage and keeps the bundled extension files.
+
+The stock `backup` extension provides `/panel/backup` plus a `Backup & Restore` action on the
+page-list heading card. Its JSON archive includes page rows, categories, tags, channels, taxonomy
+sets, redirects, and page-to-taxonomy relationships with their numeric IDs preserved. Media rows
+and media files are intentionally excluded. Restore is for a new Raven system only; it does not
+merge or remap an existing installation.
 
 ## 9) Agent Guidance
 
