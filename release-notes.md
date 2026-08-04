@@ -4,6 +4,7 @@
 
 ### August 4, 2026
 
+- Clarified that the shared CLI flags documented in the appendix apply to focused commands, except `rvn` and `rvn.sh`.
 - Updated CLI inventory generation to derive the complete list below the `Command Inventory` heading, keep `rvn` first, and generate uniform dispatcher and shell-helper references at `rvn.md` and `sh.md`.
 - Connected `rvn-docs` to the command list below the `Command Inventory` heading in the hand-authored CLI index, so discovered `rvn-*` wrappers always receive generated links without replacing the rest of the page.
 - Restored the shared CLI summary, inventory, banner contract, and QA guidance to the hand-authored CLI appendix index while keeping command-specific details on generated child pages.

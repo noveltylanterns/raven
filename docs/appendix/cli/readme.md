@@ -20,7 +20,7 @@ This is the landing page for Raven's command-line tools. Each command link opens
 
 ## Global Flags
 
-All CLI commands support:
+All CLI commands *(except `rvn` and `rvn.sh`)* support:
 
 - `-v, --verbose`: verbose status output
 - `-E, --verbose-errors`: include exception details and trace output
