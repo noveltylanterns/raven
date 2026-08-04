@@ -211,6 +211,9 @@ final class ChannelWrite
                 $currentRaw['tag_sets'] ?? ($record['tag_sets'] ?? []),
                 false
             ),
+            'index' => ChannelPolicy::normalizeChannelIndexRouteMode(
+                (string) ($currentRaw['index'] ?? ($record['index'] ?? 'auto'))
+            ),
             'editor_override' => (string) ($record['editor_override'] ?? 'inherit'),
             'theme_override' => ChannelShared::normalizeThemeOverride(
                 (string) ($currentRaw['theme_override'] ?? ($record['theme_override'] ?? 'inherit'))

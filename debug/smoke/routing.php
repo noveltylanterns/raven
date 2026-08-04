@@ -147,6 +147,17 @@ final class RoutingSmokeRunner
             'index' => 'trailing_slash',
             'description' => '',
         ]);
+        $channelWriter->updateImagePaths(30, [
+            'cover_image_path' => null,
+            'cover_image_sm_path' => null,
+            'cover_image_md_path' => null,
+            'cover_image_lg_path' => null,
+            'preview_image_path' => null,
+            'preview_image_sm_path' => null,
+            'preview_image_md_path' => null,
+            'preview_image_lg_path' => null,
+        ]);
+        $this->assert((string) (($channels->findById(30)['index'] ?? '')) === 'trailing_slash', 'Channel image persistence must preserve the selected index route mode.');
         $this->events[] = 'channel_parent_hierarchy=ok';
 
         $redirectWriter->save([
