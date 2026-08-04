@@ -6,16 +6,16 @@
 ### Basic Functions
 - [Configuration](./configuration.md)
 - [Preferences](./preferences.md)
-- [Routing Table](./routing.md)
 - [Updates](./updates.md)
 
 ### Content
 - [Pages](./pages.md)
-- [Redirects](./redirects.md)
+- [Routing Table](./routing.md)
 
 ### Taxonomy
 - [Categories](./categories.md)
 - [Channels](./channels.md)
+- [Redirects](./redirects.md)
 - [Tags](./tags.md)
 
 ### Users & Permissions
