@@ -4,22 +4,8 @@ This is the landing page for Raven's command-line tools. Each command link opens
 
 ## Command Inventory
 
-Shipped CLI entrypoints include:
-
 - `private/bin/rvn` (universal dispatcher)
-- `private/bin/rvn-cat`
-- `private/bin/rvn-chan`
-- `private/bin/rvn-group`
-- `private/bin/rvn-tag`
-- `private/bin/rvn-redir`
-- `private/bin/rvn-conf`
-- `private/bin/rvn-theme`
-- `private/bin/rvn-ext`
-- `private/bin/rvn-sys`
-- `private/bin/rvn.sh` (shell completion helper)
-
-## Command References
-
+<!-- RVN-DOCS:CLI-INVENTORY:START -->
 - [rvn-cat](./cat.md)
 - [rvn-chan](./chan.md)
 - [rvn-conf](./conf.md)
@@ -31,6 +17,8 @@ Shipped CLI entrypoints include:
 - [rvn-sys](./sys.md)
 - [rvn-tag](./tag.md)
 - [rvn-theme](./theme.md)
+<!-- RVN-DOCS:CLI-INVENTORY:END -->
+- `private/bin/rvn.sh` (shell completion helper)
 
 ## Global Flags
 

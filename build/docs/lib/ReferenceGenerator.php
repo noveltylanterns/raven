@@ -565,8 +565,50 @@ final class ReferenceGenerator
             $outputs['docs/appendix/cli/' . $slug . '.md'] = $body;
         }
 
+        // Refresh only the marked command-list fragment in the hand-authored CLI index.
+        $outputs['docs/appendix/cli/readme.md'] = $this->cliInventoryIndex($slugs);
+
         ksort($outputs, SORT_STRING);
         return $outputs;
+    }
+
+    /**
+     * Updates the generated command-link fragment inside the hand-authored CLI index.
+     *
+     * Marker boundaries keep the shared CLI summary and operational guidance outside the
+     * generator's write surface while ensuring every discovered wrapper has a live link.
+     *
+     * @param array<int, string> $slugs Discovered CLI command slugs without the `rvn-` prefix.
+     * @return string CLI index content with its command inventory fragment refreshed.
+     * @throws RuntimeException When the hand-authored index is missing its generator markers.
+     */
+    private function cliInventoryIndex(array $slugs): string
+    {
+        $relativePath = 'docs/appendix/cli/readme.md';
+        $source = $this->readRelativeFile($relativePath);
+        $startMarker = '<!-- RVN-DOCS:CLI-INVENTORY:START -->';
+        $endMarker = '<!-- RVN-DOCS:CLI-INVENTORY:END -->';
+        $startPosition = strpos($source, $startMarker);
+        $endPosition = $startPosition === false
+            ? false
+            : strpos($source, $endMarker, $startPosition + strlen($startMarker));
+
+        if ($startPosition === false || $endPosition === false) {
+            throw new RuntimeException(
+                $relativePath . ' must contain ' . $startMarker . ' and ' . $endMarker . '.'
+            );
+        }
+
+        $rows = [];
+        foreach ($slugs as $slug) {
+            $rows[] = '- [rvn-' . $slug . '](./' . $slug . '.md)';
+        }
+
+        $fragment = "\n" . implode("\n", $rows) . "\n";
+        $contentBeforeEndMarker = substr($source, 0, $startPosition + strlen($startMarker));
+        $contentAfterEndMarker = substr($source, $endPosition);
+
+        return $contentBeforeEndMarker . $fragment . $contentAfterEndMarker;
     }
 
     /**
