@@ -41,20 +41,20 @@ Top and bottom action bars (same controls in both places):
 Fields/options:
 
 - `Name` (required)
-- `Parent` (defaults to `<root>`)
 - `Slug` (required)
+- `Parent` (defaults to `<root>`; shown as a root-first indented tree with each canonical parent path in parentheses)
 - `Description` (optional)
-- `Index`: `Automatic`, `No Trailing Slash`, `Use Trailing Slash`, or `Redirect`
-- `Theme`
-- `Syndication`
-- `Enable Feed?` (shown only when global feeds are enabled)
-- `Enable dedicated sub-feeds for this channel.`
 - `Category Sets` checkbox list with `Use System Default` and `All Sets`
 - `Tag Sets` checkbox list with `Use System Default` and `All Sets`
 - `Cover Image` (optional, single file)
 - `Preview Image` (optional, single file)
 - `Remove current cover image` checkbox (shown when a cover image exists)
 - `Remove current preview image` checkbox (shown when a preview image exists)
+- `Theme`
+- `Syndication` and `Enable dedicated sub-feeds for this channel.` (Content tab; shown only when global feeds are enabled)
+- `Channel Index Route`: `Automatic`, `No Trailing Slash`, `Use Trailing Slash`, or `Redirect`
+- `Route Mode`
+- `Route Separator`
 
 Image behavior notes:
 
@@ -83,6 +83,8 @@ Parent behavior notes:
 - Nested channels appear directly beneath their parent with indentation.
 - The edited channel and its descendants are omitted from its own parent selector to prevent circular hierarchies.
 - New channels default to the stock `<root>` channel.
+
+The editor tabs are `Basic`, `Content`, `Media`, and `Routing` in alphabetical order. Basic contains `Name`, `Slug`, `Parent`, and `Description`; the Media tab ends with `Theme`; the Content tab contains `Editor Override` and `Syndication`; the Routing tab begins with `Index`, followed by `Route Mode` and `Route Separator`. Each setting includes a short inline explanation in the editor.
 
 Taxonomy set behavior notes:
 
@@ -217,12 +219,16 @@ When channel behavior changes, update this document in the same task. That inclu
 ### UI Labels Reference
 
 - `Basic`
-- `Meta`
+- `Content`
+- `Media`
+- `Routing`
 - `Editor Override`
 - `Theme`
 - `Route Mode`
 - `Route Separator`
-- `Index`
+- `Routing Settings`
+- `Taxonomy Assignments`
+- `Channel Index Route`
 - `Automatic`
 - `No Trailing Slash`
 - `Use Trailing Slash`

@@ -83,6 +83,7 @@ $clearFiltersUrl = $panelBase . '/logs';
 <?= Header::render([
     'title' => 'Event Log',
     'summary' => 'Runtime errors, warnings, and informational events recorded by Raven.',
+    'help_url' => $panelBase . '/docs/events',
 ]) ?>
 
 <?php if ($flashSuccess !== null): ?>

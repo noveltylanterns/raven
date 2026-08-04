@@ -101,6 +101,7 @@ if ($hasPersistedCategory) {
         : 'Edit Category: <span class="text-primary">\'' . e($categoryName !== '' ? $categoryName : 'Untitled') . '\'</span>',
     'summary' => $category === null ? 'Create or update a category and manage its preview/cover media.' : '',
     'body_html' => $categoryHeaderBodyHtml,
+    'help_url' => $panelBase . '/docs/categories',
 ]) ?>
 
 <?php if ($flashSuccess !== null): ?>
@@ -167,12 +168,14 @@ if ($hasPersistedCategory) {
                 <label for="name" class="form-label">Name</label>
                 <!-- Category names are display-facing labels shown in panel/public listings. -->
                 <input id="name" name="name" class="form-control" required value="<?= e((string) ($category['name'] ?? '')) ?>">
+                <div class="form-text">Display name used in category labels.</div>
             </div>
 
             <div class="form-group">
                 <label for="slug" class="form-label">Slug</label>
                 <!-- Slug powers `/{category.prefix}/{slug}` category index URLs. -->
                 <input id="slug" name="slug" class="form-control" required value="<?= e((string) ($category['slug'] ?? '')) ?>">
+                <div class="form-text">Simple name used for routing and URI segments.</div>
             </div>
 
             <div class="form-group">
@@ -186,12 +189,14 @@ if ($hasPersistedCategory) {
                         </option>
                     <?php endforeach; ?>
                 </select>
+                <div class="form-text">The taxonomy set that owns this category.</div>
             </div>
 
             <div class="form-group mb-0">
                 <label for="description" class="form-label">Description</label>
                 <!-- Optional description is editorial/context metadata for this taxonomy term. -->
                 <textarea id="description" name="description" class="form-control" rows="4"><?= e((string) ($category['description'] ?? '')) ?></textarea>
+                <div class="form-text">Optional editorial context for this category.</div>
             </div>
         </div>
 
@@ -214,6 +219,7 @@ if ($hasPersistedCategory) {
             <div class="form-group">
                 <label for="cover_image" class="form-label">Cover Image</label>
                 <input id="cover_image" name="cover_image" type="file" class="form-control" accept=".gif,.jpg,.jpeg,.png">
+                <div class="form-text">Optional wide image for category pages and previews.</div>
                 <?php if ($coverPath !== ''): ?>
                     <div class="mt-2">
                         <img src="<?= e($coverUrl) ?>" alt="Current category cover image" class="img-thumbnail" style="max-width: 240px;">
@@ -234,6 +240,7 @@ if ($hasPersistedCategory) {
                     <div class="form-check mt-2">
                         <input id="remove_cover_image" name="remove_cover_image" value="1" type="checkbox" class="form-check-input">
                         <label for="remove_cover_image" class="form-check-label">Remove current cover image</label>
+                        <div class="form-text">Delete the stored cover image when this form is saved.</div>
                     </div>
                 <?php endif; ?>
             </div>
@@ -241,6 +248,7 @@ if ($hasPersistedCategory) {
             <div class="form-group">
                 <label for="preview_image" class="form-label">Preview Image</label>
                 <input id="preview_image" name="preview_image" type="file" class="form-control" accept=".gif,.jpg,.jpeg,.png">
+                <div class="form-text">Optional image used in category previews and listings.</div>
                 <?php if ($previewPath !== ''): ?>
                     <div class="mt-2">
                         <img src="<?= e($previewUrl) ?>" alt="Current category preview image" class="img-thumbnail" style="max-width: 240px;">
@@ -261,6 +269,7 @@ if ($hasPersistedCategory) {
                     <div class="form-check mt-2">
                         <input id="remove_preview_image" name="remove_preview_image" value="1" type="checkbox" class="form-check-input">
                         <label for="remove_preview_image" class="form-check-label">Remove current preview image</label>
+                        <div class="form-text">Delete the stored preview image when this form is saved.</div>
                     </div>
                 <?php endif; ?>
             </div>
@@ -268,6 +277,7 @@ if ($hasPersistedCategory) {
             <div class="form-group mb-0">
                 <label for="icon_image" class="form-label">Icon Image</label>
                 <input id="icon_image" name="icon_image" type="file" class="form-control" accept=".gif,.jpg,.jpeg,.png">
+                <div class="form-text">Optional compact image used as the category icon.</div>
                 <?php if ($iconPath !== ''): ?>
                     <div class="mt-2">
                         <img src="<?= e($iconUrl) ?>" alt="Current category icon image" class="img-thumbnail" style="max-width: 240px;">
@@ -288,6 +298,7 @@ if ($hasPersistedCategory) {
                     <div class="form-check mt-2">
                         <input id="remove_icon_image" name="remove_icon_image" value="1" type="checkbox" class="form-check-input">
                         <label for="remove_icon_image" class="form-check-label">Remove current icon image</label>
+                        <div class="form-text">Delete the stored icon image when this form is saved.</div>
                     </div>
                 <?php endif; ?>
             </div>

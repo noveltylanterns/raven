@@ -29,6 +29,7 @@ $categorySetListToolbarItems = [
 <?= Header::render([
     'title' => 'Category Sets',
     'summary' => 'Manage reusable category sets that channels can share or isolate.',
+    'help_url' => $panelBase . '/docs/categories',
 ]) ?>
 
 <?php if ($flashSuccess !== null): ?>

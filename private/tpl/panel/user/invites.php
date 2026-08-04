@@ -49,6 +49,7 @@ $invitesEmptyId = 'invites-filter-empty';
 <?= Header::render([
     'title' => 'Invite Tokens',
     'summary' => 'Create and manage registration invite tokens for public signups.',
+    'help_url' => $panelBase . '/docs/users',
 ]) ?>
 
 <?php if ($flashSuccess !== null): ?>

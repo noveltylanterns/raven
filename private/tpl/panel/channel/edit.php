@@ -121,6 +121,7 @@ if ($hasPersistedChannel) {
         : 'Edit Channel: <span class="text-primary">\'' . e($channelName !== '' ? $channelName : 'Untitled') . '\'</span>',
     'summary' => $channel === null ? 'Create or update a channel and manage its preview/cover media.' : '',
     'body_html' => $channelHeaderBodyHtml,
+    'help_url' => $panelBase . '/docs/channels',
 ]) ?>
 
 <?php if ($flashSuccess !== null): ?>
@@ -163,6 +164,18 @@ if ($hasPersistedChannel) {
         </li>
         <li class="nav-item" role="presentation">
             <button
+                class="nav-link<?= $activeTab === 'content' ? ' active' : '' ?>"
+                id="channel-content-tab"
+                data-bs-toggle="tab"
+                data-bs-target="#rvnp-editor-pane-content"
+                type="button"
+                role="tab"
+                aria-controls="rvnp-editor-pane-content"
+                aria-selected="<?= $activeTab === 'content' ? 'true' : 'false' ?>"
+            >Content</button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button
                 class="nav-link<?= $activeTab === 'media' ? ' active' : '' ?>"
                 id="channel-media-tab"
                 data-bs-toggle="tab"
@@ -175,15 +188,15 @@ if ($hasPersistedChannel) {
         </li>
         <li class="nav-item" role="presentation">
             <button
-                class="nav-link<?= $activeTab === 'meta' ? ' active' : '' ?>"
-                id="channel-meta-tab"
+                class="nav-link<?= $activeTab === 'routing' ? ' active' : '' ?>"
+                id="channel-routing-tab"
                 data-bs-toggle="tab"
-                data-bs-target="#rvnp-editor-pane-meta"
+                data-bs-target="#rvnp-editor-pane-routing"
                 type="button"
                 role="tab"
-                aria-controls="rvnp-editor-pane-meta"
-                aria-selected="<?= $activeTab === 'meta' ? 'true' : 'false' ?>"
-            >Meta</button>
+                aria-controls="rvnp-editor-pane-routing"
+                aria-selected="<?= $activeTab === 'routing' ? 'true' : 'false' ?>"
+            >Routing</button>
         </li>
     </ul>
 
@@ -195,10 +208,20 @@ if ($hasPersistedChannel) {
             aria-labelledby="channel-basic-tab"
             tabindex="0"
         >
+            <h3>Basic Settings</h3>
+
             <div class="form-group">
                 <label for="name" class="form-label">Name</label>
                 <!-- Channel names are display-facing labels shown in panel/public listings. -->
                 <input id="name" name="name" class="form-control" required value="<?= e((string) ($channel['name'] ?? '')) ?>">
+                <div class="form-text">Display name used in channel labels.</div>
+            </div>
+
+            <div class="form-group">
+                <label for="slug" class="form-label">Slug</label>
+                <!-- Slug is used as the channel route segment. -->
+                <input id="slug" name="slug" class="form-control" required value="<?= e((string) ($channel['slug'] ?? '')) ?>">
+                <div class="form-text">Simple name used for routing and URI segments.</div>
             </div>
 
             <div class="form-group">
@@ -208,46 +231,20 @@ if ($hasPersistedChannel) {
                         <?php
                         $parentOptionId = (int) ($parentOption['id'] ?? 0);
                         $parentDepth = max(0, (int) ($parentOption['depth'] ?? 0));
-                        $parentIndent = $parentDepth > 0
-                            ? str_repeat("\u{00A0}\u{00A0}", $parentDepth) . '↳ '
-                            : '';
+                        $parentIndent = str_repeat("\u{00A0}\u{00A0}", max(0, $parentDepth - 1));
+                        $parentPath = trim((string) ($parentOption['path'] ?? ''), '/');
                         ?>
-                        <option value="<?= $parentOptionId ?>"<?= $parentId === $parentOptionId ? ' selected' : '' ?>><?= e($parentIndent . (string) ($parentOption['name'] ?? '')) ?></option>
+                        <option value="<?= $parentOptionId ?>"<?= $parentOptionId === 0 ? ' class="fw-bold"' : '' ?><?= $parentId === $parentOptionId ? ' selected' : '' ?>><?= e($parentIndent . (string) ($parentOption['name'] ?? '')) ?><?= $parentPath !== '' ? ' (' . e($parentPath) . ')' : '' ?></option>
                     <?php endforeach; ?>
                 </select>
-            </div>
-
-            <div class="form-group">
-                <label for="slug" class="form-label">Slug</label>
-                <!-- Slug is used as the channel route segment. -->
-                <input id="slug" name="slug" class="form-control" required value="<?= e((string) ($channel['slug'] ?? '')) ?>">
-            </div>
-
-            <div class="form-group mb-3">
-                <label for="description" class="form-label">Description</label>
-                <!-- Optional description is editorial/context metadata for this channel. -->
-                <textarea id="description" name="description" class="form-control" rows="4"><?= e((string) ($channel['description'] ?? '')) ?></textarea>
-            </div>
-
-            <div class="form-group">
-                <label for="index" class="form-label">Index</label>
-                <select id="index" name="index" class="form-select">
-                    <option value="auto"<?= $indexRouteMode === 'auto' ? ' selected' : '' ?>>Automatic</option>
-                    <option value="no_trailing_slash"<?= $indexRouteMode === 'no_trailing_slash' ? ' selected' : '' ?>>No Trailing Slash</option>
-                    <option value="trailing_slash"<?= $indexRouteMode === 'trailing_slash' ? ' selected' : '' ?>>Use Trailing Slash</option>
-                    <option value="redirect"<?= $indexRouteMode === 'redirect' ? ' selected' : '' ?>>Redirect</option>
-                </select>
-                <div class="form-text">Controls only the channel index URL. Redirect sends the channel root to its published <code>home</code> page, or <code>index</code> page when home is unavailable.</div>
+                <div class="form-text">Places this channel within another channel.</div>
             </div>
 
             <div class="form-group mb-0">
-                <label for="theme_override" class="form-label">Theme</label>
-                <select id="theme_override" name="theme_override" class="form-select">
-                    <option value="inherit" class="fw-bold"<?= $themeOverride === 'inherit' ? ' selected' : '' ?>>Inherit</option>
-                    <?php foreach ($themeOptions as $themeSlug => $themeName): ?>
-                        <option value="<?= e((string) $themeSlug) ?>"<?= $themeOverride === $themeSlug ? ' selected' : '' ?>><?= e((string) $themeName) ?></option>
-                    <?php endforeach; ?>
-                </select>
+                <label for="description" class="form-label">Description</label>
+                <!-- Optional description is editorial/context metadata for this channel. -->
+                <textarea id="description" name="description" class="form-control" rows="4"><?= e((string) ($channel['description'] ?? '')) ?></textarea>
+                <div class="form-text">Optional editorial description for this channel.</div>
             </div>
         </div>
 
@@ -258,6 +255,9 @@ if ($hasPersistedChannel) {
             aria-labelledby="channel-media-tab"
             tabindex="0"
         >
+
+            <h3>Media Settings</h3>
+
             <div class="form-group text-muted">
                 Allowed extensions: <code><?= e($imageAllowedExtensions) ?></code>.
                 Max filesize: <code><?= e($maxFilesizeLabel) ?></code>.
@@ -270,6 +270,7 @@ if ($hasPersistedChannel) {
             <div class="form-group">
                 <label for="cover_image" class="form-label">Cover Image</label>
                 <input id="cover_image" name="cover_image" type="file" class="form-control" accept=".gif,.jpg,.jpeg,.png">
+                <div class="form-text">Optional wide image shown with this channel's public presentation.</div>
                 <?php if ($coverPath !== ''): ?>
                     <div class="mt-2">
                         <img src="<?= e($coverUrl) ?>" alt="Current channel cover image" class="img-thumbnail" style="max-width: 240px;">
@@ -290,13 +291,15 @@ if ($hasPersistedChannel) {
                     <div class="form-check mt-2">
                         <input id="remove_cover_image" name="remove_cover_image" value="1" type="checkbox" class="form-check-input">
                         <label for="remove_cover_image" class="form-check-label">Remove current cover image</label>
+                        <div class="form-text">Delete the stored cover image when this form is saved.</div>
                     </div>
                 <?php endif; ?>
             </div>
 
-            <div class="form-group mb-0">
+            <div class="form-group">
                 <label for="preview_image" class="form-label">Preview Image</label>
                 <input id="preview_image" name="preview_image" type="file" class="form-control" accept=".gif,.jpg,.jpeg,.png">
+                <div class="form-text">Optional image used for channel previews and panel listings.</div>
                 <?php if ($previewPath !== ''): ?>
                     <div class="mt-2">
                         <img src="<?= e($previewUrl) ?>" alt="Current channel preview image" class="img-thumbnail" style="max-width: 240px;">
@@ -317,20 +320,37 @@ if ($hasPersistedChannel) {
                     <div class="form-check mt-2">
                         <input id="remove_preview_image" name="remove_preview_image" value="1" type="checkbox" class="form-check-input">
                         <label for="remove_preview_image" class="form-check-label">Remove current preview image</label>
+                        <div class="form-text">Delete the stored preview image when this form is saved.</div>
                     </div>
                 <?php endif; ?>
+            </div>
+
+            <div class="form-group mb-0">
+                <label for="theme_override" class="form-label">Theme</label>
+                <select id="theme_override" name="theme_override" class="form-select">
+                    <option value="inherit" class="fw-bold"<?= $themeOverride === 'inherit' ? ' selected' : '' ?>>Inherit</option>
+                    <?php foreach ($themeOptions as $themeSlug => $themeName): ?>
+                        <option value="<?= e((string) $themeSlug) ?>"<?= $themeOverride === $themeSlug ? ' selected' : '' ?>><?= e((string) $themeName) ?></option>
+                    <?php endforeach; ?>
+                </select>
+                <div class="form-text">Overrides the site theme for this channel and its pages.</div>
             </div>
         </div>
 
         <div
-            class="tab-pane fade<?= $activeTab === 'meta' ? ' show active' : '' ?>"
-            id="rvnp-editor-pane-meta"
+            class="tab-pane fade<?= $activeTab === 'content' ? ' show active' : '' ?>"
+            id="rvnp-editor-pane-content"
             role="tabpanel"
-            aria-labelledby="channel-meta-tab"
+            aria-labelledby="channel-content-tab"
             tabindex="0"
         >
+            <?php
+            // Buffer taxonomy controls here so they can remain grouped while
+            // rendering last in the Content tab after the content options section.
+            ob_start();
+            ?>
             <?php if ($taxonomyAssignmentsEnabled): ?>
-            <h3>Assignments</h3>
+            <h3>Taxonomy Assignments</h3>
             <?php endif; ?>
             <?php if ($categoryEnabled): ?>
                 <?php $useCategorySystemDefault = $selectedCategorySets === []; ?>
@@ -383,6 +403,7 @@ if ($hasPersistedChannel) {
                             </div>
                         <?php endforeach; ?>
                     </div>
+                    <div class="form-text">Choose which category sets are available to pages assigned to this channel.</div>
                 </div>
             <?php endif; ?>
 
@@ -437,12 +458,11 @@ if ($hasPersistedChannel) {
                             </div>
                         <?php endforeach; ?>
                     </div>
+                    <div class="form-text">Choose which tag sets are available to pages assigned to this channel.</div>
                 </div>
             <?php endif; ?>
 
-            <?php if ($taxonomyAssignmentsEnabled): ?>
-            <hr class="my-4">
-            <?php endif; ?>
+            <?php $taxonomyAssignmentsHtml = (string) ob_get_clean(); ?>
 
             <h3>Content Options</h3>
             <div class="form-group">
@@ -454,14 +474,67 @@ if ($hasPersistedChannel) {
                     <option value="autobr"<?= $editorOverride === 'autobr' ? ' selected' : '' ?>>Plaintext</option>
                     <option value="markdown"<?= $editorOverride === 'markdown' ? ' selected' : '' ?>>Markdown</option>
                 </select>
-                <div class="form-text">
-                    Controls which block type the Page Editor inserts when using <strong>Add Text Block</strong> for pages in this channel.
-                </div>
+                <div class="form-text">Controls which block type the Page Editor inserts when using <strong>Add Text Block</strong> for pages in this channel.</div>
             </div>
 
-            <hr class="my-4">
+            <?php if ($feedsEnabled): ?>
+                <div class="form-group mb-0">
+                    <label class="form-label d-block">Syndication</label>
+                    <div class="border rounded p-3" data-rvn-set-selection="syndication">
+                    <div class="form-check">
+                        <input
+                            class="form-check-input"
+                            type="checkbox"
+                            name="feed_enabled"
+                            id="feed_enabled"
+                            value="1"
+                            <?= $feedEnabled ? 'checked' : '' ?>
+                        >
+                        <label class="form-check-label" for="feed_enabled">Enable dedicated sub-feeds for this channel.</label>
+                        <div class="form-text">
+                        <?php if ($channelFeedRoutes !== []): ?>
+                            Routes:
+                            <?php foreach ($channelFeedRoutes as $index => $channelFeedRoute): ?>
+                                <?php if ($index > 0): ?>,<?php endif; ?>
+                                <code><?= e($channelFeedRoute) ?></code>
+                            <?php endforeach; ?>.
+                        <?php else: ?>
+                            Configure `feed.rss` and/or `feed.atom` globally to activate channel feed URLs.
+                        <?php endif; ?>
+                        </div>
+                    </div>
+                    </div>
+                    <div class="form-text">Enable or disable dedicated RSS and Atom feeds for this channel.</div>
+                </div>
+            <?php endif; ?>
 
-            <h3>Routing</h3>
+            <?php if ($taxonomyAssignmentsEnabled): ?>
+            <hr class="my-4">
+            <?= $taxonomyAssignmentsHtml ?>
+            <?php endif; ?>
+
+        </div>
+
+        <div
+            class="tab-pane fade<?= $activeTab === 'routing' ? ' show active' : '' ?>"
+            id="rvnp-editor-pane-routing"
+            role="tabpanel"
+            aria-labelledby="channel-routing-tab"
+            tabindex="0"
+        >
+            <h3>Routing Settings</h3>
+
+            <div class="form-group mb-3">
+                <label for="index" class="form-label">Channel Index Route</label>
+                <select id="index" name="index" class="form-select">
+                    <option value="auto"<?= $indexRouteMode === 'auto' ? ' selected' : '' ?>>Automatic</option>
+                    <option value="no_trailing_slash"<?= $indexRouteMode === 'no_trailing_slash' ? ' selected' : '' ?>>No Trailing Slash</option>
+                    <option value="trailing_slash"<?= $indexRouteMode === 'trailing_slash' ? ' selected' : '' ?>>Use Trailing Slash</option>
+                    <option value="redirect"<?= $indexRouteMode === 'redirect' ? ' selected' : '' ?>>Redirect</option>
+                </select>
+                <div class="form-text">Defines canonical channel index URI for routing enforcement.</div>
+            </div>
+
             <div class="form-group mb-3">
                 <label for="route_mode" class="form-label">Route Mode</label>
                 <select id="route_mode" name="route_mode" class="form-select">
@@ -473,9 +546,7 @@ if ($hasPersistedChannel) {
                     <option value="date_id"<?= $routeMode === 'date_id' ? ' selected' : '' ?>>/{channel}/{YYYY-MM-DD}-{page-id}</option>
                     <option value="month_id"<?= $routeMode === 'month_id' ? ' selected' : '' ?>>/{channel}/{YYYY-MM}-{page-id}</option>
                 </select>
-                <div class="form-text">
-                    Applies to page routes under this channel only. Channel landing routes stay at <code>/<?= e($channelSlug !== '' ? $channelSlug : 'channel') ?></code>.
-                </div>
+                <div class="form-text">Defines URI structure for pages within this channel.</div>
             </div>
 
             <div class="form-group mb-3">
@@ -515,37 +586,8 @@ if ($hasPersistedChannel) {
                     <label class="form-check-label" for="route_separator_underscore">_ (Underscore)</label>
                 </div>
                 </div>
+                <div class="form-text">Select the separator used between words in the URI.</div>
             </div>
-
-            <?php if ($feedsEnabled): ?>
-                <div class="form-group mb-3">
-                    <label class="form-label d-block">Syndication</label>
-                    <div class="border rounded p-3" data-rvn-set-selection="syndication">
-                    <div class="form-check">
-                        <input
-                            class="form-check-input"
-                            type="checkbox"
-                            name="feed_enabled"
-                            id="feed_enabled"
-                            value="1"
-                            <?= $feedEnabled ? 'checked' : '' ?>
-                        >
-                        <label class="form-check-label" for="feed_enabled">Enable dedicated sub-feeds for this channel.</label>
-                        <div class="form-text">
-                        <?php if ($channelFeedRoutes !== []): ?>
-                            Routes:
-                            <?php foreach ($channelFeedRoutes as $index => $channelFeedRoute): ?>
-                                <?php if ($index > 0): ?>,<?php endif; ?>
-                                <code><?= e($channelFeedRoute) ?></code>
-                            <?php endforeach; ?>.
-                        <?php else: ?>
-                            Configure `feed.rss` and/or `feed.atom` globally to activate channel feed URLs.
-                        <?php endif; ?>
-                        </div>
-                    </div>
-                    </div>
-                </div>
-            <?php endif; ?>
 
         </div>
     </div>

@@ -170,7 +170,16 @@ final class ConfigurationDocsSmokeRunner
             $manualCoverage = $this->checkUserManualRoutes();
             $this->events[] = 'check_4_scope=panel_user_manual';
             $this->events[] = 'check_4_index_status=' . $manualCoverage['index_status'];
+            $this->events[] = 'check_4_index_legacy_status=' . $manualCoverage['index_legacy_status'];
+            $this->events[] = 'check_4_index_slash_status=' . $manualCoverage['index_slash_status'];
+            $this->events[] = 'check_4_events_status=' . $manualCoverage['events_status'];
+            $this->events[] = 'check_4_appendix_home_status=' . $manualCoverage['appendix_home_status'];
+            $this->events[] = 'check_4_appendix_root_status=' . $manualCoverage['appendix_root_status'];
+            $this->events[] = 'check_4_appendix_root_slash_status=' . $manualCoverage['appendix_root_slash_status'];
+            $this->events[] = 'check_4_appendix_readme_status=' . $manualCoverage['appendix_readme_status'];
+            $this->events[] = 'check_4_appendix_readme_alias_status=' . $manualCoverage['appendix_readme_alias_status'];
             $this->events[] = 'check_4_appendix_status=' . $manualCoverage['appendix_status'];
+            $this->events[] = 'check_4_appendix_alias_status=' . $manualCoverage['appendix_alias_status'];
             $this->events[] = 'check_4_screenshots_status=' . $manualCoverage['screenshots_status'];
             $this->events[] = 'check_4_result=PASS';
             $this->events[] = 'smoke_result=PASS';
@@ -573,18 +582,63 @@ final class ConfigurationDocsSmokeRunner
     /**
      * Verifies the User Manual renders canonical docs and excludes screenshots.
      *
-     * @return array{index_status:int, appendix_status:int, screenshots_status:int}
+     * @return array{index_status:int, index_legacy_status:int, index_slash_status:int, events_status:int, appendix_home_status:int, appendix_root_status:int, appendix_root_slash_status:int, appendix_readme_status:int, appendix_readme_alias_status:int, appendix_status:int, appendix_alias_status:int, screenshots_status:int}
      */
     private function checkUserManualRoutes(): array
     {
-        $indexPage = $this->request('/panel/index.php', 'GET', '/' . $this->panelPath . '/docs');
+        $indexPage = $this->request('/panel/index.php', 'GET', '/' . $this->panelPath . '/docs/home');
         if ($indexPage['status'] !== 200 || !str_contains($indexPage['body'], 'Documentation Index')) {
             throw new RuntimeException('User Manual index route did not render the canonical documentation index (status ' . $indexPage['status'] . ').');
         }
 
-        $appendixPage = $this->request('/panel/index.php', 'GET', '/' . $this->panelPath . '/docs/appendix/filetree.md');
+        $legacyIndexPage = $this->request('/panel/index.php', 'GET', '/' . $this->panelPath . '/docs');
+        if ($legacyIndexPage['status'] !== 301) {
+            throw new RuntimeException('Legacy User Manual index route did not redirect to /docs/home.');
+        }
+
+        $slashIndexPage = $this->request('/panel/index.php', 'GET', '/' . $this->panelPath . '/docs/');
+        if ($slashIndexPage['status'] !== 301) {
+            throw new RuntimeException('Slash-terminated User Manual index route did not redirect to /docs/home.');
+        }
+
+        $eventsPage = $this->request('/panel/index.php', 'GET', '/' . $this->panelPath . '/docs/events');
+        if ($eventsPage['status'] !== 200 || !str_contains($eventsPage['body'], 'Event Log')) {
+            throw new RuntimeException('Event Log documentation route did not render the dedicated manual page.');
+        }
+
+        $appendixHomePage = $this->request('/panel/index.php', 'GET', '/' . $this->panelPath . '/docs/appendix/home');
+        if ($appendixHomePage['status'] !== 200 || !str_contains($appendixHomePage['body'], 'Raven Developer Appendix')) {
+            throw new RuntimeException('Appendix home route did not render the appendix index document.');
+        }
+
+        $appendixRootPage = $this->request('/panel/index.php', 'GET', '/' . $this->panelPath . '/docs/appendix');
+        if ($appendixRootPage['status'] !== 301) {
+            throw new RuntimeException('Appendix directory route did not redirect to /docs/appendix/home.');
+        }
+
+        $appendixRootSlashPage = $this->request('/panel/index.php', 'GET', '/' . $this->panelPath . '/docs/appendix/');
+        if ($appendixRootSlashPage['status'] !== 301) {
+            throw new RuntimeException('Slash-terminated appendix directory route did not redirect to /docs/appendix/home.');
+        }
+
+        $appendixReadmePage = $this->request('/panel/index.php', 'GET', '/' . $this->panelPath . '/docs/appendix/readme');
+        if ($appendixReadmePage['status'] !== 301) {
+            throw new RuntimeException('Appendix readme route did not redirect to /docs/appendix/home.');
+        }
+
+        $appendixReadmeAliasPage = $this->request('/panel/index.php', 'GET', '/' . $this->panelPath . '/docs/appendix/readme.md');
+        if ($appendixReadmeAliasPage['status'] !== 301) {
+            throw new RuntimeException('Appendix Markdown readme alias did not redirect to /docs/appendix/home.');
+        }
+
+        $appendixPage = $this->request('/panel/index.php', 'GET', '/' . $this->panelPath . '/docs/appendix/filetree');
         if ($appendixPage['status'] !== 200 || !str_contains($appendixPage['body'], 'Raven Filetree')) {
             throw new RuntimeException('User Manual appendix route did not render the canonical filetree document.');
+        }
+
+        $appendixAliasPage = $this->request('/panel/index.php', 'GET', '/' . $this->panelPath . '/docs/appendix/filetree.md');
+        if ($appendixAliasPage['status'] !== 301) {
+            throw new RuntimeException('User Manual Markdown alias did not redirect to its extensionless route.');
         }
 
         $screenshotsPage = $this->request('/panel/index.php', 'GET', '/' . $this->panelPath . '/docs/screenshots/README.md');
@@ -594,7 +648,16 @@ final class ConfigurationDocsSmokeRunner
 
         return [
             'index_status' => $indexPage['status'],
+            'index_legacy_status' => $legacyIndexPage['status'],
+            'index_slash_status' => $slashIndexPage['status'],
+            'events_status' => $eventsPage['status'],
+            'appendix_home_status' => $appendixHomePage['status'],
+            'appendix_root_status' => $appendixRootPage['status'],
+            'appendix_root_slash_status' => $appendixRootSlashPage['status'],
+            'appendix_readme_status' => $appendixReadmePage['status'],
+            'appendix_readme_alias_status' => $appendixReadmeAliasPage['status'],
             'appendix_status' => $appendixPage['status'],
+            'appendix_alias_status' => $appendixAliasPage['status'],
             'screenshots_status' => $screenshotsPage['status'],
         ];
     }

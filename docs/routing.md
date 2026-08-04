@@ -1,137 +1,58 @@
-# Raven Routing Guide
+# Routing Table
 
-This document describes Raven's runtime routing model and the panel Routing Table screen.
+The Routing Table is a read-only inventory of the public URLs Raven currently
+knows how to serve. Use it to review canonical paths, inspect redirects, and
+spot conflicting routes before publishing changes.
 
-## 1) Routing Architecture
+## Open the Routing Table
 
-Raven keeps routing responsibilities split by scope:
+In the panel, open **Routing** from the navigation. Raven requires an
+authenticated panel session and the routing-table view permission.
 
-- Shared dispatch primitives:
-  - `private/sys/Router/RouteHandler.php`
-  - `private/sys/Router/RouteRequest.php`
-  - `private/sys/Router/RouteResponse.php`
-  - `private/sys/Router/RouteValidator.php`
-- Public route orchestration:
-  - `private/sys/Router/Public/PublicRouter.php`
-- Panel route orchestration:
-  - `private/sys/Router/Panel/PanelRouter.php`
+The summary cards show counts for pages, channels, redirects, and conflicts.
+The table itself can include public content, feeds, taxonomy routes, profile
+and group routes, and other configured public destinations.
 
-Both scope routers register route families in a fixed order, then dispatch through one isolated `RouteHandler` instance.
+## Search and filter
 
-## 2) Public Route Registration Order
+Use the search box to match a route's title, URL, type, or status. The type
+filters narrow the table to the route families you want to inspect, while the
+status selector filters by the route's current state.
 
-Public route families are registered in this order inside `PublicRouter::register(...)`:
+Enable **Conflicts only** to focus on rows Raven identified as overlapping or
+otherwise requiring attention. The result count updates as filters are
+changed.
 
-1. `AuthRouter`
-2. Extension public routes (`Raven\Lib\Extension\Public\Routes`)
-3. `CategoryRouter`
-4. `ChannelRouter`
-5. `FeedRouter`
-6. `ProfileRouter`
-7. `GroupRouter`
-8. `TagRouter`
-9. `PageRouter`
+Click a column heading to sort the table. URI sorting is based on the complete
+stored channel path, so child-channel routes sort alongside their full parent
+paths rather than appearing under an unrelated child slug.
 
-Because extension routes register early, they can expose explicit custom endpoints before generic content routes.
+## Understand a row
 
-## 3) Public Route Families
+- **URI** is the public path Raven reports for the route. Use the copy button
+  beside it to copy the path.
+- **Title** identifies the page, channel, or other route source. When an edit
+  screen is available, the title links to it.
+- **Type** identifies the route family, such as page, channel, or redirect.
+- **Status** reports the route's current routing state and may include conflict
+  information.
 
-Core public family behavior:
+Public URLs open in a new browser tab so you can verify the resolved result
+without losing your place in the panel.
 
-- Auth helpers:
-  - `/login`, `/login/2fa`, `/register` (+ POST variants)
-- Feed routes:
-  - RSS/Atom roots, channel feeds, and taxonomy feeds when enabled by config
-- Taxonomy routes:
-  - category and tag listing routes (prefix-based)
-- Profile/group routes:
-  - enabled only when their prefixes/modes are configured
-- Content routes:
-  - Page-route segments may include a legacy/file suffix; Raven discards the first period and everything after it, then 301-redirects a resolved route to its canonical extensionless URL (for example /docs/guide.md -> /docs/guide).
-  - `content.selector` controls page lookup identity (`slug` or `id`), while `site.routing` independently controls canonical slash policy (`no_trailing_slash` or `trailing_slash`); either URL form resolves, and the non-canonical form receives a built-in 301 redirect.
-  - `/` homepage
-  - `/{slug}` root channel landing/root fallback seam
-  - `/{channel_path}` parent-aware channel landing routes, such as `/news/alpha`
-  - `/{channel_path}/{slug}` parent-aware channel-scoped pages, such as `/news/alpha/article`
-- Embedded form route:
-  - `POST /forms/submit` (extension-agnostic form submit gateway)
+## Export
 
-For the full public matching order and prefix rules, see:
+Select **Export CSV** to download the currently available routing inventory.
+The export includes the route type, title, public URL, target URL, status,
+notes, and conflict details for use in audits or deployments.
 
-- `public/theme/AGENTS.md` (Public Route Matching Order section)
+## Troubleshooting
 
-## 4) Public Route Policy Inputs
+If a route is missing, check that its content is published and that the
+relevant feature or public prefix is enabled in configuration. If a route is
+marked as conflicting, inspect the listed URI and target, then adjust the
+content path, channel hierarchy, redirect, or configured prefix as needed.
 
-`private/sys/Router/Public/PublicPolicy.php` builds normalized route policy values from config, including:
-
-- category/tag/profile/group prefixes
-- feed route slugs
-- reserved first-segment prefixes
-- availability-bypass paths (login/register)
-
-The reserved-prefix list prevents content routes from colliding with panel/auth/feed/taxonomy system paths.
-
-## 5) Panel Route Registration Order
-
-Panel route families are registered in this order inside `PanelRouter::register(...)`:
-
-1. `AuthRouter`
-2. `DashboardRouter`
-3. `PageRouter`
-4. `ChannelRouter`
-5. `CategoryRouter`
-6. `TagRouter`
-7. `RedirectRouter`
-8. `UserRouter`
-9. `GroupRouter`
-10. `LogsRouter`
-11. `RoutingRouter`
-12. `UpdateRouter`
-13. `PreferencesRouter`
-14. `ConfigRouter`
-15. `ThemeRouter`
-16. `ExtensionRouter`
-17. Extension panel routes (`Raven\Lib\Extension\Panel\Routes`)
-
-Core panel route families generally follow list/edit/save/delete seams per domain.
-
-## 6) Routing Table Screen (Panel)
-
-The Routing Table screen is served from:
-
-- `GET /routing` -> inventory UI
-- `GET /routing/export` -> CSV export
-
-Primary implementation files:
-
-- `private/sys/Controller/Panel/RoutingController.php`
-- `private/tpl/panel/routing.php`
-- `private/sys/Router/Panel/RoutingRouter.php`
-
-Behavior summary:
-
-- Requires panel login and routing route `view` permission.
-- Builds a merged read-only route inventory (pages, channels, redirects, feeds, taxonomy, user/group profile routes, and conflict metadata).
-- Channel and page URI rows use each channel's complete stored parent path, matching public canonical routes.
-- Supports filter/search/sort in UI and CSV export.
-
-## 7) Extension Routes
-
-Extension route loading is explicit and scope-specific:
-
-- Public: `Raven\Lib\Extension\Public\Routes::register(...)`
-- Panel: `Raven\Lib\Extension\Panel\Routes::register(...)`
-
-Extension provider files are loaded from extension roots (for example `routes_public.php`, `routes_panel.php`) under `private/ext/{slug}/`.
-
-## 8) Diagnostics And Verification
-
-Route inventory smoke snapshots are generated by the route-inventory diagnostic and should be
-reviewed when validating route-order or route-surface changes.
-
-## 9) Related Docs
-
-- `docs/appendix/templates/public.md`
-- `docs/appendix/templates/panel.md`
-- `docs/appendix/core/router.md`
-- `docs/appendix/core/controller.md`
+For content-specific behavior, see [Pages](./pages.md),
+[Channels](./channels.md), and [Redirects](./redirects.md). For the router's
+implementation contracts, see the [Router Developer Reference](./appendix/router.md).

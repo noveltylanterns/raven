@@ -16,16 +16,16 @@ This is the default Build Mode backlog file. If the user asks about goals, unpat
 
 
 ## Misc Panel Tweaks
-- [ ] Default option for "Channel" drop-down in Page Editor should read <root> instead of <none>, with <root> stylized bold & at the top of the dropdown list. The full parent/child channel tree should be used in the parenthethis of each option instead of the bare ({slug})
-- [ ] "Parent" drop-down in Channel Editor should be styled exactly like aforementioned Channel drop-down in Page Editor.
-- [ ] "Channel" drop-down in Redirect Editor should be styled exactly like aforementioned Channel drop-down in Page Editor.
-- [ ] Reorder "Basic" tab of Channel Editor to: Name, Slug, Parent, Index, Theme, Description.
-- [ ] Make sure each setting on Channel Editor has accompanying form-text class description text (Use quick and to-the-point descriptions).
-- [ ] Remove 'Welcome Back..." text from panel navigation to the Dashboard page. Then increase padding below button row thats before Content nav section.
-- [ ] Make sure each setting on User Preferences & User Editor forms has accompanying form-text class descriptions (Use quick and to-the-point descriptions).
-- [ ] Make sure each setting on Category & Tag Editors has accompanying form-text class description text (Use quick and to-the-point descriptions).
-- [ ] Make sure each setting on Category & Tag Set Editors has accompanying form-text class description text (Use quick and to-the-point descriptions).
-- [ ] Make sure each setting on Redirect Editor has accompanying form-text class description text (Use quick and to-the-point descriptions).
+- [x] Default option for "Channel" drop-down in Page Editor reads <root> instead of <none>, is bold and at the top, and each option shows the full parent/child channel path in parentheses.
+- [x] "Parent" drop-down in Channel Editor uses the same root-first, indented full-tree presentation as the Page Editor channel dropdown.
+- [x] "Channel" drop-down in Redirect Editor uses the same root-first, indented full-tree presentation as the Page Editor channel dropdown.
+- [x] Reordered the "Basic" tab of Channel Editor to: Name, Slug, Parent, Index, Theme, Description.
+- [x] Added concise `form-text` descriptions to Channel Editor settings.
+- [x] Removed the "Welcome Back..." text from panel navigation and increased spacing below the utility button row before Content.
+- [x] Added concise `form-text` descriptions to User Preferences and User Editor settings.
+- [x] Added concise `form-text` descriptions to Category and Tag Editor settings.
+- [x] Added concise `form-text` descriptions to Category Set and Tag Set Editor settings.
+- [x] Added concise `form-text` descriptions to Redirect Editor settings.
 
 
 ## Event Logger Completion

@@ -15,6 +15,8 @@ use FilesystemIterator;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
 use Raven\Core\Router\RouteHandler;
+use Raven\Lib\Parser\PanelParser;
+use Raven\Lib\Transport\Redirect;
 
 /**
  * Registers authenticated panel documentation routes for every canonical Markdown page.
@@ -22,10 +24,10 @@ use Raven\Core\Router\RouteHandler;
 final class DocsRouter
 {
     /**
-     * Registers the User Manual index and one route pair for each canonical document.
+     * Registers the User Manual home route and one route pair for each canonical document.
      *
-     * Both extensionless and `.md` paths are registered so the copied documentation
-     * keeps its original relative links while panel users can also use clean URLs.
+     * Extensionless paths are canonical; `.md` aliases are registered only for
+     * enumerated documents and permanently redirect to their clean counterparts.
      *
      * @param RouteHandler $router Mutable router receiving documentation routes.
      * @param PanelPayload $deps Shared panel route dependency payload.
@@ -34,8 +36,25 @@ final class DocsRouter
     public static function registerWithDeps(RouteHandler $router, PanelPayload $deps): void
     {
         $panelDocsController = $deps->panelDocsController;
-        $router->add('GET', '/docs', static function () use ($panelDocsController): void {
+        $canonicalHomePath = PanelParser::fromConfig($deps->rvn['config'], '/docs/home');
+        $router->add('GET', '/docs', static function () use ($canonicalHomePath): void {
+            // Keep the legacy panel/docs entrypoint as a stable redirect to the canonical home URL.
+            Redirect::redirect($canonicalHomePath, 301);
+        });
+        $router->add('GET', '/docs/home', static function () use ($panelDocsController): void {
             $panelDocsController()->index();
+        });
+        $canonicalAppendixHomePath = PanelParser::fromConfig($deps->rvn['config'], '/docs/appendix/home');
+        $router->add('GET', '/docs/appendix', static function () use ($canonicalAppendixHomePath): void {
+            // Keep the directory entrypoint stable while giving the appendix one canonical home URL.
+            Redirect::redirect($canonicalAppendixHomePath, 301);
+        });
+        $router->add('GET', '/docs/appendix/home', static function () use ($panelDocsController): void {
+            $panelDocsController()->page('appendix/readme.md');
+        });
+        $router->add('GET', '/docs/appendix/readme', static function () use ($canonicalAppendixHomePath): void {
+            // The source filename is an implementation detail, not a second public appendix index.
+            Redirect::redirect($canonicalAppendixHomePath, 301);
         });
 
         $projectRoot = (string) ($deps->rvn['root'] ?? '');
@@ -44,8 +63,12 @@ final class DocsRouter
             $routePath = '/docs/' . $documentPath;
             $extensionlessPath = preg_replace('/\.md$/i', '', $documentPath) ?? $documentPath;
 
-            $router->add('GET', $routePath, static function () use ($panelDocsController, $documentPath): void {
-                $panelDocsController()->page($documentPath);
+            $canonicalPath = $extensionlessPath === 'appendix/readme'
+                ? $canonicalAppendixHomePath
+                : PanelParser::fromConfig($deps->rvn['config'], '/docs/' . $extensionlessPath);
+            $router->add('GET', $routePath, static function () use ($canonicalPath): void {
+                // Redirect only a known Markdown document alias; arbitrary panel paths never enter this route family.
+                Redirect::redirect($canonicalPath, 301);
             });
             $router->add('GET', '/docs/' . $extensionlessPath, static function () use ($panelDocsController, $documentPath): void {
                 $panelDocsController()->page($documentPath);

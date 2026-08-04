@@ -37,6 +37,7 @@ $channelListToolbarItems = [
 <?= Header::render([
     'title' => 'Channels',
     'summary_html' => 'Manage channel taxonomy for URL structure &amp; landing pages.',
+    'help_url' => $panelBase . '/docs/channels',
 ]) ?>
 
 <?php if ($flashSuccess !== null): ?>

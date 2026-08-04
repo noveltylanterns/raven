@@ -88,6 +88,7 @@ HTML;
     'actions' => $extensionHeaderActions,
     'actions_class' => 'd-flex align-items-center gap-2',
     'body_html' => $extensionHeaderBodyHtml,
+    'help_url' => $panelBase . '/docs/extensions',
 ]) ?>
 
 <?php if ($flashSuccess !== null): ?>

@@ -253,7 +253,7 @@ class ChannelRead
      *
      * Excludes the root channel, which is not selectable as a page destination.
      *
-     * @return array<int, array{id: int, name: string, slug: string, parent_id: int, depth: int, category_sets: array<int, int|string>, tag_sets: array<int, int|string>, editor_override: string, route_mode: string, route_separator: string}>
+     * @return array<int, array{id: int, name: string, slug: string, path: string, parent_id: int, depth: int, category_sets: array<int, int|string>, tag_sets: array<int, int|string>, editor_override: string, route_mode: string, route_separator: string}>
      */
     public function listOptions(): array
     {
@@ -274,6 +274,7 @@ class ChannelRead
                 'id' => $channelId,
                 'name' => (string) ($channel['name'] ?? ''),
                 'slug' => (string) ($channel['slug'] ?? ''),
+                'path' => '',
                 'parent_id' => ChannelShared::normalizeParentId($channel['parent_id'] ?? 0),
                 'category_sets' => SetParser::normalizeSelection($channel['category_sets'] ?? [], false),
                 'tag_sets' => SetParser::normalizeSelection($channel['tag_sets'] ?? [], false),
@@ -319,6 +320,8 @@ class ChannelRead
                 $visited[$childId] = true;
                 $row = $recordsById[$childId];
                 $row['depth'] = $depth;
+                // Store the canonical parent-aware path once so every picker uses the same route identity.
+                $row['path'] = $this->pathForChannel($childId);
                 $rows[] = $row;
                 $appendChildren($childId, $depth + 1);
             }
@@ -335,6 +338,7 @@ class ChannelRead
             $visited[$channelId] = true;
             $channel['parent_id'] = ChannelShared::ROOT_CHANNEL_ID;
             $channel['depth'] = 0;
+            $channel['path'] = $this->pathForChannel($channelId);
             $rows[] = $channel;
             $appendChildren($channelId, 1);
         }
@@ -350,7 +354,7 @@ class ChannelRead
      * presented under the root without rewriting records during option rendering.
      *
      * @param int|null $excludeId Channel id being edited, or null while creating a channel.
-     * @return array<int, array{id: int, name: string, slug: string, parent_id: int, depth: int}> Root-first indented parent options.
+     * @return array<int, array{id: int, name: string, slug: string, path: string, parent_id: int, depth: int}> Root-first indented parent options.
      */
     public function listParentOptions(?int $excludeId = null): array
     {
@@ -444,6 +448,7 @@ class ChannelRead
                     'id' => $childId,
                     'name' => $record['name'],
                     'slug' => $record['slug'],
+                    'path' => $this->pathForChannel($childId),
                     'parent_id' => $parentById[$childId] ?? ChannelShared::ROOT_CHANNEL_ID,
                     'depth' => $depth,
                 ];
@@ -458,6 +463,7 @@ class ChannelRead
                 'id' => ChannelShared::ROOT_CHANNEL_ID,
                 'name' => $root['name'],
                 'slug' => $root['slug'],
+                'path' => '',
                 'parent_id' => ChannelShared::ROOT_CHANNEL_ID,
                 'depth' => 0,
             ];

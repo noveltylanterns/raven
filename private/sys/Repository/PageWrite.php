@@ -426,12 +426,12 @@ final class PageWrite
     }
 
     /**
-     * Resolves channel id by slug for page save operations.
+     * Resolves channel id by slug or parent-aware path for page save operations.
      *
      * Throws when a root-channel placeholder slug is passed, since root-scope pages
      * use `channel = 0` implicitly and do not go through this path.
      *
-     * @param string $slug Channel slug from form input.
+     * @param string $slug Channel slug or slash-separated parent-aware path from form input.
      * @return int|null Resolved channel id, or null when the slug resolves to nothing.
      * @throws RuntimeException When the root-channel placeholder slug is passed directly.
      */
@@ -442,9 +442,20 @@ final class PageWrite
             throw new RuntimeException('The stock <root> channel placeholder cannot be selected directly.');
         }
 
+        $normalized = strtolower(trim($slug, '/'));
+        // Prefer complete path resolution so nested channels cannot collide with same-named siblings.
+        $channel = $this->channelRepo->findByPath($normalized);
+        if (is_array($channel)) {
+            $channelId = (int) ($channel['id'] ?? 0);
+            if ($channelId > 0) {
+                return $channelId;
+            }
+        }
+
+        // Keep legacy single-slug submissions working for integrations predating parent-aware selectors.
         return ChannelParser::resolveChannelIdBySlug(
-            $slug,
-            fn (string $normalized): ?int => $this->channelRepo->idBySlug($normalized),
+            $normalized,
+            fn (string $legacySlug): ?int => $this->channelRepo->idBySlug($legacySlug),
             'Selected channel does not exist.'
         );
     }

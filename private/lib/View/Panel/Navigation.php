@@ -29,7 +29,7 @@ use function Raven\Lib\Security\e;
  *   section                     (string)  Active nav section key for highlight
  *   page_nav                    (string)  Active page sub-nav key ('list', 'create', '')
  *   page_nav_channel            (string)  Active channel slug for create-in-channel highlight
- *   welcome_name                (string)  Display name for the "Welcome back" heading
+ *   welcome_name                (string)  Legacy display name retained for caller compatibility
  *   csrf_field                  (string)  Trusted CSRF hidden-input HTML for the logout form
  *   brand_name                  (string)  Panel brand name text
  *   brand_logo_url              (string)  Absolute or root-relative URL of the brand logo
@@ -120,8 +120,7 @@ final class Navigation
 
             <div class="collapse navbar-collapse" id="ravenMobilePanelNav">
                 <div class="w-100 py-2">
-                    <h2 class="h6 text-uppercase text-white-50">Welcome back, <?= e($welcomeName) ?>!</h2>
-                    <ul class="nav nav-pills flex-column gap-1 mb-3">
+                    <ul class="nav nav-pills flex-column gap-1 mb-4 rvnp-sidebar-utility-nav">
                         <?= self::renderWelcomeItems($config) ?>
                         <li class="nav-item">
                             <!-- Logout remains POST-only with CSRF to avoid accidental/logged URL-triggered sign-outs. -->
@@ -195,9 +194,8 @@ final class Navigation
                         </a>
                     </div>
 
-                    <!-- Welcome group contains the dashboard landing link. -->
-                    <h2 class="h6 text-uppercase text-muted">Welcome back, <?= e($welcomeName) ?>!</h2>
-                    <ul class="nav nav-pills flex-column gap-1 mb-3">
+                    <!-- Utility group contains dashboard/account actions above the Content navigation. -->
+                    <ul class="nav nav-pills flex-column gap-1 mb-4 rvnp-sidebar-utility-nav">
                         <?= self::renderWelcomeItems($config, true) ?>
                         <li class="nav-item">
                             <!-- Use POST + CSRF for logout to match mobile behavior and prevent URL-logged sign-outs. -->
@@ -250,7 +248,7 @@ final class Navigation
                             <a class="nav-link<?= $section === 'dashboard' ? ' active' : '' ?><?= $dashboardTone ?>" href="<?= e($panelBase) ?>/" title="Dashboard">Dashboard</a>
                         </li>
                         <li class="nav-item"><a class="nav-link<?= $section === 'preferences' ? ' active' : '' ?><?= $preferencesTone ?>" href="<?= e($panelBase) ?>/preferences" title="Preferences">Preferences</a></li>
-                        <li class="nav-item"><a class="nav-link<?= $section === 'docs' ? ' active' : '' ?><?= $docsTone ?>" href="<?= e($panelBase) ?>/docs" title="User Manual">User Manual</a></li>
+                        <li class="nav-item"><a class="nav-link<?= $section === 'docs' ? ' active' : '' ?><?= $docsTone ?>" href="<?= e($panelBase) ?>/docs/home" title="User Manual">User Manual</a></li>
 <?php
         return (string) ob_get_clean();
     }

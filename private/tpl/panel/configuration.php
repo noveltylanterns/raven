@@ -75,8 +75,10 @@ $metaUrlPathPrefix = $siteProtocolRaw . '://' . $siteDomainRaw . '/';
 
 // Split configuration fields by top-level section so the editor can present tabbed panes.
 $basicSiteConfigFields = [];
+$basicRoutingConfigFields = [];
 $basicPanelConfigFields = [];
 $basicOtherConfigFields = [];
+$basicTimekeepingConfigFields = [];
 $captchaConfigFields = [];
 $metaConfigFields = [];
 $contentGeneralConfigFields = [];
@@ -186,6 +188,18 @@ foreach ($configFields as $field) {
         continue;
     }
 
+    // Keep URI identity and execution-clock settings visually separate while
+    // preserving their existing site.* ownership and save/validation paths.
+    if ($path === 'site.domain' || $path === 'site.protocol' || $path === 'site.routing') {
+        $basicRoutingConfigFields[] = $field;
+        continue;
+    }
+
+    if ($path === 'site.timezone' || $path === 'site.scheduler') {
+        $basicTimekeepingConfigFields[] = $field;
+        continue;
+    }
+
     if (str_starts_with($path, 'site.')) {
         $basicSiteConfigFields[] = $field;
         continue;
@@ -197,12 +211,8 @@ foreach ($configFields as $field) {
 if ($basicSiteConfigFields !== []) {
     $basicSiteOrder = [
         'site.name' => 10,
-        'site.domain' => 20,
-        'site.protocol' => 30,
-        'site.visibility' => 40,
-        'site.timezone' => 50,
-        'site.scheduler' => 60,
-        'site.routing' => 70,
+        'site.theme' => 20,
+        'site.visibility' => 30,
     ];
 
     usort(
@@ -221,6 +231,47 @@ if ($basicSiteConfigFields !== []) {
         }
     );
 }
+
+$basicRoutingOrder = [
+    'site.domain' => 10,
+    'site.protocol' => 20,
+    'site.routing' => 30,
+];
+usort(
+    $basicRoutingConfigFields,
+    static function (array $left, array $right) use ($basicRoutingOrder): int {
+        $leftPath = (string) ($left['path'] ?? '');
+        $rightPath = (string) ($right['path'] ?? '');
+        $leftRank = (int) ($basicRoutingOrder[$leftPath] ?? 1000);
+        $rightRank = (int) ($basicRoutingOrder[$rightPath] ?? 1000);
+
+        if ($leftRank !== $rightRank) {
+            return $leftRank <=> $rightRank;
+        }
+
+        return strcasecmp($leftPath, $rightPath);
+    }
+);
+
+$basicTimekeepingOrder = [
+    'site.timezone' => 10,
+    'site.scheduler' => 20,
+];
+usort(
+    $basicTimekeepingConfigFields,
+    static function (array $left, array $right) use ($basicTimekeepingOrder): int {
+        $leftPath = (string) ($left['path'] ?? '');
+        $rightPath = (string) ($right['path'] ?? '');
+        $leftRank = (int) ($basicTimekeepingOrder[$leftPath] ?? 1000);
+        $rightRank = (int) ($basicTimekeepingOrder[$rightPath] ?? 1000);
+
+        if ($leftRank !== $rightRank) {
+            return $leftRank <=> $rightRank;
+        }
+
+        return strcasecmp($leftPath, $rightPath);
+    }
+);
 
 if ($debugConfigFields !== []) {
     $debugOrder = [
@@ -884,9 +935,11 @@ $renderConfigField = static function (array $field) use (
                 <option value="off"<?= (string) $field['value'] === 'off' ? ' selected' : '' ?>>Off</option>
             </select>
             <?php if ((string) $field['value'] === 'off'): ?>
-            <div class="form-text text-warning">Manual crontab setup is required when Off. Scheduled tasks will not run without it.</div>
+            <div class="form-text text-warning">Web-request scheduling is disabled. Run <code>rvn-cron run</code> from system cron if scheduled tasks should still run.</div>
+            <?php elseif ((string) $field['value'] === 'panel'): ?>
+            <div class="form-text">Raven checks due scheduled tasks during panel requests. Set to Off to use external cron with <code>rvn-cron run</code>.</div>
             <?php else: ?>
-            <div class="form-text">Set to Off and point your server crontab at <code>rvn-cron run</code> to handle scheduling externally.</div>
+            <div class="form-text">Raven checks due scheduled tasks during public and panel requests. Set to Off to use external cron with <code>rvn-cron run</code>.</div>
             <?php endif; ?>
         <?php elseif ($isSiteTimezoneField): ?>
             <?php
@@ -1009,7 +1062,7 @@ $renderConfigField = static function (array $field) use (
                 <option value="string"<?= (string) $field['value'] === 'string' ? ' selected' : '' ?>>String</option>
             </select>
         <?php elseif ($isCategorySelectorField || $isTagSelectorField || $isGroupSelectorField): ?>
-            <!-- Selector controls which URL segment identifies the taxonomy/group item. -->
+            <!-- Selector controls which URI segment identifies the taxonomy/group item. -->
             <select
                 class="form-select font-monospace"
                 id="<?= e($inputId) ?>"
@@ -1108,6 +1161,7 @@ $configurationToolbarItems = [
     'title' => 'System Configuration',
     'summary' => 'Manage site, database, debug, media, meta, security, and user/session runtime settings.',
     'summary_class' => 'text-muted mt-2 mb-0',
+    'help_url' => $panelBase . '/docs/configuration',
 ]) ?>
 
 <?php if ($flashSuccess !== null): ?>
@@ -1233,7 +1287,7 @@ $configurationToolbarItems = [
                             aria-labelledby="config-basic-tab"
                             tabindex="0"
                         >
-                            <?php if ($basicSiteConfigFields === [] && $basicPanelConfigFields === [] && $basicOtherConfigFields === []): ?>
+                            <?php if ($basicSiteConfigFields === [] && $basicRoutingConfigFields === [] && $basicPanelConfigFields === [] && $basicOtherConfigFields === [] && $basicTimekeepingConfigFields === []): ?>
                                 <p class="text-muted mb-0">No configuration fields available.</p>
                             <?php else: ?>
                                 <?php $hasBasicSections = false; ?>
@@ -1245,6 +1299,17 @@ $configurationToolbarItems = [
                                     </p>
                                     <?php foreach ($basicSiteConfigFields as $siteField): ?>
                                         <?php $renderConfigField($siteField); ?>
+                                    <?php endforeach; ?>
+                                    <?php $hasBasicSections = true; ?>
+                                <?php endif; ?>
+
+                                <?php if ($basicRoutingConfigFields !== []): ?>
+                                    <?php if ($hasBasicSections): ?>
+                                        <hr class="my-4">
+                                    <?php endif; ?>
+                                    <h3>Routing</h3>
+                                    <?php foreach ($basicRoutingConfigFields as $routingField): ?>
+                                        <?php $renderConfigField($routingField); ?>
                                     <?php endforeach; ?>
                                     <?php $hasBasicSections = true; ?>
                                 <?php endif; ?>
@@ -1266,6 +1331,16 @@ $configurationToolbarItems = [
                                     <?php endif; ?>
                                     <?php $renderConfigFieldGroup($basicOtherConfigFields); ?>
                                     <?php $hasBasicSections = true; ?>
+                                <?php endif; ?>
+
+                                <?php if ($basicTimekeepingConfigFields !== []): ?>
+                                    <?php if ($hasBasicSections): ?>
+                                        <hr class="my-4">
+                                    <?php endif; ?>
+                                    <h3>Timekeeping</h3>
+                                    <?php foreach ($basicTimekeepingConfigFields as $timekeepingField): ?>
+                                        <?php $renderConfigField($timekeepingField); ?>
+                                    <?php endforeach; ?>
                                 <?php endif; ?>
 
                             <?php endif; ?>

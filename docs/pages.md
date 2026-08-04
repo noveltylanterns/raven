@@ -26,14 +26,15 @@ All mutating routes are login/permission/CSRF guarded.
 
 ## 2) Page Editor Surface
 
-The page editor is split into three main areas:
+The page editor is split into four tabs:
 
 - Content:
   - title/body editing
   - optional block-based content sections
+- Taxonomy:
+  - channel/category/tag assignments
 - Meta:
   - status, slug, scheduling
-  - channel/category/tag assignments
   - page-level metadata fields
 - Media:
   - gallery upload/delete and metadata
@@ -43,7 +44,7 @@ New pages must be saved before gallery operations are available.
 
 The panel editor exposes these corresponding field controls:
 
-The quick Create Page menu offers root-level channel shortcuts; the page editor's channel selector still includes nested channels.
+The quick Create Page menu offers root-level channel shortcuts; the page editor's channel selector starts with a bold `<root>` option, followed by alphabetized root channels and alphabetized descendants indented two spaces per level. Each channel option shows its complete parent-aware path in parentheses.
 
 When editing a published page, the header card shows its full canonical URL, including every parent channel path segment.
 
@@ -63,7 +64,7 @@ Related persistence seams:
 - taxonomy links (`page_categories`, `page_tags`) managed by page write flow
 - gallery/image records through `MediaRead`/`MediaWrite`
 
-Root-scope pages use channel id `0` (root channel scope), while editor UX may present that as `<none>` for route clarity.
+Root-scope pages use channel id `0` (root channel scope), presented in the editor as the bold `<root>` option.
 
 ## 4) Public Page Rendering
 
@@ -103,7 +104,7 @@ Page publication/expiry behavior is driven by page status and schedule fields. R
 
 For broader routing and availability policy context:
 
-- `docs/routing.md`
+- `docs/appendix/router.md`
 - `docs/configuration.md`
 
 ## 6) Media And Gallery Behavior

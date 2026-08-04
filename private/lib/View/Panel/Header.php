@@ -23,8 +23,8 @@ final class Header
      *
      * Templates pass plain strings for common fields and trusted HTML fragments
      * only for route-specific markup such as buttons, permalinks, or embedded
-     * forms. This keeps page-level policy in the template while centralizing the
-     * repeated card structure in one canonical helper.
+     * forms. A supplied `help_url` is rendered as a standard icon-only help
+     * action so documentation links stay consistent across heading cards.
      *
      * @param array<string, mixed> $config Header fields such as title/title_html, intro_html, summary/summary_html, subheading/subheading_html, actions, body_html, and optional class overrides.
      * @return string Rendered `<header>` markup ready to echo from a panel template.
@@ -42,6 +42,14 @@ final class Header
         $summaryHtml = self::textOrHtml($config, 'summary', 'summary_html');
         $bodyHtml = trim((string) ($config['body_html'] ?? ''));
         $actions = self::normalizeHtmlList($config['actions'] ?? []);
+        $helpUrl = trim((string) ($config['help_url'] ?? ''));
+        if ($helpUrl !== '') {
+            // Append the help affordance so it remains the rightmost action in every heading card.
+            $actions[] =
+                '<a href="' . e($helpUrl) . '" class="btn btn-warning btn-sm" title="Open help documentation" aria-label="Open help documentation">'
+                    . '<i class="bi bi-question-lg" aria-hidden="true"></i>'
+                    . '</a>';
+        }
 
         // Default classes preserve the existing Bootstrap header-card footprint while
         // still allowing templates to opt into spacing variants such as `mb-3`.

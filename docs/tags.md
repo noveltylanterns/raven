@@ -45,6 +45,8 @@ What you can do:
 
 ### Tag Editor (`/tag/edit` and `/tag/edit/{id}`)
 
+The editor provides short inline descriptions for the tag name, slug, set, description, and media controls.
+
 Top and bottom action bars (same controls in both places):
 
 - `Save Tag`

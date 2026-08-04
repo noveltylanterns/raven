@@ -77,6 +77,7 @@ $updateToolbarItems = [
 <?= Header::render([
     'title' => 'Update Raven',
     'summary' => 'Compare this Raven install against a git source, dry run the overlay, or update the managed package files in place.',
+    'help_url' => $panelBase . '/docs/updates',
 ]) ?>
 
 <?= Toolbar::render([

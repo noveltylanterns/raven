@@ -164,7 +164,7 @@ final class ChannelEditController
             );
         }
 
-        $activeTab = $this->editorTabs->normalizeEditorTab($_GET['tab'] ?? null, ['basic', 'meta', 'media'], 'basic');
+        $activeTab = $this->editorTabs->normalizeEditorTab($_GET['tab'] ?? null, ['basic', 'content', 'media', 'routing'], 'basic');
 
         $this->context->renderPanel('panel/channel/edit', [
             'channel' => $channel,
@@ -211,7 +211,7 @@ final class ChannelEditController
             Redirect::redirect($this->context->panelUrl('/channel'));
         }
 
-        $activeTab = $this->editorTabs->normalizeEditorTab($post['tab'] ?? null, ['basic', 'meta', 'media'], 'basic');
+        $activeTab = $this->editorTabs->normalizeEditorTab($post['tab'] ?? null, ['basic', 'content', 'media', 'routing'], 'basic');
         $existingChannel = $id !== null ? $this->channelRead->findById($id) : null;
         $parentId = ChannelShared::normalizeParentId($post['parent_id'] ?? ChannelShared::ROOT_CHANNEL_ID);
         $parentOptionIds = array_map(

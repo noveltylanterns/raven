@@ -84,6 +84,7 @@ $pageListToolbarItems = [
 <?= Header::render([
     'title' => 'Pages',
     'summary' => 'Create, organize, and manage your site pages with publication and channel controls.',
+    'help_url' => $panelBase . '/docs/pages',
 ]) ?>
 
 <?php if ($flashSuccess !== null): ?>

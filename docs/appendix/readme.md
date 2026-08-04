@@ -8,6 +8,8 @@ This page is the developer-surface index for Raven CMS. It links the stable impl
 - Primary references:
   - [Architecture Appendix](./architecture.md)
   - [Filetree Appendix](./filetree.md)
+  - [Router Developer Reference](./router.md)
+  - [Core Router Symbol Inventory](./core/router.md)
   - [Core Runtime Appendix Overview](./core/overview.md)
   - [Config Appendix](./config.md)
   - [Database Appendix](./database.md)
@@ -51,10 +53,11 @@ This page is the developer-surface index for Raven CMS. It links the stable impl
 ## Suggested Reading Order
 
 1. [Core Runtime Appendix Overview](./core/overview.md)
-2. [Config Appendix](./config.md)
-3. [Database Appendix](./database.md)
-4. [Extensions Appendix Overview](./extensions/overview.md)
-5. [Libraries Appendix Overview](./libraries/overview.md)
-6. [CLI Appendix Overview](./cli/overview.md)
-7. [Templates Appendix (Public)](./templates/public.md)
-8. [Bootstrap Appendix](./bootstrap.md)
+2. [Router Developer Reference](./router.md)
+3. [Config Appendix](./config.md)
+4. [Database Appendix](./database.md)
+5. [Extensions Appendix Overview](./extensions/overview.md)
+6. [Libraries Appendix Overview](./libraries/overview.md)
+7. [CLI Appendix Overview](./cli/overview.md)
+8. [Templates Appendix (Public)](./templates/public.md)
+9. [Bootstrap Appendix](./bootstrap.md)

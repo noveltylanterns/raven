@@ -45,13 +45,15 @@ Top and bottom action bars (same controls in both places):
 Fields/options:
 
 - `Title` (required)
-- `Description` (optional)
 - `Slug` (required)
-- `Channel` (`<none>` or a canonical parent-aware channel path such as `news/alpha`)
+- `Channel` (bold `<root>` or an alphabetized, indented parent-aware channel tree such as `news/alpha`)
+- `Target URI` (required)
 - `Status` (`Active` or `Inactive`)
-- `Target URL` (required)
+- `Description` (optional)
 
-`Target URL` format rules:
+All Redirect Editor fields include short inline descriptions. Root-scoped redirects use the `<root>` channel option; selecting a nested channel shows its complete canonical path in parentheses.
+
+`Target URI` format rules:
 
 - Absolute `http://` or `https://` URL
 - Or root-relative path beginning with `/`

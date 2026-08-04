@@ -51,6 +51,7 @@ $themeHeaderActions = [
     'summary' => 'Manage installed public themes, switch the active theme, and scaffold new theme folders.',
     'actions' => $themeHeaderActions,
     'actions_class' => 'd-flex align-items-center gap-2',
+    'help_url' => $panelBase . '/docs/theming',
 ]) ?>
 
 <?php if ($flashSuccess !== null): ?>
@@ -270,7 +271,7 @@ $themeHeaderActions = [
                                     <option value="<?= e($slug) ?>"><?= e($label) ?> [<?= e($slug) ?>]</option>
                                 <?php endforeach; ?>
                             </select>
-                            <div class="form-text">When selected, all files from the source theme are copied into the new theme.</div>
+                            <div class="form-text">Copies the source theme files into the new theme before applying its new name, slug, and metadata.</div>
                         </div>
                         <div class="col-12">
                             <label for="parent_theme" class="form-label">Parent Theme (optional)</label>
@@ -280,7 +281,7 @@ $themeHeaderActions = [
                                     <option value="<?= e($slug) ?>"><?= e($label) ?> [<?= e($slug) ?>]</option>
                                 <?php endforeach; ?>
                             </select>
-                            <div class="form-text">Selecting a parent marks the new theme as a child theme and overrides cloned parent metadata.</div>
+                            <div class="form-text">Selecting a parent marks the new theme as a child and records that parent in its manifest.</div>
                         </div>
                         <div class="col-12">
                             <div class="form-check">

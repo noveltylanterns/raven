@@ -238,6 +238,7 @@ if ($hasPersistedUser) {
         : 'Edit User: <span class="text-primary">\'' . e($userDisplayName !== '' ? $userDisplayName : ($userName !== '' ? $userName : 'Untitled')) . '\'</span>',
     'summary' => $userRow === null ? 'Create or update user accounts, group membership, theme, and avatar settings.' : '',
     'body_html' => $userHeaderBodyHtml,
+    'help_url' => $panelBase . '/docs/users',
 ]) ?>
 
 <?php if ($flashSuccess !== null): ?>
@@ -336,11 +337,13 @@ if ($hasPersistedUser) {
             <div class="form-group">
                 <label for="display_name" class="form-label">Display Name</label>
                 <input id="display_name" name="display_name" class="form-control" value="<?= e((string) ($userRow['name'] ?? '')) ?>">
+                <div class="form-text">Name shown in the panel, profile areas, and authored content.</div>
             </div>
 
             <div class="form-group">
                 <label for="email" class="form-label">Email</label>
                 <input id="email" name="email" type="email" class="form-control" required value="<?= e((string) ($userRow['email'] ?? '')) ?>">
+                <div class="form-text">Account email used for notifications and email-based authentication.</div>
             </div>
 
             <div class="form-group mb-0">
@@ -479,6 +482,7 @@ if ($hasPersistedUser) {
                     <div class="form-check mt-2">
                         <input class="form-check-input" type="checkbox" value="1" id="remove_avatar" name="remove_avatar">
                         <label class="form-check-label" for="remove_avatar">Remove current avatar</label>
+                        <div class="form-text">Delete the stored avatar when this form is saved.</div>
                     </div>
                 <?php endif; ?>
             </div>
@@ -500,12 +504,14 @@ if ($hasPersistedUser) {
                     <div class="form-check mt-2">
                         <input class="form-check-input" type="checkbox" value="1" id="remove_cover_image" name="remove_cover_image">
                         <label class="form-check-label" for="remove_cover_image">Remove current cover image</label>
+                        <div class="form-text">Delete the stored cover image when this form is saved.</div>
                     </div>
                 <?php endif; ?>
             </div>
 
             <div class="form-group mb-0">
                 <label class="form-label d-block h3">Contact Information</label>
+                <div class="form-text">Optional public contact profiles displayed by themes that support them.</div>
                 <div id="user-contact-profiles-list">
                     <?php foreach ($contactProfiles as $index => $contactProfile): ?>
                         <?php
@@ -531,6 +537,7 @@ if ($hasPersistedUser) {
                                             ><?= e($optionLabel) ?></option>
                                         <?php endforeach; ?>
                                     </select>
+                                    <div class="form-text">Select the kind of contact profile being added.</div>
                                 </div>
                                 <div class="col-md pe-md-0">
                                     <label class="form-label">Value</label>
@@ -545,6 +552,7 @@ if ($hasPersistedUser) {
                                             placeholder="username/path or value"
                                         >
                                     </div>
+                                    <div class="form-text">Enter the profile handle, path, or value for this contact type.</div>
                                 </div>
                                 <div class="col-auto ps-md-0 d-flex align-items-end">
                                     <button type="button" class="<?= e($contactBlockLayout['remove_button_class']) ?>" data-user-contact-remove="1"><i class="bi bi-x-circle-fill" aria-hidden="true"></i></button>
@@ -584,6 +592,7 @@ if ($hasPersistedUser) {
                         class="form-control"
                         required
                     >
+                    <div class="form-text">Repeat the password exactly to confirm the new account credential.</div>
                 </div>
             <?php else: ?>
                 <div class="form-group">
@@ -596,7 +605,7 @@ if ($hasPersistedUser) {
 
             <div class="form-group mb-0">
                 <label class="form-label h3 d-block">Two-Factor Methods</label>
-                <p class="text-muted mb-2">Admins can remove methods here to recover locked-out users.</p>
+                <p class="form-text mb-2">Admins can remove methods here to recover locked-out users.</p>
                 <?php if ($hasPersistedUser): ?>
                     <input type="hidden" name="two_factor_methods_present" value="1">
                 <?php endif; ?>
@@ -625,14 +634,17 @@ if ($hasPersistedUser) {
                                     <div class="col-md-3">
                                         <label class="form-label">Type</label>
                                         <input type="text" class="form-control" value="<?= e($methodTypeLabel) ?>" disabled>
+                                        <div class="form-text">Configured authentication method type.</div>
                                     </div>
                                     <div class="col-md-3">
                                         <label class="form-label">Label</label>
                                         <input type="text" class="form-control" value="<?= e($methodLabel) ?>" disabled>
+                                        <div class="form-text">Friendly label for identifying this method.</div>
                                     </div>
                                     <div class="col-md">
                                         <label class="form-label">Details</label>
                                         <input type="text" class="form-control" value="<?= e($methodDescription) ?>" placeholder="Configured method" disabled>
+                                        <div class="form-text">Status and identifying details for this configured method.</div>
                                     </div>
                                     <div class="col-auto ps-md-0 d-flex align-items-end">
                                         <button type="button" class="<?= e($securityBlockLayout['compact_remove_button_class']) ?>" data-user-two-factor-remove="1"><i class="bi bi-x-circle-fill" aria-hidden="true"></i></button>
@@ -736,6 +748,7 @@ if ($hasPersistedUser) {
                         <option value="<?= e((string) $optionSlug) ?>" data-url-prefix="<?= e($optionPrefix) ?>"><?= e($optionLabel) ?></option>
                     <?php endforeach; ?>
                 </select>
+                <div class="form-text">Select the kind of contact profile being added.</div>
             </div>
             <div class="col-md pe-md-0">
                 <label class="form-label">Value</label>
@@ -748,6 +761,7 @@ if ($hasPersistedUser) {
                         placeholder="username/path or value"
                     >
                 </div>
+                <div class="form-text">Enter the profile handle, path, or value for this contact type.</div>
             </div>
             <div class="col-auto ps-md-0 d-flex align-items-end">
                 <button type="button" class="<?= e($contactBlockLayout['remove_button_class']) ?>" data-user-contact-remove="1"><i class="bi bi-x-circle-fill" aria-hidden="true"></i></button>

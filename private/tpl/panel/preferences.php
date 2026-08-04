@@ -142,6 +142,7 @@ $preferencesToolbarItems = [
 <?= Header::render([
     'title' => 'Preferences',
     'summary' => 'Manage your account details, panel theme, and avatar.',
+    'help_url' => $panelBase . '/docs/preferences',
 ]) ?>
 
 <?php if ($flashSuccess !== null): ?>
@@ -165,14 +166,17 @@ $preferencesToolbarItems = [
                         <option value="<?= e((string) $typeValue) ?>"><?= e((string) $typeLabel) ?></option>
                     <?php endforeach; ?>
                 </select>
+                <div class="form-text">Authentication method to configure.</div>
                 <input type="hidden" data-preferences-two-factor-key="status" value="pending">
             </div>
             <div class="col-md-3" data-preferences-two-factor-section="label">
                 <label class="form-label">Label</label>
                 <input type="text" class="form-control form-control-sm" data-preferences-two-factor-key="label" placeholder="My Authenticator / Office Key">
+                <div class="form-text">Friendly label to identify this method.</div>
             </div>
             <div class="col-md position-relative" data-preferences-two-factor-section="totp" style="display:none;">
                 <label class="form-label" data-preferences-two-factor-totp-label="1">TOTP Secret / Confirm Code</label>
+                <div class="form-text">Use an authenticator app to generate a secret and verify the setup code.</div>
                 <div class="input-group input-group-sm">
                     <input
                         type="text"
@@ -192,6 +196,7 @@ $preferencesToolbarItems = [
             </div>
             <div class="col-md position-relative" data-preferences-two-factor-section="webauthn" style="display:none;">
                 <label class="form-label">Credential ID</label>
+                <div class="form-text">Pair a security key; its PIN or biometric prompt handles user verification.</div>
                 <div class="input-group input-group-sm">
                     <span class="input-group-text">
                         <input class="form-check-input mt-0 me-2" type="checkbox" data-preferences-two-factor-key="require_uv" value="1" aria-label="Require PIN/Biometric?">
@@ -206,10 +211,12 @@ $preferencesToolbarItems = [
             </div>
             <div class="col-md" data-preferences-two-factor-section="email" style="display:none;">
                 <label class="form-label">Email Address</label>
+                <div class="form-text">Leave blank to use the account email.</div>
                 <input type="email" class="form-control form-control-sm" data-preferences-two-factor-key="target_email" placeholder="Defaults to account email if blank">
             </div>
                 <div class="col-md position-relative" data-preferences-two-factor-section="recovery" style="display:none;">
                     <label class="form-label">Recovery Phrase</label>
+                    <div class="form-text">Backup phrase for account recovery; reusable phrases can be used more than once.</div>
                     <div class="input-group input-group-sm">
                     <span class="input-group-text">
                         <input
@@ -1597,6 +1604,18 @@ $preferencesToolbarItems = [
                 aria-selected="<?= $activeTab === 'security' ? 'true' : 'false' ?>"
             >Security</button>
         </li>
+        <li class="nav-item" role="presentation">
+            <button
+                class="nav-link<?= $activeTab === 'site' ? ' active' : '' ?>"
+                id="preferences-site-tab"
+                data-bs-toggle="tab"
+                data-bs-target="#rvnp-editor-pane-site"
+                type="button"
+                role="tab"
+                aria-controls="rvnp-editor-pane-site"
+                aria-selected="<?= $activeTab === 'site' ? 'true' : 'false' ?>"
+            >Site</button>
+        </li>
     </ul>
 
     <div class="tab-content raven-tab-content-surface border border-top-0 p-3" id="rvnp-editor-content">
@@ -1639,45 +1658,6 @@ $preferencesToolbarItems = [
                 >
             </div>
 
-            <div class="form-group">
-                <label class="form-label" for="theme">Panel Theme</label>
-                <select class="form-select" id="theme" name="theme" required>
-                    <?php foreach ($themeOptions as $option): ?>
-                        <?php $optionLabel = (string) ($themeLabels[$option] ?? $option); ?>
-                        <option value="<?= e($option) ?>"<?= $selectedTheme === $option ? ' selected' : '' ?>>
-                            <?= e($optionLabel) ?>
-                        </option>
-                    <?php endforeach; ?>
-                </select>
-                <div class="form-text"><code>&lt;Default&gt;</code> follows the system's configured default admin theme.</div>
-            </div>
-
-            <div class="form-group mb-0">
-                <label class="form-label" for="timezone">Timezone</label>
-                <?php
-                // Build grouped timezone list for the select: group by first segment (continent/region).
-                $prefTzSelected = (string) ($preferences['timezone'] ?? '');
-                $prefTzGroups = [];
-                foreach (\DateTimeZone::listIdentifiers(\DateTimeZone::ALL_WITH_BC) as $prefTzId) {
-                    $prefTzSlash = strpos($prefTzId, '/');
-                    $prefTzGroup = $prefTzSlash !== false ? substr($prefTzId, 0, $prefTzSlash) : 'Other';
-                    $prefTzGroups[$prefTzGroup][] = $prefTzId;
-                }
-                ksort($prefTzGroups);
-                ?>
-                <select class="form-select font-monospace" id="timezone" name="timezone">
-                    <!-- Empty value means "use site/server default" — never defaults to UTC. -->
-                    <option value=""<?= $prefTzSelected === '' ? ' selected' : '' ?>>— Use Site Default —</option>
-                    <?php foreach ($prefTzGroups as $prefTzGroupName => $prefTzIds): ?>
-                        <optgroup label="<?= e($prefTzGroupName) ?>">
-                            <?php foreach ($prefTzIds as $prefTzId): ?>
-                                <option value="<?= e($prefTzId) ?>"<?= $prefTzSelected === $prefTzId ? ' selected' : '' ?>><?= e($prefTzId) ?></option>
-                            <?php endforeach; ?>
-                        </optgroup>
-                    <?php endforeach; ?>
-                </select>
-                <div class="form-text">Your personal timezone override. Leave blank to follow the site default.</div>
-            </div>
         </div>
 
         <div
@@ -1718,6 +1698,7 @@ $preferencesToolbarItems = [
                     <div class="form-check mt-2">
                         <input class="form-check-input" type="checkbox" value="1" id="remove_avatar" name="remove_avatar">
                         <label class="form-check-label" for="remove_avatar">Remove current avatar</label>
+                        <div class="form-text">Delete the stored avatar when this form is saved.</div>
                     </div>
                 <?php endif; ?>
             </div>
@@ -1739,12 +1720,14 @@ $preferencesToolbarItems = [
                     <div class="form-check mt-2">
                         <input class="form-check-input" type="checkbox" value="1" id="remove_cover_image" name="remove_cover_image">
                         <label class="form-check-label" for="remove_cover_image">Remove current cover image</label>
+                        <div class="form-text">Delete the stored cover image when this form is saved.</div>
                     </div>
                 <?php endif; ?>
             </div>
 
             <div class="form-group mb-0">
                 <label class="form-label h3 d-block">Contact Information</label>
+                <div class="form-text">Optional public contact profiles displayed by themes that support them.</div>
                 <div id="preferences-contact-profiles-list">
                     <?php foreach ($contactProfiles as $index => $contactProfile): ?>
                         <?php
@@ -1770,6 +1753,7 @@ $preferencesToolbarItems = [
                                             ><?= e($optionLabel) ?></option>
                                         <?php endforeach; ?>
                                     </select>
+                                    <div class="form-text">Select the kind of contact profile being added.</div>
                                 </div>
                                 <div class="col-md pe-md-0">
                                     <label class="form-label">Value</label>
@@ -1784,6 +1768,7 @@ $preferencesToolbarItems = [
                                             placeholder="username/path or value"
                                         >
                                     </div>
+                                    <div class="form-text">Enter the profile handle, path, or value for this contact type.</div>
                                 </div>
                                 <div class="col-auto ps-md-0 d-flex align-items-end">
                                     <button type="button" class="<?= e($contactBlockLayout['remove_button_class']) ?>" data-preferences-contact-remove="1"><i class="bi bi-x-circle-fill" aria-hidden="true"></i></button>
@@ -1878,6 +1863,7 @@ $preferencesToolbarItems = [
                                             <option value="<?= e((string) $typeValue) ?>"<?= $methodType === (string) $typeValue ? ' selected' : '' ?>><?= e((string) $typeLabel) ?></option>
                                         <?php endforeach; ?>
                                     </select>
+                                    <div class="form-text">Authentication method to configure.</div>
                                     <input
                                         type="hidden"
                                         data-preferences-two-factor-key="status"
@@ -1895,9 +1881,11 @@ $preferencesToolbarItems = [
                                         value="<?= e($methodLabel) ?>"
                                         placeholder="<?= e($methodLabelPlaceholder) ?>"
                                     >
+                                    <div class="form-text">Friendly label to identify this method.</div>
                                 </div>
                                 <div class="col-md position-relative" data-preferences-two-factor-section="totp"<?= $methodType === 'totp' ? '' : ' style="display:none;"' ?>>
                                     <label class="form-label" data-preferences-two-factor-totp-label="1"><?= $isTotpConfirmed ? 'TOTP Secret' : 'TOTP Secret / Confirm Code' ?></label>
+                                    <div class="form-text">Use an authenticator app to generate a secret and verify the setup code.</div>
                                     <div class="input-group input-group-sm">
                                         <input
                                             type="text"
@@ -1940,6 +1928,7 @@ $preferencesToolbarItems = [
                                 </div>
                                 <div class="col-md position-relative" data-preferences-two-factor-section="webauthn"<?= $methodType === 'webauthn' ? '' : ' style="display:none;"' ?>>
                                     <label class="form-label">Credential ID</label>
+                                    <div class="form-text">Pair a security key; its PIN or biometric prompt handles user verification.</div>
                                     <div class="input-group input-group-sm">
                                         <span class="input-group-text">
                                             <input
@@ -1981,6 +1970,7 @@ $preferencesToolbarItems = [
                                 </div>
                                 <div class="col-md" data-preferences-two-factor-section="email"<?= $methodType === 'email' ? '' : ' style="display:none;"' ?>>
                                     <label class="form-label">Email Address</label>
+                                    <div class="form-text">Leave blank to use the account email.</div>
                                     <input
                                         type="email"
                                         class="form-control form-control-sm"
@@ -1992,6 +1982,7 @@ $preferencesToolbarItems = [
                                 </div>
                                 <div class="col-md position-relative" data-preferences-two-factor-section="recovery"<?= $methodType === 'recovery' ? '' : ' style="display:none;"' ?>>
                                     <label class="form-label">Recovery Phrase</label>
+                                    <div class="form-text">Backup phrase for account recovery; reusable phrases can be used more than once.</div>
                                     <div class="input-group input-group-sm">
                                         <span class="input-group-text">
                                             <input
@@ -2054,6 +2045,54 @@ $preferencesToolbarItems = [
                 </div>
 
                 <button type="button" class="btn btn-primary btn-sm" id="preferences-two-factor-add">Add 2FA Method</button>
+            </div>
+        </div>
+
+        <div
+            class="tab-pane fade<?= $activeTab === 'site' ? ' show active' : '' ?>"
+            id="rvnp-editor-pane-site"
+            role="tabpanel"
+            aria-labelledby="preferences-site-tab"
+            tabindex="0"
+        >
+            <div class="form-group">
+                <label class="form-label" for="theme">Panel Theme</label>
+                <select class="form-select" id="theme" name="theme" required>
+                <?php foreach ($themeOptions as $option): ?>
+                    <?php $optionLabel = (string) ($themeLabels[$option] ?? $option); ?>
+                    <option value="<?= e($option) ?>"<?= $selectedTheme === $option ? ' selected' : '' ?>>
+                        <?= e($optionLabel) ?>
+                    </option>
+                <?php endforeach; ?>
+                </select>
+                <div class="form-text"><code>&lt;Default&gt;</code> follows the system's configured default admin theme.</div>
+            </div>
+
+            <div class="form-group mb-0">
+                <label class="form-label" for="timezone">Timezone</label>
+                <?php
+                // Build grouped timezone list for the select: group by first segment (continent/region).
+                $prefTzSelected = (string) ($preferences['timezone'] ?? '');
+                $prefTzGroups = [];
+                foreach (\DateTimeZone::listIdentifiers(\DateTimeZone::ALL_WITH_BC) as $prefTzId) {
+                    $prefTzSlash = strpos($prefTzId, '/');
+                    $prefTzGroup = $prefTzSlash !== false ? substr($prefTzId, 0, $prefTzSlash) : 'Other';
+                    $prefTzGroups[$prefTzGroup][] = $prefTzId;
+                }
+                ksort($prefTzGroups);
+                ?>
+                <select class="form-select font-monospace" id="timezone" name="timezone">
+                    <!-- Empty value means "use site/server default" — never defaults to UTC. -->
+                    <option value=""<?= $prefTzSelected === '' ? ' selected' : '' ?>>— Use Site Default —</option>
+                    <?php foreach ($prefTzGroups as $prefTzGroupName => $prefTzIds): ?>
+                        <optgroup label="<?= e($prefTzGroupName) ?>">
+                            <?php foreach ($prefTzIds as $prefTzId): ?>
+                                <option value="<?= e($prefTzId) ?>"<?= $prefTzSelected === $prefTzId ? ' selected' : '' ?>><?= e($prefTzId) ?></option>
+                            <?php endforeach; ?>
+                        </optgroup>
+                <?php endforeach; ?>
+                </select>
+                <div class="form-text">Your personal timezone override. Leave blank to follow the site default.</div>
             </div>
         </div>
     </div>
@@ -2146,6 +2185,7 @@ $preferencesToolbarItems = [
                         <option value="<?= e((string) $optionSlug) ?>" data-url-prefix="<?= e($optionPrefix) ?>"><?= e($optionLabel) ?></option>
                     <?php endforeach; ?>
                 </select>
+                <div class="form-text">Select the kind of contact profile being added.</div>
             </div>
             <div class="col-md pe-md-0">
                 <label class="form-label">Value</label>
@@ -2158,6 +2198,7 @@ $preferencesToolbarItems = [
                         placeholder="username/path or value"
                     >
                 </div>
+                <div class="form-text">Enter the profile handle, path, or value for this contact type.</div>
             </div>
             <div class="col-auto pe-md-0 d-flex align-items-end">
                 <button type="button" class="<?= e($contactBlockLayout['remove_button_class']) ?>" data-preferences-contact-remove="1"><i class="bi bi-x-circle-fill" aria-hidden="true"></i></button>

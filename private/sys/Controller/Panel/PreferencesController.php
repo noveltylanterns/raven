@@ -154,7 +154,7 @@ final class PreferencesController
             Redirect::redirect($this->context->panelUrl('/'));
         }
 
-        $activeTab = $this->editorTabs->normalizeEditorTab($_GET['tab'] ?? null, ['account', 'profile', 'security'], 'account');
+        $activeTab = $this->editorTabs->normalizeEditorTab($_GET['tab'] ?? null, ['account', 'profile', 'security', 'site'], 'account');
         $normalizedTheme = $this->panelTheme->normalizeChoice((string) ($preferences['theme'] ?? 'default'), true);
         $preferences['theme'] = $normalizedTheme ?? 'default';
         $preferences['two_factor'] = $this->prepareTwoFactorMethodsForView(
@@ -192,7 +192,7 @@ final class PreferencesController
     public function preferencesSave(array $post, array $files): void
     {
         $this->context->requirePanelLogin();
-        $activeTab = $this->editorTabs->normalizeEditorTab($post['tab'] ?? null, ['account', 'profile', 'security'], 'account');
+        $activeTab = $this->editorTabs->normalizeEditorTab($post['tab'] ?? null, ['account', 'profile', 'security', 'site'], 'account');
         $preferencesUrl = $this->editorTabs->panelEditorUrlWithTab(
             fn (string $suffix): string => $this->context->panelUrl($suffix),
             '/preferences',

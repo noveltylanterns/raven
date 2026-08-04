@@ -246,6 +246,7 @@ if ($canDeleteGroup) {
         : 'Edit Group: <span class="text-primary">\'' . e($groupName !== '' ? $groupName : 'Untitled') . '\'</span>',
     'summary' => $group === null ? 'Create or update group permissions and group-level route behavior.' : '',
     'body_html' => $groupHeaderBodyHtml,
+    'help_url' => $panelBase . '/docs/groups',
 ]) ?>
 
 <?php if ($flashSuccess !== null): ?>
@@ -365,7 +366,7 @@ if ($canDeleteGroup) {
                 <?php elseif ($isGuestGroup): ?>
                     <div class="form-text">Guest group URI routing is permanently disabled.</div>
                 <?php elseif (!$groupRoutingEnabledSystemWide): ?>
-                    <div class="form-text">System-level group routing is disabled in Configuration.</div>
+                    <div class="form-text">Group URI routing is disabled system-wide in Configuration.</div>
                 <?php endif; ?>
             </div>
         </div>

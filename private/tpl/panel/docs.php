@@ -20,11 +20,11 @@ use function Raven\Lib\Security\e;
 $panelBase = '/' . trim($site['panel_path'], '/');
 $documentPath = trim((string) ($documentPath ?? ''), '/');
 $documentTitle = trim((string) ($documentTitle ?? 'User Manual'));
-$indexUrl = $panelBase . '/docs';
+$indexUrl = $panelBase . '/docs/home';
 $headerActions = [];
 if ($documentPath !== 'readme.md') {
-    $headerActions[] = '<a class="btn btn-outline-secondary btn-sm" href="' . e($indexUrl) . '">'
-        . '<i class="bi bi-arrow-left me-2" aria-hidden="true"></i>Manual Index</a>';
+    $headerActions[] = '<a class="btn btn-primary btn-sm" href="' . e($indexUrl) . '">'
+        . '<i class="bi bi-arrow-left me-2" aria-hidden="true"></i>Documentation Index</a>';
 }
 ?>
 

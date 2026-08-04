@@ -16,6 +16,9 @@ Primary action:
 
 - `Save Preferences`
 
+Each account, profile, contact, password, and two-factor setting includes a short inline explanation beside the control.
+The Preferences tabs are `Account`, `Profile`, `Security`, and `Site`; `Panel Theme` and `Timezone` are grouped on the Site tab.
+
 Fields/options:
 
 - `Username` (required)
@@ -25,8 +28,8 @@ Fields/options:
 - `Change Password` button reveals password-change inputs
 - `New Password` (optional, leave blank to keep current)
 - `Enter new password again to confirm:` helper text under the confirmation field
-- `Panel Theme` (`<Default>`, `Corporate`, `Ice`, `Midnight`)
-- `Timezone` (timezone offset for scheduled content; `— Use Site Default —` uses the value from `site.timezone` in site configuration)
+- `Panel Theme` (`<Default>`, `Corporate`, `Ice`, `Midnight`; Site tab)
+- `Timezone` (Site tab; `— Use Site Default —` uses the value from `site.timezone` in site configuration)
 - `Avatar` file upload (`gif/jpg/jpeg/png`)
 - `Remove current avatar` checkbox (shown only when avatar exists)
 - `Cover Image` local file upload (`gif/jpg/jpeg/png`)
@@ -136,6 +139,9 @@ When Preferences behavior changes, update this document in the same task. That i
 ### UI Labels Reference
 
 - `Account`
+- `Profile`
+- `Security`
+- `Site`
 - `Contact Information`
 - `Add More Contact Information`
 - `Type`

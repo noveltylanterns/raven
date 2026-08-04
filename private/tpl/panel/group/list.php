@@ -39,6 +39,7 @@ $groupListToolbarItems = [
 <?= Header::render([
     'title' => 'Groups',
     'summary' => 'Manage permission groups, member assignments, and optional group route behavior.',
+    'help_url' => $panelBase . '/docs/groups',
 ]) ?>
 
 <?php if ($flashSuccess !== null): ?>

@@ -29,6 +29,7 @@ $tagSetListToolbarItems = [
 <?= Header::render([
     'title' => 'Tag Sets',
     'summary' => 'Manage reusable tag sets that channels can share or isolate.',
+    'help_url' => $panelBase . '/docs/tags',
 ]) ?>
 
 <?php if ($flashSuccess !== null): ?>

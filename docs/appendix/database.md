@@ -706,6 +706,7 @@ Heuristic mapping of schema keys to repository/controller/template files.
     - `private/sys/Controller/Public/TagController.php`
     - `private/sys/Debug/RouteProfiler.php`
   - `content`
+    - `private/sys/Controller/Panel/ChannelEditController.php`
     - `private/sys/Controller/Panel/PageEditController.php`
     - `private/sys/Controller/Public/CategoryController.php`
     - `private/sys/Controller/Public/ChannelController.php`
@@ -713,7 +714,6 @@ Heuristic mapping of schema keys to repository/controller/template files.
     - `private/sys/Controller/Public/TagController.php`
     - `private/sys/Repository/ChannelWrite.php`
     - `private/sys/Repository/PageRead.php`
-    - `private/sys/Repository/PageWrite.php`
   - `cover_image`
     - `private/sys/Controller/Panel/ChannelEditController.php`
     - `private/sys/Repository/CategoryRead.php`
@@ -771,7 +771,7 @@ Heuristic mapping of schema keys to repository/controller/template files.
     - `private/sys/Schema/SchemaBootstrap.php`
     - `private/sys/Schema/SchemaBuilder.php`
     - `private/sys/Schema/SchemaInstaller.php`
-    - `private/tpl/panel/channel/edit.php`
+    - `private/tpl/panel/category/edit.php`
   - `published`
     - `private/sys/Controller/Panel/PageEditController.php`
     - `private/sys/Debug/RouteProfiler.php`
@@ -1152,7 +1152,6 @@ Heuristic mapping of schema keys to repository/controller/template files.
     - `private/tpl/panel/user/edit.php`
   - `registered`
     - `private/sys/Repository/UserWrite.php`
-    - `private/sys/Router/Panel/DocsRouter.php`
     - `private/sys/Shell.php`
   - `resettable`
     - `private/sys/Repository/UserWrite.php`

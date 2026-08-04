@@ -55,6 +55,7 @@ $categoryListToolbarItems = [
 <?= Header::render([
     'title' => 'Categories',
     'summary' => 'Manage category taxonomy to organize pages and category landing views.',
+    'help_url' => $panelBase . '/docs/categories',
 ]) ?>
 
 <?php if ($flashSuccess !== null): ?>

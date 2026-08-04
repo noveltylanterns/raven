@@ -22,7 +22,7 @@ Panel renderers use layout `panel/wrapper` for standard wrapped responses.
 | `channel/list` | `GET /channel` | `ChannelListController::channelList()` |
 | `configuration` | `GET /configuration` | `ConfigController::configuration()` |
 | `dashboard` | `GET /` | `DashboardController::dashboard()` |
-| `docs` | `GET (expr: $routePath)`<br>`GET (expr: '/docs/' . $extensionlessPath)` | `DocsController::page()` |
+| `docs` | `GET (expr: $routePath)`<br>`GET (expr: '/docs/' . $extensionlessPath)`<br>`GET /docs/appendix`<br>`GET /docs/appendix/home` | `DocsController::page()` |
 | `extensions` | `GET /extensions` | `ExtensionController::extensions()` |
 | `group/edit` | `GET /group/edit`<br>`GET /group/edit/{id}` | `GroupEditController::groupEdit()` |
 | `group/list` | `GET /group` | `GroupListController::groupList()` |

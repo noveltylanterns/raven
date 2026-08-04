@@ -29,3 +29,4 @@
 - [Extensions](./extensions.md)
 - [Theming](./theming.md)
 - [CLI](./cli.md)
+- [Router Developer Reference](./appendix/router.md)

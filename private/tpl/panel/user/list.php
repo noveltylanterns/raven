@@ -77,6 +77,7 @@ $userListToolbarItems[] = '<button type="submit" class="btn btn-danger" form="' 
 <?= Header::render([
     'title' => 'Users',
     'summary' => 'Manage user accounts, profile details, and group memberships.',
+    'help_url' => $panelBase . '/docs/users',
 ]) ?>
 
 <?php if ($flashSuccess !== null): ?>

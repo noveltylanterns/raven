@@ -71,6 +71,7 @@ $routingToolbarItems = [
 <?= Header::render([
     'title' => 'Routing Table',
     'summary' => 'A sortable inventory of all public URI routes and their destinations.',
+    'help_url' => $panelBase . '/docs/routing',
 ]) ?>
 
 <?php if ($flashSuccess !== null): ?>

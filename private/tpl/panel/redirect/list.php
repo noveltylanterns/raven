@@ -70,6 +70,7 @@ $redirectListToolbarItems = [
 <?= Header::render([
     'title' => 'Redirects',
     'summary' => 'Manage redirect rules, target destinations, and active route behavior.',
+    'help_url' => $panelBase . '/docs/redirects',
 ]) ?>
 
 <?php if ($flashSuccess !== null): ?>

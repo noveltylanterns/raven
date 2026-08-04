@@ -55,6 +55,8 @@ Important behavior:
 
 ### User Editor (`/user/edit` and `/user/edit/{id}`)
 
+Account, permission, profile, contact, password, and two-factor controls include short inline descriptions to clarify their scope.
+
 Top and bottom action bars (same controls in both places):
 
 - `Save User`

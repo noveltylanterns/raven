@@ -80,6 +80,7 @@ if ($hasPersistedRedirect) {
         : 'Edit Redirect: <span class="text-primary">\'' . e($redirectTitle !== '' ? $redirectTitle : 'Untitled') . '\'</span>',
     'summary' => $redirectRow === null ? 'Create or update redirect routes and destination targets.' : '',
     'body_html' => $redirectHeaderBodyHtml,
+    'help_url' => $panelBase . '/docs/redirects',
 ]) ?>
 
 <?php if ($flashSuccess !== null): ?>
@@ -112,27 +113,23 @@ if ($hasPersistedRedirect) {
                 <label for="title" class="form-label">Title</label>
                 <!-- Human-facing title used for admin list readability. -->
                 <input id="title" name="title" class="form-control" required value="<?= e((string) ($redirectRow['title'] ?? '')) ?>">
+                <div class="form-text">Internal label used to identify this redirect in the panel.</div>
             </div>
 
             <div class="form-group">
                 <label for="slug" class="form-label">Slug</label>
                 <!-- Slug composes redirect source path: /{slug} or /{channel_path}/{slug}. -->
                 <input id="slug" name="slug" class="form-control" required value="<?= e((string) ($redirectRow['slug'] ?? '')) ?>">
-            </div>
-
-            <div class="form-group">
-                <label for="description" class="form-label">Description</label>
-                <!-- Optional admin-facing note describing intent/purpose of this redirect. -->
-                <textarea id="description" name="description" class="form-control" rows="3"><?= e((string) ($redirectRow['description'] ?? '')) ?></textarea>
+                <div class="form-text">URI path segment that visitors request before being redirected.</div>
             </div>
 
             <div class="form-group">
                 <label for="channel_slug" class="form-label">Channel</label>
                 <!-- Optional parent-aware channel scope for redirects under /{channel_path}/{slug}. -->
                 <select id="channel_slug" name="channel_slug" class="form-select">
-                    <option value="">&lt;none&gt;</option>
+                    <option value="" class="fw-bold"<?= $selectedChannelSlug === '' ? ' selected' : '' ?>>&lt;root&gt;</option>
                     <?php foreach ($channelOptions as $channelOption): ?>
-                        <?php $optionPath = (string) ($channelOption['path'] ?? ''); ?>
+                        <?php $optionPath = trim((string) ($channelOption['path'] ?? ''), '/'); ?>
                         <?php if ($optionPath === ''): ?>
                             <?php continue; ?>
                         <?php endif; ?>
@@ -140,24 +137,16 @@ if ($hasPersistedRedirect) {
                             value="<?= e($optionPath) ?>"
                             <?= $selectedChannelSlug === $optionPath ? 'selected' : '' ?>
                         >
-                            <?= e(str_repeat('— ', max(0, (int) ($channelOption['depth'] ?? 1) - 1)) . (string) ($channelOption['name'] ?? $optionPath)) ?>
+                            <?= e(str_repeat("\u{00A0}\u{00A0}", max(0, (int) ($channelOption['depth'] ?? 1) - 1)) . (string) ($channelOption['name'] ?? $optionPath)) ?>
                             (<?= e($optionPath) ?>)
                         </option>
                     <?php endforeach; ?>
                 </select>
+                <div class="form-text">Scopes this redirect to a channel; choose <code>&lt;root&gt;</code> for a site-level redirect.</div>
             </div>
 
             <div class="form-group">
-                <label for="status" class="form-label">Status</label>
-                <!-- Active redirects resolve on public routes; Inactive entries are ignored. -->
-                <select id="status" name="status" class="form-select">
-                    <option value="active"<?= $isActive ? ' selected' : '' ?>>Active</option>
-                    <option value="inactive"<?= !$isActive ? ' selected' : '' ?>>Inactive</option>
-                </select>
-            </div>
-
-            <div class="form-group mb-0">
-                <label for="target" class="form-label">Target URL</label>
+                <label for="target" class="form-label">Target URI</label>
                 <!-- Supports external absolute URLs and root-relative internal destinations. -->
                 <input
                     id="target"
@@ -168,8 +157,25 @@ if ($hasPersistedRedirect) {
                     placeholder="https://example.com/path or /local-path"
                 >
                 <div class="form-text">
-                    Allowed values: absolute <code>http(s)</code> URLs or root-relative paths starting with <code>/</code>.
+                    Allowed values: absolute <code>http(s)</code> URIs or root-relative paths starting with <code>/</code>.
                 </div>
+            </div>
+
+            <div class="form-group">
+                <label for="status" class="form-label">Status</label>
+                <!-- Active redirects resolve on public routes; Inactive entries are ignored. -->
+                <select id="status" name="status" class="form-select">
+                    <option value="active"<?= $isActive ? ' selected' : '' ?>>Active</option>
+                    <option value="inactive"<?= !$isActive ? ' selected' : '' ?>>Inactive</option>
+                </select>
+                <div class="form-text">Choose whether this redirect is active on public routes.</div>
+            </div>
+
+            <div class="form-group mb-0">
+                <label for="description" class="form-label">Description</label>
+                <!-- Optional admin-facing note describing intent/purpose of this redirect. -->
+                <textarea id="description" name="description" class="form-control" rows="3"><?= e((string) ($redirectRow['description'] ?? '')) ?></textarea>
+                <div class="form-text">Optional note explaining why this redirect exists.</div>
             </div>
 
         </div>

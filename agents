@@ -21,7 +21,7 @@ Last updated: 2026-03-25
 - `panel/theme/AGENTS.md`
 
 ## Documentation Map
-- System file tree and ownership map: `docs/filetree.md`
+- System file tree and ownership map: `docs/appendix/filetree.md`
 - Project summary: `README.md`
 - Project docs index: `docs/readme.md`
 - Core behavior docs: `docs/*.md` (pages.md, users.md, routing.md, configuration.md, extensions.md, etc.)
@@ -29,7 +29,7 @@ Last updated: 2026-03-25
 - Release change history: `release-notes.md`
 
 ## First Orientation
-- If you need the fastest whole-system map, read `docs/filetree.md` immediately after this file.
+- If you need the fastest whole-system map, read `docs/appendix/filetree.md` immediately after this file.
 - It is the quickest way to understand Raven's component boundaries and how the main directories relate to one another.
 
 ## Runtime Summary
@@ -68,7 +68,7 @@ Last updated: 2026-03-25
 - Do not add pass-through wrappers in `private/sys/` or `private/lib/` that only rename one downstream call without adding real policy, normalization, compatibility, or boundary value.
 - Avoid catch-all dumping grounds such as `Common`, `Misc`, or extra helper piles; place core code in the narrowest domain folder that actually owns the responsibility.
 - Prefer one canonical domain entrypoint where practical, and flatten no-op service-to-service hops in hot paths instead of stacking abstractions.
-- When core responsibilities move or new `private/lib/` modules are added, update `docs/Filetree.md` in the same task so future agents inherit the same boundary rules.
+- When core responsibilities move or new `private/lib/` modules are added, update `docs/appendix/filetree.md` in the same task so future agents inherit the same boundary rules.
 
 ## Theme Rules
 - Public themes must live in `public/theme/{slug}/`.
@@ -110,5 +110,5 @@ they feed the `rvn-docs` documentation generator that powers the live docs site.
 - Command usage and arguments live in `docs/cli.md`.
 
 ## System Map
-- The full directory/component map now lives in `docs/filetree.md`.
+- The full directory/component map now lives in `docs/appendix/filetree.md`.
 - Use subsystem-local guides for build rules in `private/ext/AGENTS.md`, `public/theme/AGENTS.md`, and `panel/theme/AGENTS.md`.

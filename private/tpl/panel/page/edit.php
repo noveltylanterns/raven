@@ -64,6 +64,8 @@ if ($selectedAuthorUserId < 1) {
 $deleteFormId = 'delete-page-form';
 $selectedChannelSlug = (string) ($page['channel_slug'] ?? '');
 $selectedChannelPath = trim((string) ($channelPath ?? ''));
+// Existing page rows expose the leaf slug separately; the select must use the full path for nested channels.
+$selectedChannelOption = $selectedChannelPath !== '' ? $selectedChannelPath : $selectedChannelSlug;
 $selectedStatus = ($page['status'] ?? 'published') === 'published' ? 'published' : 'draft';
 $rawPublishAt = (string) ($page['published'] ?? '');
 $rawExpireAt = (string) ($page['expires'] ?? '');
@@ -319,6 +321,7 @@ if ($hasPersistedPage) {
         : 'Edit Page: <span class="text-primary">\'' . e($pageTitle !== '' ? $pageTitle : 'Untitled') . '\'</span>',
     'summary' => $page === null ? 'Create or update page content, metadata, and gallery media.' : '',
     'body_html' => $pageHeaderBodyHtml,
+    'help_url' => $panelBase . '/docs/pages',
 ]) ?>
 
 <?php if ($flashSuccess !== null): ?>
@@ -564,7 +567,7 @@ if ($hasPersistedPage) {
                             class="form-control"
                             value="<?= e($publishAtInputValue) ?>"
                         >
-                        <div class="form-text">When reached, status automatically changes to Published. Leave blank for no scheduled publish.</div>
+                        <div class="form-text">When the scheduler runs after this time, status changes to Published. Leave blank for no scheduled publish.</div>
                     </div>
 
                     <div class="form-group">
@@ -576,7 +579,7 @@ if ($hasPersistedPage) {
                             class="form-control"
                             value="<?= e($expireAtInputValue) ?>"
                         >
-                        <div class="form-text">When reached, status automatically changes to Draft. Leave blank for no auto-expiry.</div>
+                        <div class="form-text">When the scheduler runs after this time, status changes to Draft. Leave blank for no automatic expiry.</div>
                     </div>
 
                     <div class="form-group">
@@ -605,7 +608,7 @@ if ($hasPersistedPage) {
                     <div class="form-group">
                         <label for="description" class="form-label">Description</label>
                         <textarea id="description" name="description" class="form-control" rows="3"><?= e((string) ($page['description'] ?? '')) ?></textarea>
-                        <div class="form-text">Summary text used for meta & social preview descriptions. Auto-generates if left blank.</div>
+                        <div class="form-text">Summary text used for metadata and social preview descriptions. Leave blank to omit a page-specific description.</div>
                     </div>
 
                 </div>
@@ -622,10 +625,11 @@ if ($hasPersistedPage) {
                         <select id="channel_slug" name="channel_slug" class="form-select">
                             <option
                                 value=""
+                                class="fw-bold"
                                 data-rvn-channel-category-sets="<?= e(implode(',', array_map('strval', $defaultCategorySetSelection))) ?>"
                                 data-rvn-channel-tag-sets="<?= e(implode(',', array_map('strval', $defaultTagSetSelection))) ?>"
-                                <?= $selectedChannelSlug === '' ? ' selected' : '' ?>
-                            >&lt;none&gt;</option>
+                                <?= $selectedChannelOption === '' ? ' selected' : '' ?>
+                            >&lt;root&gt;</option>
                             <?php foreach ($channelOptions as $channel): ?>
                                 <?php $slug = (string) ($channel['slug'] ?? ''); ?>
                                 <?php
@@ -645,20 +649,22 @@ if ($hasPersistedPage) {
                                 <?php $channelDepth = max(0, (int) ($channel['depth'] ?? 0)); ?>
                                 <?php $channelIndent = str_repeat("\u{00a0}", $channelDepth * 2); ?>
                                 <?php $channelLabel = $channelIndent . (string) ($channel['name'] ?? $slug); ?>
+                                <?php $channelPath = trim((string) ($channel['path'] ?? $slug), '/'); ?>
+                                <?php if ($channelPath === '') { $channelPath = $slug; } ?>
                                 <option
-                                    value="<?= e($slug) ?>"
+                                    value="<?= e($channelPath) ?>"
                                     data-rvn-channel-editor-override="<?= e($channelEditorOverride) ?>"
                                     data-rvn-channel-route-mode="<?= e($channelRouteMode) ?>"
                                     data-rvn-channel-route-separator="<?= e($channelUrlSeparator) ?>"
                                     data-rvn-channel-category-sets="<?= e(implode(',', array_map('strval', is_array($channel['category_sets'] ?? null) ? $channel['category_sets'] : $defaultCategorySetSelection))) ?>"
                                     data-rvn-channel-tag-sets="<?= e(implode(',', array_map('strval', is_array($channel['tag_sets'] ?? null) ? $channel['tag_sets'] : $defaultTagSetSelection))) ?>"
-                                    <?= $selectedChannelSlug === $slug ? ' selected' : '' ?>
+                                    <?= $selectedChannelOption === $channelPath ? ' selected' : '' ?>
                                 >
-                                    <?= e($channelLabel) ?> (<?= e($slug) ?>)
+                                    <?= e($channelLabel) ?> (<?= e($channelPath) ?>)
                                 </option>
                             <?php endforeach; ?>
                         </select>
-                        <div class="form-text">Sort this page into the designated channel.</div>
+                        <div class="form-text">Select the channel where this page is published; choose <code>&lt;root&gt;</code> for a site-level page.</div>
                     </div>
 
                     <?php if ($categoryEnabled): ?>

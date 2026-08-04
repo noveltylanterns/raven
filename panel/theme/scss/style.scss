@@ -271,23 +271,18 @@ body#rvnp .rvnp-sidebar-card .nav-pills .show > .nav-link {
 }
 
 // Keep the first sidebar action group compact while preserving its text labels for assistive technology.
-body#rvnp #rvnp-sidebar .rvnp-sidebar-brand + h2 + ul {
+body#rvnp #rvnp-sidebar .rvnp-sidebar-utility-nav {
   flex-direction: row !important;
   align-items: center;
   column-gap: 0.5rem !important;
 }
 
-body#rvnp #rvnp-sidebar .rvnp-sidebar-brand + h2 {
-  margin-bottom: 0.75rem !important;
-  letter-spacing: 0.04em;
-}
-
-body#rvnp #rvnp-sidebar .rvnp-sidebar-brand + h2 + ul > li {
+body#rvnp #rvnp-sidebar .rvnp-sidebar-utility-nav > li {
   flex: 0 0 auto;
 }
 
-body#rvnp #rvnp-sidebar .rvnp-sidebar-brand + h2 + ul > li > .nav-link,
-body#rvnp #rvnp-sidebar .rvnp-sidebar-brand + h2 + ul > li > form > .nav-link {
+body#rvnp #rvnp-sidebar .rvnp-sidebar-utility-nav > li > .nav-link,
+body#rvnp #rvnp-sidebar .rvnp-sidebar-utility-nav > li > form > .nav-link {
   width: 24px !important;
   height: 24px;
   padding: 0;
@@ -299,8 +294,8 @@ body#rvnp #rvnp-sidebar .rvnp-sidebar-brand + h2 + ul > li > form > .nav-link {
 }
 
 // Match the compact welcome actions to the panel's rounded form-button treatment.
-body#rvnp #rvnp-sidebar .rvnp-sidebar-brand + h2 + ul > li > .nav-link,
-body#rvnp #rvnp-sidebar .rvnp-sidebar-brand + h2 + ul > li > form > .nav-link {
+body#rvnp #rvnp-sidebar .rvnp-sidebar-utility-nav > li > .nav-link,
+body#rvnp #rvnp-sidebar .rvnp-sidebar-utility-nav > li > form > .nav-link {
   border: 1px solid var(--bs-btn-border-color);
   border-radius: 0.35rem;
   background-color: var(--bs-btn-bg);
@@ -308,33 +303,33 @@ body#rvnp #rvnp-sidebar .rvnp-sidebar-brand + h2 + ul > li > form > .nav-link {
   box-shadow: 0 0.15rem 0.35rem rgba(31, 42, 52, 0.12);
 }
 
-body#rvnp #rvnp-sidebar .rvnp-sidebar-brand + h2 + ul > li > .nav-link:hover,
-body#rvnp #rvnp-sidebar .rvnp-sidebar-brand + h2 + ul > li > .nav-link:focus-visible,
-body#rvnp #rvnp-sidebar .rvnp-sidebar-brand + h2 + ul > li > form > .nav-link:hover,
-body#rvnp #rvnp-sidebar .rvnp-sidebar-brand + h2 + ul > li > form > .nav-link:focus-visible {
+body#rvnp #rvnp-sidebar .rvnp-sidebar-utility-nav > li > .nav-link:hover,
+body#rvnp #rvnp-sidebar .rvnp-sidebar-utility-nav > li > .nav-link:focus-visible,
+body#rvnp #rvnp-sidebar .rvnp-sidebar-utility-nav > li > form > .nav-link:hover,
+body#rvnp #rvnp-sidebar .rvnp-sidebar-utility-nav > li > form > .nav-link:focus-visible {
   border-color: var(--bs-btn-hover-border-color);
   background-color: var(--bs-btn-hover-bg);
   color: var(--bs-btn-hover-color);
 }
 
-body#rvnp #rvnp-sidebar .rvnp-sidebar-brand + h2 + ul > li > .nav-link.active {
+body#rvnp #rvnp-sidebar .rvnp-sidebar-utility-nav > li > .nav-link.active {
   border-color: var(--raven-accent);
   background-color: var(--raven-accent);
   color: #fff;
 }
 
-body#rvnp #rvnp-sidebar .rvnp-sidebar-brand + h2 + ul > li > .nav-link:active,
-body#rvnp #rvnp-sidebar .rvnp-sidebar-brand + h2 + ul > li > form > .nav-link:active {
+body#rvnp #rvnp-sidebar .rvnp-sidebar-utility-nav > li > .nav-link:active,
+body#rvnp #rvnp-sidebar .rvnp-sidebar-utility-nav > li > form > .nav-link:active {
   border-color: var(--bs-btn-active-border-color);
   background-color: var(--bs-btn-active-bg);
   color: var(--bs-btn-active-color);
 }
 
 // Bootstrap Icons supply the visual language; the original link text remains the accessible name.
-body#rvnp #rvnp-sidebar .rvnp-sidebar-brand + h2 + ul > li > a[href$="/"]::before,
-body#rvnp #rvnp-sidebar .rvnp-sidebar-brand + h2 + ul > li > a[href$="/preferences"]::before,
-body#rvnp #rvnp-sidebar .rvnp-sidebar-brand + h2 + ul > li > a[href$="/docs"]::before,
-body#rvnp #rvnp-sidebar .rvnp-sidebar-brand + h2 + ul > li > form[action$="/logout"] > .nav-link::before {
+body#rvnp #rvnp-sidebar .rvnp-sidebar-utility-nav > li > a[href$="/"]::before,
+body#rvnp #rvnp-sidebar .rvnp-sidebar-utility-nav > li > a[href$="/preferences"]::before,
+body#rvnp #rvnp-sidebar .rvnp-sidebar-utility-nav > li > a[href$="/docs/home"]::before,
+body#rvnp #rvnp-sidebar .rvnp-sidebar-utility-nav > li > form[action$="/logout"] > .nav-link::before {
   display: inline-block;
   font-family: bootstrap-icons !important;
   font-size: 16px;
@@ -343,19 +338,19 @@ body#rvnp #rvnp-sidebar .rvnp-sidebar-brand + h2 + ul > li > form[action$="/logo
   line-height: 1;
 }
 
-body#rvnp #rvnp-sidebar .rvnp-sidebar-brand + h2 + ul > li > a[href$="/"]::before {
+body#rvnp #rvnp-sidebar .rvnp-sidebar-utility-nav > li > a[href$="/"]::before {
   content: "\f580";
 }
 
-body#rvnp #rvnp-sidebar .rvnp-sidebar-brand + h2 + ul > li > a[href$="/preferences"]::before {
+body#rvnp #rvnp-sidebar .rvnp-sidebar-utility-nav > li > a[href$="/preferences"]::before {
   content: "\f3e5";
 }
 
-body#rvnp #rvnp-sidebar .rvnp-sidebar-brand + h2 + ul > li > a[href$="/docs"]::before {
+body#rvnp #rvnp-sidebar .rvnp-sidebar-utility-nav > li > a[href$="/docs/home"]::before {
   content: "\f194";
 }
 
-body#rvnp #rvnp-sidebar .rvnp-sidebar-brand + h2 + ul > li > form[action$="/logout"] > .nav-link::before {
+body#rvnp #rvnp-sidebar .rvnp-sidebar-utility-nav > li > form[action$="/logout"] > .nav-link::before {
   content: "\f1c3";
 }
 
@@ -434,7 +429,7 @@ body#rvnp.theme-light #rvnp-mobile .nav-pills .show > .nav-link {
   background: linear-gradient(135deg, #2f6f97, #3e8bb8);
 }
 
-body#rvnp.theme-light #rvnp-sidebar .rvnp-sidebar-brand + h2 + ul > li > .nav-link.active {
+body#rvnp.theme-light #rvnp-sidebar .rvnp-sidebar-utility-nav > li > .nav-link.active {
   border-color: #2c6c93;
   background: linear-gradient(135deg, #2f6f97, #3e8bb8);
 }
@@ -1223,7 +1218,7 @@ body#rvnp.theme-dark #rvnp-mobile .nav-pills .show > .nav-link {
   background-color: #46628d;
 }
 
-body#rvnp.theme-dark #rvnp-sidebar .rvnp-sidebar-brand + h2 + ul > li > .nav-link.active {
+body#rvnp.theme-dark #rvnp-sidebar .rvnp-sidebar-utility-nav > li > .nav-link.active {
   border-color: #46628d;
   background-color: #46628d;
 }

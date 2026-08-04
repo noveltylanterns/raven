@@ -55,6 +55,7 @@ $tagListToolbarItems = [
 <?= Header::render([
     'title' => 'Tags',
     'summary' => 'Manage tags used for page labeling, filtering, and public tag index views.',
+    'help_url' => $panelBase . '/docs/tags',
 ]) ?>
 
 <?php if ($flashSuccess !== null): ?>

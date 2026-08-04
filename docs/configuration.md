@@ -33,7 +33,7 @@ Access requirements:
 
 ## 3) Editor Behavior
 
-The panel editor renders normalized field descriptors from config and groups them by domain tabs (for example basic/content/database/debug/media/meta/security/users).
+The panel editor renders normalized field descriptors from config and groups them by domain tabs (for example basic/content/database/debug/media/meta/security/users). The Basic tab presents Site, Routing, Panel, and Timekeeping sections; Domain, Protocol, and Site Routing Mode are under Routing, while Timezone and Scheduler are grouped at the end under Timekeeping.
 
 Notable behavior:
 
@@ -91,6 +91,6 @@ Use `private/bin/rvn-conf` for scripted changes:
 ## 8) Related References
 
 - `docs/appendix/config.md`
-- `docs/routing.md`
+- `docs/appendix/router.md`
 - `docs/appendix/core/controller.md`
 - `docs/appendix/core/runtime.md`

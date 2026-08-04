@@ -45,6 +45,8 @@ What you can do:
 
 ### Category Editor (`/category/edit` and `/category/edit/{id}`)
 
+The editor provides short inline descriptions for the category name, slug, set, description, and media controls.
+
 Top and bottom action bars (same controls in both places):
 
 - `Save Category`
