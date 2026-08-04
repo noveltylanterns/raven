@@ -25,7 +25,7 @@ Last updated: 2026-03-25
 - Project summary: `README.md`
 - Project docs index: `docs/readme.md`
 - Core behavior docs: `docs/*.md` (pages.md, users.md, routing.md, configuration.md, extensions.md, etc.)
-- CLI command docs: `docs/cli.md`
+- CLI command docs: `docs/appendix/cli/readme.md` and its generated command references.
 - Release change history: `release-notes.md`
 
 ## First Orientation
@@ -107,7 +107,7 @@ they feed the `rvn-docs` documentation generator that powers the live docs site.
 ## CLI Map
 - Shipped Raven commands live in `private/bin/`.
 - Shared CLI implementation lives in `private/lib/Shell/raven_cli.php`.
-- Command usage and arguments live in `docs/cli.md`.
+- Command usage and arguments live in `docs/appendix/cli/readme.md` and its generated command references.
 
 ## System Map
 - The full directory/component map now lives in `docs/appendix/filetree.md`.

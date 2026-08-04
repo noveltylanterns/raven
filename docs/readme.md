@@ -23,7 +23,7 @@
 - [Users](./users.md)
 
 ### Advanced Usage
-- [Command Line](./cli.md)
+- [Command Line](./appendix/cli/readme.md)
 - [Extensions](./extensions.md)
 - [Theming](./theming.md)
 

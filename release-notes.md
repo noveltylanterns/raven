@@ -4,12 +4,14 @@
 
 ### August 4, 2026
 
+- Restored the shared CLI summary, inventory, banner contract, and QA guidance to the hand-authored CLI appendix index while keeping command-specific details on generated child pages.
+- Consolidated CLI documentation under the hand-authored `docs/appendix/cli/readme.md`; removed the redundant `docs/cli.md`, moved command guidance into generated command pages, and left the generator responsible only for those child references.
 - Fixed child channels inheriting public theme overrides through their parent channel chain before falling back to the system theme.
 - Simplified the CLI appendix index rows to show only linked `rvn-*` command names.
 - Updated the CLI appendix overview links to use the actual `rvn-*` wrapper names and point directly to each generated command reference.
 - Fixed channel saves reverting the selected Index route mode to `Automatic` when the post-save image persistence pass rewrote the channel record without carrying that setting forward.
 - Renamed the generated core, extensions, and libraries appendix landing files from `overview.md` to `readme.md`, keeping all appendix families consistent.
-- Updated `rvn-docs` to generate the CLI appendix landing page at `docs/appendix/cli/readme.md`, matching the repository's documentation index convention.
+- Updated `rvn-docs` to generate CLI command references under `docs/appendix/cli/`, matching the repository's documentation index convention.
 - Added the bundled stock `Backup & Restore` system extension at `/panel/backup`, with a complete JSON export/import archive for pages, taxonomy, channels, sets, redirects, and page relationships; numeric IDs are preserved, media is excluded, and the restore UI warns that archives are for new systems only.
 - Removed the User Manual help action from the panel Dashboard header while retaining contextual help actions on other panel sections.
 - Fixed authenticated panel sessions retaining an empty extension sidebar after login or 2FA cleared the pre-authentication navigation snapshot; extension routes and navigation now become available together.

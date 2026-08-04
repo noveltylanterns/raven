@@ -37,7 +37,7 @@ NOTE: All paths relative to project root. (../ from the perspective of this dire
 	- Reuse the existing topmost heading when it already matches today's date; only create a new heading when the date changes
 - Keep release notes concise and implementation-accurate.
 - Include the standard AI-generated notice block in `docs/*.md`.
-- Appendix reference files (`docs/appendix/Libraries.md`, `docs/appendix/ConfigKeys.md`, `docs/appendix/Database.md`) and `docs/CLI.md` are generator-owned — do not hand-edit them. They are produced by `php build/docs/rvn-docs.php`.
+- Generated appendix reference files are generator-owned — do not hand-edit the generated command pages under `docs/appendix/cli/`.
 - When public repository methods are added, removed, or renamed, include enough context in the commit message so the generator pass can be verified quickly.
 - Hand-authored docs (`docs/API.md`, `docs/Introduction.md`, narrative docs, `docs/extensions/`) are fair game to edit directly and should be kept in sync with codebase changes as normal.
 
@@ -52,7 +52,7 @@ NOTE: All paths relative to project root. (../ from the perspective of this dire
   - Update `public/theme/AGENTS.md` with relevant command references.
   - Update `panel/theme/AGENTS.md` with relevant command references.
   - Update `private/ext/AGENTS.md` with relevant command references.
-  - Keep CLI command documentation synchronized in `docs/CLI.md`.
+  - Keep the hand-authored CLI index synchronized in `docs/appendix/cli/readme.md`; generated command pages are refreshed from shipped command help.
 4) See the Inline Comment and PHPDoc Contract section below — it is a first-class requirement.
 5) All code you generate must remain readable/editable for human developers to pick up on.
 6) All files within `build/` must NEVER be mentioned in files outside of `build/`, and ESPECIALLY NOT in ANY `AGENTS.md` not under `build/`, nor documentation files!!!

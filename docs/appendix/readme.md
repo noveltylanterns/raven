@@ -19,8 +19,7 @@ This page is the developer-surface index for Raven CMS. It links the stable impl
 - Command wrappers: `private/bin/rvn-*`
 - Shared CLI implementation: `private/lib/Shell/raven_cli.php`
 - Primary references:
-  - [CLI Appendix Overview](./cli/readme.md)
-  - [CLI Narrative Guide](../cli.md)
+  - [CLI Appendix Index](./cli/readme.md)
 
 ## Extensions
 
@@ -58,6 +57,6 @@ This page is the developer-surface index for Raven CMS. It links the stable impl
 4. [Database Appendix](./database.md)
 5. [Extensions Appendix Overview](./extensions/readme.md)
 6. [Libraries Appendix Overview](./libraries/readme.md)
-7. [CLI Appendix Overview](./cli/readme.md)
+7. [CLI Appendix Index](./cli/readme.md)
 8. [Templates Appendix (Public)](./templates/public.md)
 9. [Bootstrap Appendix](./bootstrap.md)
