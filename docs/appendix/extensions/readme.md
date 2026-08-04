@@ -6,10 +6,10 @@ Extension references extracted from `private/ext/*` manifests, provider files, a
 
 | Slug | Name | Type | Providers | Symbols |
 | --- | --- | --- | --- | --- |
-| `backup` | Backup & Restore | `system` | 3 | 3 |
-| `contact` | Contact Forms | `content` | 4 | 21 |
-| `cron` | Scheduled Tasks | `system` | 4 | 17 |
-| `database` | Database Manager | `system` | 2 | 0 |
-| `phpinfo` | PHP Info | `system` | 1 | 0 |
-| `repo` | Repositories | `module` | 7 | 102 |
-| `signups` | Signup Sheets | `content` | 4 | 21 |
+| [`backup`](./backup.md) | Backup & Restore | `system` | 3 | 3 |
+| [`contact`](./contact.md) | Contact Forms | `content` | 4 | 21 |
+| [`cron`](./cron.md) | Scheduled Tasks | `system` | 4 | 17 |
+| [`database`](./database.md) | Database Manager | `system` | 2 | 0 |
+| [`phpinfo`](./phpinfo.md) | PHP Info | `system` | 1 | 0 |
+| [`repo`](./repo.md) | Repositories | `module` | 7 | 102 |
+| [`signups`](./signups.md) | Signup Sheets | `content` | 4 | 21 |

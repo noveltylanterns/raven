@@ -1219,7 +1219,7 @@ MARKDOWN,
 
             $groupPath = 'docs/appendix/core/' . $group . '.md';
             $outputs[$groupPath] = $this->renderCoreGroupDocument($group, $entries);
-            $overviewLines[] = '- `' . $group . '` (' . count($entries) . ' symbols)';
+            $overviewLines[] = '- [`' . $group . '`](./' . $group . '.md) (' . count($entries) . ' symbols)';
         }
 
         $overviewLines[] = '';
@@ -1833,7 +1833,7 @@ MARKDOWN,
 
             $groupPath = 'docs/appendix/libraries/' . $group . '.md';
             $outputs[$groupPath] = $this->renderLibraryGroupDocument($group, $entries);
-            $overviewLines[] = '- `' . $group . '` (' . count($entries) . ' symbols)';
+            $overviewLines[] = '- [`' . $group . '`](./' . $group . '.md) (' . count($entries) . ' symbols)';
         }
 
         // Libraries appendix directories use readme.md as their landing document.
@@ -2750,7 +2750,7 @@ MARKDOWN,
                 $entries
             );
 
-            $overviewLines[] = '| `' . $slug . '` | '
+            $overviewLines[] = '| [`' . $slug . '`](./' . $slug . '.md) | '
                 . $this->escapeMarkdownTableCell($manifest['name']) . ' | '
                 . '`' . $this->escapeBackticks($manifest['type']) . '` | '
                 . (string) count($providers) . ' | '

@@ -8,12 +8,12 @@ Service-key grouping is inferred from `$rvn['...']` container usage in each sour
 
 ## Groups
 
-- `controller` (197 symbols)
-- `debug` (47 symbols)
-- `repository` (237 symbols)
-- `router` (220 symbols)
-- `runtime` (243 symbols)
-- `schema` (50 symbols)
+- [`controller`](./controller.md) (197 symbols)
+- [`debug`](./debug.md) (47 symbols)
+- [`repository`](./repository.md) (238 symbols)
+- [`router`](./router.md) (220 symbols)
+- [`runtime`](./runtime.md) (243 symbols)
+- [`schema`](./schema.md) (50 symbols)
 
 ## Service Keys
 
