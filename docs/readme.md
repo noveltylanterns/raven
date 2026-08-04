@@ -38,3 +38,5 @@
 - [Libraries Appendix](./appendix/libraries/readme.md)
 - [Router Summary](./appendix/router.md)
 - [Shell Command Appendix](./appendix/cli/readme.md)
+- [Template Set Appendix (Panel)](./appendix/templates-panel.md)
+- [Template Set Appendix (Public)](./appendix/templates-public.md)
