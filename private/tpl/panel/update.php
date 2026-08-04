@@ -69,7 +69,7 @@ $revisionRows = [
 ];
 $updateToolbarItems = [
     '<button type="submit" form="update-system-form" name="update_action" value="check" class="btn btn-primary">Check For Updates</button>',
-    '<button type="submit" form="update-system-form" name="update_action" value="dry_run" class="btn btn-warning">Dry Run</button>',
+    '<button type="submit" form="update-system-form" name="update_action" value="dry_run" class="btn btn-secondary">Dry Run</button>',
     '<button type="submit" form="update-system-form" name="update_action" value="update_now" class="btn btn-danger">Update Now</button>',
 ];
 ?>
